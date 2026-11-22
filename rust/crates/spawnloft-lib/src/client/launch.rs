@@ -1009,9 +1009,22 @@ pub fn fake_client_java() -> Option<String> {
 /// Whether a profile is one the Node core still launches: a mod loader's, or one with the
 /// harness (which needs Fabric).
 pub fn node_launches(profile: &Profile) -> bool {
-    let loader = !matches!(profile.get("loader"), None | Some(Value::Null))
-        && profile.text("loader") != Some("vanilla");
-    loader || js::truthy(profile.get("harness"))
+    node_installs(profile) || js::truthy(profile.get("harness"))
+}
+
+/// Whether a profile's loader is one the Node core still sets up (Forge and NeoForge, whose
+/// installers part 4b ports).
+pub fn node_installs(profile: &Profile) -> bool {
+    !matches!(profile.get("loader"), None | Some(Value::Null))
+        && !matches!(profile.text("loader"), Some("vanilla" | "fabric" | "quilt"))
+}
+
+/// The profile's loader, `None` for vanilla.
+fn loader_of(profile: &Profile) -> Option<String> {
+    match profile.get("loader") {
+        None | Some(Value::Null) => None,
+        Some(v) => Some(js::string(Some(v))).filter(|l| l != "vanilla"),
+    }
 }
 
 /// How a launch was asked for (`client launch`'s flags).
@@ -1391,20 +1404,25 @@ fn launch_locked(
 
     // the version file first: what the game needs is read from it before anything else downloads
     let mc = js::string(profile.get("mc"));
-    let prepare = || {
-        install::prepare_vanilla(
-            paths,
-            &mc,
-            &mut |_| {},
-            &meta::default_fetch,
-            &install::default_fetch,
-        )
-    };
+    let prepare =
+        || super::fabric::prepare_version(paths, name, &mut |_| {}, &super::fabric::Fetchers::real());
+    let loader = loader_of(&profile);
     let mut fake_installed = false;
     let version_id = if fake.is_some() {
-        let on_disk = Path::new(&paths.version_json(&mc)).exists();
+        let id = match &loader {
+            Some(l) => match profile.get("loaderVersion") {
+                None | Some(Value::Null) => {
+                    return Err(user(format!(
+                        "profile \"{name}\" uses the {l} loader but has no loaderVersion; set one with spawnloft client set"
+                    )));
+                }
+                Some(v) => super::fabric::version_id(l, &mc, &js::string(Some(v))),
+            },
+            None => mc.clone(),
+        };
+        let on_disk = Path::new(&paths.version_json(&id)).exists();
         fake_installed = on_disk;
-        if on_disk { mc.clone() } else { prepare()? }
+        if on_disk { id } else { prepare()? }
     } else {
         prepare()?
     };
@@ -1463,6 +1481,13 @@ fn launch_locked(
             )?
         }
     };
+    let mut picked = picked;
+    if loader.is_some()
+        && fake.is_none()
+        && let Some(w) = &picked.warning
+    {
+        picked.warning = Some(format!("{w} Mods often fail on a newer Java."));
+    }
     if let Some(w) = &picked.warning {
         warn(&mut warnings, w.clone());
     }
@@ -1508,6 +1533,17 @@ fn launch_locked(
             &mut warnings,
             "running under Windows x64 emulation (experimental)".into(),
         );
+    }
+    // Fabric and Quilt both load Fabric API (the fake game has none)
+    if fake.is_none() && loader.is_some() {
+        super::fabric::ensure_fabric_api(
+            paths,
+            name,
+            &mc,
+            opts.on_progress,
+            &super::fabric::default_modrinth,
+            &install::default_fetch,
+        )?;
     }
 
     let account = match &selector {

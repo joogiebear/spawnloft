@@ -1,0 +1,954 @@
+{
+ "about": "C7 part 4a: Fabric and Quilt profiles (made by make-c7-loader-scenario.mjs). Install picks the stable Fabric build and pins it, a pinned build, a meta answering for another build or another game version, a library whose checksum does not match, a build the meta lacks, a snapshot and an old release Fabric does not build for; Quilt picks the newest build that is not a beta from a list out of order, fills each checksum from the .sha1 beside the library (with a file name after it, in capitals, named already, from Fabric's maven and from Mojang's), and refuses a library on another host, one in a shape it does not know, a checksum file that holds none and an id that does not match; installed again from what is on disk; and the fake game launched on a loader profile (Fabric API is not fetched for it), with no build pinned, and with a build the launch fetches.",
+ "platforms": [
+  "linux-x64",
+  "darwin",
+  "win32"
+ ],
+ "env": {
+  "NODE_ENV": "test"
+ },
+ "hosts": {
+  "https://piston-meta.mojang.com": {
+   "routes": {
+    "GET /v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json": {
+     "base64": "eyJvYmplY3RzIjp7fX0="
+    },
+    "GET /v1/packages/fc76e2527488840cbbf51682fd84973fbe0a6fbd/1.20.1.json": {
+     "base64": "eyJpZCI6IjEuMjAuMSIsInR5cGUiOiJyZWxlYXNlIiwibWFpbkNsYXNzIjoibmV0Lm1pbmVjcmFmdC5jbGllbnQubWFpbi5NYWluIiwiamF2YVZlcnNpb24iOnsiY29tcG9uZW50IjoiamF2YS1ydW50aW1lLWdhbW1hIiwibWFqb3JWZXJzaW9uIjoxN30sImFyZ3VtZW50cyI6eyJnYW1lIjpbIi0tdXNlcm5hbWUiLCIke2F1dGhfcGxheWVyX25hbWV9IiwiLS12ZXJzaW9uIiwiJHt2ZXJzaW9uX25hbWV9Il0sImp2bSI6WyItY3AiLCIke2NsYXNzcGF0aH0iXX0sImFzc2V0SW5kZXgiOnsiaWQiOiJlbXB0eSIsInNoYTEiOiI2MmVhNzg3YzFmODAwYzA5MWI5ODY3OGIwNTA0NTNhNWFlNTlkN2JjIiwic2l6ZSI6MTQsInRvdGFsU2l6ZSI6MCwidXJsIjoiaHR0cHM6Ly9waXN0b24tbWV0YS5tb2phbmcuY29tL3YxL3BhY2thZ2VzLzYyZWE3ODdjMWY4MDBjMDkxYjk4Njc4YjA1MDQ1M2E1YWU1OWQ3YmMvZW1wdHkuanNvbiJ9LCJhc3NldHMiOiJlbXB0eSIsImRvd25sb2FkcyI6eyJjbGllbnQiOnsic2hhMSI6ImFjOTdiMmRiNzA1ZjM5ZDYwNDA3MWQ0YjJkZWUyODlkMDMxYjEzNjQiLCJzaXplIjo1MDAsInVybCI6Imh0dHBzOi8vcGlzdG9uLWRhdGEubW9qYW5nLmNvbS92MS9vYmplY3RzL2FjOTdiMmRiNzA1ZjM5ZDYwNDA3MWQ0YjJkZWUyODlkMDMxYjEzNjQvY2xpZW50LmphciJ9fSwibGlicmFyaWVzIjpbeyJuYW1lIjoiY29tLmV4YW1wbGU6c2hhcmVkOjEuMCIsImRvd25sb2FkcyI6eyJhcnRpZmFjdCI6eyJwYXRoIjoiY29tL2V4YW1wbGUvc2hhcmVkLzEuMC9zaGFyZWQtMS4wLmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvY29tL2V4YW1wbGUvc2hhcmVkLzEuMC9zaGFyZWQtMS4wLmphciIsInNoYTEiOiJhNDFkYTE2YTA3MjRjZGFhMGJhZWIwZWUzZDk0MjBkMzEyMDk1ZTA1Iiwic2l6ZSI6MzAwfX19XX0="
+    },
+    "GET /v1/packages/9f5766e9429f5b6aa105513a1c6906cbbbf32800/24w01a.json": {
+     "base64": "eyJpZCI6IjI0dzAxYSIsInR5cGUiOiJzbmFwc2hvdCIsIm1haW5DbGFzcyI6Im5ldC5taW5lY3JhZnQuY2xpZW50Lm1haW4uTWFpbiIsImphdmFWZXJzaW9uIjp7ImNvbXBvbmVudCI6ImphdmEtcnVudGltZS1nYW1tYSIsIm1ham9yVmVyc2lvbiI6MTd9LCJhcmd1bWVudHMiOnsiZ2FtZSI6WyItLXVzZXJuYW1lIiwiJHthdXRoX3BsYXllcl9uYW1lfSIsIi0tdmVyc2lvbiIsIiR7dmVyc2lvbl9uYW1lfSJdLCJqdm0iOlsiLWNwIiwiJHtjbGFzc3BhdGh9Il19LCJhc3NldEluZGV4Ijp7ImlkIjoiZW1wdHkiLCJzaGExIjoiNjJlYTc4N2MxZjgwMGMwOTFiOTg2NzhiMDUwNDUzYTVhZTU5ZDdiYyIsInNpemUiOjE0LCJ0b3RhbFNpemUiOjAsInVybCI6Imh0dHBzOi8vcGlzdG9uLW1ldGEubW9qYW5nLmNvbS92MS9wYWNrYWdlcy82MmVhNzg3YzFmODAwYzA5MWI5ODY3OGIwNTA0NTNhNWFlNTlkN2JjL2VtcHR5Lmpzb24ifSwiYXNzZXRzIjoiZW1wdHkiLCJkb3dubG9hZHMiOnsiY2xpZW50Ijp7InNoYTEiOiJhYzk3YjJkYjcwNWYzOWQ2MDQwNzFkNGIyZGVlMjg5ZDAzMWIxMzY0Iiwic2l6ZSI6NTAwLCJ1cmwiOiJodHRwczovL3Bpc3Rvbi1kYXRhLm1vamFuZy5jb20vdjEvb2JqZWN0cy9hYzk3YjJkYjcwNWYzOWQ2MDQwNzFkNGIyZGVlMjg5ZDAzMWIxMzY0L2NsaWVudC5qYXIifX0sImxpYnJhcmllcyI6W3sibmFtZSI6ImNvbS5leGFtcGxlOnNoYXJlZDoxLjAiLCJkb3dubG9hZHMiOnsiYXJ0aWZhY3QiOnsicGF0aCI6ImNvbS9leGFtcGxlL3NoYXJlZC8xLjAvc2hhcmVkLTEuMC5qYXIiLCJ1cmwiOiJodHRwczovL2xpYnJhcmllcy5taW5lY3JhZnQubmV0L2NvbS9leGFtcGxlL3NoYXJlZC8xLjAvc2hhcmVkLTEuMC5qYXIiLCJzaGExIjoiYTQxZGExNmEwNzI0Y2RhYTBiYWViMGVlM2Q5NDIwZDMxMjA5NWUwNSIsInNpemUiOjMwMH19fV19"
+    },
+    "GET /v1/packages/692fe8c2a31865c2efe80b88e44687fb44a918f2/1.12.2.json": {
+     "base64": "eyJpZCI6IjEuMTIuMiIsInR5cGUiOiJyZWxlYXNlIiwibWFpbkNsYXNzIjoibmV0Lm1pbmVjcmFmdC5jbGllbnQubWFpbi5NYWluIiwiamF2YVZlcnNpb24iOnsiY29tcG9uZW50IjoiamF2YS1ydW50aW1lLWdhbW1hIiwibWFqb3JWZXJzaW9uIjoxN30sImFyZ3VtZW50cyI6eyJnYW1lIjpbIi0tdXNlcm5hbWUiLCIke2F1dGhfcGxheWVyX25hbWV9IiwiLS12ZXJzaW9uIiwiJHt2ZXJzaW9uX25hbWV9Il0sImp2bSI6WyItY3AiLCIke2NsYXNzcGF0aH0iXX0sImFzc2V0SW5kZXgiOnsiaWQiOiJlbXB0eSIsInNoYTEiOiI2MmVhNzg3YzFmODAwYzA5MWI5ODY3OGIwNTA0NTNhNWFlNTlkN2JjIiwic2l6ZSI6MTQsInRvdGFsU2l6ZSI6MCwidXJsIjoiaHR0cHM6Ly9waXN0b24tbWV0YS5tb2phbmcuY29tL3YxL3BhY2thZ2VzLzYyZWE3ODdjMWY4MDBjMDkxYjk4Njc4YjA1MDQ1M2E1YWU1OWQ3YmMvZW1wdHkuanNvbiJ9LCJhc3NldHMiOiJlbXB0eSIsImRvd25sb2FkcyI6eyJjbGllbnQiOnsic2hhMSI6ImFjOTdiMmRiNzA1ZjM5ZDYwNDA3MWQ0YjJkZWUyODlkMDMxYjEzNjQiLCJzaXplIjo1MDAsInVybCI6Imh0dHBzOi8vcGlzdG9uLWRhdGEubW9qYW5nLmNvbS92MS9vYmplY3RzL2FjOTdiMmRiNzA1ZjM5ZDYwNDA3MWQ0YjJkZWUyODlkMDMxYjEzNjQvY2xpZW50LmphciJ9fSwibGlicmFyaWVzIjpbeyJuYW1lIjoiY29tLmV4YW1wbGU6c2hhcmVkOjEuMCIsImRvd25sb2FkcyI6eyJhcnRpZmFjdCI6eyJwYXRoIjoiY29tL2V4YW1wbGUvc2hhcmVkLzEuMC9zaGFyZWQtMS4wLmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvY29tL2V4YW1wbGUvc2hhcmVkLzEuMC9zaGFyZWQtMS4wLmphciIsInNoYTEiOiJhNDFkYTE2YTA3MjRjZGFhMGJhZWIwZWUzZDk0MjBkMzEyMDk1ZTA1Iiwic2l6ZSI6MzAwfX19XX0="
+    },
+    "GET /mc/game/version_manifest_v2.json": {
+     "json": {
+      "latest": {
+       "release": "1.20.1",
+       "snapshot": "24w01a"
+      },
+      "versions": [
+       {
+        "id": "1.20.1",
+        "type": "release",
+        "url": "https://piston-meta.mojang.com/v1/packages/fc76e2527488840cbbf51682fd84973fbe0a6fbd/1.20.1.json",
+        "sha1": "${sha1:https://piston-meta.mojang.com/v1/packages/fc76e2527488840cbbf51682fd84973fbe0a6fbd/1.20.1.json}"
+       },
+       {
+        "id": "24w01a",
+        "type": "snapshot",
+        "url": "https://piston-meta.mojang.com/v1/packages/9f5766e9429f5b6aa105513a1c6906cbbbf32800/24w01a.json",
+        "sha1": "${sha1:https://piston-meta.mojang.com/v1/packages/9f5766e9429f5b6aa105513a1c6906cbbbf32800/24w01a.json}"
+       },
+       {
+        "id": "1.12.2",
+        "type": "release",
+        "url": "https://piston-meta.mojang.com/v1/packages/692fe8c2a31865c2efe80b88e44687fb44a918f2/1.12.2.json",
+        "sha1": "${sha1:https://piston-meta.mojang.com/v1/packages/692fe8c2a31865c2efe80b88e44687fb44a918f2/1.12.2.json}"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "https://piston-data.mojang.com": {
+   "routes": {
+    "GET /v1/objects/ac97b2db705f39d604071d4b2dee289d031b1364/client.jar": {
+     "base64": "BitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZI="
+    }
+   }
+  },
+  "https://libraries.minecraft.net": {
+   "routes": {
+    "GET /com/example/shared/1.0/shared-1.0.jar": {
+     "base64": "ASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoU"
+    },
+    "GET /org/ow2/asm/asm/9.6/asm-9.6.jar": {
+     "base64": "GD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUP"
+    },
+    "GET /org/ow2/asm/asm/9.6/asm-9.6.jar.sha1": {
+     "base64": "OWI1Mzc1NTUwYmQyZDY4MTg4MDRhNTA4MDJhNjMwMDY3NzFmZGI1OQo="
+    }
+   }
+  },
+  "https://meta.fabricmc.net": {
+   "routes": {
+    "GET /v2/versions/game": {
+     "json": [
+      {
+       "version": "1.20.1",
+       "stable": true
+      },
+      {
+       "version": "1.12.2-not",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/loader/1.20.1": {
+     "json": [
+      {
+       "loader": {
+        "separator": ".",
+        "build": 17,
+        "maven": "net.fabricmc:fabric-loader:0.16.0-beta.1",
+        "version": "0.16.0-beta.1",
+        "stable": false
+       }
+      },
+      {
+       "loader": {
+        "separator": ".",
+        "build": 16,
+        "maven": "net.fabricmc:fabric-loader:0.15.11",
+        "version": "0.15.11",
+        "stable": true
+       }
+      },
+      {
+       "loader": {
+        "separator": ".",
+        "build": 15,
+        "maven": "net.fabricmc:fabric-loader:0.14.0",
+        "version": "0.14.0",
+        "stable": true
+       }
+      }
+     ]
+    },
+    "GET /v2/versions/loader/1.20.1/0.15.11/profile/json": {
+     "json": {
+      "id": "fabric-loader-0.15.11-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": [],
+       "jvm": [
+        "-DFabricMcEmu= net.minecraft.client.main.Main "
+       ]
+      },
+      "libraries": [
+       {
+        "name": "net.fabricmc:fabric-loader:0.15.11",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "fdcbf1f7abccfd708ad6819edb2baf784272e4fd",
+        "size": 800
+       },
+       {
+        "name": "net.fabricmc:intermediary:1.20.1",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "db16f2164c8698985126113a5dd079f9f88846f7",
+        "size": 400
+       }
+      ]
+     }
+    },
+    "GET /v2/versions/loader/1.20.1/0.14.0/profile/json": {
+     "json": {
+      "id": "fabric-loader-0.14.0-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": [],
+       "jvm": [
+        "-DFabricMcEmu= net.minecraft.client.main.Main "
+       ]
+      },
+      "libraries": [
+       {
+        "name": "net.fabricmc:fabric-loader:0.14.0",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "5c406c9880ffabe46719214936540d700c4327af",
+        "size": 800
+       },
+       {
+        "name": "net.fabricmc:intermediary:1.20.1",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "db16f2164c8698985126113a5dd079f9f88846f7",
+        "size": 400
+       }
+      ]
+     }
+    },
+    "GET /v2/versions/loader/1.20.1/0.13.0/profile/json": {
+     "json": {
+      "id": "fabric-loader-0.13.1-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": [],
+       "jvm": [
+        "-DFabricMcEmu= net.minecraft.client.main.Main "
+       ]
+      },
+      "libraries": [
+       {
+        "name": "net.fabricmc:fabric-loader:0.13.1",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "5c406c9880ffabe46719214936540d700c4327af",
+        "size": 800
+       },
+       {
+        "name": "net.fabricmc:intermediary:1.20.1",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "db16f2164c8698985126113a5dd079f9f88846f7",
+        "size": 400
+       }
+      ]
+     }
+    },
+    "GET /v2/versions/loader/1.20.1/0.12.0/profile/json": {
+     "json": {
+      "id": "fabric-loader-0.12.0-1.20.1",
+      "inheritsFrom": "1.19.4",
+      "type": "release",
+      "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": [],
+       "jvm": [
+        "-DFabricMcEmu= net.minecraft.client.main.Main "
+       ]
+      },
+      "libraries": [
+       {
+        "name": "net.fabricmc:fabric-loader:0.12.0",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "5c406c9880ffabe46719214936540d700c4327af",
+        "size": 800
+       },
+       {
+        "name": "net.fabricmc:intermediary:1.20.1",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "db16f2164c8698985126113a5dd079f9f88846f7",
+        "size": 400
+       }
+      ]
+     }
+    },
+    "GET /v2/versions/loader/1.20.1/0.11.0/profile/json": {
+     "json": {
+      "id": "fabric-loader-0.11.0-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": [],
+       "jvm": [
+        "-DFabricMcEmu= net.minecraft.client.main.Main "
+       ]
+      },
+      "libraries": [
+       {
+        "name": "net.fabricmc:bent:1.0",
+        "url": "https://maven.fabricmc.net/",
+        "sha1": "0000000000000000000000000000000000000000",
+        "size": 50
+       }
+      ]
+     }
+    }
+   }
+  },
+  "https://maven.fabricmc.net": {
+   "routes": {
+    "GET /net/fabricmc/fabric-loader/0.15.11/fabric-loader-0.15.11.jar": {
+     "base64": "Ci9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKr9T5I0htkrfcBitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc4="
+    },
+    "GET /net/fabricmc/intermediary/1.20.1/intermediary-1.20.1.jar": {
+     "base64": "CS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1g=="
+    },
+    "GET /net/fabricmc/fabric-loader/0.14.0/fabric-loader-0.14.0.jar": {
+     "base64": "CS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKr9T5I0htkrfcBitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM0="
+    },
+    "GET /net/fabricmc/fabric-loader/0.13.1/fabric-loader-0.13.1.jar": {
+     "base64": "CS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKr9T5I0htkrfcBitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM0="
+    },
+    "GET /net/fabricmc/fabric-loader/0.12.0/fabric-loader-0.12.0.jar": {
+     "base64": "CS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKr9T5I0htkrfcBitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM0="
+    },
+    "GET /net/fabricmc/fabric-loader/0.11.0/fabric-loader-0.11.0.jar": {
+     "base64": "CS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKr9T5I0htkrfcBitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM0="
+    },
+    "GET /net/fabricmc/bent/1.0/bent-1.0.jar": {
+     "base64": "BClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzw="
+    },
+    "GET /net/fabricmc/intermediary/1.20.1/intermediary-1.20.1.jar.sha1": {
+     "base64": "ZGIxNmYyMTY0Yzg2OTg5ODUxMjYxMTNhNWRkMDc5ZjlmODg4NDZmNwo="
+    }
+   }
+  },
+  "https://meta.quiltmc.org": {
+   "routes": {
+    "GET /v3/versions/game": {
+     "json": [
+      {
+       "version": "1.20.1",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v3/versions/loader/1.20.1": {
+     "json": [
+      {
+       "loader": {
+        "version": "0.25.0"
+       }
+      },
+      {
+       "loader": {
+        "version": "0.26.0-beta.2"
+       }
+      },
+      {
+       "loader": {
+        "version": "0.26.0"
+       }
+      },
+      {
+       "loader": {
+        "version": "0.26.0-beta.10"
+       }
+      },
+      {
+       "loader": {
+        "version": "0.24.0"
+       }
+      }
+     ]
+    },
+    "GET /v3/versions/loader/1.20.1/0.26.0/profile/json": {
+     "json": {
+      "id": "quilt-loader-0.26.0-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": []
+      },
+      "libraries": [
+       {
+        "name": "org.quiltmc:quilt-loader:0.26.0",
+        "url": "https://maven.quiltmc.org/repository/release"
+       },
+       {
+        "name": "org.quiltmc:hashed:1.0",
+        "url": "https://maven.quiltmc.org/repository/release"
+       },
+       {
+        "name": "org.quiltmc:named:1.0",
+        "url": "https://maven.quiltmc.org/repository/release",
+        "sha1": "07fcfdc48f1bd07f831de3577f9d8708f350f7ab"
+       },
+       {
+        "name": "net.fabricmc:intermediary:1.20.1",
+        "url": "https://maven.fabricmc.net"
+       },
+       {
+        "name": "org.ow2.asm:asm:9.6"
+       }
+      ]
+     }
+    },
+    "GET /v3/versions/loader/1.20.1/0.25.0/profile/json": {
+     "json": {
+      "id": "quilt-loader-0.25.0-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": []
+      },
+      "libraries": [
+       {
+        "name": "org.quiltmc:quilt-loader:0.25.0",
+        "url": "https://maven.quiltmc.org/repository/release"
+       },
+       {
+        "name": "org.evil:mod:1.0",
+        "url": "https://evil.example.com/maven"
+       }
+      ]
+     }
+    },
+    "GET /v3/versions/loader/1.20.1/0.24.0/profile/json": {
+     "json": {
+      "id": "quilt-loader-0.24.0-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": []
+      },
+      "libraries": [
+       {
+        "name": "org.quiltmc:shaped:1.0",
+        "downloads": {
+         "artifact": {}
+        }
+       }
+      ]
+     }
+    },
+    "GET /v3/versions/loader/1.20.1/0.26.0-beta.2/profile/json": {
+     "json": {
+      "id": "quilt-loader-0.26.0-beta.2-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": []
+      },
+      "libraries": [
+       {
+        "name": "org.quiltmc:nosum:1.0",
+        "url": "https://maven.quiltmc.org/repository/release"
+       }
+      ]
+     }
+    },
+    "GET /v3/versions/loader/1.20.1/0.26.0-beta.10/profile/json": {
+     "json": {
+      "id": "quilt-loader-0.26.0-beta.9-1.20.1",
+      "inheritsFrom": "1.20.1",
+      "type": "release",
+      "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+      "arguments": {
+       "game": []
+      },
+      "libraries": [
+       {
+        "name": "org.quiltmc:quilt-loader:0.26.0-beta.10",
+        "url": "https://maven.quiltmc.org/repository/release"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "https://maven.quiltmc.org": {
+   "routes": {
+    "GET /repository/release/org/quiltmc/quilt-loader/0.26.0/quilt-loader-0.26.0.jar": {
+     "base64": "FTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKr9T5I0htkrfcBitQdZq/5A4zWH2ix+wWO2CFqs/0HkNojbLXASZLcJW63wkuU3idwucRNluApcrvGT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1Hw=="
+    },
+    "GET /repository/release/org/quiltmc/quilt-loader/0.26.0/quilt-loader-0.26.0.jar.sha1": {
+     "base64": "NWE5ODY0YzZjODQwOWNlZmQyOGI0MmMwYzMzNmRjM2I1YjdmYTI5OQo="
+    },
+    "GET /repository/release/org/quiltmc/hashed/1.0/hashed-1.0.jar": {
+     "base64": "FjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWo="
+    },
+    "GET /repository/release/org/quiltmc/hashed/1.0/hashed-1.0.jar.sha1": {
+     "base64": "MzM0NjkyN0YxNjkxRTM1OTBEMDVFODBCRTcyNTI4RDQ1OUQ2NUE3MCAgaGFzaGVkLTEuMC5qYXIK"
+    },
+    "GET /repository/release/org/quiltmc/named/1.0/named-1.0.jar": {
+     "base64": "FzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3i"
+    },
+    "GET /repository/release/org/quiltmc/named/1.0/named-1.0.jar.sha1": {
+     "base64": "MDdmY2ZkYzQ4ZjFiZDA3ZjgzMWRlMzU3N2Y5ZDg3MDhmMzUwZjdhYgo="
+    },
+    "GET /repository/release/org/quiltmc/quilt-loader/0.25.0/quilt-loader-0.25.0.jar": {
+     "base64": "GT5jiK3S9yFGa5C12gQpTnOYveIMMVZ7oMXqFDleg6jN8hxBZouw1fokSW6TuN0HLFF2m8DlDzRZfqPI7Rc8YYar0PUfRGmOs9gCJ0xxlrvgCi9UeZ7D6BI3XIGmy/AaP2SJrtP4IkdskbbbBSpPdJm+4w0yV3yhxusVOl+Eqc7zHUJnjLHWACVKb5S53ggtUnecweYQNVp/pMnuGD1ih6zR9iBFao+02QMoTXKXvOELMFV6n8TpEzhdgqfM8RtAZYqv1PkjSG2St9wGK1B1mr/kDjNYfaLH7BY7YIWqz/QeQ2iNstcBJktwlbrfCS5TeJ3C5xE2W4Clyu8ZPmOIrdL3IUZrkLXaBClOc5i94gwxVnugxeoUOV6DqM3yHEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvMdQmeMsdYAJUpvlLneCC1Sd5zB5hA1Wn+kye4YPWKHrNH2IEVqj7TZAyhNcpe84QswVXqfxOkTOF2Cp8zxG0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsNX6JEluk7jdByxRdpvA5Q80WX6jyO0XPGGGq9D1H0RpjrPYAidMcZa74AovVHmew+gSN1yBpsvwGj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKn"
+    },
+    "GET /repository/release/org/quiltmc/quilt-loader/0.25.0/quilt-loader-0.25.0.jar.sha1": {
+     "base64": "MDA5N2I4NDljOGI4NWFmMzZhMzhiODA0MzAyOGNiNDM2NWJlYmU4Zgo="
+    },
+    "GET /repository/release/org/quiltmc/nosum/1.0/nosum-1.0.jar": {
+     "base64": "Gj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKrw=="
+    },
+    "GET /repository/release/org/quiltmc/nosum/1.0/nosum-1.0.jar.sha1": {
+     "base64": "bm90IGEgY2hlY2tzdW0K"
+    },
+    "GET /repository/release/org/quiltmc/quilt-loader/0.26.0-beta.10/quilt-loader-0.26.0-beta.10.jar": {
+     "base64": "G0Bliq/U+SNIbZK33AYrUHWav+QOM1h9osfsFjtgharP9B5DaI2y1wEmS3CVut8JLlN4ncLnETZbgKXK7xk+Y4it0vchRmuQtdoEKU5zmL3iDDFWe6DF6hQ5XoOozfIcQWaLsA=="
+    },
+    "GET /repository/release/org/quiltmc/quilt-loader/0.26.0-beta.10/quilt-loader-0.26.0-beta.10.jar.sha1": {
+     "base64": "ODlhZTc3NDkwMmE1ODczZGE4OWVkNzcyMTU5NWUyNzg5M2RlNWJiOQo="
+    }
+   }
+  }
+ },
+ "normalize": [
+  {
+   "pattern": "^1[5-9]\\d{11}$",
+   "replace": "<epoch-ms>"
+  },
+  {
+   "pattern": "\"procStart\":( ?)\"\\d+\"",
+   "replace": "\"procStart\":$1\"<t>\""
+  },
+  {
+   "pattern": "(?:(?:libraries|assets) \\d+/\\d+ \\([^)\\n]*\\)\\n)+",
+   "replace": "<progress>\n"
+  }
+ ],
+ "ignore": [
+  "data/client/cache/verified.json",
+  "data/client/logs/**"
+ ],
+ "steps": [
+  {
+   "write": "data/client/profiles.json",
+   "json": {
+    "version": 1,
+    "profiles": {
+     "fab": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabpin": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.14.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabid": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.13.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabparent": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.12.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabbent": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.11.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabgone": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.10.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabunknown": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.9.9",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabsnap": {
+      "mc": "24w01a",
+      "loader": "fabric",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "fabold": {
+      "mc": "1.12.2",
+      "loader": "fabric",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "qui": {
+      "mc": "1.20.1",
+      "loader": "quilt",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "quihost": {
+      "mc": "1.20.1",
+      "loader": "quilt",
+      "loaderVersion": "0.25.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "quishape": {
+      "mc": "1.20.1",
+      "loader": "quilt",
+      "loaderVersion": "0.24.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "quisum": {
+      "mc": "1.20.1",
+      "loader": "quilt",
+      "loaderVersion": "0.26.0-beta.2",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "quiid": {
+      "mc": "1.20.1",
+      "loader": "quilt",
+      "loaderVersion": "0.26.0-beta.10",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "quisnap": {
+      "mc": "24w01a",
+      "loader": "quilt",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "quiold": {
+      "mc": "1.12.2",
+      "loader": "quilt",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "lnull": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "lpin": {
+      "mc": "1.20.1",
+      "loader": "quilt",
+      "loaderVersion": "0.26.0",
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     }
+    },
+    "defaultAccount": null
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fab"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fab",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabpin",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabid"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabparent",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabbent"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabgone",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabunknown"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabsnap"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fabold",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "qui"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "qui",
+    "--verify",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "quihost"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "quishape",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "quisum"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "quiid",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "quisnap"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "quiold"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "remove": "data/client/versions/fabric-loader-0.15.11-1.20.1/fabric-loader-0.15.11-1.20.1.json"
+  },
+  {
+   "write": "data/client/versions/quilt-loader-0.26.0-1.20.1/quilt-loader-0.26.0-1.20.1.json",
+   "text": "{\"id\":\"quilt-loa"
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "fab",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "qui",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "lnull"
+   ],
+   "expect": {
+    "code": 1
+   },
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "fab",
+    "--as",
+    "Fabby",
+    "--wait",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "lpin",
+    "--as",
+    "Quilty",
+    "--wait"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "list",
+    "--json"
+   ]
+  }
+ ]
+}
