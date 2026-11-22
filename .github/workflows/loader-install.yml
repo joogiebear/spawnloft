@@ -2,10 +2,20 @@
 # checked, its build steps run on Mojang's Java, every output checked, and the launch command
 # built with every file it names on disk. It stops before the game would start; no job can show a
 # game window. Runs on pull requests that change the loaders' code, weekly, and by hand.
+#
+# The profiles are set up by the Rust core's client (spawnloft-core, rust/PLAN-CORE-PORT.md C7b);
+# the checks read what it wrote with the Node core's readers. By hand, `core: node` runs the
+# Node core's client instead, until it leaves in C10.
 name: loader-install
 
 on:
   workflow_dispatch:
+    inputs:
+      core:
+        description: Which core sets the loaders up
+        type: choice
+        options: [rust, node]
+        default: rust
   schedule:
     - cron: '17 5 * * 1'
   pull_request:
@@ -18,6 +28,12 @@ on:
       - src/client-install.mjs
       - src/client-meta.mjs
       - src/client.mjs
+      - rust/crates/spawnloft-lib/src/client/**
+      - rust/crates/spawnloft-core/src/port/client.rs
+      - rust/crates/spawnloft-lib/src/zip.rs
+      - rust/crates/spawnloft-lib/src/download.rs
+      - rust/crates/spawnloft-lib/src/download/**
+      - rust/crates/spawnloft-lib/src/java.rs
       - tools/real-loader-install.mjs
       - .github/workflows/loader-install.yml
 
@@ -50,5 +66,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
+      # the check job's cache from v2 (rust-internal.yml), restored only: this workflow saves none
+      - uses: actions/cache/restore@v4
+        if: inputs.core != 'node'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core
+        if: inputs.core != 'node'
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          cargo build -p spawnloft-core --locked
       - name: Set ${{ matrix.loader }} ${{ matrix.build }} up for Minecraft ${{ matrix.mc }}
-        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }} ${{ matrix.and && format('--and {0}', matrix.and) || '' }}
+        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }} ${{ matrix.and && format('--and {0}', matrix.and) || '' }} ${{ inputs.core != 'node' && '--core rust/target/debug/spawnloft-core' || '' }}

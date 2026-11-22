@@ -18,6 +18,10 @@
     {
       "pattern": "\"size\": \\d+,",
       "replace": "\"size\": <archive-size>,"
+    },
+    {
+      "pattern": "size=\\d+ csize=\\d+ crc=[0-9a-f]+",
+      "replace": "size=<n> csize=<n> crc=<crc>"
     }
   ],
   "steps": [

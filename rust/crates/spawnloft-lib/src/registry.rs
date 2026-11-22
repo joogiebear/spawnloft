@@ -573,6 +573,21 @@ pub fn default_dir(instances_dir: &str, name: &str) -> String {
     crate::jspath::join(&[instances_dir, name])
 }
 
+/// `inst.dir` where Node passes it to `path.join`, which refuses anything but a string.
+pub fn dir_text(inst: &Instance) -> Result<String, crate::failure::Failure> {
+    match inst.get("dir") {
+        Some(Value::String(s)) => Ok(s.clone()),
+        other => Err(crate::failure::Failure::Internal {
+            head: "TypeError [ERR_INVALID_ARG_TYPE]".into(),
+            message: format!(
+                "The \"path\" argument must be of type string. {}",
+                crate::js::received(other)
+            ),
+            code: Some("ERR_INVALID_ARG_TYPE".into()),
+        }),
+    }
+}
+
 /// `serverJarPath`.
 pub fn server_jar_path(inst: &Instance) -> String {
     crate::jspath::join(&[inst.dir().unwrap_or(""), inst.jar().unwrap_or("")])

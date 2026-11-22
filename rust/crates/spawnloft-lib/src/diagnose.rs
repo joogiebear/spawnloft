@@ -24,6 +24,28 @@ pub struct Context {
     pub panel: bool,
 }
 
+impl Context {
+    /// A server's context, as `why` and the diag bundle build it: `{ port, memory, dir,
+    /// crashDir: path.join(dir, 'crash-reports') }`.
+    pub fn of(inst: &crate::registry::Instance) -> Context {
+        let text = |key: &str| match inst.get(key) {
+            None | Some(Value::Null) => None,
+            v => Some(js::string(v)),
+        };
+        let dir = inst.get("dir").map(|d| js::string(Some(d)));
+        Context {
+            port: text("port"),
+            memory: text("memory"),
+            crash_dir: dir.as_deref().map(|d| jspath::join(&[d, "crash-reports"])),
+            dir: inst
+                .get("dir")
+                .filter(|v| js::truthy(Some(v)))
+                .map(|d| js::string(Some(d))),
+            panel: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     pub id: &'static str,
@@ -65,7 +87,7 @@ fn shape(id: &'static str, source: &str, ignore_case: bool, title: &'static str,
     }
 }
 
-fn class_version_to_java(major: f64) -> String {
+pub(crate) fn class_version_to_java(major: f64) -> String {
     js::number_to_string(major - 44.0)
 }
 

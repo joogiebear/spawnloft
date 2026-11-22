@@ -112,7 +112,8 @@ function describeFile(abs, rel, normalize) {
   const lower = rel.toLowerCase()
   if (/\.(zip|jar|mrpack)$/.test(lower) || (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50)) {
     const listing = zipListing(buf)
-    if (listing !== null) return { zip: listing }
+    // evened out like text, so a scenario can even out what it knows differs (diag's checksums)
+    if (listing !== null) return { zip: normalize(listing, rel) }
   }
   if (/\.(tar|tar\.gz|tgz)$/.test(lower)) {
     const listing = tarListing(buf)
