@@ -15,9 +15,9 @@
 ;   `uninstall --yes`, and ask (default no) whether to delete the data too;
 ; - a running spawnloft-core (daemons) never blocks an update: the old binary is renamed aside
 ;   into resources\bin\old-<stamp>\, keeping its file name (design section 4);
-; - the bundled Node lives in a versioned folder, resources\runtime\node-<ver>\; a held node.exe
-;   of the same version is renamed aside into resources\runtime\old-<stamp>\, and other
-;   versions' folders go once nothing runs them (PLAN-2.0-REMAINING.md A6);
+; - no Node ships (rust/PLAN-CORE-PORT.md 5.1): the resources\runtime and resources\core that 2.0
+;   builds before C10 carried are removed after `handover stop`, and both stay for that run while
+;   a node.exe in them is held (plan section 7; SPAWNLOFT_REMOVE_NODE);
 ; - a 1.x installer can still roll back over this install (it finds the same keys and runs this
 ;   uninstaller with --updated);
 ; - over 1.x, servers are stopped gracefully through the installed 1.x CLI before the 1.x
@@ -76,10 +76,6 @@ ${StrLoc}
 ; core binary's source, which the installer extracts on its own before anything else (2.3 step 1)
 !ifndef SPAWNLOFT_CORE_SRC
   !error "SPAWNLOFT_CORE_SRC is not defined: build with installer/installer-config.mjs"
-!endif
-; and the bundled Node's folder under resources\runtime\ (node-<version>)
-!ifndef SPAWNLOFT_NODE_DIR
-  !error "SPAWNLOFT_NODE_DIR is not defined: build with installer/installer-config.mjs"
 !endif
 
 !define WEBVIEW2APPGUID "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
@@ -732,61 +728,50 @@ FunctionEnd
   FindClose $R7
 !macroend
 
-; SPAWNLOFT: Node runtimes moved aside by earlier updates, once nothing runs them (a held
-; node.exe is not deleted, so its folder stays for the next install)
-!macro SPAWNLOFT_CLEAN_OLD_RUNTIMES
-  ClearErrors
-  FindFirst $R7 $R8 "$INSTDIR\resources\runtime\old-*"
-  ${DoWhile} $R8 != ""
-    Delete "$INSTDIR\resources\runtime\$R8\node.exe"
-    RMDir "$INSTDIR\resources\runtime\$R8"
-    FindNext $R7 $R8
-  ${Loop}
-  FindClose $R7
-!macroend
-
-; SPAWNLOFT: other versions' runtime folders, once nothing runs them. Only after this build's
-; runtime and runtime.json are in place: until then the installed copy still runs the old one,
-; and an install that stops early (cancelled, a held file) must leave it working.
-!macro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
-  ClearErrors
-  FindFirst $R7 $R8 "$INSTDIR\resources\runtime\node-*"
-  ${DoWhile} $R8 != ""
-    ${If} $R8 != "${SPAWNLOFT_NODE_DIR}"
-      Delete "$INSTDIR\resources\runtime\$R8\node.exe"
-      Delete "$INSTDIR\resources\runtime\$R8\LICENSE"
-      RMDir "$INSTDIR\resources\runtime\$R8"
-    ${EndIf}
-    FindNext $R7 $R8
-  ${Loop}
-  FindClose $R7
-!macroend
-
-; SPAWNLOFT: this build's node.exe, when the same version is installed already and a long-lived
-; process runs it (`spawnloft mcp`, the bot host, a console): a running exe cannot be overwritten
-; but can be renamed, so it moves into a dated folder of its own, as the core does, and the new
-; copy is written in its place (PLAN-2.0-REMAINING.md A6).
-!macro SPAWNLOFT_MOVE_HELD_NODE
-  ${If} ${FileExists} "$INSTDIR\resources\runtime\${SPAWNLOFT_NODE_DIR}\node.exe"
+; SPAWNLOFT: the bundled Node and the Node core that 2.0 builds before C10 shipped
+; (resources\runtime\node-<ver>\, resources\runtime\old-<stamp>\ and resources\core\;
+; rust/PLAN-CORE-PORT.md sections 5.1 and 7). This package lists neither, and an update never
+; deletes a file the new package does not list (design 5.6), so they are removed here, and only
+; here: after `handover stop` (spawnloft-lib handover/legacy.rs reads a 1.x install's
+; resources\core\mcctl.mjs and package.json to recognise and stop 1.x) and after this build's
+; files are in place. A Node process started before the update (an MCP session, a bot run) holds
+; its node.exe and still loads files from resources\core, so every node.exe is tried first: if
+; one cannot be deleted, BOTH folders stay for this run, and the next install (or `spawnloft
+; repair`, spawnloft-core port/maintenance.rs) removes them once nothing holds them. Nothing
+; outside the two folders is touched.
+!macro SPAWNLOFT_REMOVE_NODE
+  ; only folders SpawnLoft wrote (runtime.json, mcctl.mjs): the install folder can be one the
+  ; person chose, and another app's resources\core or resources\runtime is not ours
+  StrCpy $R6 0
+  ${If} ${FileExists} "$INSTDIR\resources\runtime\runtime.json"
     ClearErrors
-    Delete "$INSTDIR\resources\runtime\${SPAWNLOFT_NODE_DIR}\node.exe"
-    ${If} ${Errors}
-      ${GetTime} "" "L" $0 $1 $2 $3 $4 $5 $6
-      StrCpy $R6 "old-$2$1$0-$4$5$6"
-      ${If} ${FileExists} "$INSTDIR\resources\runtime\$R6\*.*"
-        System::Call "kernel32::GetTickCount() i .r0"
-        StrCpy $R6 "$R6-$0"
+    FindFirst $R7 $R8 "$INSTDIR\resources\runtime\*"
+    ${DoWhile} $R8 != ""
+      ; FindFirst lists . and .. too, and ..\node.exe would be resources\node.exe
+      ${If} $R8 != "."
+      ${AndIf} $R8 != ".."
+      ${AndIf} ${FileExists} "$INSTDIR\resources\runtime\$R8\node.exe"
+        ClearErrors
+        Delete "$INSTDIR\resources\runtime\$R8\node.exe"
+        ${If} ${Errors}
+          StrCpy $R6 1
+        ${EndIf}
       ${EndIf}
-      ClearErrors
-      CreateDirectory "$INSTDIR\resources\runtime\$R6"
-      Rename "$INSTDIR\resources\runtime\${SPAWNLOFT_NODE_DIR}\node.exe" "$INSTDIR\resources\runtime\$R6\node.exe"
-      ${If} ${Errors}
-        SetErrorLevel 2
-        Abort "node.exe is in use and could not be moved aside"
-      ${EndIf}
-      DetailPrint "node.exe is in use; it was moved to resources\runtime\$R6 until that program ends"
+      FindNext $R7 $R8
+    ${Loop}
+    FindClose $R7
+  ${EndIf}
+  ${If} $R6 = 1
+    DetailPrint "node.exe is in use; resources\runtime and resources\core stay until that program ends"
+  ${Else}
+    ${If} ${FileExists} "$INSTDIR\resources\runtime\runtime.json"
+      RMDir /r "$INSTDIR\resources\runtime"
+    ${EndIf}
+    ${If} ${FileExists} "$INSTDIR\resources\core\mcctl.mjs"
+      RMDir /r "$INSTDIR\resources\core"
     ${EndIf}
   ${EndIf}
+  ClearErrors
 !macroend
 
 !define MUI_CUSTOMFUNCTION_ABORT SpawnLoftUserAbort
@@ -1048,7 +1033,6 @@ Section Install
   ; (step 3)
   Call StageCore
   !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
-  !insertmacro SPAWNLOFT_CLEAN_OLD_RUNTIMES
   ${If} $LegacyMode = 1
     ${If} $StopDone <> 1
       DetailPrint "Stopping servers for the update"
@@ -1113,7 +1097,6 @@ Section Install
       DetailPrint "spawnloft-core.exe is in use by running servers; it was moved to resources\bin\$R6 until they restart"
     ${EndIf}
   ${EndIf}
-  !insertmacro SPAWNLOFT_MOVE_HELD_NODE
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
@@ -1208,8 +1191,9 @@ Section Install
 
   ; SPAWNLOFT: the staged copy has done its job
   RMDir /r "$INSTDIR\resources\bin\staging"
-  ; and the Node runtimes of other versions, now that this one is in place
-  !insertmacro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
+  ; and the Node runtime and Node core of a 2.0 build before C10, now that `handover stop` has run
+  ; and this build is in place
+  !insertmacro SPAWNLOFT_REMOVE_NODE
 
   ; SPAWNLOFT: `spawnloft` in a new terminal (spawnloft-lib user_path.rs). A new install and the
   ; 1.x handover put resources\bin on the user PATH; a 2.x update leaves the PATH as the user has
@@ -1396,11 +1380,10 @@ Section Uninstall
 
   ; Delete uninstaller
   Delete "$INSTDIR\uninstall.exe"
-  ; SPAWNLOFT: core binaries and Node runtimes moved aside by updates, and other versions'
-  ; runtime folders, once nothing runs them
+  ; SPAWNLOFT: core binaries moved aside by updates, and the Node runtime and Node core of a 2.0
+  ; build before C10, once nothing runs them
   !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
-  !insertmacro SPAWNLOFT_CLEAN_OLD_RUNTIMES
-  !insertmacro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
+  !insertmacro SPAWNLOFT_REMOVE_NODE
   RMDir /r "$INSTDIR\resources\bin\staging"
 
   {{#each resources_ancestors}}

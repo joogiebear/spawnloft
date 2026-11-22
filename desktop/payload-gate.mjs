@@ -1,65 +1,49 @@
-// What the release gate checks inside a package's payload, before it is bundled
-// (PLAN-2.0-REMAINING.md A3 and section 5 W1):
+// What the release gate checks inside a package's payload, before or after it is bundled
+// (PLAN-2.0-REMAINING.md A3 and section 5 W1; rust/PLAN-CORE-PORT.md 5.1):
 //
-//   checkRuntime(dir)        resources/runtime as staged by stage-runtime.mjs: the pinned Node
-//                            version, the pinned nodejs.org archive hash for its platform, the
-//                            executable byte for byte as staged (Windows keeps the OpenJS
-//                            Authenticode signature; macOS re-signs it, so its hash is not
-//                            compared there), and that it runs as that version on this machine
-//                            when it can (same platform and architecture)
+//   checkNoNode(paths)       no Node.js in any shipped file: no `node` or `node.exe` binary and
+//                            no `.mjs` file of the Node core. Since C10 every command runs in
+//                            spawnloft-core, so a package that still carries either is a build
+//                            from the wrong tree. The one `node` allowed is the command-line
+//                            package's compatibility link bin/node, which points at
+//                            spawnloft-core (5.2)
 //   checkNoInternalStrings(files)   no wording that marks a test build (the "internal spike"
 //                            page, "Internal build: not for release.") in any shipped file,
 //                            binaries included (searched as bytes)
 //
-// Both return a list of problems (empty when fine). release-gate.mjs runs them with --runtime
-// and --payload.
-import crypto from 'node:crypto'
+// Both return a list of problems (empty when fine). release-gate.mjs runs them on every
+// --payload and --installed path.
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const HERE = path.dirname(fileURLToPath(import.meta.url))
-const { NODE_VERSION, nodeArchive } = await import(pathToFileURL(path.join(HERE, 'node-pin.mjs')).href)
+const NODE_NAMES = new Set(['node', 'node.exe'])
+const CORE_NAMES = new Set(['spawnloft-core', 'spawnloft-core.exe'])
 
-const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex')
+// every entry under p, p itself included; a symlink is reported as itself, never followed
+function* entriesUnder(p) {
+  const st = fs.lstatSync(p)
+  yield [p, st]
+  if (!st.isDirectory()) return
+  for (const entry of fs.readdirSync(p)) yield* entriesUnder(path.join(p, entry))
+}
 
-export function checkRuntime(dir, { run = true } = {}) {
+export function checkNoNode(paths) {
   const problems = []
-  const recordFile = path.join(dir, 'runtime.json')
-  let record
-  try {
-    record = JSON.parse(fs.readFileSync(recordFile, 'utf8'))
-  } catch (e) {
-    return [`${recordFile}: ${e.message}`]
-  }
-  if (record.node !== NODE_VERSION) problems.push(`runtime.json says Node ${record.node}, the pin (desktop/node-pin.mjs) is ${NODE_VERSION}`)
-  let pin = null
-  try {
-    pin = nodeArchive(record.platform, record.arch)
-  } catch (e) {
-    problems.push(`runtime.json: ${e.message}`)
-  }
-  if (pin) {
-    if (record.archive !== pin.file) problems.push(`runtime.json names archive ${record.archive}, the pin is ${pin.file}`)
-    if (record.archiveSha256 !== pin.sha256) problems.push(`runtime.json records archive sha256 ${record.archiveSha256}, the pin is ${pin.sha256}`)
-    if (record.exe !== `node-${NODE_VERSION}/${pin.exe}`) problems.push(`runtime.json exe is ${record.exe}, expected node-${NODE_VERSION}/${pin.exe}`)
-  }
-  const exe = path.join(dir, String(record.exe || ''))
-  if (!record.exe || !fs.existsSync(exe)) {
-    problems.push(`the bundled Node ${exe} is missing`)
-    return problems
-  }
-  if (record.platform !== 'darwin' && sha256(fs.readFileSync(exe)) !== record.exeSha256) {
-    problems.push(`${exe} is not the executable staged from ${record.archive} (sha256 differs from runtime.json)`)
-  }
-  // only what is in the folder ships: the versioned folder and its record
-  for (const entry of fs.readdirSync(dir)) {
-    if (entry !== 'runtime.json' && entry !== `node-${NODE_VERSION}`) problems.push(`unexpected ${entry} in the runtime folder`)
-  }
-  if (run && record.platform === process.platform && record.arch === process.arch) {
-    const ran = spawnSync(exe, ['-e', 'process.stdout.write(process.version)'], { encoding: 'utf8', timeout: 60000 })
-    if (ran.status !== 0 || ran.stdout !== `v${NODE_VERSION}`) problems.push(`the bundled Node does not run as v${NODE_VERSION}: exit ${ran.status ?? ran.error?.message}, printed ${ran.stdout}`)
+  for (const root of paths) {
+    if (!fs.existsSync(root)) {
+      problems.push(`${root} is missing`)
+      continue
+    }
+    for (const [file, st] of entriesUnder(root)) {
+      const name = path.basename(file).toLowerCase()
+      if (st.isDirectory()) continue
+      if (NODE_NAMES.has(name)) {
+        if (st.isSymbolicLink() && CORE_NAMES.has(path.basename(fs.readlinkSync(file)).toLowerCase())) continue
+        problems.push(`${file} is a Node.js binary, which no 2.x package may ship`)
+      } else if (name.endsWith('.mjs')) {
+        problems.push(`${file} is a Node core .mjs file, which no 2.x package may ship`)
+      }
+    }
   }
   return problems
 }

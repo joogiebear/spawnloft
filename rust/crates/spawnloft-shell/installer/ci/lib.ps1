@@ -12,9 +12,12 @@ $script:fixtures = Join-Path $env:RUNNER_TEMP 'installer-fixtures'
 $script:result = [ordered]@{}
 $script:scenario = 'scenario'
 $script:failures = 0
-# the harness's own Node (setup-node), by full path: seeding, list.mjs and the fake JVM stand-in
-# run on it; nothing of 2.0 may (the scenarios hide every other Node from 2.0, see Set-NodeMode)
+# the harness's own Node (setup-node), by full path: seeding and list.mjs run on it; nothing of
+# 2.0 may (the scenarios hide every other Node from 2.0, see Set-NodeMode)
 $script:harnessNode = (Get-Command node).Source
+# the checkout's Node core (src\), which the harness's own readers import: 2.0 ships none
+# (rust/PLAN-CORE-PORT.md 5.1), and its registry and state files are the same as 2.0's
+$script:checkoutCore = $env:GITHUB_WORKSPACE
 $script:nodeMode = 'none'
 $script:decoyLog = Join-Path $env:RUNNER_TEMP 'decoy-node.log'
 
@@ -25,14 +28,25 @@ function Start-Scenario($name) {
   # the fixtures live outside the install folder and the data root, at a path both 1.x and 2.0
   # daemons can run them from
   New-Item -ItemType Directory -Force -Path $fixtures | Out-Null
-  Copy-Item -Force "$PSScriptRoot\fake-java.mjs" $fixtures
-  Copy-Item -Recurse -Force (Join-Path $env:GITHUB_WORKSPACE 'test\fixtures\fake-mariadb') $fixtures
+  # the JVM stand-in is native (spawnloft-fakes' fake-java, which installer.yml builds and names
+  # in FAKE_JAVA_EXE): 1.x's daemon and 2.0's both run it as they run a real java, where a
+  # release 2.0 core runs no .mjs stand-in
+  if (-not $env:FAKE_JAVA_EXE -or -not (Test-Path $env:FAKE_JAVA_EXE)) { throw "FAKE_JAVA_EXE does not name fake-java.exe: '$env:FAKE_JAVA_EXE'" }
+  Copy-Item -Force $env:FAKE_JAVA_EXE (Join-Path $fixtures 'fake-java.exe')
+  # the MariaDB tools likewise: spawnloft-fakes' fake-mariadb (FAKE_MARIADB_EXE) under each
+  # tool's name in bin\, where both cores look for <name>.exe before <name>.mjs
+  if (-not $env:FAKE_MARIADB_EXE -or -not (Test-Path $env:FAKE_MARIADB_EXE)) { throw "FAKE_MARIADB_EXE does not name fake-mariadb.exe: '$env:FAKE_MARIADB_EXE'" }
+  $mariaBin = Join-Path $fixtures 'fake-mariadb\bin'
+  New-Item -ItemType Directory -Force -Path $mariaBin | Out-Null
+  foreach ($t in 'mariadbd', 'mariadb', 'mariadb-admin', 'mariadb-dump', 'mariadb-install-db') {
+    Copy-Item -Force $env:FAKE_MARIADB_EXE (Join-Path $mariaBin "$t.exe")
+  }
   Set-NodeMode $script:nodeMode
 }
 
-# 2.0 runs on the Node it carries (PLAN-2.0-REMAINING.md section 4), so every scenario runs with
-# no Node.js on any PATH 2.0 could read: this process's (which the installer, the core and the
-# CLI inherit) and the persisted user and machine PATH (which Task Scheduler and the app read).
+# 2.0 runs no Node at all (rust/PLAN-CORE-PORT.md 5.1), so every scenario runs with no Node.js on
+# any PATH 2.0 could read: this process's (which the installer, the core and the CLI inherit)
+# and the persisted user and machine PATH (which Task Scheduler and the app read).
 #   none   no node.exe on any PATH
 #   decoy  a node.exe first on every PATH that logs each run to $decoyLog and fails; Finish
 #          fails the scenario if anything ran it
@@ -56,7 +70,7 @@ function Set-NodeMode([string] $mode) {
 class Decoy {
   static int Main() {
     System.IO.File.AppendAllText(@"$($script:decoyLog)", System.Environment.CommandLine + "\r\n");
-    System.Console.Error.WriteLine("decoy node.exe: SpawnLoft 2 must run its own Node");
+    System.Console.Error.WriteLine("decoy node.exe: SpawnLoft 2 must not run a Node");
     return 1;
   }
 }
@@ -79,7 +93,7 @@ class Decoy {
 function Check-No-Decoy {
   if ($script:nodeMode -ne 'decoy') { return }
   $ran = if (Test-Path $script:decoyLog) { (Get-Content $script:decoyLog -Raw).Trim() } else { '' }
-  Check 'nothing ran the decoy node.exe on PATH (the bundled Node ran)' (-not $ran) $ran
+  Check 'nothing ran the decoy node.exe on PATH (2.0 runs no Node)' (-not $ran) $ran
 }
 
 function Save-Result {
@@ -205,8 +219,7 @@ function List1 {
   Parse-List (Run-Captured "$inst\SpawnLoft.exe" @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120 @{ ELECTRON_RUN_AS_NODE = '1' })
 }
 
-# 2.0's CLI: spawnloft-core, which forwards the commands it does not own to the Node core on the
-# bundled Node
+# 2.0's CLI: spawnloft-core, which answers every command itself
 function Cli2([string[]] $cliArgs, [switch] $AllowFail) {
   $r = Run-Captured "$inst\resources\bin\spawnloft-core.exe" $cliArgs 240
   Write-Host "2.0 $($cliArgs -join ' ') -> $($r.code)`n$($r.out)$($r.err)"
@@ -214,9 +227,10 @@ function Cli2([string[]] $cliArgs, [switch] $AllowFail) {
   $r
 }
 
-# 2.0's view (its own readState, run on the harness's Node: orphaned and stale included)
+# 2.0's view (readState of the checkout's Node core, run on the harness's Node, over the same
+# files 2.0 writes: orphaned and stale included)
 function Status2 {
-  Parse-List (Run-Captured $script:harnessNode @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120)
+  Parse-List (Run-Captured $script:harnessNode @("$PSScriptRoot\list.mjs", $script:checkoutCore) 120)
 }
 
 # `spawnloft list --json` the way a person runs it in a terminal: the 1.x path's spawnloft.cmd
@@ -253,9 +267,38 @@ function Mcp-Initialize($p) {
   Mcp-Call $p 1 'initialize' @{ protocolVersion = '2025-06-18'; capabilities = @{}; clientInfo = @{ name = 'installer-ci'; version = '1' } }
 }
 
-# The node.exe children of a process (the forwarder's Node)
-function Node-Children([int] $parent) {
-  @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $parent" | Where-Object { $_.Name -eq 'node.exe' })
+# What a 2.0 build before C10 left in the install folder: its bundled Node and its Node core
+# (installer.nsi SPAWNLOFT_REMOVE_NODE removes them, spawnloft-core repair too)
+function Old-Node-Folders {
+  @('runtime', 'core' | Where-Object { Test-Path "$inst\resources\$_" })
+}
+
+# Lays out, under the installed 2.x, what a 2.0 build before C10 shipped and every update since
+# keeps (an update deletes no file the new package does not list): resources\runtime with a real
+# node.exe (a copy of the harness's) and runtime.json, an older update's held old-<stamp> copy,
+# and resources\core with the Node core's files. Then, with -Hold, starts that node.exe on a
+# script from resources\core that sleeps, as an MCP session or a bot run started before the
+# update would be. Returns the held process, or $null.
+function Seed-Old-Node([switch] $Hold) {
+  $ver = '24.22.3'
+  $rt = "$inst\resources\runtime"
+  New-Item -ItemType Directory -Force "$rt\node-$ver", "$rt\old-20261120-101500", "$inst\resources\core\src" | Out-Null
+  Copy-Item -Force $script:harnessNode "$rt\node-$ver\node.exe"
+  Copy-Item -Force $script:harnessNode "$rt\old-20261120-101500\node.exe"
+  Set-Content "$rt\node-$ver\LICENSE" 'Node.js licence'
+  @{ node = $ver; exe = "node-$ver/node.exe"; platform = 'win32'; arch = 'x64' } | ConvertTo-Json | Set-Content "$rt\runtime.json"
+  Set-Content "$inst\resources\core\mcctl.mjs" '// the Node core of an older 2.0 build'
+  @{ name = 'spawnloft'; version = '2.0.0-internal.900' } | ConvertTo-Json | Set-Content "$inst\resources\core\package.json"
+  Set-Content "$inst\resources\core\internal-defaults.json" '{ "daemon": "rust" }'
+  Set-Content "$inst\resources\core\src\hold.mjs" 'setInterval(() => {}, 1 << 30)'
+  Check 'the older build''s resources\runtime and resources\core are laid out' ((Old-Node-Folders).Count -eq 2)
+  if (-not $Hold) { return $null }
+  $p = Start-Process "$rt\node-$ver\node.exe" -ArgumentList "`"$inst\resources\core\src\hold.mjs`"" -PassThru -WindowStyle Hidden
+  $null = $p.Handle
+  Start-Sleep -Seconds 2
+  Check '  and its node.exe runs, holding the file' (-not $p.HasExited) "pid $($p.Id)"
+  Check '  so it cannot be deleted' ((Get-Process -Id $p.Id -ErrorAction SilentlyContinue).Path -eq "$rt\node-$ver\node.exe") "$((Get-Process -Id $p.Id -ErrorAction SilentlyContinue).Path)"
+  $p
 }
 
 # What 2.0 writes to disk names spawnloft-core, never a Node (A5): the files, and the record
@@ -347,9 +390,12 @@ function Check-Layout2 {
   Check '1.x uninstaller gone' (-not (Test-Path "$inst\Uninstall SpawnLoft.exe"))
   Check '2.0 uninstaller present' (Test-Path "$inst\uninstall.exe")
   Check 'core at resources\bin\spawnloft-core.exe' (Test-Path "$inst\resources\bin\spawnloft-core.exe")
-  Check 'Node core at resources\core\mcctl.mjs' (Test-Path "$inst\resources\core\mcctl.mjs")
-  $rt = Read-Json "$inst\resources\runtime\runtime.json"
-  Check 'bundled Node at resources\runtime\node-<ver>\node.exe' ($rt -and $rt.exe -match '^node-[\d.]+/node\.exe$' -and (Test-Path (Join-Path "$inst\resources\runtime" $rt.exe))) "$($rt | ConvertTo-Json -Compress)"
+  Check 'the licence at resources\LICENSE' (Test-Path "$inst\resources\LICENSE")
+  # no Node and no Node core in 2.x (rust/PLAN-CORE-PORT.md 5.1); over 1.x, its resources\core
+  # was read by `handover stop` before anything removed it
+  Check 'no resources\runtime and no resources\core' ((Old-Node-Folders).Count -eq 0) "$(Old-Node-Folders)"
+  $leftNode = @(Get-ChildItem $inst -Recurse -File -Include 'node.exe', '*.mjs' -ErrorAction SilentlyContinue | ForEach-Object FullName)
+  Check 'no node.exe and no .mjs anywhere in the install folder' ($leftNode.Count -eq 0) "$leftNode"
   Check 'the CLI forwarders at 1.x''s paths' ((Test-Path "$inst\resources\bin\spawnloft.cmd") -and (Test-Path "$inst\resources\bin\mcctl.cmd"))
   Check 'staging folder removed' (-not (Test-Path "$inst\resources\bin\staging"))
   $v2 = Reg $uninstKey 'DisplayVersion'

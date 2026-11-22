@@ -46,3 +46,17 @@ path = "src/bin/net-probe.rs"
 [[bin]]
 name = "fake-scheduler"
 path = "src/bin/fake-scheduler.rs"
+
+# Test-only: the native JVM stand-in for the installer scenarios (installer.yml,
+# installer-linux.yml), which 1.x's and 2.0's daemons both run; ported from the
+# installer/ci/fake-java.mjs it replaces.
+[[bin]]
+name = "fake-java"
+path = "src/bin/fake-java.rs"
+
+# Test-only: the MariaDB tools for the installer scenarios (installer.yml), one program copied
+# under each tool's name; a native port of test/fixtures/fake-mariadb, which a release 2.0 core
+# cannot run.
+[[bin]]
+name = "fake-mariadb"
+path = "src/bin/fake-mariadb.rs"

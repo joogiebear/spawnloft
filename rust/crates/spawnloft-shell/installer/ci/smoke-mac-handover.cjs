@@ -139,6 +139,9 @@ async function main() {
     assert.equal(plist(installed, 'CFBundleIdentifier'), 'io.github.joogiebear.mcctl')
     assert.equal(plist(installed, 'CFBundleShortVersionString'), version)
     assert.ok(fs.existsSync(path.join(installed, 'Contents/Resources/resources/bin/spawnloft-core')), 'the 2.0 bundle has no Rust core in resources/bin')
+    // Squirrel.Mac replaces the bundle whole: nothing of 1.x's Node core is left, and 2.0 ships no
+    // Node (rust/PLAN-CORE-PORT.md 5.1)
+    for (const dir of ['core', 'runtime']) assert.ok(!fs.existsSync(path.join(installed, 'Contents/Resources/resources', dir)), `the installed bundle has resources/${dir}`)
     execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', installed])
     await validateStapled(installed, { run: (command, args) => spawnSync('/usr/bin/' + command, args, { encoding: 'utf8' }) })
     const spctl = spawnSync('/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=2', installed], { encoding: 'utf8' })

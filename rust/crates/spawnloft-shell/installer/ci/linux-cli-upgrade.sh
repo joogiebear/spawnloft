@@ -1,9 +1,10 @@
 #!/bin/sh
 # Inside a clean container, as root: the headless package. Install the published 1.x
 # spawnloft-cli, start a server with it, install the 2.0 spawnloft-cli over it, and check that
-# /usr/bin/spawnloft is now the Rust core on the bundled runtime, that what 1.x wrote to disk
+# /usr/bin/spawnloft is now the Rust core and no Node came with it, that what 1.x wrote to disk
 # (task shims and MCP configs name /opt/spawnloft-cli/bin/node and core/mcctl.mjs) still runs,
-# that 2.0 sees and stops the 1.x server, and that the desktop package is refused beside it.
+# now through bin/node as a link to the core (rust/PLAN-CORE-PORT.md 5.2), that 2.0 sees and
+# stops the 1.x server, and that the desktop package is refused beside it.
 # desktop/smoke-cli-package.sh then runs a server end to end on the installed 2.0 package.
 #
 #   docker run --rm -v "$PWD:/repo:ro" -v "$PKG:/pkg:ro" <image> sh /repo/rust/crates/spawnloft-shell/installer/ci/linux-cli-upgrade.sh deb|rpm <old version> <new version>
@@ -38,12 +39,14 @@ export SPAWNLOFT_DATA_ROOT=/tmp/spawnloft-data
 export MCCTL_DATA_ROOT="$SPAWNLOFT_DATA_ROOT"
 export HOME=/tmp/spawnloft-home
 mkdir -p "$HOME" "$SPAWNLOFT_DATA_ROOT/instances/pkgtest"
-cp /repo/test/fixtures/fake-java.mjs /tmp/fake-java.mjs
+# the native JVM stand-in (spawnloft-fakes' fake-java, static), which 1.x's daemon and 2.0's both
+# run as a real java (a release 2.0 core runs no .mjs one); the workflow puts it in /repo/fakes
+cp "${FAKE_JAVA:-/repo/fakes/fake-java}" /tmp/fake-java && chmod 755 /tmp/fake-java
 printf 'eula=true\n' > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/eula.txt"
 : > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/server.jar"
 cat > "$SPAWNLOFT_DATA_ROOT/instances.json" <<JSON
 { "version": 1, "instances": { "pkgtest": {
-  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java.mjs", "memory": "1G",
+  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java", "memory": "1G",
   "port": 45665, "rcon": { "port": 45675, "password": "package-smoke" }, "autoRestart": false } } }
 JSON
 spawnloft start pkgtest
@@ -58,11 +61,14 @@ test "$(cat /opt/spawnloft-cli/package-type)" = "$kind" || fail "package-type"
 out=$(spawnloft --version)
 echo "spawnloft --version: $out"
 case "$out" in "spawnloft-core $new "*) ;; *) fail "/usr/bin/spawnloft is not the $new core" ;; esac
-test -f /opt/spawnloft-cli/runtime/runtime.json || fail "no runtime.json"
-node_exe="/opt/spawnloft-cli/runtime/$(sed -n 's/.*"exe": *"\([^"]*\)".*/\1/p' /opt/spawnloft-cli/runtime/runtime.json)"
-test -x "$node_exe" || fail "runtime.json names $node_exe, which is not there"
-# the 1.x path stays, for what 1.x wrote to disk
-test "$(readlink -f /opt/spawnloft-cli/bin/node)" = "$(readlink -f "$node_exe")" || fail "bin/node does not reach the runtime"
+# no Node and no Node core: the 1.x package's went with it
+for d in /opt/spawnloft-cli/runtime /opt/spawnloft-cli/core; do
+  test ! -e "$d" || fail "$d is there: a 2.x package carries no Node: $(find "$d" | head -n 20 | tr '\n' ' ')"
+done
+test -f /opt/spawnloft-cli/LICENSE || fail "no LICENSE beside the binaries"
+# the 1.x path stays, for what 1.x wrote to disk: a link to the core, which drops the
+# mcctl.mjs argument (that file is gone and never read)
+test "$(readlink -f /opt/spawnloft-cli/bin/node)" = /opt/spawnloft-cli/bin/spawnloft-core || fail "bin/node does not reach the core: $(readlink -f /opt/spawnloft-cli/bin/node)"
 /opt/spawnloft-cli/bin/node /opt/spawnloft-cli/core/mcctl.mjs list | grep -q pkgtest || fail "the 1.x shim form does not run"
 kill -0 "$pid" 2>/dev/null || fail "the 1.x daemon died during the upgrade"
 echo "the 1.x daemon (pid $pid) kept running through the upgrade"

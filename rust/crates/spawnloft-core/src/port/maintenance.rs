@@ -3,6 +3,9 @@
 //! `repair --quiet` is the installer's form (design 2.3 step 8): nothing printed, a line in
 //! `run/handover.log`, and the exit code.
 
+#[cfg(any(windows, test))]
+use std::path::{Path, PathBuf};
+
 use serde_json::{Value, json};
 
 use spawnloft_lib::failure::Failure;
@@ -47,6 +50,15 @@ pub fn repair(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         return Ok(());
     }
     checked?;
+    #[cfg(windows)]
+    if let Some(note) = node_leftovers() {
+        if quiet {
+            quiet_log(note);
+        } else if !flag(ctx, "json") {
+            ctx.out
+                .line(&format!("{}{}.", note[..1].to_uppercase(), &note[1..]));
+        }
+    }
     let signature = relocate::runtime_signature();
     let marker = relocate::marker_file(ctx.layout);
     let result = relocate::repair_after_move(ctx.layout, &sched(ctx), &marker, &signature, true);
@@ -92,6 +104,82 @@ pub fn repair(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     Ok(())
 }
 
+/// What [`remove_node_leftovers`] found.
+#[cfg(any(windows, test))]
+#[derive(Debug, PartialEq, Eq)]
+enum Leftovers {
+    /// Neither folder is there.
+    None,
+    /// Both are gone.
+    Removed,
+    /// A file in them could not be deleted (a node.exe still running), so they stay.
+    Held,
+}
+
+/// The `resources` folder of an installed copy, from the running binary's path
+/// (`<install>\resources\bin\spawnloft-core.exe`), or `None` when the binary does not sit there
+/// (a build run from `rust\target`).
+#[cfg(any(windows, test))]
+fn resources_of(exe: &Path) -> Option<PathBuf> {
+    let bin = exe.parent()?;
+    let resources = bin.parent()?;
+    let named = |p: &Path, name: &str| p.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
+    (named(bin, "bin") && named(resources, "resources")).then(|| resources.to_path_buf())
+}
+
+/// The `resources\runtime` (the bundled Node) and `resources\core` (the Node core) that 2.0
+/// builds before C10 shipped (rust/PLAN-CORE-PORT.md sections 5.1 and 7). An update leaves what
+/// the new package does not list, and the installer removes them itself unless a Node process
+/// started before the update still holds its node.exe; this finishes that job. As the installer
+/// does (installer.nsi SPAWNLOFT_REMOVE_NODE): every node.exe first, and when one cannot be
+/// deleted both folders stay, for a later repair or install. A failed delete is never an error,
+/// and nothing outside the two folders is touched. A folder is only taken for SpawnLoft's when it
+/// holds what SpawnLoft put there (`runtime\runtime.json`, `core\mcctl.mjs`): the install folder
+/// can be one the person chose, and another app's `resources\core` is not ours to delete.
+#[cfg(any(windows, test))]
+fn remove_node_leftovers(resources: &Path) -> Leftovers {
+    let runtime = Some(resources.join("runtime")).filter(|r| r.join("runtime.json").is_file());
+    let core = Some(resources.join("core")).filter(|c| c.join("mcctl.mjs").is_file());
+    if runtime.is_none() && core.is_none() {
+        return Leftovers::None;
+    }
+    let mut held = false;
+    for entry in runtime
+        .iter()
+        .flat_map(|r| std::fs::read_dir(r).into_iter().flatten().flatten())
+    {
+        let exe = entry.path().join("node.exe");
+        if exe.is_file() && std::fs::remove_file(&exe).is_err() {
+            held = true;
+        }
+    }
+    if !held {
+        for dir in runtime.iter().chain(&core) {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+    }
+    if runtime.iter().chain(&core).any(|d| d.exists()) {
+        Leftovers::Held
+    } else {
+        Leftovers::Removed
+    }
+}
+
+/// [`remove_node_leftovers`] beside the running binary, as the line repair logs or prints.
+#[cfg(windows)]
+fn node_leftovers() -> Option<&'static str> {
+    let resources = resources_of(&std::env::current_exe().ok()?)?;
+    match remove_node_leftovers(&resources) {
+        Leftovers::None => None,
+        Leftovers::Removed => {
+            Some("removed resources\\runtime and resources\\core, which an older build left")
+        }
+        Leftovers::Held => {
+            Some("resources\\runtime and resources\\core stay: a node.exe in them is still running")
+        }
+    }
+}
+
 /// `cmdUninstall`: run by the uninstaller. Stops servers, removes scheduled tasks, and with
 /// `--data` deletes what SpawnLoft created.
 pub fn uninstall(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
@@ -127,4 +215,83 @@ pub fn uninstall(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         ctx.out.set_code(1);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("sl-port-maint-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn only_an_installed_copy_has_a_resources_folder_to_clean() {
+        let base = Path::new("C:/Users/v/AppData/Local/Programs/SpawnLoft");
+        let exe = base.join("resources").join("bin").join("spawnloft-core.exe");
+        assert_eq!(resources_of(&exe), Some(base.join("resources")));
+        let upper = base.join("Resources").join("BIN").join("spawnloft-core.exe");
+        assert_eq!(resources_of(&upper), Some(base.join("Resources")));
+        for other in [
+            "rust/target/release/spawnloft-core.exe",
+            "resources/spawnloft-core.exe",
+            "spawnloft-core.exe",
+        ] {
+            assert_eq!(resources_of(Path::new(other)), None, "{other}");
+        }
+    }
+
+    #[test]
+    fn the_old_runtime_and_core_go_and_nothing_else() {
+        let resources = scratch("leftovers");
+        for dir in [
+            "runtime/node-24.22.3",
+            "runtime/old-20261120-101500",
+            "core/src",
+            "bin",
+        ] {
+            std::fs::create_dir_all(resources.join(dir)).unwrap();
+        }
+        for file in [
+            "runtime/runtime.json",
+            "runtime/node-24.22.3/node.exe",
+            "runtime/node-24.22.3/LICENSE",
+            "runtime/old-20261120-101500/node.exe",
+            "core/mcctl.mjs",
+            "core/package.json",
+            "core/src/ui.mjs",
+            "bin/spawnloft-core.exe",
+            "bin/spawnloft.cmd",
+            "LICENSE",
+        ] {
+            std::fs::write(resources.join(file), "x").unwrap();
+        }
+        assert_eq!(remove_node_leftovers(&resources), Leftovers::Removed);
+        assert!(!resources.join("runtime").exists() && !resources.join("core").exists());
+        for kept in ["bin/spawnloft-core.exe", "bin/spawnloft.cmd", "LICENSE"] {
+            assert!(resources.join(kept).is_file(), "{kept} was touched");
+        }
+        // the next repair finds nothing to do
+        assert_eq!(remove_node_leftovers(&resources), Leftovers::None);
+        // another app's folders of the same names (no runtime.json, no mcctl.mjs) stay
+        for file in ["runtime/node-1/node.exe", "core/index.js"] {
+            let f = resources.join(file);
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+            std::fs::write(&f, "x").unwrap();
+        }
+        assert_eq!(remove_node_leftovers(&resources), Leftovers::None);
+        assert!(
+            resources.join("runtime/node-1/node.exe").is_file() && resources.join("core/index.js").is_file()
+        );
+        std::fs::remove_dir_all(resources.join("runtime")).unwrap();
+        std::fs::remove_dir_all(resources.join("core")).unwrap();
+        // a core folder left alone (its runtime already gone) goes too
+        std::fs::create_dir_all(resources.join("core")).unwrap();
+        std::fs::write(resources.join("core/mcctl.mjs"), "x").unwrap();
+        assert_eq!(remove_node_leftovers(&resources), Leftovers::Removed);
+        std::fs::remove_dir_all(&resources).unwrap();
+    }
 }

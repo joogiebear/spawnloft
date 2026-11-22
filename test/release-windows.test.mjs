@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseArgs, signingSettings, gateArgs, OPENJS_CN } from '../rust/crates/spawnloft-shell/installer/release-windows.mjs'
+import { parseArgs, signingSettings, gateArgs } from '../rust/crates/spawnloft-shell/installer/release-windows.mjs'
 import { signCommand } from '../rust/crates/spawnloft-shell/installer/sign-command.mjs'
 import { parseSigned } from '../desktop/release-gate.mjs'
 
@@ -34,17 +34,20 @@ test('the signing account is the one 1.x stables are signed with', () => {
   assert.throws(() => signingSettings({}), /azureSignOptions/)
 })
 
-test('the gate is asked for the publisher on the setup, the shell and the core, and OpenJS on node.exe', () => {
-  const args = gateArgs({ out: 'O', version: '2.0.0-beta.1', pubkey: 'P', publisher: 'victor zemeckis', shellExe: 'S.exe', coreExe: 'C.exe', nodeExe: 'N\\node.exe', runtime: 'R', payload: 'Y' })
+test('the gate is asked for the publisher on the setup, the shell and the core, and for a payload without Node', () => {
+  const args = gateArgs({ out: 'O', version: '2.0.0-beta.1', pubkey: 'P', publisher: 'victor zemeckis', shellExe: 'S.exe', coreExe: 'C.exe', payload: 'Y' })
   assert.deepEqual(args.slice(args.indexOf('--authenticode-cn'), args.indexOf('--authenticode-cn') + 2), ['--authenticode-cn', 'victor zemeckis'])
   const signed = args.flatMap((a, i) => (a === '--signed' ? [parseSigned(args[i + 1])] : []))
-  assert.deepEqual(signed, [{ file: 'S.exe', cn: null }, { file: 'C.exe', cn: null }, { file: 'N\\node.exe', cn: OPENJS_CN }])
+  assert.deepEqual(signed, [{ file: 'S.exe', cn: null }, { file: 'C.exe', cn: null }])
+  // no bundled Node since C10 (rust/PLAN-CORE-PORT.md 5.1): the gate's --runtime is gone
+  assert.ok(!args.includes('--runtime') && !args.some(a => /node\.exe/i.test(a)))
+  assert.equal(args[args.indexOf('--payload') + 1], 'Y')
   assert.ok(args.includes('--check-binary-versions'))
   // release mode on the Windows half, the built shell and core read for their keys
   assert.ok(args.includes('--release') && args.includes('--partial'))
   assert.deepEqual(args.flatMap((a, i) => (a === '--binary' ? [args[i + 1]] : [])), ['S.exe', 'C.exe'])
   assert.ok(!args.includes('--throwaway-key') && !args.includes('--write-record'))
-  const more = gateArgs({ out: 'O', version: '2.0.0-beta.1', pubkey: 'P', publisher: 'p', shellExe: 'S.exe', coreExe: 'C.exe', nodeExe: 'N', runtime: 'R', payload: 'Y', record: 'O.gate-record.json', throwaway: true })
+  const more = gateArgs({ out: 'O', version: '2.0.0-beta.1', pubkey: 'P', publisher: 'p', shellExe: 'S.exe', coreExe: 'C.exe', payload: 'Y', record: 'O.gate-record.json', throwaway: true })
   assert.ok(more.includes('--throwaway-key'))
   assert.equal(more[more.indexOf('--write-record') + 1], 'O.gate-record.json')
 })

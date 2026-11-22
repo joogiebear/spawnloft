@@ -5,8 +5,9 @@
  *
  *   SpawnLoft.exe seed-1x.mjs <1.x core dir> <spec json file>
  *
- * spec: { servers: [{ name, ignoreStop? }], databases: [name], fixtures: <dir with fake-java.mjs
- * and fake-mariadb> }. Prints { dataRoot, servers: { name: dir }, databases: { name: dir } }.
+ * spec: { servers: [{ name, ignoreStop? }], databases: [name], fixtures: <dir with fake-java.exe
+ * (spawnloft-fakes' native stand-in, which 1.x's and 2.0's daemons both run) and fake-mariadb\bin
+ * with spawnloft-fakes' fake-mariadb.exe under each tool's name> }. Prints { dataRoot, servers: { name: dir }, databases: { name: dir } }.
  */
 import fs from 'node:fs'
 import net from 'node:net'
@@ -41,7 +42,7 @@ for (const s of spec.servers || []) {
   putInstance(s.name, {
     dir,
     jar: 'server.jar',
-    java: path.join(spec.fixtures, 'fake-java.mjs'),
+    java: path.join(spec.fixtures, 'fake-java.exe'),
     memory: '1G',
     port,
     rcon: { port: rcon, password: 'installer-ci' },

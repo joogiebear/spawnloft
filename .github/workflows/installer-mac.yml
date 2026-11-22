@@ -149,13 +149,6 @@ jobs:
             codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" ../../target/release/spawnloft-core
             codesign --verify --strict --verbose=2 ../../target/release/spawnloft-core
             ../../target/release/spawnloft-core --version
-            # the bundled Node (PLAN-2.0-REMAINING.md A7): pinned and hash-checked, then signed with
-            # the Developer ID and the JIT entitlements, which V8 needs under the hardened runtime
-            node installer/mac-config.mjs --stage-runtime "$RUNNER_TEMP/cfg-$v"
-            nodebin="$(node -p 'const d=process.argv[1]; d + "/" + require(d + "/runtime.json").exe' "$RUNNER_TEMP/cfg-$v/runtime")"
-            codesign --force --options runtime --timestamp --entitlements installer/node.entitlements --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" "$nodebin"
-            codesign --verify --strict --verbose=2 "$nodebin"
-            "$nodebin" -e 'console.log("bundled node", process.version, process.arch)'
             node installer/mac-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --icons="$RUNNER_TEMP/icons" --feed-http
             # start from a clean bundle dir so a stale .app/.app.tar.gz (from the restored cache, or
             # from build a) is never mistaken for this build
@@ -329,12 +322,6 @@ jobs:
           codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" ../../target/release/spawnloft-core
           codesign --verify --strict --verbose=2 ../../target/release/spawnloft-core
           ../../target/release/spawnloft-core --version
-          node installer/mac-config.mjs --stage-runtime "$cfg"
-          # the pinned archive's bytes, before the Developer ID signature changes them
-          node -e "import('../../../desktop/payload-gate.mjs').then(m => { const p = m.checkRuntime(process.argv[1]); if (p.length) { console.error(p.join('\\n')); process.exit(1) } console.log('bundled Node is the pinned archive') })" "$cfg/runtime"
-          nodebin="$(node -p 'const d=process.argv[1]; d + "/" + require(d + "/runtime.json").exe' "$cfg/runtime")"
-          codesign --force --options runtime --timestamp --entitlements installer/node.entitlements --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" "$nodebin"
-          codesign --verify --strict --verbose=2 "$nodebin"
           # release.pub, no --feed-http: the shell trusts the release key and speaks HTTPS only
           node installer/mac-config.mjs "$v" release.pub "$cfg" --icons="$RUNNER_TEMP/icons"
           if grep -q dangerousInsecureTransportProtocol "$cfg/overlay.json"; then echo "::error::the release overlay allows an HTTP feed"; exit 1; fi
