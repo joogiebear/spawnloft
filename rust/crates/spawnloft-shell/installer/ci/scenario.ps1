@@ -1,11 +1,12 @@
 # One installer scenario of rust/INSTALLER-UPDATER-DESIGN.md section 11, on a fresh windows-latest
 # machine (installer.yml runs each in a job of its own).
 #
-#   scenario.ps1 -Name s1|s2a|s2b|s3|s4|s5|s8|s9|s10|s11 -Feed <dir with the 2.0 installers> -Beta <1.6 setup>
+#   scenario.ps1 -Name s1|s2a|s2b|s3|s4|s5|s8|s9|s10|s11|s12 -Feed <dir with the 2.0 installers> -Beta <1.6 setup>
 #                -Stable <1.5.0 setup> -VersionA <2.x a> -VersionB <2.x b> [-NodeMode none|decoy]
 #
-# Every scenario runs with no Node.js on PATH (2.0 carries its own); -NodeMode decoy puts a
-# node.exe on PATH that fails and logs each run, and the scenario fails if anything ran it.
+# Every scenario runs with no Node.js on PATH (2.0 runs none, rust/PLAN-CORE-PORT.md 5.1);
+# -NodeMode decoy puts a node.exe on PATH that fails and logs each run, and the scenario fails if
+# anything ran it.
 #
 # Writes $env:RESULTS\<name>.json; exits non-zero on the first broken expectation.
 param(
@@ -207,7 +208,7 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   Check-Graceful $dataRoot 'mysql-main' $dbJava 'Normal shutdown'
   Check "lost's JVM was not touched" (Pid-Alive $lostJava) "pid $lostJava"
   $starts = Starts $seed.servers.survival
-  Check 'survival was started again on the bundled Node, not by SpawnLoft.exe or a system Node' ($starts.Count -ge 2 -and $starts[-1].runtime -like "$inst\resources\runtime\node-*\node.exe") "$($starts | ConvertTo-Json -Compress)"
+  Check 'survival was started again by 2.0, not by SpawnLoft.exe as Node' ($starts.Count -ge 2 -and $starts[-1].runtime -notlike '*\SpawnLoft.exe') "$($starts | ConvertTo-Json -Compress)"
   Check-Rust-Daemon $dataRoot 'survival' | Out-Null
   Check-Rust-Daemon $dataRoot 'mysql-main' | Out-Null
   $l2 = Status2
@@ -400,10 +401,10 @@ switch ($Name) {
     Check "2.x a installs (exit 0)" ($run.code -eq 0) "exit $($run.code)"
     Kill-Everything
     $dataRoot = Use-Layout 'new'
-    # a server made by 2.0 (its registry, through the machine's Node)
+    # a server made by 2.0 (its registry, through the checkout's Node core on the harness's Node)
     $spec = @{ servers = @(@{ name = 'live' }); databases = @(); fixtures = $fixtures } | ConvertTo-Json -Depth 4
     Set-Content (Join-Path $env:RUNNER_TEMP 'seed2.json') $spec
-    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", "$inst\resources\core", (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
+    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", $script:checkoutCore, (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
     Check 'seeded through 2.0' ($r.code -eq 0) "$($r.out)$($r.err)"
     $seed = ($r.out.Trim() -split "`n")[-1] | ConvertFrom-Json
     Cli2 @('task', 'add', 'live', '--do', 'backup', '--daily', '03:00') | Out-Null
@@ -434,11 +435,12 @@ switch ($Name) {
     $probe.newNameAfter = Probe $pa.Id
     $probe.folderAfter = Probe $pb.Id
 
-    # an MCP server running through the update holds the bundled node.exe (A6, design scenario 5)
+    # an MCP server running through the update holds spawnloft-core.exe, as the daemon does (design
+    # scenario 5); it starts no Node
     $mcp = Start-Mcp
     Check 'an MCP server answers before the update' ((Mcp-Initialize $mcp).result.serverInfo.name -eq 'spawnloft')
-    $mcpNode = @(Node-Children $mcp.Id)[0]
-    Check '  on the bundled Node' ($mcpNode -and $mcpNode.ExecutablePath -like "$inst\resources\runtime\node-*\node.exe") "$($mcpNode.ExecutablePath)"
+    $mcpNode = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($mcp.Id)" | Where-Object { $_.Name -eq 'node.exe' })
+    Check '  and starts no Node' ($mcpNode.Count -eq 0) "$($mcpNode.ExecutablePath)"
 
     $run = Run-Installer $setupB @('/P', '/UPDATE', '/R') 600
     $script:result.update = $run
@@ -450,16 +452,12 @@ switch ($Name) {
     Check 'the daemon survived' (Pid-Alive $daemon)
     Check 'the JVM survived' (Pid-Alive $java)
     Check 'status says running through the update' ((Status2)['live'].status -eq 'running')
-    $heldNode = @(Get-ChildItem "$inst\resources\runtime" -Directory -Filter 'old-*')
-    Check 'the held node.exe sits in resources\runtime\old-<stamp>\node.exe' ($heldNode.Count -eq 1 -and (Test-Path (Join-Path $heldNode[0].FullName 'node.exe'))) "$($heldNode.Name)"
-    $rt = Read-Json "$inst\resources\runtime\runtime.json"
-    Check 'and the new one is in place' (Test-Path (Join-Path "$inst\resources\runtime" $rt.exe))
+    Check 'no resources\runtime and no resources\core after the update' ((Old-Node-Folders).Count -eq 0) "$(Old-Node-Folders)"
     $tools = Mcp-Call $mcp 2 'tools/list'
     Check 'the MCP server still answers after the update' (@($tools.result.tools).Count -gt 0) "$($tools | ConvertTo-Json -Compress -Depth 3)"
-    # a killed forwarder takes its Node with it (the kill-on-close job, A6)
-    $mcpNodePid = Proc-Key $mcpNode.ProcessId
+    # the old core it runs from is in resources\bin\old-<stamp>, which the next install removes
+    # once nothing runs it
     Stop-Process -Id $mcp.Id -Force
-    Check 'killing spawnloft-core mcp ends its Node too' (Wait-Until { -not (Pid-Alive $mcpNodePid) } 30) "node $mcpNodePid"
     # a 2.x update runs no repair itself; the app's first start (or this) writes the record
     Cli2 @('repair', '--json') | Out-Null
     Check-Entry-Point $dataRoot
@@ -479,7 +477,6 @@ switch ($Name) {
     $run = Run-Installer $setupB @('/P', '/UPDATE') 600
     Check 'the next install (b again) exit 0' ($run.code -eq 0) "exit $($run.code)"
     Check 'and it removed the old-<stamp> folder' (@(Get-ChildItem "$inst\resources\bin" -Directory -Filter 'old-*').Count -eq 0)
-    Check 'and the old node.exe folder' (@(Get-ChildItem "$inst\resources\runtime" -Directory -Filter 'old-*').Count -eq 0)
   }
 
   's8' {
@@ -499,7 +496,7 @@ switch ($Name) {
     $dataRoot = Use-Layout 'new'
     $spec = @{ servers = @(@{ name = 'keep' }); databases = @(); fixtures = $fixtures } | ConvertTo-Json -Depth 4
     Set-Content (Join-Path $env:RUNNER_TEMP 'seed2.json') $spec
-    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", "$inst\resources\core", (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
+    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", $script:checkoutCore, (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
     Check 'seeded through 2.0' ($r.code -eq 0) "$($r.out)$($r.err)"
     $seed = ($r.out.Trim() -split "`n")[-1] | ConvertFrom-Json
     Cli2 @('task', 'add', 'keep', '--do', 'backup', '--daily', '03:00') | Out-Null
@@ -794,6 +791,66 @@ switch ($Name) {
     Check '  2.0 lists good running' ((Status2)['good'].status -eq 'running')
     Check '  the task is on again' ("$((Get-ScheduledTask -TaskPath '\mcctl\' -TaskName $task.TaskName).State)" -ne 'Disabled' -and [bool] $rec.tasksReenabled)
     Check '  no sign-in restore left behind' (-not (Reg 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce' 'SpawnLoftHandover'))
+  }
+
+  's12' {
+    # rust/PLAN-CORE-PORT.md section 7: an update from a 2.0 build that carried Node. The update
+    # deletes no file the new package does not list, so the installer removes resources\runtime
+    # and resources\core itself; while a node.exe started before the update (an MCP session, a bot
+    # run) still runs, both stay, and a later install or `spawnloft-core repair` removes them.
+    Start-Scenario 's12-update-over-a-held-bundled-node'
+    $dataRoot = Use-Layout 'new'
+    $run = Run-Installer $setupA @('/S') 300
+    Check '2.x a installs (exit 0)' ($run.code -eq 0) "exit $($run.code)"
+    Kill-Everything
+    Check 'a fresh install has no resources\runtime and no resources\core' ((Old-Node-Folders).Count -eq 0) "$(Old-Node-Folders)"
+
+    # 1. the update while the old node.exe runs: both folders stay, and nothing fails
+    $held = Seed-Old-Node -Hold
+    $run = Run-Installer $setupB @('/P', '/UPDATE') 600
+    $script:result.updateHeld = $run
+    Check '2.x a -> b with a held node.exe exit 0' ($run.code -eq 0) "exit $($run.code)"
+    Check '  b is installed' ((Reg $uninstKey 'DisplayVersion') -eq $VersionB) (Reg $uninstKey 'DisplayVersion')
+    Check '  the old node.exe still runs' (-not $held.HasExited)
+    Check '  resources\runtime and resources\core both stay' ((Old-Node-Folders).Count -eq 2) "$(Old-Node-Folders)"
+    Check '  the held node.exe and the Node core files with them' ((Test-Path "$inst\resources\runtime\node-24.22.3\node.exe") -and (Test-Path "$inst\resources\core\mcctl.mjs") -and (Test-Path "$inst\resources\core\src\hold.mjs"))
+    $v = Core @('--version')
+    Check '  the new core runs beside them' ($v.out -match [regex]::Escape(" $VersionB ")) "$($v.out)"
+
+    # 2. once it has ended, `repair --quiet` (what the installer runs over 1.x) removes both
+    Stop-Process -Id $held.Id -Force
+    Check 'the old node.exe ended' ($held.WaitForExit(30000))
+    Start-Sleep -Seconds 1
+    $r = Core @('repair', '--quiet') -AllowFail
+    $script:result.repairCode = $r.code
+    Check 'repair --quiet removed resources\runtime and resources\core' ((Old-Node-Folders).Count -eq 0) "$(Old-Node-Folders)"
+    $log = Join-Path $dataRoot 'run\handover.log'
+    $logText = if (Test-Path $log) { Get-Content $log -Raw } else { '' }
+    $script:result.handoverLog = $logText
+    Check '  and said so in handover.log' ($logText -match 'repair: removed resources\\runtime and resources\\core') $logText
+    Check '  the rest of the install is untouched' ((Test-Path "$inst\resources\bin\spawnloft-core.exe") -and (Test-Path "$inst\resources\bin\spawnloft.cmd") -and (Test-Path "$inst\resources\LICENSE") -and (Test-Path "$inst\SpawnLoft.exe"))
+    $r = Core @('repair', '--quiet') -AllowFail
+    Check '  a second repair finds nothing to remove' ((Old-Node-Folders).Count -eq 0 -and $r.code -eq $script:result.repairCode) "exit $($r.code)"
+
+    # 3. the same through the installer: held at one install, removed by the next
+    $held = Seed-Old-Node -Hold
+    $run = Run-Installer $setupB @('/P', '/UPDATE') 600
+    Check 'b again with a held node.exe exit 0' ($run.code -eq 0) "exit $($run.code)"
+    Check '  both folders stay' ((Old-Node-Folders).Count -eq 2) "$(Old-Node-Folders)"
+    Stop-Process -Id $held.Id -Force
+    Check 'the old node.exe ended' ($held.WaitForExit(30000))
+    Start-Sleep -Seconds 1
+    $run = Run-Installer $setupB @('/P', '/UPDATE') 600
+    Check 'b again, nothing held, exit 0' ($run.code -eq 0) "exit $($run.code)"
+    Check '  the install removed resources\runtime and resources\core' ((Old-Node-Folders).Count -eq 0) "$(Old-Node-Folders)"
+    Check '  and kept its own files' ((Test-Path "$inst\resources\bin\spawnloft-core.exe") -and (Test-Path "$inst\resources\LICENSE"))
+
+    # 4. nothing held at the update: removed by that same install
+    Seed-Old-Node | Out-Null
+    $run = Run-Installer $setupB @('/P', '/UPDATE') 600
+    Check 'b over an older build''s folders, nothing held, exit 0' ($run.code -eq 0) "exit $($run.code)"
+    Check '  removed by that install' ((Old-Node-Folders).Count -eq 0) "$(Old-Node-Folders)"
+    Kill-Everything
   }
 
   default { throw "unknown scenario $Name" }

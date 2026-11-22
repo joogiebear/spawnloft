@@ -9,6 +9,8 @@
 #     relaunch and 1.x task shims run it) and /opt/SpawnLoft/resources/bin/spawnloft (what
 #     /usr/bin/spawnloft execed in 1.x and what MCP configs may hold);
 #   - /usr/bin/spawnloft is the Rust core; /usr/bin/spawnloft-desktop is still the app;
+#   - no Node and no Node core are installed (rust/PLAN-CORE-PORT.md 5.1), yet the 1.x shim form
+#     (the app with resources/core/mcctl.mjs) still reaches the core, which drops that argument;
 #   - the window's libraries resolve on this distribution; user data is untouched;
 #   - the 1.x server keeps running through the upgrade, and the 2.0 command line sees it and
 #     stops it;
@@ -111,7 +113,14 @@ for f in /opt/SpawnLoft/spawnloft-desktop /opt/SpawnLoft/resources/bin/spawnloft
          /opt/SpawnLoft/resources/bin/spawnloft-core /usr/bin/spawnloft; do
   test -x "$f" || fail "$f is missing or not executable"
 done
-test -f /opt/SpawnLoft/resources/core/mcctl.mjs || fail "no Node core"
+test -f /opt/SpawnLoft/resources/LICENSE || fail "no LICENSE beside the binaries"
+# no Node and no Node core: what 1.x had there went with the old package
+for d in /opt/SpawnLoft/resources/core /opt/SpawnLoft/resources/runtime; do
+  test ! -e "$d" || fail "$d is there: a 2.x package carries no Node"
+done
+if found=$(find /opt/SpawnLoft \( -name node -o -name node.exe -o -name '*.mjs' \) -print | head -n 5) && [ -n "$found" ]; then
+  fail "Node files in the package: $found"
+fi
 grep -q '^Exec=/opt/SpawnLoft/spawnloft-desktop %U$' /usr/share/applications/spawnloft-desktop.desktop || fail ".desktop entry"
 test "$(readlink -f /usr/bin/spawnloft-desktop)" = /opt/SpawnLoft/spawnloft-desktop || fail "/usr/bin/spawnloft-desktop is $(readlink -f /usr/bin/spawnloft-desktop 2>&1)"
 
@@ -138,7 +147,8 @@ spawnloft status pkgtest --json | grep -q '"status": *"running"' || fail "2.0 do
 spawnloft stop pkgtest
 spawnloft status pkgtest --json | grep -q '"status": *"stopped"' || fail "2.0 did not stop the 1.x server"
 if kill -0 "$pid" 2>/dev/null; then fail "the 1.x daemon (pid $pid) is still alive after stop"; fi
-# what a 1.x task shim or MCP config runs: the app with the Node core's script path
+# what a 1.x task shim or MCP config runs: the app with the Node core's script path, which no
+# longer exists and is never read (the shell drops it, rust/PLAN-CORE-PORT.md 5.2)
 /opt/SpawnLoft/spawnloft-desktop /opt/SpawnLoft/resources/core/mcctl.mjs list | grep -q pkgtest || fail "the 1.x shim form does not reach the core"
 spawnloft start pkgtest
 spawnloft status pkgtest --json | grep -q '"status": *"running"' || fail "2.0 did not start the server"

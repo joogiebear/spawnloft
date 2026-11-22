@@ -1,7 +1,8 @@
 /**
  * Every registered server and database with its status, through a core's own readState: run by
- * 1.x's SpawnLoft.exe as Node for the 1.x view, or by the machine's Node over the 2.0 install's
- * resources\core for 2.0's. (No shipped 1.x answers `list --json`.)
+ * 1.x's SpawnLoft.exe as Node over its resources\core for the 1.x view, or by the harness's Node
+ * over the checkout (its src\) for 2.0's, which ships no Node core (rust/PLAN-CORE-PORT.md 5.1)
+ * and keeps the same files. (No shipped 1.x answers `list --json`.)
  *
  *   <node> list.mjs <core dir>   prints [{ name, kind, status, daemonPid, javaPid, daemonExe }]
  */
