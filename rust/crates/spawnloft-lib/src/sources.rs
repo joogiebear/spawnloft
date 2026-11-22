@@ -1556,9 +1556,12 @@ pub enum JarProgress {
     Bytes { received: u64, total: u64 },
 }
 
+/// Who hears a download's progress.
+type Hears = std::rc::Rc<dyn Fn(JarProgress)>;
+
 thread_local! {
     /// Who hears the bytes of the download this thread is in ([`fetch_jar_reporting`]).
-    static BYTES: std::cell::RefCell<Option<std::rc::Rc<dyn Fn(JarProgress)>>> = const { std::cell::RefCell::new(None) };
+    static BYTES: std::cell::RefCell<Option<Hears>> = const { std::cell::RefCell::new(None) };
 }
 
 fn report_bytes(received: u64, total: u64) {
