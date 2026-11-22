@@ -345,8 +345,7 @@
     {
      "get": "/api/instances/run1/activity"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -436,7 +435,6 @@
      "body": "skip"
     }
    ],
-   "own": true,
    "timeoutMs": 300000
   },
   {

@@ -91,7 +91,7 @@ pub fn node_with(env: Option<PathBuf>, runtime: Option<PathBuf>) -> Result<PathB
     if let Some(p) = env {
         return Ok(p);
     }
-    crate::panel::path_node().ok_or_else(|| {
+    path_node().ok_or_else(|| {
         "Node.js was not found: this is a development build with no bundled runtime \
          (install Node 20 or later, or set SPAWNLOFT_NODE)"
             .to_string()
@@ -182,6 +182,40 @@ fn run_forwarded(cmd: Command, node: &Path) -> u8 {
             126
         }
     }
+}
+
+/// The first `node` on PATH (then the places a GUI-started app misses on macOS): what a
+/// development build with no bundled runtime runs on.
+fn path_node() -> Option<PathBuf> {
+    let exe = if cfg!(windows) { "node.exe" } else { "node" };
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .chain(gui_fallback_dirs())
+        .map(|dir| dir.join(exe))
+        .find(|p| p.is_file())
+}
+
+/// An app started from Finder or launchd gets PATH=/usr/bin:/bin:/usr/sbin:/sbin, without the
+/// places Node is installed (found on the Mac mini in P0-F); Electron never needed this because it
+/// carries Node. Checked after PATH, so a PATH entry still wins.
+fn gui_fallback_dirs() -> Vec<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+    let mut dirs = vec![
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+    ];
+    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        dirs.push(home.join(".volta/bin"));
+        // nvm keeps one folder per version; any of them will do for the spike (sorted by name)
+        if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
+            let mut versions: Vec<PathBuf> = entries.flatten().map(|e| e.path().join("bin")).collect();
+            versions.sort();
+            dirs.extend(versions.into_iter().rev());
+        }
+    }
+    dirs
 }
 
 #[cfg(test)]

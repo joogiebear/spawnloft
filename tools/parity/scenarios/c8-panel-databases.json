@@ -322,8 +322,7 @@
     {
      "get": "/api/databases"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -426,8 +425,7 @@
     {
      "get": "/api/databases/db1/backups"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -648,8 +646,7 @@
     {
      "get": "/api/databases"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -846,8 +843,7 @@
     {
      "get": "/api/databases"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [
@@ -951,8 +947,7 @@
     {
      "get": "/api/databases"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [

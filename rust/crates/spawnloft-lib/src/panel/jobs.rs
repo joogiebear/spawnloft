@@ -2,9 +2,6 @@
 //! page as an event stream: `jobs`, `cancels`, `jobUpdate`, `cancellable` and `cancelJob` of
 //! `ui.mjs`. In memory and keyed by an id the page chose; losing them at a restart is fine.
 
-// used by the route families as they move (C8); the allow goes with the last of them
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Mutex, MutexGuard};

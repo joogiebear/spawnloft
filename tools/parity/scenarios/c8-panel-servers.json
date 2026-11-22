@@ -499,8 +499,7 @@
     {
      "get": "/api/instances"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -563,7 +562,6 @@
      "post": "/api/instances/run1/stop"
     }
    ],
-   "own": true,
    "timeoutMs": 400000
   },
   {
@@ -607,8 +605,7 @@
     {
      "get": "/api/activity"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [

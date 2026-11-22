@@ -208,8 +208,12 @@
    "replace": "\"loginId\": \"<id>\""
   },
   {
-   "pattern": "(code_challenge|state)=[A-Za-z0-9_-]+",
-   "replace": "$1=<x>"
+   "pattern": "code_challenge=[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])",
+   "replace": "code_challenge=<x>"
+  },
+  {
+   "pattern": "state=[A-Za-z0-9_-]{22}(?![A-Za-z0-9_-])",
+   "replace": "state=<x>"
   },
   {
    "pattern": "localhost%3A\\d+",
@@ -486,8 +490,7 @@
     {
      "get": "/api/client/javas/x"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -772,8 +775,7 @@
     {
      "get": "/api/client/profiles"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [
@@ -932,8 +934,7 @@
     {
      "post": "/api/client/accounts/login"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "write": "data/client/accounts.json",
@@ -1175,7 +1176,6 @@
      "waitMs": 800
     }
    ],
-   "own": true,
    "env": {
     "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
    }
@@ -1209,7 +1209,6 @@
      "get": "/api/client/profiles/p1/log"
     }
    ],
-   "own": true,
    "env": {
     "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs",
     "FAKE_CLIENT_FAIL": "window"
@@ -1353,8 +1352,7 @@
      "get": "/api/client/accounts",
      "waitMs": 1500
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [

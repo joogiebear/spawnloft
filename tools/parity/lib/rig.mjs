@@ -166,17 +166,10 @@ function stepLabel(i, step) {
   return `step ${i + 1} (${step.run.join(' ')})`
 }
 
-// How each side's panel is started for a `panel` step. The Node side is `spawnloft ui` as a
-// terminal runs it. Until `ui` itself moves (the last C8 pull request), the Rust side is the
-// window's form of the command: the Rust panel, which answers the routes it has and hands the
-// rest to a Node panel it starts. `"window": true` gives both sides what the desktop window gives
-// its panel (SPAWNLOFT_SHELL), which is what serves /setup.
-// `"own": true` says every request of the step is one the Rust panel answers itself: its side
-// is told (SPAWNLOFT_TEST_PANEL_OWN, a test-hooks build only) to answer 502 where it would hand a
-// request to the Node panel, so a request that fell through, and would agree with the Node side
-// by being it, is a difference instead.
-function panelArgs(step, side, ctx) {
-  if (side === 'rust') return ['ui', '--port', '0', '--exit-with-stdin', '--core-dir', ctx.repo]
+// How each side's panel is started for a `panel` step: `spawnloft ui` as a terminal runs it, on
+// both sides (the Node side by SPAWNLOFT_CORE_IMPL). `"window": true` gives both sides what the
+// desktop window gives its panel (SPAWNLOFT_SHELL), which is what serves /setup.
+function panelArgs() {
   return ['ui', '--port', '0', '--no-open']
 }
 
@@ -210,7 +203,7 @@ async function runSide(scenario, side, o) {
     if (raw.panel) {
       const step = expand(raw, ctx)
       commands.add('ui')
-      const env = sideEnv(ctx, side, { origins: o.origins, extra: { ...scenario.env, ...(step.window ? { SPAWNLOFT_SHELL: 'tauri' } : {}), ...(step.own && side === 'rust' ? { SPAWNLOFT_TEST_PANEL_OWN: '1' } : {}), ...step.env } })
+      const env = sideEnv(ctx, side, { origins: o.origins, extra: { ...scenario.env, ...(step.window ? { SPAWNLOFT_SHELL: 'tauri' } : {}), ...step.env } })
       const label = stepLabel(i, raw)
       const res = await replay(o.core, panelArgs(step, side, ctx), step.panel, { cwd: ctx.run, env, ctx })
       if (res.problem) problems.push(`${side}: ${label}: ${res.problem}`)

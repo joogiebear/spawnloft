@@ -658,7 +658,6 @@
      "get": "/api/instances/srv1/backups/history"
     }
    ],
-   "own": true,
    "expect": {
     "includes": [
      "\"created\": \"first-one_plugins_"
@@ -742,8 +741,7 @@
     {
      "get": "/api/instances/srv1/backups/auto"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "write": "data/run/srv1/tasks.log",
@@ -972,8 +970,7 @@
     {
      "get": "/api/instances/srv1/schedules"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [
@@ -1125,8 +1122,7 @@
     {
      "get": "/api/instances/ghost/worlds"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [
@@ -1197,7 +1193,6 @@
      "get": "/api/instances/srv1/backups/history"
     }
    ],
-   "own": true,
    "expect": {
     "includes": [
      "A backup is being put back"
@@ -1263,7 +1258,6 @@
      "get": "/api/instances/run1/schedules"
     }
    ],
-   "own": true,
    "expect": {
     "includes": [
      "\"running\": true",
