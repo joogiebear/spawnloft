@@ -73,6 +73,9 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
     // the daemon every 2.0 package runs (and the only one once the Node core is gone); a
     // scenario about the Node daemon says so in its own env
     SPAWNLOFT_DAEMON: 'rust',
+    // the daemon binary: the core under test, which the Node core would otherwise look for in an
+    // installed layout beside its code folder
+    ...(ctx.core ? { SPAWNLOFT_CORE_BIN: ctx.core } : {}),
     // an empty map still refuses every host that is not on this machine: no scenario downloads
     // anything real, whether or not it fakes a host
     SPAWNLOFT_TEST_ORIGINS: origins ?? '{}',
@@ -236,7 +239,7 @@ function checkExpect(step, result, side, label) {
 async function runSide(scenario, side, o) {
   const run = path.join(o.scratch, 'run')
   fs.rmSync(run, { recursive: true, force: true })
-  const ctx = { run, data: path.join(run, 'data'), home: path.join(run, 'home'), repo: o.repo, scheduler: findFakeScheduler(o.core) }
+  const ctx = { run, data: path.join(run, 'data'), home: path.join(run, 'home'), repo: o.repo, core: o.core, scheduler: findFakeScheduler(o.core) }
   fs.mkdirSync(ctx.data, { recursive: true })
   fs.mkdirSync(ctx.home, { recursive: true })
   const extra = scenario.normalize ?? []
