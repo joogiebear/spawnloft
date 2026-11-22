@@ -118,7 +118,7 @@ done
 test -f /opt/SpawnLoft/resources/LICENSE || fail "no LICENSE beside the binaries"
 # no Node and no Node core: what 1.x had there went with the old package
 for d in /opt/SpawnLoft/resources/core /opt/SpawnLoft/resources/runtime; do
-  test ! -e "$d" || fail "$d is there: a 2.x package carries no Node"
+  test ! -e "$d" || fail "$d is there: a 2.x package carries no Node: $(find "$d" | head -n 20 | tr '\n' ' ')"
 done
 if found=$(find /opt/SpawnLoft \( -name node -o -name node.exe -o -name '*.mjs' \) -print | head -n 5) && [ -n "$found" ]; then
   fail "Node files in the package: $found"

@@ -63,7 +63,7 @@ echo "spawnloft --version: $out"
 case "$out" in "spawnloft-core $new "*) ;; *) fail "/usr/bin/spawnloft is not the $new core" ;; esac
 # no Node and no Node core: the 1.x package's went with it
 for d in /opt/spawnloft-cli/runtime /opt/spawnloft-cli/core; do
-  test ! -e "$d" || fail "$d is there: a 2.x package carries no Node"
+  test ! -e "$d" || fail "$d is there: a 2.x package carries no Node: $(find "$d" | head -n 20 | tr '\n' ' ')"
 done
 test -f /opt/spawnloft-cli/LICENSE || fail "no LICENSE beside the binaries"
 # the 1.x path stays, for what 1.x wrote to disk: a link to the core, which drops the

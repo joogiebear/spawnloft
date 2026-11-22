@@ -103,6 +103,11 @@ if command -v "$ua" >/dev/null 2>&1; then
 else
   ln -sf ${INSTALL_DIR}/${EXECUTABLE} /usr/bin/${EXECUTABLE}
 fi
+# an older package's resources/core and resources/runtime: the package manager took their files,
+# but rpm leaves a folder no package listed as its own; only empty folders go
+for d in ${INSTALL_DIR}/resources/core ${INSTALL_DIR}/resources/runtime; do
+  if [ -d "$d" ] && [ ! -L "$d" ]; then find "$d" -depth -type d -empty -delete 2>/dev/null || true; fi
+done
 if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database -q /usr/share/applications || true; fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true; fi
 exit 0
