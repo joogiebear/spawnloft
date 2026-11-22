@@ -1,0 +1,963 @@
+{
+ "about": "C8's database routes, answered by the Rust panel itself: the list (a running MariaDB and Garnet stand-in, a record with an engine nobody knows, external ones probed), engines and versions, a database's credentials, root, attach, detach with and without drop, delete and address, its SQL backups (taken, listed, downloaded, put back with a safety copy, deleted, and every refusal), registering an external database (a name from its label, a probe that fails), creating a managed one as a job (cached in the stand-in store, a version not offered, a MySQL download with the wrong bytes) and a server's own database made, started and attached, each with the job's last state read from its stream; odd bodies (null, a string, wrong types) and unknown names throughout.",
+ "env": {
+  "FAKE_MARIADB_STABLE_DUMP": "1"
+ },
+ "normalize": [
+  {
+   "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{24}\\b",
+   "replace": "<password>"
+  },
+  {
+   "pattern": "\\b(?:\\d+[dhm] +)*\\d+s\\b *",
+   "replace": "<secs> "
+  }
+ ],
+ "ignore": [
+  "home/**/panel.key",
+  "data/run/**",
+  "data/services/*/data/fake-shutdowns.log",
+  "data/services/*/data/checkpoint.txt"
+ ],
+ "hosts": {
+  "https://cdn.mysql.com": {
+   "routes": {
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-linux-glibc2.28-x86_64-minimal.tar.xz": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    },
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-winx64.zip": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    },
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-macos15-arm64.tar.gz": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    },
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-macos15-x86_64.tar.gz": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    }
+   }
+  }
+ },
+ "steps": [
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadbd.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-admin.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-dump.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-install-db.mjs"
+  },
+  {
+   "write": "data/engines/garnet-0.0.0-fake/GarnetServer.mjs",
+   "copy": "../../../test/fixtures/fake-garnet/GarnetServer.mjs"
+  },
+  {
+   "mkdir": "data/instances/srv1"
+  },
+  {
+   "mkdir": "data/instances/srv2"
+  },
+  {
+   "write": "data/services/db1/my.ini",
+   "text": "[mysqld]\ndatadir={data}/services/db1/data\nport=31311\nbind-address=127.0.0.1\n"
+  },
+  {
+   "mkdir": "data/services/db1/data/mysql"
+  },
+  {
+   "mkdir": "data/services/kv1/data"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv1": {
+      "dir": "{data}/instances/srv1",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 31300,
+      "label": "Survival"
+     },
+     "srv2": {
+      "dir": "{data}/instances/srv2",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 31305
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/db1",
+      "port": 31311,
+      "root": {
+       "user": "root",
+       "password": "pw-test"
+      },
+      "attachments": {},
+      "label": "Main DB"
+     },
+     "kv1": {
+      "kind": "database",
+      "engine": "garnet",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/kv1",
+      "port": 31324,
+      "root": {
+       "password": "pw-kv"
+      },
+      "attachments": {}
+     },
+     "odd": {
+      "kind": "database",
+      "engine": "nope",
+      "port": 31340,
+      "tools": {
+       "dir": "x"
+      },
+      "attachments": [
+       "a",
+       {
+        "database": "d",
+        "user": "u",
+        "password": "secret-in-list"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "write": "data/backups/db1/hand.sql",
+   "text": "CREATE DATABASE IF NOT EXISTS `srv1`;\n"
+  },
+  {
+   "write": "data/backups/db1/hand.json",
+   "json": {
+    "label": "by hand",
+    "databases": [
+     "srv1"
+    ]
+   }
+  },
+  {
+   "write": "data/backups/db1/notes.txt",
+   "text": "not a backup"
+  },
+  {
+   "run": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "write": "data/backups/db1/hand2.sql",
+   "text": "-- second\n"
+  },
+  {
+   "run": [
+    "start",
+    "kv1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/databases"
+    },
+    {
+     "get": "/api/databases/engines"
+    },
+    {
+     "get": "/api/databases/engines/more"
+    },
+    {
+     "get": "/api/databases/versions"
+    },
+    {
+     "get": "/api/databases/versions?engine=garnet"
+    },
+    {
+     "get": "/api/databases/versions?engine="
+    },
+    {
+     "get": "/api/databases/versions?engine=mariadb"
+    },
+    {
+     "post": "/api/databases/engines",
+     "json": {}
+    },
+    {
+     "get": "/api/databases/nope"
+    },
+    {
+     "get": "/api/databases/srv1"
+    },
+    {
+     "get": "/api/databases/bad%20name"
+    },
+    {
+     "get": "/api/databases/db1"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/databases/db1/attach"
+    },
+    {
+     "get": "/api/databases/db1/credentials"
+    },
+    {
+     "get": "/api/databases/db1/credentials?server=srv1"
+    },
+    {
+     "get": "/api/databases/db1/root"
+    },
+    {
+     "get": "/api/databases/kv1/root"
+    },
+    {
+     "get": "/api/databases/odd/root"
+    },
+    {
+     "post": "/api/databases/db1/frob",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": "srv1"
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {
+      "server": "nope"
+     }
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {
+      "server": "kv1"
+     }
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {
+      "server": "srv1"
+     }
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {
+      "server": "srv1"
+     }
+    },
+    {
+     "get": "/api/databases/db1/credentials?server=srv1"
+    },
+    {
+     "post": "/api/databases/kv1/attach",
+     "json": {
+      "server": "srv2"
+     }
+    },
+    {
+     "get": "/api/databases/kv1/credentials?server=srv2"
+    },
+    {
+     "post": "/api/databases/odd/attach",
+     "json": {
+      "server": "srv2"
+     }
+    },
+    {
+     "get": "/api/databases"
+    }
+   ],
+   "own": true
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/databases/db1/backups"
+    },
+    {
+     "get": "/api/databases/kv1/backups"
+    },
+    {
+     "get": "/api/databases/odd/backups"
+    },
+    {
+     "post": "/api/databases/kv1/backups",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/db1/backups",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/databases/db1/backups",
+     "json": {
+      "label": "  Before   the update! "
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups",
+     "json": {
+      "label": 42
+     }
+    },
+    {
+     "get": "/api/databases/db1/backups"
+    },
+    {
+     "get": "/api/databases/db1/backups/download?file=hand.sql"
+    },
+    {
+     "get": "/api/databases/db1/backups/download?file=../hand.sql"
+    },
+    {
+     "get": "/api/databases/db1/backups/download?file=gone.sql"
+    },
+    {
+     "get": "/api/databases/db1/backups/download?file=notes.txt"
+    },
+    {
+     "get": "/api/databases/db1/backups/download"
+    },
+    {
+     "post": "/api/databases/db1/backups/download",
+     "json": {}
+    },
+    {
+     "get": "/api/databases/db1/backups/frob"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/databases/db1/backups"
+    },
+    {
+     "post": "/api/databases/db1/backups/frob",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/db1/backups/restore",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/db1/backups/restore",
+     "json": {
+      "file": 5
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups/restore",
+     "json": {
+      "file": "hand.sql"
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups/delete",
+     "json": {
+      "file": "gone.sql"
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups/delete",
+     "json": {
+      "file": "hand2.sql"
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups/delete",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "get": "/api/databases/db1/backups"
+    }
+   ],
+   "own": true
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/databases/external",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/external",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/databases/external",
+     "json": "e1"
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "e1",
+      "engine": "mariadb"
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "bad name",
+      "engine": "mysql",
+      "port": 31311
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "srv1",
+      "engine": "mysql",
+      "port": 31311
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "e3",
+      "engine": "garnet",
+      "port": "abc"
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "e3",
+      "engine": "garnet",
+      "port": 1
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "e3",
+      "engine": "mysql",
+      "port": 31311,
+      "tools": "{run}/nowhere"
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "label": "  My Ext DB! ",
+      "engine": "mysql",
+      "port": 31311,
+      "password": "pw-test"
+     }
+    },
+    {
+     "post": "/api/databases/external",
+     "json": {
+      "name": "e2",
+      "engine": "garnet",
+      "port": "31324",
+      "password": "pw-kv",
+      "label": "e2"
+     }
+    },
+    {
+     "post": "/api/databases/external/extra",
+     "json": {
+      "name": "e4",
+      "engine": "garnet",
+      "host": "127.0.0.1",
+      "port": 31324,
+      "password": "pw-kv",
+      "label": "Fourth"
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/databases/db1/address",
+     "json": {
+      "host": "x"
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "host": "a b"
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "host": "  "
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "port": 0
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "port": "x"
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "port": ""
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "port": 1
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/address",
+     "json": {
+      "port": "31311",
+      "user": "  admin ",
+      "password": ""
+     }
+    },
+    {
+     "get": "/api/databases/My-Ext-DB/root"
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/attach",
+     "json": {
+      "server": "srv2"
+     }
+    },
+    {
+     "get": "/api/databases"
+    },
+    {
+     "post": "/api/databases/db1/detach",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/db1/detach",
+     "json": {
+      "server": "srv2"
+     }
+    },
+    {
+     "post": "/api/databases/db1/detach",
+     "json": {
+      "server": "srv1",
+      "drop": "yes"
+     }
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {
+      "server": "srv1"
+     }
+    },
+    {
+     "post": "/api/databases/db1/detach",
+     "json": {
+      "server": "srv1",
+      "drop": true
+     }
+    },
+    {
+     "post": "/api/databases/kv1/detach",
+     "json": {
+      "server": "srv2",
+      "drop": true
+     }
+    },
+    {
+     "post": "/api/databases/kv1/delete",
+     "json": {}
+    },
+    {
+     "post": "/api/databases/e2/delete",
+     "json": {
+      "purge": true
+     }
+    },
+    {
+     "post": "/api/databases/My-Ext-DB/delete"
+    },
+    {
+     "post": "/api/databases/odd/delete",
+     "json": {
+      "purge": true
+     }
+    },
+    {
+     "get": "/api/databases"
+    }
+   ],
+   "own": true
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/databases",
+     "json": {}
+    },
+    {
+     "post": "/api/databases",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "kv2"
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "kv2",
+      "version": "0.0.0-fake",
+      "engine": "mariadb",
+      "jobId": "j0"
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "kv2",
+      "version": "0.0.0-fake",
+      "engine": [
+       "garnet"
+      ]
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "kv2",
+      "version": "0.0.0-fake",
+      "engine": "redis",
+      "jobId": "j0"
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "kv2",
+      "version": "9.9.9",
+      "engine": "garnet",
+      "jobId": "j1"
+     }
+    },
+    {
+     "get": "/api/jobs/j1/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "bad name",
+      "version": "0.0.0-fake",
+      "engine": "garnet",
+      "jobId": "j1b"
+     }
+    },
+    {
+     "get": "/api/jobs/j1b/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "label": "Key  Value",
+      "version": "0.0.0-fake",
+      "engine": "garnet",
+      "port": 31331,
+      "jobId": "j2"
+     }
+    },
+    {
+     "get": "/api/jobs/j2/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "Key-Value",
+      "version": "0.0.0-fake",
+      "engine": "garnet",
+      "jobId": "j2b"
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "kv3",
+      "version": "0.0.0-fake",
+      "engine": "garnet",
+      "port": 31300
+     }
+    },
+    {
+     "post": "/api/databases",
+     "json": {
+      "name": "m1",
+      "version": "8.4.11",
+      "port": 31332,
+      "jobId": "j3"
+     }
+    },
+    {
+     "get": "/api/jobs/j3/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "get": "/api/jobs/never/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "post": "/api/instances/srv2/databases/create",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv2/databases/create",
+     "json": {
+      "engine": "mariadb",
+      "jobId": "s0"
+     }
+    },
+    {
+     "post": "/api/instances/db1/databases/create",
+     "json": {
+      "engine": "garnet",
+      "version": "0.0.0-fake",
+      "jobId": "s0"
+     }
+    },
+    {
+     "get": "/api/jobs/s0/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "post": "/api/instances/srv2/databases/create",
+     "json": {
+      "engine": "garnet",
+      "version": "0.0.0-fake",
+      "jobId": "s1"
+     }
+    },
+    {
+     "get": "/api/jobs/s1/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "post": "/api/instances/srv1/databases/create",
+     "json": {
+      "engine": "garnet",
+      "version": "9.9.9",
+      "jobId": "s2"
+     }
+    },
+    {
+     "get": "/api/jobs/s2/stream",
+     "stream": {
+      "events": 1,
+      "ms": 5000
+     }
+    },
+    {
+     "get": "/api/databases"
+    }
+   ],
+   "own": true
+  },
+  {
+   "run": [
+    "db",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "srv2-db"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "kv1"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "db1"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/databases/db1/backups"
+    },
+    {
+     "post": "/api/databases/db1/backups",
+     "json": {
+      "label": "late"
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups/restore",
+     "json": {
+      "file": "hand.sql"
+     }
+    },
+    {
+     "post": "/api/databases/db1/backups/delete",
+     "json": {
+      "file": "hand.sql"
+     }
+    },
+    {
+     "post": "/api/databases/db1/attach",
+     "json": {
+      "server": "srv2"
+     }
+    },
+    {
+     "post": "/api/databases/srv2-db/detach",
+     "json": {
+      "server": "srv2",
+      "drop": true
+     }
+    },
+    {
+     "post": "/api/databases/srv2-db/detach",
+     "json": {
+      "server": "srv2"
+     }
+    },
+    {
+     "post": "/api/databases/kv1/delete",
+     "json": {
+      "purge": true
+     }
+    },
+    {
+     "post": "/api/databases/Key-Value/delete",
+     "json": {
+      "purge": true
+     }
+    },
+    {
+     "post": "/api/databases/Key-Value/delete",
+     "json": {
+      "purge": true
+     }
+    },
+    {
+     "get": "/api/databases"
+    }
+   ],
+   "own": true
+  },
+  {
+   "run": [
+    "db",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

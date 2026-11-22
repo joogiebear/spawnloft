@@ -350,6 +350,18 @@ pub fn login_path(key: &Key, port: u16, to: Option<&str>) -> Result<String, Stri
     })
 }
 
+/// `loginLink(key, port, to)`: a one-use link that signs a browser in at the panel on `port`,
+/// and the link's nonce, which names the page that carries it (`panel_open`).
+pub fn login_link(key: &Key, port: u16, to: Option<&str>) -> Result<(String, String), String> {
+    let nonce = b64url_encode(&random::<16>()?);
+    let token = make_token(key, Purpose::Login, port, now_ms(), &nonce);
+    let to = match to.filter(|t| LOGIN_TARGETS.contains(t)) {
+        Some(to) => format!("&to={to}"),
+        None => String::new(),
+    };
+    Ok((format!("http://127.0.0.1:{port}/auth?t={token}{to}"), nonce))
+}
+
 /// A decimal number as these tokens write one: digits only, no leading zero, at most `digits`.
 fn canonical(text: &str, digits: usize) -> Option<u64> {
     let b = text.as_bytes();
@@ -435,7 +447,12 @@ pub enum Verdict {
     /// A route that carries its own proof; route it.
     Open,
     /// `/auth` with a good token: set the cookie to `session`, go to `to`.
-    Login { session: String, to: &'static str },
+    /// `nonce` is the link's own: the page that carried it can go
+    Login {
+        session: String,
+        to: &'static str,
+        nonce: String,
+    },
     /// `/auth` with a bad, used or expired token (the 401 page).
     LoginRefused,
     /// Route it. `session` goes to [`PanelAuth::release`] when the request ends.
@@ -624,7 +641,9 @@ impl PanelAuth {
         let Ok(id) = random::<32>() else {
             return Verdict::LoginRefused;
         };
-        state.used.insert(checked.nonce, (checked.issued, idle_now));
+        state
+            .used
+            .insert(checked.nonce.clone(), (checked.issued, idle_now));
         let session = b64url_encode(&id);
         state.sessions.insert(
             session_key(&session),
@@ -638,7 +657,11 @@ impl PanelAuth {
             .find(|t| Some(**t) == to)
             .copied()
             .unwrap_or("/");
-        Verdict::Login { session, to }
+        Verdict::Login {
+            session,
+            to,
+            nonce: checked.nonce,
+        }
     }
 
     /// The request `decide` allowed on `session` has ended (its connection closed).
@@ -954,7 +977,7 @@ mod tests {
                 };
                 assert_eq!(said, step["expect"].as_str().unwrap(), "{what}");
                 match got {
-                    Verdict::Login { session, to } => {
+                    Verdict::Login { session, to, .. } => {
                         assert_eq!(to, step["to"].as_str().unwrap(), "{what}");
                         assert_eq!(session.len(), 43, "{what}");
                         sessions.insert(step["save"].as_str().unwrap().to_string(), session);
@@ -984,7 +1007,7 @@ mod tests {
             "/auth?t={}",
             make_token(&key, Purpose::Login, 9, 1, &"A".repeat(22))
         );
-        let Verdict::Login { session, to } = request(&rule, &link, None, 1, 0) else {
+        let Verdict::Login { session, to, .. } = request(&rule, &link, None, 1, 0) else {
             panic!("no login");
         };
         assert_eq!(to, "/");

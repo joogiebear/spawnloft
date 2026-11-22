@@ -51,6 +51,7 @@ pub mod nodecore;
 pub mod notify;
 pub mod panel;
 pub mod panel_auth;
+pub mod panel_open;
 pub mod paths;
 pub mod patterns;
 pub mod platform;

@@ -30,10 +30,24 @@ use std::time::Duration;
 use crate::panel_auth::{self, PanelAuth, Verdict};
 use crate::settings::{self, Layout};
 
+mod backups;
 mod basics;
+mod client;
+mod creates;
+mod databases;
 mod http;
+mod jobs;
 mod pages;
+mod players;
+mod plugins;
 mod routes;
+mod schedules;
+mod server_files;
+mod server_props;
+mod servers;
+mod shared;
+mod sse;
+mod worlds;
 
 /// What the routes answered in this process know about the panel they run in.
 struct Panel {
@@ -42,13 +56,27 @@ struct Panel {
     layout: Option<Layout>,
     /// Behind the desktop window (`behindWindow()`): it sets `SPAWNLOFT_SHELL` for the core.
     shell: bool,
+    /// The long jobs this panel started, for the pages that watch them.
+    jobs: Arc<jobs::Jobs>,
+    /// The port this panel listens on: what a browser sent to it must come back to (the
+    /// Microsoft sign-in's redirect address).
+    #[allow(dead_code)] // read by the launcher's routes when they move
+    port: u16,
 }
 
 impl Panel {
-    fn of_this_process() -> Panel {
+    /// Who the history says did what a route does (`asActor({ kind: 'panel' })`).
+    #[allow(dead_code)] // used by the route families as they move
+    fn actor() -> crate::activity::Actor {
+        crate::activity::Actor::new("panel", None)
+    }
+
+    fn of_this_process(port: u16) -> Panel {
         Panel {
             layout: Layout::resolve(&settings::load().0).ok(),
             shell: behind_window(),
+            jobs: Arc::default(),
+            port,
         }
     }
 }
@@ -150,7 +178,7 @@ pub fn run(opts: Options) -> i32 {
     let _ = std::io::stdout().flush();
 
     let upstream = Arc::new(upstream);
-    let panel = Arc::new(Panel::of_this_process());
+    let panel = Arc::new(Panel::of_this_process(local.port()));
     for conn in listener.incoming() {
         let Ok(conn) = conn else { continue };
         let upstream = Arc::clone(&upstream);
@@ -492,7 +520,9 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream, panel: &Pa
                 br#"{"error":"this panel only answers requests addressed to localhost"}"#,
             );
         }
-        Verdict::Login { session, to } => {
+        Verdict::Login { session, to, nonce } => {
+            // the page that carried this link (`spawnloft ui`) has done its job
+            crate::panel_open::remove_open_file(&nonce);
             let cookie = panel_auth::session_cookie(auth.port(), &session);
             return respond_with(
                 &mut conn,
@@ -853,6 +883,8 @@ mod tests {
         let panel = Panel {
             layout: None,
             shell: false,
+            jobs: Arc::default(),
+            port: 0,
         };
         front_of(panel, upstream, requests)
     }
@@ -893,6 +925,8 @@ mod tests {
                 data_root: root,
             }),
             shell,
+            jobs: Arc::default(),
+            port: 0,
         }
     }
 
@@ -1079,40 +1113,6 @@ mod tests {
             &format!("POST /api/setup HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: 2\r\n\r\n{{}}"),
         );
         assert!(out.starts_with("HTTP/1.1 401"), "{out}");
-    }
-
-    #[test]
-    fn a_route_that_has_not_moved_still_goes_to_the_upstream_with_its_body() {
-        // an upstream that reads to the end of the body (the head and the body are two writes)
-        let up_listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let up = up_listener.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (mut s, _) = up_listener.accept().unwrap();
-            let mut got = Vec::new();
-            let mut buf = [0u8; 1024];
-            while !got.ends_with(b"{\"name\":1}") {
-                let n = s.read(&mut buf).unwrap();
-                assert!(n > 0, "the body never came");
-                got.extend_from_slice(&buf[..n]);
-            }
-            let head = format!(
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                got.len()
-            );
-            s.write_all(head.as_bytes()).unwrap();
-            s.write_all(&got).unwrap();
-        });
-        let addr = front_of(panel_in("unmoved", false), Upstream::Node(up), 1);
-        let p = addr.port();
-        let out = exchange(
-            addr,
-            &format!(
-                "POST /api/instances HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: 10\r\n{}\r\n{{\"name\":1}}",
-                api_header(p)
-            ),
-        );
-        assert!(out.contains("POST /api/instances HTTP/1.1"), "{out}");
-        assert!(out.contains("{\"name\":1}"), "{out}");
     }
 
     fn exchange(addr: SocketAddr, request: &str) -> String {

@@ -1031,6 +1031,48 @@ pub struct LaunchOpts<'a> {
     pub fake_java: Option<String>,
 }
 
+/// What a launch from the panel adds to [`LaunchOpts`]: `server: false` (the title screen even
+/// when the profile names a server), an address SpawnLoft does not run, who asked, each step as
+/// it starts, and a stopped target server started (and waited for) just before the game.
+#[allow(missing_debug_implementations)]
+pub struct PanelOpts<'a> {
+    pub server_off: bool,
+    pub address: Option<String>,
+    pub launched_by: &'static str,
+    /// `onStage({ stage, message })`.
+    pub on_stage: &'a (dyn Fn(&str, &str) + Sync),
+    pub ensure_server: Option<EnsureServer<'a>>,
+}
+
+/// Starts a stopped server and waits for it (`ensureServer(target)`).
+pub type EnsureServer<'a> = &'a (dyn Fn(&str) -> Result<(), Failure> + Sync);
+
+impl PanelOpts<'_> {
+    /// A launch from the command line: none of it.
+    pub fn cli() -> PanelOpts<'static> {
+        PanelOpts {
+            server_off: false,
+            address: None,
+            launched_by: "cli",
+            on_stage: &|_, _| {},
+            ensure_server: None,
+        }
+    }
+}
+
+/// The step a message of the install belongs to, as `onStage` names it.
+fn stage_of(message: &str, loader: Option<&str>) -> String {
+    if message == "Reading the Minecraft version list" {
+        "manifest".into()
+    } else if message.starts_with("Downloading the version file for Minecraft") {
+        "version".into()
+    } else if message == "Finding Java" || message.starts_with("Getting Mojang's Java") {
+        "java".into()
+    } else {
+        loader.unwrap_or("loader").to_string()
+    }
+}
+
 /// What `launch` answers: `{ pid, profile, version, account, warnings }`, and the game itself.
 #[derive(Debug)]
 pub struct Launched {
@@ -1448,6 +1490,17 @@ pub fn launch(
     name: &str,
     opts: &LaunchOpts<'_>,
 ) -> Result<Launched, Failure> {
+    launch_with(paths, layout, name, opts, &PanelOpts::cli())
+}
+
+/// [`launch`] with what the panel adds.
+pub fn launch_with(
+    paths: &Paths,
+    layout: &Layout,
+    name: &str,
+    opts: &LaunchOpts<'_>,
+    extra: &PanelOpts<'_>,
+) -> Result<Launched, Failure> {
     profiles::get(paths, name)?;
     let lock_file = paths.launch_lock(name);
     let lock = crate::lock::acquire(Path::new(&lock_file), crate::lock::Options::fail())
@@ -1461,7 +1514,7 @@ pub fn launch(
             "launching",
         ));
     };
-    let result = launch_locked(paths, layout, name, opts);
+    let result = launch_locked(paths, layout, name, opts, extra);
     let _ = lock.release();
     result
 }
@@ -1471,6 +1524,7 @@ fn launch_locked(
     layout: &Layout,
     name: &str,
     opts: &LaunchOpts<'_>,
+    extra: &PanelOpts<'_>,
 ) -> Result<Launched, Failure> {
     let fake = opts.fake_java.clone();
     let os = launch_os(fake.is_some())?;
@@ -1488,12 +1542,24 @@ fn launch_locked(
     if let Some(refusal) = library::platform_refusal(None, &os, None)? {
         return Err(user(refusal));
     }
-    let target: Option<String> = match &opts.server {
-        Some(s) => Some(s.clone()),
-        None => match profile.get("server") {
-            None | Some(Value::Null) => None,
-            Some(v) => Some(js::string(Some(v))),
-        },
+    // before any download: a database is a registered instance but nothing a game can join
+    if extra.address.is_some() && opts.server.is_some() {
+        return Err(user("join either a SpawnLoft server or an address, not both"));
+    }
+    let address = match &extra.address {
+        Some(text) => Some(parse_server_address(text)?),
+        None => None,
+    };
+    let target: Option<String> = if address.is_some() || extra.server_off {
+        None
+    } else {
+        match &opts.server {
+            Some(s) => Some(s.clone()),
+            None => match profile.get("server") {
+                None | Some(Value::Null) => None,
+                Some(v) => Some(js::string(Some(v))),
+            },
+        }
     }
     .filter(|t| !t.is_empty());
     if let Some(t) = &target
@@ -1552,16 +1618,29 @@ fn launch_locked(
         ),
     };
     let mut warnings: Vec<String> = Vec::new();
+    let mut stopped = false;
     let warn = |warnings: &mut Vec<String>, w: String| {
         (opts.on_warning)(&w);
         warnings.push(w);
     };
     if let Some(t) = &target {
-        let (refusal, found, _stopped) = server_check(layout, t, &provisional.0, &provisional.1);
+        let (refusal, found, was_stopped) = server_check(layout, t, &provisional.0, &provisional.1);
+        stopped = was_stopped;
         if let Some(r) = refusal {
-            return Err(user(r));
+            // the launcher has no --account flag to point at; it has an account picker
+            return Err(user(if extra.launched_by == "launcher" {
+                format!("{t} requires a Microsoft account (online-mode=true); sign in or pick another server")
+            } else {
+                r
+            }));
         }
-        warnings.extend(found);
+        // a server this launch will start is not worth a warning
+        let starts = was_stopped && extra.ensure_server.is_some();
+        warnings.extend(
+            found
+                .into_iter()
+                .filter(|w| !(starts && w.contains("is not running"))),
+        );
         let server_mc = crate::plugins::mc_version_of(&instance(layout, t)?);
         let mc = js::string(profile.get("mc"));
         if let Some(smc) = server_mc.filter(|s| !s.is_empty() && *s != mc) {
@@ -1570,12 +1649,31 @@ fn launch_locked(
             ));
         }
     }
+    // SpawnLoft cannot read another machine's server.properties: a warning, not a refusal
+    if let (Some(text), true) = (&extra.address, provisional.0 == "offline") {
+        warnings.push(format!(
+            "{} is an offline player, so {text} will refuse the join unless it runs with online-mode=false; sign in to play on public servers",
+            provisional.1
+        ));
+    }
     for w in &warnings {
         (opts.on_warning)(w);
     }
 
-    let join = match &target {
-        Some(t) => {
+    let lookup = || {
+        if fake.is_some() {
+            Lookup::Fake
+        } else {
+            Lookup::System
+        }
+    };
+    let join = match (&address, &target) {
+        (Some(at), _) => {
+            let text = extra.address.as_deref().unwrap_or("");
+            assert_resolvable(at, js::trim(text), lookup())?;
+            Some(at.clone())
+        }
+        (None, Some(t)) => {
             let at = local_join_address(&instance(layout, t)?)?;
             assert_resolvable(
                 &at,
@@ -1588,14 +1686,15 @@ fn launch_locked(
             )?;
             Some(at)
         }
-        None => None,
+        (None, None) => None,
     };
 
     // the version file first: what the game needs is read from it before anything else downloads
     let mc = js::string(profile.get("mc"));
-    let prepare =
-        || super::fabric::prepare_version(paths, name, &mut |_| {}, &super::fabric::Fetchers::real());
     let loader = loader_of(&profile);
+    let stage = |m: &str| (extra.on_stage)(&stage_of(m, loader.as_deref()), m);
+    let prepare =
+        || super::fabric::prepare_version(paths, name, &mut |m| stage(m), &super::fabric::Fetchers::real());
     let mut fake_installed = false;
     let version_id = if fake.is_some() {
         let id = match &loader {
@@ -1635,6 +1734,9 @@ fn launch_locked(
     }
     let run_os = resolved.os.clone();
 
+    // a launch that was cancelled stops between its steps; what it fetched is kept
+    cancel::check_cancelled()?;
+    (extra.on_stage)("java", "Finding Java");
     let (picked, bounds) = match &fake {
         Some(f) => (
             Picked {
@@ -1645,7 +1747,7 @@ fn launch_locked(
             None,
         ),
         None => {
-            let (p, r) = java_for(paths, &profile, &resolved, &|_| {}, opts.on_progress)?;
+            let (p, r) = java_for(paths, &profile, &resolved, &stage, opts.on_progress)?;
             (p, Some(r))
         }
     };
@@ -1702,6 +1804,14 @@ fn launch_locked(
     });
     if let (Some(dir), Some(i)) = (&assets_dir, &installed) {
         let copy = prop(Some(i), "assetsLayout") == Some(&json!("resources"));
+        (extra.on_stage)(
+            "assets",
+            if copy {
+                "Laying out the sounds in this profile's folder"
+            } else {
+                "Laying out the shared sounds and language files"
+            },
+        );
         materialise_assets(
             paths,
             prop(Some(i), "assetIndex").unwrap_or(&Value::Null),
@@ -1716,6 +1826,11 @@ fn launch_locked(
         );
     }
     // Fabric and Quilt both load Fabric API (the fake game has none)
+    if fake.is_none()
+        && let Some(l @ ("fabric" | "quilt")) = loader.as_deref()
+    {
+        (extra.on_stage)(l, "Checking Fabric API");
+    }
     if fake.is_none() && loader.is_some() {
         super::fabric::ensure_fabric_api(
             paths,
@@ -1727,6 +1842,7 @@ fn launch_locked(
         )?;
     }
     if fake.is_none() && js::truthy(profile.get("harness")) {
+        (extra.on_stage)("harness", "Checking the harness mod");
         super::harness::ensure_harness_jar(
             paths,
             name,
@@ -1736,6 +1852,7 @@ fn launch_locked(
         )?;
     }
 
+    cancel::check_cancelled()?;
     let account = match &selector {
         None => offline_account(&match opts.player_name.as_deref().filter(|p| !p.is_empty()) {
             Some(p) => p.to_string(),
@@ -1749,7 +1866,7 @@ fn launch_locked(
                 let checked = target
                     .as_deref()
                     .is_some_and(|t| server_checks_accounts(layout, t));
-                if code_of(&err) != Some("sign-in-unreachable") || checked {
+                if code_of(&err) != Some("sign-in-unreachable") || address.is_some() || checked {
                     return Err(err);
                 }
                 let saved = peek_account(paths, sel)?;
@@ -1764,6 +1881,12 @@ fn launch_locked(
             }
         },
     };
+    cancel::check_cancelled()?;
+    // last before the game, so a failed download or sign-in does not leave a server started
+    if let (true, Some(ensure), Some(t)) = (stopped, extra.ensure_server, &target) {
+        (extra.on_stage)("server", &format!("Starting {t}"));
+        ensure(t)?;
+    }
     // the game reads its Multiplayer list as it starts, so this is the last moment to set it
     if let Some(skipped) = fill_server_list(paths, layout, name, &profile) {
         warn(
@@ -1801,6 +1924,9 @@ fn launch_locked(
         "type": prop(Some(&account), "type").cloned().unwrap_or(Value::Null),
         "name": prop(Some(&account), "name").cloned().unwrap_or(Value::Null),
     });
+    (extra.on_stage)("spawn", "Starting the game");
+    // the last moment: once the game is started, stopping it is Stop's job, not Cancel's
+    cancel::check_cancelled()?;
     let started = spawn_client(
         paths,
         &command,
@@ -1809,8 +1935,8 @@ fn launch_locked(
             mode: prop(Some(&account), "type").cloned().unwrap_or(json!("offline")),
             account: account_short.clone(),
             server: target.clone(),
-            address: None,
-            launched_by: "cli",
+            address: address.as_ref().map(Address::format),
+            launched_by: extra.launched_by,
             harness: harness_token
                 .as_ref()
                 .map(|t| json!({ "token": t, "port": null })),

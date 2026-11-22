@@ -175,10 +175,21 @@ export async function replay(core, args, requests, { cwd, env, ctx }) {
     return { text: '', problem: e.message }
   }
   const out = []
+  // `keep: { name: regex }` keeps the first group a regex finds in an answer's body; a later
+  // request's address reads it as `{name}` (a sign-in's state, which only the answer knows)
+  const kept = {}
+  const fill = (t) => (typeof t === 'string' ? t.replace(/\{(\w+)\}/g, (m, k) => kept[k] ?? m) : t)
   try {
-    for (const req of requests) {
+    for (const raw of requests) {
+      const req = { ...raw, ...Object.fromEntries(['get', 'post', 'delete', 'patch', 'path'].filter((k) => raw[k]).map((k) => [k, fill(raw[k])])) }
       if (req.waitMs) await new Promise((r) => setTimeout(r, req.waitMs))
-      if (req.get || req.post || req.delete || req.patch || req.path) out.push(describe(req, await send(panel.port, req, env, ctx), panel.port))
+      if (!(req.get || req.post || req.delete || req.patch || req.path)) continue
+      const res = await send(panel.port, req, env, ctx)
+      for (const [k, re] of Object.entries(req.keep ?? {})) {
+        const m = new RegExp(re).exec(res.body?.toString('utf8') ?? '')
+        if (m) kept[k] = m[1]
+      }
+      out.push(describe(raw, res, panel.port))
     }
   } finally {
     await panel.stop()

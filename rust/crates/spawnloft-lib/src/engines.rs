@@ -14,6 +14,10 @@ pub struct Progress {
     pub message: String,
     pub received: Option<u64>,
     pub total: u64,
+    /// The engine was already in the store (`{ cached: true }`): nothing was fetched.
+    pub cached: bool,
+    /// The last step of the whole job (`{ done: true }`).
+    pub done: bool,
 }
 
 impl Progress {
@@ -22,6 +26,24 @@ impl Progress {
             message: message.into(),
             received: None,
             total: 0,
+            cached: false,
+            done: false,
+        }
+    }
+
+    /// `{ cached: true, message }`.
+    pub fn cached(message: impl Into<String>) -> Progress {
+        Progress {
+            cached: true,
+            ..Progress::say(message)
+        }
+    }
+
+    /// `{ message, done: true }`.
+    pub fn finished(message: impl Into<String>) -> Progress {
+        Progress {
+            done: true,
+            ..Progress::say(message)
         }
     }
 }
@@ -117,6 +139,8 @@ pub fn fetch_pinned(
             message: message.to_string(),
             received: Some(received),
             total,
+            cached: false,
+            done: false,
         });
     };
     let options = download::Options {

@@ -7,6 +7,30 @@ use std::time::Duration;
 use crate::failure::Failure;
 use crate::js;
 
+/// `slugFor(label)`: a name a server or database can have, made from what the person typed:
+/// runs of anything else become one dash, the ends lose their dashes and underscores, at most 32
+/// characters; `server` when nothing is left.
+pub fn slug_for(label: &str) -> String {
+    let mut slug = String::new();
+    for c in label.chars() {
+        if c.is_ascii_alphanumeric() || c == '_' {
+            slug.push(c);
+        } else if !slug.ends_with('-') {
+            // `[^A-Za-z0-9_-]+` to one dash, then `-{2,}` to one
+            slug.push('-');
+        }
+    }
+    let ends = |c: char| c == '-' || c == '_';
+    let slug = slug.trim_matches(ends);
+    // ASCII by now, so 32 characters are 32 UTF-16 units
+    let slug = slug[..slug.len().min(32)].trim_end_matches(ends);
+    if slug.is_empty() {
+        "server".into()
+    } else {
+        slug.into()
+    }
+}
+
 /// `cleanLabel(raw)`: whitespace runs as one space, control characters dropped, trimmed, at most
 /// 48 UTF-16 units and trimmed again; `None` when nothing is left.
 pub fn clean_label(raw: &str) -> Option<String> {
@@ -204,6 +228,17 @@ pub fn dir_size(dir: &std::path::Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slugs_from_labels() {
+        assert_eq!(slug_for("My Server!"), "My-Server");
+        assert_eq!(slug_for("  -- a__b -- c -_"), "a__b-c");
+        assert_eq!(slug_for("a - b"), "a-b");
+        assert_eq!(slug_for("é😀"), "server");
+        assert_eq!(slug_for(""), "server");
+        assert_eq!(slug_for(&"x".repeat(40)), "x".repeat(32));
+        assert_eq!(slug_for(&format!("{}-y", "x".repeat(31))), "x".repeat(31));
+    }
 
     #[test]
     fn labels_clean_as_util_mjs_does() {

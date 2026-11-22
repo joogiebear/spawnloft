@@ -5,12 +5,20 @@
 //! [`Routed::NotPorted`], decided on the method and the path alone: the body has not been read,
 //! so the listener can still send the request on to the Node panel whole.
 
+use serde_json::json;
+
 use crate::failure::Failure;
-use crate::software;
+use crate::{services, software};
 
 use super::Panel;
-use super::basics;
 use super::http::{Reply, Request, failure_reply};
+use super::{
+    backups, basics, client, creates, databases, players, plugins, schedules, server_files, server_props,
+    servers, worlds,
+};
+
+/// Whether the routes that start a job are answered here; see `chain`.
+const JOBS_MOVED: bool = true;
 
 pub enum Routed {
     Reply(Reply),
@@ -64,7 +72,7 @@ fn chain(panel: &Panel, req: &mut Request) -> Result<Routed, Failure> {
         return reply(basics::mcp());
     }
     if s1 == "client" {
-        return Ok(Routed::NotPorted);
+        return client::route(panel, layout, req);
     }
     if s1 == "health" && get {
         return reply(basics::health(layout));
@@ -87,10 +95,21 @@ fn chain(panel: &Panel, req: &mut Request) -> Result<Routed, Failure> {
     if s1 == "settings" && get {
         return reply(basics::settings_get(layout));
     }
-    // scheduler/linger and the two job routes sit here in ui.mjs; none of them can be a path
-    // the two below also fit, unless a software were named "scheduler" or "jobs"
-    if (s1 == "scheduler" && s2 == "linger" && post) || s1 == "jobs" {
+    if s1 == "scheduler" && s2 == "linger" && post {
+        return servers::linger(panel, layout);
+    }
+    let s3 = req.seg(3).unwrap_or("").to_string();
+    // A job's progress is kept by the process that runs the job. Until every route that starts
+    // one has moved (creates, plugin and modpack installs, a database for a server, a game
+    // launch), the jobs are the Node panel's and so are these two.
+    if s1 == "jobs" && !JOBS_MOVED {
         return Ok(Routed::NotPorted);
+    }
+    if s1 == "jobs" && s3 == "cancel" && n == 4 && post {
+        return reply(Reply::ok(json!({ "cancelling": panel.jobs.cancel(&s2) })));
+    }
+    if s1 == "jobs" && s3 == "stream" && get {
+        return reply(panel.jobs.stream(&s2));
     }
     if s1 == "software" && n == 2 && get {
         return reply(basics::software_list());
@@ -98,5 +117,57 @@ fn chain(panel: &Panel, req: &mut Request) -> Result<Routed, Failure> {
     if s2 == "versions" && n == 3 && get && software::is_software(&s1) {
         return reply(basics::software_versions(&s1)?);
     }
-    Ok(Routed::NotPorted)
+    if s1 == "modpacks" && s2 == "search" && get {
+        return plugins::modpack_search(panel, layout, req);
+    }
+    // databases are kept out of the server list so nothing that iterates servers sees one
+    // (with nothing after it and another method it is, as in ui.mjs, a server with no name)
+    if s1 == "databases" && (n > 2 || get || post) {
+        return databases::route(panel, layout, req);
+    }
+    if s1 == "instances" && n == 2 && get {
+        return servers::list(panel, layout);
+    }
+    if s1 == "activity" && n == 2 && get {
+        return servers::activity(panel, layout, req);
+    }
+    if s1 == "overview" && n == 2 && get {
+        return servers::overview(panel, layout);
+    }
+    if s1 == "instances" && s2 == "adopt" && post {
+        return creates::adopt(panel, layout, req);
+    }
+    if s1 == "instances" && post && n == 2 {
+        return creates::create(panel, layout, req);
+    }
+
+    // everything below is about one server (or one database, which the registry also holds)
+    let name = s2;
+    if name.is_empty() || !services::has_instance(layout, &name)? {
+        return reply(Reply::error(404, "no such instance"));
+    }
+    if s3 == "stream" && get {
+        return servers::console_stream(panel, layout, &name);
+    }
+    // these take GET and POST, so they sit above the POST-only gate below
+    match s3.as_str() {
+        "join" if req.seg(4).is_none() => return servers::join(panel, layout, req, &name),
+        "props" | "icon" => return server_props::route(panel, layout, req, &name),
+        "backups" => return backups::route(panel, layout, req, &name),
+        "schedules" => return schedules::route(panel, layout, req, &name),
+        "players" => return players::route(panel, layout, req, &name),
+        "plugins" | "upgrade" | "pack" => return plugins::route(panel, layout, req, &name),
+        "worlds" => return worlds::route(panel, layout, req, &name),
+        "files" => return server_files::route(panel, layout, req, &name),
+        "activity" | "console" | "diag" | "metrics" => return servers::reads(panel, layout, req, &name),
+        "diagnose" | "databases" if get => return servers::reads(panel, layout, req, &name),
+        _ => {}
+    }
+    if !post {
+        return reply(Reply::method_not_allowed());
+    }
+    if s3 == "databases" && req.seg(4) == Some("create") {
+        return databases::create_for_server(panel, layout, req, &name);
+    }
+    servers::act(panel, layout, req, &name)
 }

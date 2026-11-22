@@ -234,6 +234,7 @@ pub fn ensure_harness_jar(
         done: 1,
         total: 1,
         bytes: size as f64,
+        fetching: false,
     });
     Ok(())
 }
