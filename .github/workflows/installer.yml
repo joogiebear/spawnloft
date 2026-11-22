@@ -85,11 +85,23 @@ jobs:
             cp ../../target/release/bundle/nsis/SpawnLoft_${v}_x64-setup.exe* "$RUNNER_TEMP/feed/"
           done
           ls -la "$RUNNER_TEMP/feed"
+      - name: Build the native JVM stand-in (spawnloft-fakes' fake-java)
+        # both daemons run it as a real java; a release 2.0 core runs no .mjs stand-in
+        working-directory: rust
+        run: |
+          cargo build --release --locked -p spawnloft-fakes --bin fake-java
+          mkdir -p "$RUNNER_TEMP/fakes"
+          cp target/release/fake-java.exe "$RUNNER_TEMP/fakes/"
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ github.run_number }}-setups
           retention-days: 14
           path: ${{ runner.temp }}/feed/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ github.run_number }}-fakes
+          retention-days: 14
+          path: ${{ runner.temp }}/fakes/
 
   scenario:
     needs: build
@@ -115,6 +127,10 @@ jobs:
         with:
           name: installer-${{ github.run_number }}-setups
           path: ${{ runner.temp }}/feed
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-${{ github.run_number }}-fakes
+          path: ${{ runner.temp }}/fakes
       - name: Download the published 1.5.0 and 1.6.0-beta.413 setups
         shell: bash
         env:
@@ -125,6 +141,8 @@ jobs:
           ls -la "$RUNNER_TEMP/beta" "$RUNNER_TEMP/stable"
       - name: Scenario ${{ matrix.name }} (Node on PATH ${{ matrix.node }})
         shell: pwsh
+        env:
+          FAKE_JAVA_EXE: ${{ runner.temp }}\fakes\fake-java.exe
         run: |
           $beta = Get-ChildItem "$env:RUNNER_TEMP\beta" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
           $stable = Get-ChildItem "$env:RUNNER_TEMP\stable" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1

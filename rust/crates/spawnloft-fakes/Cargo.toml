@@ -46,3 +46,10 @@ path = "src/bin/net-probe.rs"
 [[bin]]
 name = "fake-scheduler"
 path = "src/bin/fake-scheduler.rs"
+
+# Test-only: the native JVM stand-in for the installer scenarios (installer.yml,
+# installer-linux.yml), which 1.x's and 2.0's daemons both run; ported from the
+# installer/ci/fake-java.mjs it replaces.
+[[bin]]
+name = "fake-java"
+path = "src/bin/fake-java.rs"

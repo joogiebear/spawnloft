@@ -39,12 +39,14 @@ export SPAWNLOFT_DATA_ROOT=/tmp/spawnloft-data
 export MCCTL_DATA_ROOT="$SPAWNLOFT_DATA_ROOT"
 export HOME=/tmp/spawnloft-home
 mkdir -p "$HOME" "$SPAWNLOFT_DATA_ROOT/instances/pkgtest"
-cp /repo/test/fixtures/fake-java.mjs /tmp/fake-java.mjs
+# the native JVM stand-in (spawnloft-fakes' fake-java, static), which 1.x's daemon and 2.0's both
+# run as a real java (a release 2.0 core runs no .mjs one); the workflow puts it in /repo/fakes
+cp "${FAKE_JAVA:-/repo/fakes/fake-java}" /tmp/fake-java && chmod 755 /tmp/fake-java
 printf 'eula=true\n' > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/eula.txt"
 : > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/server.jar"
 cat > "$SPAWNLOFT_DATA_ROOT/instances.json" <<JSON
 { "version": 1, "instances": { "pkgtest": {
-  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java.mjs", "memory": "1G",
+  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java", "memory": "1G",
   "port": 45665, "rcon": { "port": 45675, "password": "package-smoke" }, "autoRestart": false } } }
 JSON
 spawnloft start pkgtest

@@ -45,12 +45,12 @@ function Start-Running1([string[]] $names) {
 function Make-Orphan($dataRoot, $name, $dir) {
   # what a crashed 1.x daemon leaves: java still running, the daemon gone, state.json saying
   # running. (Killing a real 1.x daemon takes its JVM with it: the JVM is in the daemon's job.)
-  $java = Start-Process $script:harnessNode -ArgumentList "`"$fixtures\fake-java.mjs`"" -WorkingDirectory $dir -PassThru -WindowStyle Hidden
+  $java = Start-Process "$fixtures\fake-java.exe" -WorkingDirectory $dir -PassThru -WindowStyle Hidden
   $gone = Start-Process "$env:WINDIR\System32\cmd.exe" -ArgumentList '/c', 'exit' -PassThru -WindowStyle Hidden
   $gone.WaitForExit()
   $runDir = Join-Path $dataRoot "run\$name"
   New-Item -ItemType Directory -Force $runDir | Out-Null
-  @{ name = $name; running = $true; daemonPid = $gone.Id; daemonExe = 'SpawnLoft.exe'; javaPid = $java.Id; javaExe = 'node.exe'; startedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } |
+  @{ name = $name; running = $true; daemonPid = $gone.Id; daemonExe = 'SpawnLoft.exe'; javaPid = $java.Id; javaExe = 'fake-java.exe'; startedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } |
     ConvertTo-Json | Set-Content (Join-Path $runDir 'state.json')
   Check "$name is orphaned under 1.x (java alive, daemon gone)" (Wait-Until { (List1)[$name].status -eq 'orphaned' } 30) "$((List1)[$name].status)"
   $java.Id
@@ -208,7 +208,9 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   Check-Graceful $dataRoot 'mysql-main' $dbJava 'Normal shutdown'
   Check "lost's JVM was not touched" (Pid-Alive $lostJava) "pid $lostJava"
   $starts = Starts $seed.servers.survival
-  Check 'survival was started again by 2.0, not by SpawnLoft.exe as Node' ($starts.Count -ge 2 -and $starts[-1].runtime -notlike '*\SpawnLoft.exe') "$($starts | ConvertTo-Json -Compress)"
+  # the stand-in is native for both daemons, so its runtime is fake-java.exe either way; whose
+  # daemon started it is Check-Rust-Daemon's question, just below
+  Check 'survival was started again, on the native stand-in' ($starts.Count -ge 2 -and $starts[-1].runtime -like '*\fake-java.exe') "$($starts | ConvertTo-Json -Compress)"
   Check-Rust-Daemon $dataRoot 'survival' | Out-Null
   Check-Rust-Daemon $dataRoot 'mysql-main' | Out-Null
   $l2 = Status2

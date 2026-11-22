@@ -5,7 +5,7 @@
 #   docker run --rm -v "$PWD:/repo:ro" <image> sh /repo/desktop/smoke-cli-package.sh deb|rpm [db]
 #
 # The images have no Node, which is the point: the package says it needs none. They have no Java
-# either, so the server is the test suite's fake one, run by the package's own runtime. What is
+# either, so the server is the native fake JVM (spawnloft-fakes' fake-java). What is
 # being proved is everything around the JVM: the dependencies the package declares resolve on this
 # distribution, its runtime loads against this distribution's libc, the daemon detaches and is
 # recognised afterwards - the check that called every server ORPHANED under Node 24, and only ever
@@ -33,12 +33,14 @@ export HOME=/tmp/spawnloft-home
 mkdir -p "$HOME" "$SPAWNLOFT_DATA_ROOT/instances/pkgtest"
 spawnloft config
 
-cp /repo/test/fixtures/fake-java.mjs /tmp/fake-java.mjs
+# the native JVM stand-in (spawnloft-fakes' fake-java, static), which 1.x's daemon and 2.0's both
+# run as a real java (a release 2.0 core runs no .mjs one); the workflow puts it in /repo/fakes
+cp "${FAKE_JAVA:-/repo/fakes/fake-java}" /tmp/fake-java && chmod 755 /tmp/fake-java
 printf 'eula=true\n' > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/eula.txt"
 : > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/server.jar"
 cat > "$SPAWNLOFT_DATA_ROOT/instances.json" <<JSON
 { "version": 1, "instances": { "pkgtest": {
-  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java.mjs", "memory": "1G",
+  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java", "memory": "1G",
   "port": 45665, "rcon": { "port": 45675, "password": "package-smoke" }, "autoRestart": false } } }
 JSON
 

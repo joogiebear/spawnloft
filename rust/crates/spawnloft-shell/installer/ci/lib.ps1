@@ -12,8 +12,8 @@ $script:fixtures = Join-Path $env:RUNNER_TEMP 'installer-fixtures'
 $script:result = [ordered]@{}
 $script:scenario = 'scenario'
 $script:failures = 0
-# the harness's own Node (setup-node), by full path: seeding, list.mjs and the fake JVM stand-in
-# run on it; nothing of 2.0 may (the scenarios hide every other Node from 2.0, see Set-NodeMode)
+# the harness's own Node (setup-node), by full path: seeding and list.mjs run on it; nothing of
+# 2.0 may (the scenarios hide every other Node from 2.0, see Set-NodeMode)
 $script:harnessNode = (Get-Command node).Source
 # the checkout's Node core (src\), which the harness's own readers import: 2.0 ships none
 # (rust/PLAN-CORE-PORT.md 5.1), and its registry and state files are the same as 2.0's
@@ -28,7 +28,11 @@ function Start-Scenario($name) {
   # the fixtures live outside the install folder and the data root, at a path both 1.x and 2.0
   # daemons can run them from
   New-Item -ItemType Directory -Force -Path $fixtures | Out-Null
-  Copy-Item -Force "$PSScriptRoot\fake-java.mjs" $fixtures
+  # the JVM stand-in is native (spawnloft-fakes' fake-java, which installer.yml builds and names
+  # in FAKE_JAVA_EXE): 1.x's daemon and 2.0's both run it as they run a real java, where a
+  # release 2.0 core runs no .mjs stand-in
+  if (-not $env:FAKE_JAVA_EXE -or -not (Test-Path $env:FAKE_JAVA_EXE)) { throw "FAKE_JAVA_EXE does not name fake-java.exe: '$env:FAKE_JAVA_EXE'" }
+  Copy-Item -Force $env:FAKE_JAVA_EXE (Join-Path $fixtures 'fake-java.exe')
   Copy-Item -Recurse -Force (Join-Path $env:GITHUB_WORKSPACE 'test\fixtures\fake-mariadb') $fixtures
   Set-NodeMode $script:nodeMode
 }

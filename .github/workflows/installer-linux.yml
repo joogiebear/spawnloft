@@ -50,6 +50,7 @@ on:
       - 'rust/crates/spawnloft-shell/installer/**'
       - 'rust/crates/spawnloft-shell/src/updater.rs'
       - 'rust/crates/spawnloft-lib/src/update/**'
+      - 'rust/crates/spawnloft-fakes/src/bin/fake-java.rs'
       - 'desktop/build-cli-package.mjs'
       - 'desktop/smoke-cli-package.sh'
       - 'desktop/release-gate.mjs'
@@ -137,6 +138,14 @@ jobs:
           core="$GITHUB_WORKSPACE/rust/target/${{ matrix.triple }}/release/spawnloft-core"
           "$core" --version
           echo "CORE=$core" >> "$GITHUB_ENV"
+      - name: Build the native JVM stand-in (spawnloft-fakes' fake-java, static like the core)
+        # the upgrade job's containers run it under 1.x's daemon and 2.0's; a release 2.0 core
+        # runs no .mjs stand-in, and the images have no Node
+        working-directory: rust
+        run: |
+          cargo build --release --locked -p spawnloft-fakes --bin fake-java --target ${{ matrix.triple }}
+          mkdir -p "$RUNNER_TEMP/fakes"
+          cp target/${{ matrix.triple }}/release/fake-java "$RUNNER_TEMP/fakes/"
       - name: Build the shell (tauri build, no bundle)
         # the release public key is compiled in, as in a release; the packages are laid out by
         # linux-package.mjs, not the bundler (the script's header says why)
@@ -165,6 +174,12 @@ jobs:
           path: |
             dist-linux/*.deb
             dist-linux/*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-fakes-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ runner.temp }}/fakes/
 
   upgrade:
     needs: build
@@ -181,6 +196,12 @@ jobs:
         with:
           name: installer-linux-${{ matrix.arch }}
           path: pkg
+      # the native JVM stand-in, at /repo/fakes/fake-java in the containers (the scripts copy it
+      # and set its execute bit, which an artifact does not keep)
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-linux-fakes-${{ matrix.arch }}
+          path: fakes
       - name: Download the published 1.x packages
         run: |
           deb=$([ "${{ matrix.arch }}" = x64 ] && echo amd64 || echo arm64)
