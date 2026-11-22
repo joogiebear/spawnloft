@@ -31,9 +31,10 @@ fn setting_node() -> Option<PathBuf> {
 pub fn node() -> Result<PathBuf, String> {
     node_with(
         setting_node(),
+        // a relative path would resolve against whatever folder this process started in
         std::env::var_os("SPAWNLOFT_NODE")
-            .filter(|p| !p.is_empty())
-            .map(PathBuf::from),
+            .map(PathBuf::from)
+            .filter(|p| p.is_absolute()),
         path_node(),
     )
 }
@@ -162,10 +163,17 @@ pub fn prepare(cmd: &mut Command) {
 
 /// The first `node` on PATH, then the places a GUI-started app misses on macOS.
 fn path_node() -> Option<PathBuf> {
-    let exe = if cfg!(windows) { "node.exe" } else { "node" };
     let path = std::env::var_os("PATH").unwrap_or_default();
-    std::env::split_paths(&path)
-        .chain(gui_fallback_dirs())
+    node_in(std::env::split_paths(&path).chain(gui_fallback_dirs()))
+}
+
+/// The first folder's `node`. An empty or relative entry (`PATH=$PATH:`, `.`) is skipped: it
+/// names the folder this process happens to run in, a downloaded pack's say, and a `node` left
+/// there would run.
+fn node_in(dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    let exe = if cfg!(windows) { "node.exe" } else { "node" };
+    dirs.into_iter()
+        .filter(|dir| dir.is_absolute())
         .map(|dir| dir.join(exe))
         .find(|p| p.is_file())
 }
@@ -212,6 +220,18 @@ fn version_key(name: &str) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_relative_folder_never_yields_a_node() {
+        let exe = if cfg!(windows) { "node.exe" } else { "node" };
+        let rel = PathBuf::from(format!("node-in-test-{}", std::process::id()));
+        std::fs::create_dir_all(&rel).unwrap();
+        std::fs::write(rel.join(exe), "").unwrap();
+        let abs = std::env::current_dir().unwrap().join(&rel);
+        assert_eq!(node_in([PathBuf::new(), rel.clone()]), None);
+        assert_eq!(node_in([rel.clone(), abs.clone()]), Some(abs.join(exe)));
+        std::fs::remove_dir_all(&rel).unwrap();
+    }
 
     #[test]
     fn the_setting_wins_and_must_exist() {
