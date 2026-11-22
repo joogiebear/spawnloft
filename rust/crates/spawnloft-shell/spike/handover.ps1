@@ -152,7 +152,6 @@ if (-not $Uninstall) {
   Check '1.x uninstaller gone' (-not (Test-Path "$inst\Uninstall SpawnLoft.exe"))
   Check 'Tauri uninstaller present' (Test-Path "$inst\uninstall.exe")
   Check 'core binary at resources\bin\spawnloft-core.exe' (Test-Path "$inst\resources\bin\spawnloft-core.exe")
-  Check 'Node core at resources\core\mcctl.mjs' (Test-Path "$inst\resources\core\mcctl.mjs")
   $v2 = Reg $uninstKey 'DisplayVersion'
   Check 'same uninstall key, new version' ($v2 -like '2.0.0*') "DisplayVersion $v2"
   $result.uninstallString2 = Reg $uninstKey 'UninstallString'

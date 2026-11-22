@@ -14,15 +14,11 @@ const overlay = {
   version,
   bundle: {
     createUpdaterArtifacts: true,
-    // paths are relative to rust/crates/spawnloft-shell; the layout under the install folder is
-    // the one 1.x has (resources\bin\spawnloft-core.exe, resources\core\mcctl.mjs), so task
-    // shims, server launchers and MCP configs written by 1.x find the same files
+    // paths are relative to rust/crates/spawnloft-shell; the core binary sits where 1.x's layout
+    // has it (resources\bin\spawnloft-core.exe). There is no Node core to carry since C10: the
+    // shell hands 1.x's `... resources\core\mcctl.mjs <command>` form to the core.
     resources: {
       [`../../target/release/${exe}`]: `resources/bin/${exe}`,
-      '../../../mcctl.mjs': 'resources/core/mcctl.mjs',
-      '../../../spawnloft.mjs': 'resources/core/spawnloft.mjs',
-      '../../../package.json': 'resources/core/package.json',
-      '../../../src/': 'resources/core/src/',
     },
   },
   plugins: {
