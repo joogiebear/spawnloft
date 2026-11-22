@@ -85,7 +85,7 @@ pub fn mtime_ms(meta: &std::fs::Metadata) -> f64 {
 }
 
 /// `sha1OfFile(file)`.
-fn sha1_of_file(file: &Path) -> std::io::Result<String> {
+pub(crate) fn sha1_of_file(file: &Path) -> std::io::Result<String> {
     let mut f = std::fs::File::open(file)?;
     let mut h = Hasher::new(Hash::Sha1);
     let mut buf = vec![0u8; 64 * 1024];
@@ -250,7 +250,7 @@ impl Ledger {
     }
 }
 
-fn ledger_key(paths: &Paths, file: &str) -> String {
+pub(crate) fn ledger_key(paths: &Paths, file: &str) -> String {
     let rel = jspath::relative(&paths.root, file);
     if cfg!(windows) {
         rel.replace('\\', "/")
@@ -260,7 +260,7 @@ fn ledger_key(paths: &Paths, file: &str) -> String {
 }
 
 /// `noteChecked(ledger, file, sha1)`: the file was just downloaded against this hash.
-fn note_checked(paths: &Paths, ledger: &Mutex<Ledger>, file: &str, sha1: &Value) {
+pub(crate) fn note_checked(paths: &Paths, ledger: &Mutex<Ledger>, file: &str, sha1: &Value) {
     if !is_sha1(sha1) {
         return;
     }
@@ -279,7 +279,13 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 /// `needsFetch(file, { sha1, size }, ledger)`: missing, the wrong size, or not matching its hash;
 /// a file whose line in the list still fits it is not read again.
-fn needs_fetch(paths: &Paths, file: &str, sha1: &Value, size: &Value, ledger: &Mutex<Ledger>) -> bool {
+pub(crate) fn needs_fetch(
+    paths: &Paths,
+    file: &str,
+    sha1: &Value,
+    size: &Value,
+    ledger: &Mutex<Ledger>,
+) -> bool {
     let Ok(meta) = std::fs::metadata(file) else {
         return true;
     };

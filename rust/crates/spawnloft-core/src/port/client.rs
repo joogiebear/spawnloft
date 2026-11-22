@@ -361,16 +361,7 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
             let [name] = rest.as_slice() else {
                 return Err(usage());
             };
-            let profile = profiles::get(&paths, name)?;
-            // a mod loader's profile goes to the Node core before anything is printed
-            // (`hands_to_node`); this only guards against installing one here
-            if uses_loader(&profile) {
-                return Err(Failure::Internal {
-                    head: "Error".into(),
-                    message: format!("profile \"{name}\" uses a mod loader, which the Node core sets up"),
-                    code: None,
-                });
-            }
+            profiles::get(&paths, name)?;
             let verify = ctx.args.get("verify") == Some(&Flag::Bool(true));
             let out = std::sync::Mutex::new(&mut *ctx.out);
             let say = |text: &str| out.lock().unwrap_or_else(|p| p.into_inner()).err(text);
@@ -396,6 +387,20 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                     ));
                 }
             };
+            // Forge and NeoForge: the game's Java found and the installer's build steps run on it
+            launch::install_loader(
+                &paths,
+                name,
+                &id,
+                verify,
+                &|message| {
+                    if !quiet {
+                        say(&format!("{message}\n"));
+                    }
+                },
+                &on_progress,
+                &mut |w| say(&format!("warning: {w}\n")),
+            )?;
             let result = install::ensure_version(
                 &paths,
                 &id,
