@@ -86,6 +86,10 @@ pub fn launch(
             "jobId must be 1 to 64 letters, digits, dashes or underscores",
         ));
     }
+    // Node saw that no such job runs and made it one in a single turn. Here two requests are two
+    // threads: the second waits until the first's job is one it can see.
+    static STARTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _starting = STARTING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if panel.jobs.running(&job_id) {
         return Err(Failure::user("that job is already running"));
     }
@@ -203,13 +207,17 @@ fn launch_job(
                 p.phase
             };
             // nothing fetched so far in this step: the files on disk are being checked
-            let message = if p.bytes > 0.0 {
+            let message = if p.bytes > 0.0 || p.fetching {
+                let size = if p.bytes > 0.0 {
+                    format!(" · {}", crate::text::human_bytes(Some(p.bytes)))
+                } else {
+                    String::new()
+                };
                 format!(
-                    "Downloading {} · {} of {} files · {}",
+                    "Downloading {} · {} of {} files{size}",
                     p.phase,
                     grouped(p.done),
-                    grouped(p.total),
-                    crate::text::human_bytes(Some(p.bytes))
+                    grouped(p.total)
                 )
             } else {
                 format!(

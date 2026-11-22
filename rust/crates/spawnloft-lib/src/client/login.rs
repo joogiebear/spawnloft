@@ -16,7 +16,7 @@
 
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -44,6 +44,8 @@ pub struct Hooks {
     /// Keeps the account: re-read the list, upsert this one entry by uuid, and make it the
     /// default when there is none.
     pub save: Save,
+    /// Holds off every other write to the account lists for as long as what it answers lives.
+    pub writing: Arc<dyn Fn() -> Box<dyn std::any::Any> + std::marker::Send + Sync>,
 }
 
 /// How a finished sign-in's account is kept.
@@ -58,19 +60,24 @@ struct Record {
     finished: bool,
     listeners: Vec<(u64, Sender<Value>)>,
     last: Value,
-    /// Bumped to call off the orphan timer armed before (`clearTimer`).
-    orphan_timer: u64,
+    /// When a record nobody listens to is dropped (`orphanTimer`); `None` is a timer cleared.
+    orphan_at: Option<Instant>,
+    /// When the record is dropped whatever its state (`expiryTimer`).
+    expires_at: Instant,
 }
 
 #[derive(Default)]
 struct Records {
     list: Vec<Record>,
     next: u64,
+    /// Whether the thread that keeps the timers runs.
+    ticking: bool,
 }
 
 static RECORDS: Mutex<Records> = Mutex::new(Records {
     list: Vec::new(),
     next: 0,
+    ticking: false,
 });
 
 fn records() -> MutexGuard<'static, Records> {
@@ -108,19 +115,58 @@ fn drop_record(recs: &mut Records, id: &str, event: Option<Value>) {
 }
 
 fn arm_orphan_timer(record: &mut Record) {
-    record.orphan_timer += 1;
-    let (id, armed) = (record.id.clone(), record.orphan_timer);
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(ORPHAN_MS));
-        let mut recs = records();
-        let orphaned = recs
-            .list
-            .iter()
-            .any(|r| r.id == id && r.orphan_timer == armed && r.listeners.is_empty());
-        if orphaned {
-            drop_record(&mut recs, &id, None);
-        }
-    });
+    record.orphan_at = Some(Instant::now() + Duration::from_millis(ORPHAN_MS));
+}
+
+/// Node's two timers per record, kept by one thread for all of them: it runs while there is a
+/// record and ends with the last, so starting sign-ins over and over leaves nothing behind.
+fn keep_timers(recs: &mut Records) {
+    if recs.ticking {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("sign-in timers".into())
+        .spawn(|| {
+            loop {
+                std::thread::sleep(Duration::from_millis(250));
+                let mut recs = records();
+                let now = Instant::now();
+                let expired: Vec<String> = recs
+                    .list
+                    .iter()
+                    .filter(|r| r.expires_at <= now)
+                    .map(|r| r.id.clone())
+                    .collect();
+                for id in expired {
+                    drop_record(
+                        &mut recs,
+                        &id,
+                        Some(
+                            json!({ "status": "failed", "message": "the sign-in took longer than 10 minutes; start it again" }),
+                        ),
+                    );
+                }
+                let orphaned: Vec<String> = recs
+                    .list
+                    .iter_mut()
+                    .filter(|r| r.orphan_at.is_some_and(|at| at <= now))
+                    .filter_map(|r| {
+                        // the timer has fired: it drops the record only if nobody listens
+                        r.orphan_at = None;
+                        r.listeners.is_empty().then(|| r.id.clone())
+                    })
+                    .collect();
+                for id in orphaned {
+                    drop_record(&mut recs, &id, None);
+                }
+                if recs.list.is_empty() {
+                    recs.ticking = false;
+                    return;
+                }
+            }
+        });
+    // with no thread to be had the record stays until it is finished, cancelled or replaced
+    recs.ticking = spawned.is_ok();
 }
 
 /// `startBrowserLogin({ redirectUri })`: the state, the PKCE verifier and Microsoft's page. A
@@ -194,21 +240,12 @@ pub fn start_login(redirect_uri: &str) -> Result<Started, Failure> {
         finished: false,
         listeners: Vec::new(),
         last: json!({ "status": "pending" }),
-        orphan_timer: 0,
+        orphan_at: None,
+        expires_at: Instant::now() + Duration::from_millis(EXPIRY_MS),
     };
     arm_orphan_timer(&mut record);
     recs.list.push(record);
-    let expiring = id.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(EXPIRY_MS));
-        drop_record(
-            &mut records(),
-            &expiring,
-            Some(
-                json!({ "status": "failed", "message": "the sign-in took longer than 10 minutes; start it again" }),
-            ),
-        );
-    });
+    keep_timers(&mut recs);
     Ok(Started::Started {
         login_id: id,
         authorize_url,
@@ -232,7 +269,7 @@ pub fn listen_login(login_id: &str) -> Option<Listening> {
     let (send, events) = channel();
     let _ = send.send(record.last.clone());
     record.listeners.push((listener, send));
-    record.orphan_timer += 1;
+    record.orphan_at = None;
     Some(Listening { events, listener })
 }
 
@@ -373,12 +410,22 @@ fn finish(id: &str, code: Option<String>, verifier: &str, redirect_uri: &str, ho
         }
     };
     // Cancelled, expired or replaced while Microsoft was slow: the stream has said so already,
-    // so the account is not kept.
-    if !records().list.iter().any(|r| r.id == id) {
+    // so the account is not kept. Node looked and saved in one turn; here the look and the save
+    // are held together, so a cancel comes wholly before (nothing is saved) or wholly after.
+    let saved = {
+        let _writing = (hooks.writing)();
+        let recs = records();
+        if recs.list.iter().any(|r| r.id == id) {
+            Some((hooks.save)(&account))
+        } else {
+            None
+        }
+    };
+    let Some(saved) = saved else {
         (hooks.log)("sign-in finished after it was cancelled; the account was not saved");
         return;
-    }
-    if let Err(err) = (hooks.save)(&account) {
+    };
+    if let Err(err) = saved {
         let message = match &err {
             Failure::User { message, .. } => message.clone(),
             other => {
@@ -509,6 +556,7 @@ mod tests {
                 saved.lock().unwrap().push(a.clone());
                 Ok(())
             }),
+            writing: Arc::new(|| Box::new(())),
         }
     }
 

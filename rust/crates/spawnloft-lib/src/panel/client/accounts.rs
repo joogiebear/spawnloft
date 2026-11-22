@@ -170,8 +170,9 @@ fn hooks(paths: &Paths, panel: &Panel) -> login::Hooks {
                 super::panel_log(dir, line);
             }
         }),
+        // no other write to the lists runs between the last look at the sign-in and the save
+        writing: Arc::new(|| Box::new(writing())),
         save: Arc::new(move |account: &Value| {
-            let _w = writing();
             accounts::update_iterating(&save_paths, |list| accounts::upsert(list, account.clone(), None))?;
             if profiles::default_account(&save_paths)?.is_none() {
                 launcher::set_default_account(&save_paths, Some(&js::string(account.get("uuid"))))?;

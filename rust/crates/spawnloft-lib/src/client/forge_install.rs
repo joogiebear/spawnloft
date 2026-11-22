@@ -903,6 +903,7 @@ fn ensure_libraries(
             done: n + 1,
             total,
             bytes,
+            fetching: false,
         });
     }
     Ok(())

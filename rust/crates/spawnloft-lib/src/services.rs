@@ -1093,11 +1093,13 @@ pub fn list_database_backups(layout: &Layout, name: &str) -> Result<Vec<Value>, 
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return Ok(Vec::new());
     };
-    let files: Vec<String> = entries
+    let mut files: Vec<String> = entries
         .filter_map(Result::ok)
         .filter_map(|e| e.file_name().to_str().map(str::to_string))
         .filter(|f| is_dump_name(f))
         .collect();
+    // by name first, so that backups of one time list the same way every time
+    files.sort();
     let mut rows: Vec<(i64, Value)> = Vec::new();
     for f in files {
         let full = crate::jspath::join_path(&dir, &[&f]);
@@ -1326,6 +1328,9 @@ impl Drop for RestoreMark {
 /// `beginRestore(name)`: marks the database for as long as the restore runs, so a second
 /// restore, a delete or a new dump refuses until it has finished, from any process.
 fn begin_restore(layout: &Layout, name: &str) -> Result<RestoreMark, Failure> {
+    // Node looked for a mark and wrote its own in one turn; two requests here are two threads
+    static MARKING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _marking = MARKING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let state = layout.state_file(name);
     if let Some(why) = crate::control::restore_block(Path::new(&state), name, "restoring another") {
         return Err(Failure::user(why));
