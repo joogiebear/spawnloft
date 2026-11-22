@@ -85,7 +85,7 @@ pub fn check_client_profiles(paths: &Paths, repair: bool, javas: &[Option<u32>])
                         // launch uses a Fabric API someone put in mods/ by hand, so the doctor
                         // counts one too
                         let mods_json = super::read_json(&jspath::join(&[&mods_dir, ".spawnloft-mods.json"]))?;
-                        let has_fabric_api = managed_fabric_api(mods_json.as_ref(), &mods_dir)
+                        let has_fabric_api = managed_fabric_api(mods_json.as_ref(), &mods_dir)?
                             || !super::fabric::fabric_api_jars(&mods_dir)?.is_empty();
                         if !has_fabric_api {
                             problems.push(format!(
@@ -170,23 +170,33 @@ fn mc_text(mc: Option<&Value>) -> String {
 
 /// `modsJson && modsJson.managed && Object.entries(modsJson.managed).some(...)`: a managed
 /// Fabric API whose jar is still in mods/.
-fn managed_fabric_api(mods_json: Option<&Value>, mods_dir: &str) -> bool {
+fn managed_fabric_api(mods_json: Option<&Value>, mods_dir: &str) -> Result<bool, Failure> {
     if !js::truthy(mods_json) {
-        return false;
+        return Ok(false);
     }
     let managed = prop(mods_json, "managed");
     if !js::truthy(managed) {
-        return false;
+        return Ok(false);
     }
     let entries: Vec<(String, &Value)> = match managed {
         Some(Value::Object(m)) => js::object_entries(m.iter().map(|(k, v)| (k.clone(), v)).collect()),
         Some(Value::Array(a)) => a.iter().enumerate().map(|(i, v)| (i.to_string(), v)).collect(),
         _ => Vec::new(),
     };
-    entries.into_iter().any(|(file, entry)| {
-        prop(Some(entry), "project").is_some_and(|p| p == "fabric-api")
+    for (file, entry) in entries {
+        // `entry.project` on a null entry throws, as Node's does
+        if entry.is_null() {
+            return Err(Failure::type_error(
+                "Cannot read properties of null (reading 'project')",
+            ));
+        }
+        if prop(Some(entry), "project").is_some_and(|p| p == "fabric-api")
             && Path::new(&jspath::join(&[mods_dir, &file])).exists()
-    })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 const REJECTED: &[&str] = &[
@@ -342,15 +352,14 @@ mod tests {
         std::fs::create_dir_all(&mods).unwrap();
         let dir = mods.to_string_lossy().into_owned();
         let doc = json!({ "managed": { "fabric-api.jar": { "project": "fabric-api" } } });
-        assert!(!managed_fabric_api(Some(&doc), &dir));
+        assert!(!managed_fabric_api(Some(&doc), &dir).unwrap());
         std::fs::write(mods.join("fabric-api.jar"), "x").unwrap();
-        assert!(managed_fabric_api(Some(&doc), &dir));
-        assert!(!managed_fabric_api(
-            Some(&json!({ "managed": "fabric-api.jar" })),
-            &dir
-        ));
-        assert!(!managed_fabric_api(Some(&json!(null)), &dir));
-        assert!(!managed_fabric_api(None, &dir));
+        assert!(managed_fabric_api(Some(&doc), &dir).unwrap());
+        assert!(!managed_fabric_api(Some(&json!({ "managed": "fabric-api.jar" })), &dir).unwrap());
+        assert!(!managed_fabric_api(Some(&json!(null)), &dir).unwrap());
+        assert!(!managed_fabric_api(None, &dir).unwrap());
+        // a null entry throws in Node's `entry.project`
+        assert!(managed_fabric_api(Some(&json!({ "managed": { "a.jar": null } })), &dir).is_err());
         let _ = std::fs::remove_dir_all(&d);
     }
 
