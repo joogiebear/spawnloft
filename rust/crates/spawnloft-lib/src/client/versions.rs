@@ -418,6 +418,235 @@ pub fn table_rows(rows: &[VersionRow], show: &str, limit: usize) -> Vec<Vec<Stri
     out
 }
 
+// ---- the launcher's picker -------------------------------------------------------------------
+
+/// `availability(mc, lists)`: `{ fabric, loaders }`, every loader null when the lists were not
+/// asked for.
+fn availability(mc: &str, lists: Option<&Lists>) -> (Value, Map<String, Value>) {
+    let loaders = match lists {
+        Some(l) => loaders::loaders_for(mc, l),
+        None => loaders::MODS.iter().map(|l| (l.to_string(), Value::Null)).collect(),
+    };
+    (super::or_null(loaders.get("fabric")), loaders)
+}
+
+/// `olderThan(row, refTimes, release)`: by the manifest's times, else by the numbers.
+fn older_than(id: &str, release_time: Option<&Value>, ref_time: Option<f64>, release: &str) -> bool {
+    if let (Some(r), Some(t)) = (ref_time, release_time.filter(|t| js::truthy(Some(t)))) {
+        return crate::jsdate::parse(&js::string(Some(t))) < r;
+    }
+    static MAJOR_MINOR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d+)\.(\d+)").expect("valid"));
+    let Some(m) = MAJOR_MINOR.captures(id) else {
+        return false;
+    };
+    let Some(r) = MAJOR_MINOR.captures(release) else {
+        return false;
+    };
+    let n = |c: &regex::Captures<'_>, i: usize| js::string_to_number(&c[i]);
+    n(&m, 1) < n(&r, 1) || (n(&m, 1) == n(&r, 1) && n(&m, 2) < n(&r, 2))
+}
+
+/// `listVersions({ fabric, refresh })` as the launcher's version picker reads it: every id
+/// Mojang lists, newest first, with what the launch would say about the ones on disk.
+pub fn list_for_picker(
+    paths: &Paths,
+    os: &super::rules::Os,
+    fabric: bool,
+    refresh: bool,
+    fetch: FetchJson<'_>,
+) -> Result<Value, Failure> {
+    let installed = installed_versions(paths)?;
+    let machine_refusal = super::library::platform_refusal(None, os, None)?;
+    // asked only when a downloaded version lacks natives for this arch
+    let mut needs_caps = false;
+    for i in &installed {
+        if !super::library::native_arches(&i.json, os)?.contains(&os.arch) {
+            needs_caps = true;
+        }
+    }
+    let host_caps = needs_caps.then(|| super::launch::host_x64(os));
+    type Got<'a> = (Result<Value, Failure>, Option<Lists>, Result<&'a str, Failure>);
+    let (mojang, lists, harness): Got<'_> = std::thread::scope(|s| {
+        let m = s.spawn(|| fetch_manifest(paths, refresh, fetch));
+        let l = (fabric || refresh).then(|| s.spawn(|| loaders::loader_lists(paths, refresh, fetch)));
+        let h = s.spawn(|| super::harness_index::refresh_default(paths, refresh));
+        let lists = l.map(|l| l.join().unwrap_or_default());
+        let harness = h.join().unwrap_or(Ok("off"));
+        let mojang = m
+            .join()
+            .unwrap_or_else(|_| Err(Failure::user("the version list could not be read")));
+        (mojang, lists, harness)
+    });
+    harness?;
+    let (manifest, offline) = match mojang {
+        Ok(m) => (Some(m), Value::Null),
+        Err(e) => (
+            None,
+            json!(format!(
+                "the Minecraft version list could not be read ({}), so only downloaded versions are listed",
+                e.message()
+            )),
+        ),
+    };
+    let source: Vec<(String, Option<Value>, Option<Value>)> = match &manifest {
+        Some(m) => {
+            let mut out = Vec::new();
+            for v in manifest_rows(m, "filter")? {
+                if let Some(Value::String(id)) = row_id(v)?
+                    && is_safe_version_id(id)
+                {
+                    out.push((
+                        id.clone(),
+                        prop(Some(v), "type").cloned(),
+                        prop(Some(v), "releaseTime").cloned(),
+                    ));
+                }
+            }
+            out
+        }
+        None => installed
+            .iter()
+            .map(|i| {
+                let t = match prop(Some(&i.json), "type") {
+                    v if super::nullish(v) => json!("release"),
+                    v => super::or_null(v),
+                };
+                let r = super::or_null(prop(Some(&i.json), "releaseTime"));
+                (i.id.clone(), Some(t), Some(r))
+            })
+            .collect(),
+    };
+    let win_arm = os.name == "windows" && os.arch == "arm64";
+    let ref_time = |id: &str| -> Option<f64> {
+        let m = manifest.as_ref()?;
+        let rows = prop(Some(m), "versions").and_then(Value::as_array)?;
+        let row = rows.iter().find(|v| prop(Some(v), "id") == Some(&json!(id)))?;
+        let t = crate::jsdate::parse(&match prop(Some(row), "releaseTime") {
+            v if super::nullish(v) => String::new(),
+            v => js::string(v),
+        });
+        (!t.is_nan()).then_some(t)
+    };
+    let (t113, t121) = (ref_time("1.13"), ref_time("1.21"));
+    let harness_ids = super::harness::published_ids(paths);
+    let mut rows: Vec<(f64, Value)> = Vec::new();
+    for (id, kind_raw, release_time) in source {
+        let disk = installed.iter().find(|i| i.id == id);
+        let mut notes: Vec<&str> = Vec::new();
+        if older_than(&id, release_time.as_ref(), t113, "1.13") {
+            notes.push("old launcher arguments; untested");
+        }
+        if win_arm && older_than(&id, release_time.as_ref(), t121, "1.21") {
+            notes.push("may not run on this machine; checked at launch");
+        }
+        let kind_text = kind_raw.as_ref().and_then(Value::as_str);
+        let java_needs = match disk {
+            Some(d) => crate::jsjson::num(super::version::java_requirement(&d.json).major),
+            None if matches!(kind_text, Some("old_alpha" | "old_beta")) => json!(8),
+            None => json!(crate::java::required_major(Some(&id))),
+        };
+        let (fabric_has, loaders) = availability(&id, lists.as_ref());
+        let refusal = match disk {
+            Some(d) => json!(super::library::platform_refusal(Some(&d.json), os, host_caps)?),
+            None => Value::Null,
+        };
+        let release = super::or_null(release_time.as_ref());
+        let row = super::object(vec![
+            ("id", Some(json!(id))),
+            ("type", kind_raw.clone()),
+            ("kind", Some(json!(version_kind(&id, kind_text)))),
+            ("releaseTime", Some(release.clone())),
+            ("downloaded", Some(json!(disk.is_some_and(|d| d.downloaded)))),
+            ("javaNeeds", Some(java_needs)),
+            ("javaNeedsExact", Some(json!(disk.is_some()))),
+            ("harness", Some(json!(harness_ids.contains(&id)))),
+            ("fabric", Some(fabric_has)),
+            ("loaders", Some(Value::Object(loaders))),
+            ("refusal", Some(refusal)),
+            ("note", Some(if notes.is_empty() { Value::Null } else { json!(notes.join("; ")) })),
+        ]);
+        rows.push((parse_time(Some(&release)), row));
+    }
+    // newest first, by release time; a row without one keeps its place at the end
+    rows.sort_by(|a, b| (b.0 - a.0).partial_cmp(&0.0).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(json!({
+        "machineRefusal": machine_refusal,
+        "offline": offline,
+        "versions": rows.into_iter().map(|(_, r)| r).collect::<Vec<Value>>(),
+    }))
+}
+
+/// `describeVersion(id)`: one version in full, for the form. Its JSON is fetched (and kept in
+/// versions/) when it is not on disk, and the launch's own decisions are read from it.
+pub fn describe_version(
+    paths: &Paths,
+    os: &super::rules::Os,
+    id: &Value,
+    fetch: FetchJson<'_>,
+) -> Result<Value, Failure> {
+    let known = assert_version_id(paths, id, fetch)?;
+    let mc = known.mc.clone();
+    let json = match read_json(&paths.version_json(&mc))? {
+        Some(j) if js::truthy(Some(&j)) => j,
+        _ => {
+            let manifest = known.manifest.clone().unwrap_or(Value::Null);
+            super::install::fetch_version_json(paths, &mc, &manifest, &super::install::default_fetch)?;
+            read_json(&paths.version_json(&mc))?.unwrap_or(Value::Null)
+        }
+    };
+    let needs_caps = !super::library::native_arches(&json, os)?.contains(&os.arch);
+    let caps = needs_caps.then(|| super::launch::host_x64(os));
+    let features = super::version::launch_features(false);
+    let resolved =
+        super::version::resolve_version(&json, os, &features, caps, super::version::LAUNCHER_FORMAT)?;
+    let refused = super::version::resolved_refusal(&resolved);
+    let (lists, harness) = std::thread::scope(|s| {
+        let l = s.spawn(|| loaders::loader_lists(paths, false, fetch));
+        let h = s.spawn(|| super::harness_index::refresh_default(paths, false));
+        (l.join().unwrap_or_default(), h.join().unwrap_or(Ok("off")))
+    });
+    harness?;
+    let kind = match prop(Some(&json), "type") {
+        v if super::nullish(v) => json!("release"),
+        v => super::or_null(v),
+    };
+    let (fabric_has, loaders) = availability(&mc, Some(&lists));
+    let java = &resolved.java;
+    let (refusal, code) = match &refused {
+        Some(Failure::User { message, code }) => (json!(message), super::or_null(code.as_ref().map(|c| json!(c)).as_ref())),
+        Some(other) => (json!(other.message()), Value::Null),
+        None => (Value::Null, Value::Null),
+    };
+    let problems: Vec<Value> = resolved
+        .problems
+        .iter()
+        .map(|p| json!({ "code": p.code, "message": p.message }))
+        .collect();
+    Ok(json!({
+        "id": mc,
+        "type": kind,
+        "kind": version_kind(&mc, kind.as_str()),
+        "releaseTime": super::or_null(prop(Some(&json), "releaseTime")),
+        "javaNeeds": crate::jsjson::num(java.major),
+        "javaNeedsExact": true,
+        "java": {
+            "major": crate::jsjson::num(java.major),
+            "component": java.component,
+            "min": crate::jsjson::num(java.min),
+            "max": java.max.map_or(Value::Null, crate::jsjson::num),
+            "prefer": crate::jsjson::num(java.prefer),
+        },
+        "arch": resolved.os.arch,
+        "emulated": resolved.emulated,
+        "fabric": fabric_has,
+        "loaders": Value::Object(loaders),
+        "harness": super::harness::harness_for(paths, &mc).is_some(),
+        "refusal": refusal,
+        "code": code,
+        "problems": problems,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
