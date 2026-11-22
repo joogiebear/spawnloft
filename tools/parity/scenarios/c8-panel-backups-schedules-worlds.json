@@ -19,7 +19,7 @@
    "replace": "\"$1\"$2:$3<n>"
   },
   {
-   "pattern": "(pre-restore_files_<stamp>)_\\d+",
+   "pattern": "((?:pre-restore|world-delete)_files_<stamp>)_\\d+",
    "replace": "$1"
   },
   {
@@ -1140,7 +1140,7 @@
   {
    "write": "data/run/srv1/restoring.json",
    "json": {
-    "pid": 1
+    "pid": "{rig-pid}"
    }
   },
   {

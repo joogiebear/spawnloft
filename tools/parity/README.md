@@ -87,6 +87,7 @@ Not isolated: the Windows user PATH.
 ```
 
 - `{run}`, `{data}`, `{home}` and `{repo}` in any string are this side's paths.
+- A value that is exactly `"{rig-pid}"` becomes the number of the rig's own process: one that is alive on every system while the scenario runs.
 - `expect` is checked on both sides. It stops a scenario from passing only because both sides
   failed the same way, for example when a host was not faked.
 - `hosts`: see `lib/fake-host.mjs`. A route answers with `json`, `text`, `base64`,

@@ -38,6 +38,8 @@ export function findFakeScheduler(core, env = process.env) {
 
 // {run}, {data}, {home}, {repo} in a step's strings, as this side's real paths.
 function expand(value, ctx) {
+  // a process that is alive on every system for as long as the scenario runs: this one
+  if (value === '{rig-pid}') return process.pid
   if (typeof value === 'string') return value.replace(/\{(run|data|home|repo)\}/g, (_, k) => ctx[k])
   if (Array.isArray(value)) return value.map(v => expand(v, ctx))
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, expand(v, ctx)]))
