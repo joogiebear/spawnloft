@@ -70,6 +70,69 @@ fn query_alias(command: &str) -> Option<&'static str> {
     })
 }
 
+/// Every name `COMMANDS` in mcctl.mjs answers.
+const COMMANDS: &[&str] = &[
+    "list",
+    "ls",
+    "status",
+    "start",
+    "stop",
+    "restart",
+    "kill",
+    "logs",
+    "log",
+    "cmd",
+    "rcon",
+    "send",
+    "console",
+    "attach",
+    "players",
+    "new",
+    "clone",
+    "adopt",
+    "rm",
+    "remove",
+    "set",
+    "props",
+    "backup",
+    "snapshot",
+    "snapshots",
+    "backups",
+    "restore",
+    "prune",
+    "verify",
+    "templates",
+    "template",
+    "jars",
+    "paper",
+    "config",
+    "data",
+    "rename",
+    "rebuild",
+    "reveal",
+    "open",
+    "plugins",
+    "upgrade",
+    "pack",
+    "worlds",
+    "why",
+    "diagnostics",
+    "diag",
+    "metrics",
+    "launchers",
+    "ui",
+    "panel",
+    "task",
+    "doctor",
+    "repair",
+    "db",
+    "mcp",
+    "bot",
+    "client",
+    "uninstall",
+    "help",
+];
+
 /// The commands whose own handler takes `--json` (mcctl.mjs main).
 const JSON_HANDLERS: &[&str] = &[
     "backup", "snapshot", "doctor", "repair", "metrics", "data", "bot", "diag", "client",
@@ -135,6 +198,12 @@ fn dispatch(
         }
         Some(c) => c,
     };
+    // mcctl.mjs looks the handler up first: an unknown command is that, with or without --json
+    if !COMMANDS.contains(&command) {
+        return Err(Failure::usage(format!(
+            "Unknown command \"{command}\". Run \"spawnloft help\" for usage."
+        )));
+    }
     if parsed.get("csv").is_some() && command != "metrics" {
         return Err(Failure::usage("--csv is supported only for metrics"));
     }

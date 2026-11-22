@@ -1,5 +1,5 @@
 {
- "about": "A start that fails, for a server and a database under the daemon: the reason, the advice and the console's last lines. The activity log is left out: the daemon's crash entry and the command's failed-start entry are written by two processes in either order, on either side.",
+ "about": "A start that fails, for a server and a database under the daemon (the steps that asked for the Node daemon now get the Rust one, and are not frozen): the reason, the advice and the console's last lines. The activity log is left out: the daemon's crash entry and the command's failed-start entry are written by two processes in either order, on either side.",
  "ignore": [
   "data/run/**",
   "data/activity.jsonl",
@@ -99,6 +99,24 @@
   {
    "run": [
     "start",
+    "bad1",
+    "--timeout",
+    "30"
+   ],
+   "env": {
+    "FAKE_JAVA_FAIL": "start",
+    "SPAWNLOFT_DAEMON": "node"
+   },
+   "frozen": false,
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "did not reach ready state"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
     "bad2",
     "--timeout",
     "30"
@@ -107,6 +125,24 @@
     "FAKE_JAVA_FAIL": "start",
     "SPAWNLOFT_DAEMON": "rust"
    },
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "did not reach ready state"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "db1",
+    "--timeout",
+    "30"
+   ],
+   "env": {
+    "FAKE_MARIADB_FAIL": "start",
+    "SPAWNLOFT_DAEMON": "node"
+   },
+   "frozen": false,
    "expect": {
     "code": 1,
     "stdoutIncludes": "did not reach ready state"
