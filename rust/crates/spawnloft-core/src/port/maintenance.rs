@@ -133,26 +133,32 @@ fn resources_of(exe: &Path) -> Option<PathBuf> {
 /// started before the update still holds its node.exe; this finishes that job. As the installer
 /// does (installer.nsi SPAWNLOFT_REMOVE_NODE): every node.exe first, and when one cannot be
 /// deleted both folders stay, for a later repair or install. A failed delete is never an error,
-/// and nothing outside the two folders is touched.
+/// and nothing outside the two folders is touched. A folder is only taken for SpawnLoft's when it
+/// holds what SpawnLoft put there (`runtime\runtime.json`, `core\mcctl.mjs`): the install folder
+/// can be one the person chose, and another app's `resources\core` is not ours to delete.
 #[cfg(any(windows, test))]
 fn remove_node_leftovers(resources: &Path) -> Leftovers {
-    let runtime = resources.join("runtime");
-    let core = resources.join("core");
-    if !runtime.exists() && !core.exists() {
+    let runtime = Some(resources.join("runtime")).filter(|r| r.join("runtime.json").is_file());
+    let core = Some(resources.join("core")).filter(|c| c.join("mcctl.mjs").is_file());
+    if runtime.is_none() && core.is_none() {
         return Leftovers::None;
     }
     let mut held = false;
-    for entry in std::fs::read_dir(&runtime).into_iter().flatten().flatten() {
+    for entry in runtime
+        .iter()
+        .flat_map(|r| std::fs::read_dir(r).into_iter().flatten().flatten())
+    {
         let exe = entry.path().join("node.exe");
         if exe.is_file() && std::fs::remove_file(&exe).is_err() {
             held = true;
         }
     }
     if !held {
-        let _ = std::fs::remove_dir_all(&runtime);
-        let _ = std::fs::remove_dir_all(&core);
+        for dir in runtime.iter().chain(&core) {
+            let _ = std::fs::remove_dir_all(dir);
+        }
     }
-    if runtime.exists() || core.exists() {
+    if runtime.iter().chain(&core).any(|d| d.exists()) {
         Leftovers::Held
     } else {
         Leftovers::Removed
@@ -270,6 +276,18 @@ mod tests {
         }
         // the next repair finds nothing to do
         assert_eq!(remove_node_leftovers(&resources), Leftovers::None);
+        // another app's folders of the same names (no runtime.json, no mcctl.mjs) stay
+        for file in ["runtime/node-1/node.exe", "core/index.js"] {
+            let f = resources.join(file);
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+            std::fs::write(&f, "x").unwrap();
+        }
+        assert_eq!(remove_node_leftovers(&resources), Leftovers::None);
+        assert!(
+            resources.join("runtime/node-1/node.exe").is_file() && resources.join("core/index.js").is_file()
+        );
+        std::fs::remove_dir_all(resources.join("runtime")).unwrap();
+        std::fs::remove_dir_all(resources.join("core")).unwrap();
         // a core folder left alone (its runtime already gone) goes too
         std::fs::create_dir_all(resources.join("core")).unwrap();
         std::fs::write(resources.join("core/mcctl.mjs"), "x").unwrap();

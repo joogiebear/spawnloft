@@ -85,8 +85,8 @@ jobs:
           done
           ls -la "$RUNNER_TEMP/feed"
       - name: Build the native JVM and MariaDB stand-ins (spawnloft-fakes' fake-java, fake-mariadb)
-        # both daemons run it as a real java; a release 2.0 core runs no .mjs stand-in
         # both daemons run them as real programs; a release 2.0 core runs no .mjs stand-in
+        working-directory: rust
         run: |
           cargo build --release --locked -p spawnloft-fakes --bin fake-java --bin fake-mariadb
           mkdir -p "$RUNNER_TEMP/fakes"

@@ -740,12 +740,17 @@ FunctionEnd
 ; repair`, spawnloft-core port/maintenance.rs) removes them once nothing holds them. Nothing
 ; outside the two folders is touched.
 !macro SPAWNLOFT_REMOVE_NODE
+  ; only folders SpawnLoft wrote (runtime.json, mcctl.mjs): the install folder can be one the
+  ; person chose, and another app's resources\core or resources\runtime is not ours
   StrCpy $R6 0
-  ${If} ${FileExists} "$INSTDIR\resources\runtime\*.*"
+  ${If} ${FileExists} "$INSTDIR\resources\runtime\runtime.json"
     ClearErrors
     FindFirst $R7 $R8 "$INSTDIR\resources\runtime\*"
     ${DoWhile} $R8 != ""
-      ${If} ${FileExists} "$INSTDIR\resources\runtime\$R8\node.exe"
+      ; FindFirst lists . and .. too, and ..\node.exe would be resources\node.exe
+      ${If} $R8 != "."
+      ${AndIf} $R8 != ".."
+      ${AndIf} ${FileExists} "$INSTDIR\resources\runtime\$R8\node.exe"
         ClearErrors
         Delete "$INSTDIR\resources\runtime\$R8\node.exe"
         ${If} ${Errors}
@@ -759,8 +764,12 @@ FunctionEnd
   ${If} $R6 = 1
     DetailPrint "node.exe is in use; resources\runtime and resources\core stay until that program ends"
   ${Else}
-    RMDir /r "$INSTDIR\resources\runtime"
-    RMDir /r "$INSTDIR\resources\core"
+    ${If} ${FileExists} "$INSTDIR\resources\runtime\runtime.json"
+      RMDir /r "$INSTDIR\resources\runtime"
+    ${EndIf}
+    ${If} ${FileExists} "$INSTDIR\resources\core\mcctl.mjs"
+      RMDir /r "$INSTDIR\resources\core"
+    ${EndIf}
   ${EndIf}
   ClearErrors
 !macroend
