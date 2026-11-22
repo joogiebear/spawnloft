@@ -464,6 +464,14 @@ function renormalized(record, extra) {
   }
 }
 
+// A side as it is held against a record frozen on another runner: a tar's members come in the
+// order the runner's file system listed the folder, so they are compared as a sorted list. Two
+// cores on one machine are still held to the same order.
+function acrossRunners(side) {
+  const tree = new Map([...side.tree].map(([p, e]) => [p, e && typeof e.tar === 'string' ? { ...e, tar: e.tar.split('\n').sort().join('\n') } : e]))
+  return { ...side, tree }
+}
+
 // A frozen record read back as a side compareSides takes.
 export function sideOfRecord(record) {
   return { steps: record.steps, requests: record.requests, tree: new Map(Object.entries(record.tree)) }
@@ -540,7 +548,7 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
       // already found between the sides
       // the scenario's normalize rules run over the record too, so a rule added after it was
       // frozen (a runner's tool version, say) holds without recording it again
-      if (!(expect === 'differ' && results.node)) frozenDiffs = compareSides(sideOfRecord(renormalized(record, scenario.normalize ?? [])), sideOfRecord(recordOf(results.rust, neutral)), ['frozen', 'rust'])
+      if (!(expect === 'differ' && results.node)) frozenDiffs = compareSides(acrossRunners(sideOfRecord(renormalized(record, scenario.normalize ?? []))), acrossRunners(sideOfRecord(recordOf(results.rust, neutral))), ['frozen', 'rust'])
     } else if (!results.node) {
       problems.push(`no frozen record for ${platformKey()}: ${path.relative(repo, recordPath)}`)
     }

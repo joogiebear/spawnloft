@@ -9,6 +9,8 @@
   "data/instances/run1/logs/**"
  ],
  "normalize": [
+  {"pattern": "\"memoryMb\": \\d+", "replace": "\"memoryMb\": <n>"},
+  {"pattern": "\"error\": \"(?:instance \\\\\"run1\\\\\" is not running|server process is not running)\"", "replace": "\"error\": \"<not running>\""},
   {
    "pattern": "\"lan\": \\[[^\\]]*\\]",
    "replace": "\"lan\": [<lan>]"
