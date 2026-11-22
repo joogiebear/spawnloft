@@ -1,5 +1,5 @@
-//! Black-box tests: the built binary, run as a process, the way the Node supervisor and
-//! verify-build.mjs will run it.
+//! Black-box tests: the built binary, run as a process, the way the supervisor and
+//! desktop/release-gate.mjs will run it.
 
 use spawnloft_fakes::{TempDir, run};
 

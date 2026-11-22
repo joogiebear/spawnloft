@@ -7,7 +7,7 @@
 //      entry, so discovery never sees the tag before its assets exist (a bare tag or an
 //      unfinished release newer than the newest beta makes every beta check 404);
 //   3. every asset is uploaded and the size and sha256 digest GitHub reports for each uploaded
-//      asset are compared to the local bytes before anything is made public (as publish-stable
+//      asset are compared to the local bytes before anything is made public (as 1.x's publish-stable
 //      does; GitHub computes the digest from the stored bytes);
 //   4. only then is the draft flipped to published, atomically carrying its prerelease and
 //      make_latest flags. make_latest follows the rule in release-gate.releaseFlags: a beta is a

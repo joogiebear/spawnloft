@@ -73,6 +73,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # a YAML parser for test/workflows.test.mjs, outside the repository (the root has no
+      # dependencies to take one from)
+      - name: js-yaml for the workflow check
+        run: npm install --prefix "$RUNNER_TEMP/yaml" --no-save --no-package-lock js-yaml@4.1.0 && echo "SPAWNLOFT_YAML_DIR=$RUNNER_TEMP/yaml" >> "$GITHUB_ENV"
       - name: Test
         run: npm test
       # The tools and the other workflows run on .node-version (Node 24), and Node 24 is not Node 22:

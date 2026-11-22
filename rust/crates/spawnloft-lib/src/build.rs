@@ -49,7 +49,7 @@ impl BuildInfo {
         }
     }
 
-    /// The same as one JSON object, for scripts and `verify-build.mjs`.
+    /// The same as one JSON object, for scripts and `desktop/release-gate.mjs`.
     pub fn json(&self) -> String {
         use crate::json::string;
         let commit = self.commit.map(string).unwrap_or_else(|| "null".to_string());
