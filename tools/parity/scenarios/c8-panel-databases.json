@@ -82,7 +82,7 @@
   },
   {
    "write": "data/services/db1/my.ini",
-   "text": "[mysqld]\ndatadir={data}/services/db1/data\nport=48311\nbind-address=127.0.0.1\n"
+   "text": "[mysqld]\ndatadir={data}/services/db1/data\nport=31311\nbind-address=127.0.0.1\n"
   },
   {
    "mkdir": "data/services/db1/data/mysql"
@@ -99,21 +99,21 @@
       "dir": "{data}/instances/srv1",
       "jar": "server.jar",
       "memory": "1G",
-      "port": 48300,
+      "port": 31300,
       "label": "Survival"
      },
      "srv2": {
       "dir": "{data}/instances/srv2",
       "jar": "server.jar",
       "memory": "1G",
-      "port": 48305
+      "port": 31305
      },
      "db1": {
       "kind": "database",
       "engine": "mariadb",
       "version": "0.0.0-fake",
       "dir": "{data}/services/db1",
-      "port": 48311,
+      "port": 31311,
       "root": {
        "user": "root",
        "password": "pw-test"
@@ -126,7 +126,7 @@
       "engine": "garnet",
       "version": "0.0.0-fake",
       "dir": "{data}/services/kv1",
-      "port": 48324,
+      "port": 31324,
       "root": {
        "password": "pw-kv"
       },
@@ -135,7 +135,7 @@
      "odd": {
       "kind": "database",
       "engine": "nope",
-      "port": 48340,
+      "port": 31340,
       "tools": {
        "dir": "x"
       },
@@ -452,7 +452,7 @@
      "json": {
       "name": "bad name",
       "engine": "mysql",
-      "port": 48311
+      "port": 31311
      }
     },
     {
@@ -460,7 +460,7 @@
      "json": {
       "name": "srv1",
       "engine": "mysql",
-      "port": 48311
+      "port": 31311
      }
     },
     {
@@ -484,7 +484,7 @@
      "json": {
       "name": "e3",
       "engine": "mysql",
-      "port": 48311,
+      "port": 31311,
       "tools": "{run}/nowhere"
      }
     },
@@ -493,7 +493,7 @@
      "json": {
       "label": "  My Ext DB! ",
       "engine": "mysql",
-      "port": 48311,
+      "port": 31311,
       "password": "pw-test"
      }
     },
@@ -502,7 +502,7 @@
      "json": {
       "name": "e2",
       "engine": "garnet",
-      "port": "48324",
+      "port": "31324",
       "password": "pw-kv",
       "label": "e2"
      }
@@ -513,7 +513,7 @@
       "name": "e4",
       "engine": "garnet",
       "host": "127.0.0.1",
-      "port": 48324,
+      "port": 31324,
       "password": "pw-kv",
       "label": "Fourth"
      }
@@ -568,7 +568,7 @@
     {
      "post": "/api/databases/My-Ext-DB/address",
      "json": {
-      "port": "48311",
+      "port": "31311",
       "user": "  admin ",
       "password": ""
      }
@@ -730,7 +730,7 @@
       "label": "Key  Value",
       "version": "0.0.0-fake",
       "engine": "garnet",
-      "port": 48331,
+      "port": 31331,
       "jobId": "j2"
      }
     },
@@ -756,7 +756,7 @@
       "name": "kv3",
       "version": "0.0.0-fake",
       "engine": "garnet",
-      "port": 48300
+      "port": 31300
      }
     },
     {
@@ -764,7 +764,7 @@
      "json": {
       "name": "m1",
       "version": "8.4.11",
-      "port": 48332,
+      "port": 31332,
       "jobId": "j3"
      }
     },
