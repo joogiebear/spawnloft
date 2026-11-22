@@ -15,11 +15,9 @@
 // zip files and removed.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-
-import { readZipEntry, zipEntryList } from '../src/plugins.mjs'
+import zlib from 'node:zlib'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const outArg = process.argv.indexOf('--out')
@@ -99,27 +97,63 @@ async function saveList(rel, url) {
   save(rel, Buffer.from(JSON.stringify(list.map((row) => ({ loader: row.loader })), null, 2) + '\n'), url)
 }
 
+// A jar's entries, read from its central directory (what the Node core's plugins.mjs did): name,
+// method, sizes and where its local header is. Zip64 archives (0xffffffff sizes) are declined
+// rather than misread: none of the pinned installers is one.
+function zipEntries(buf) {
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65535); i--) {
+    if (buf.readUInt32LE(i) !== 0x06054b50) continue
+    const count = buf.readUInt16LE(i + 10)
+    let at = buf.readUInt32LE(i + 16)
+    if (at === 0xffffffff) return []
+    const out = []
+    for (let n = 0; n < count && at + 46 <= buf.length && buf.readUInt32LE(at) === 0x02014b50; n++) {
+      const nameLen = buf.readUInt16LE(at + 28)
+      out.push({
+        name: buf.toString('utf8', at + 46, at + 46 + nameLen),
+        method: buf.readUInt16LE(at + 10),
+        compressed: buf.readUInt32LE(at + 20),
+        size: buf.readUInt32LE(at + 24),
+        localOffset: buf.readUInt32LE(at + 42),
+      })
+      at += 46 + nameLen + buf.readUInt16LE(at + 30) + buf.readUInt16LE(at + 32)
+    }
+    return out
+  }
+  return []
+}
+
+// Every entry's name and unpacked size, in the archive's order.
+const zipEntryList = (buf) => zipEntries(buf).map((e) => ({ name: e.name, size: e.size }))
+
+// One entry's bytes, or null when it is missing or cannot be read.
+function readZipEntry(buf, wanted) {
+  const entry = zipEntries(buf).find((e) => e.name === wanted)
+  if (!entry || entry.compressed === 0xffffffff || entry.localOffset === 0xffffffff) return null
+  if (buf.readUInt32LE(entry.localOffset) !== 0x04034b50) return null
+  // the local header's extra field can differ in length from the central one
+  const dataAt = entry.localOffset + 30 + buf.readUInt16LE(entry.localOffset + 26) + buf.readUInt16LE(entry.localOffset + 28)
+  const data = buf.subarray(dataAt, Math.min(buf.length, dataAt + entry.compressed))
+  if (entry.method === 0) return Buffer.from(data)
+  if (entry.method === 8) return zlib.inflateRawSync(data, { maxOutputLength: Math.max(entry.size, 1) })
+  return null
+}
+
 // legacy: the installer format with no version.json (Forge 1.12.2 builds before 2851 and older)
 async function captureInstaller(dir, url, { legacy = false } = {}) {
   const jar = await get(url)
   const published = await sidecar(url)
   const actual = sha1(jar)
   if (published && published !== actual) throw new Error(`${url}: sha1 ${actual}, the maven publishes ${published}`)
-  const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sl-installer-')), 'installer.jar')
-  fs.writeFileSync(tmp, jar)
-  try {
-    const entries = zipEntryList(tmp)
-    if (entries.length === 0) throw new Error(`${url}: no entries could be read out of the jar`)
-    for (const name of ['install_profile.json', 'version.json']) {
-      const data = readZipEntry(tmp, name)
-      if (data) save(`${dir}/${name}`, data, `${url}!/${name}`)
-      else if (name === 'install_profile.json' || !legacy) throw new Error(`${url}: ${name} could not be read out of the jar`)
-    }
-    const info = { url, sha1: actual, publishedSha1: published, bytes: jar.length, entries }
-    save(`${dir}/installer.json`, Buffer.from(JSON.stringify(info, null, 2) + '\n'), url)
-  } finally {
-    fs.rmSync(path.dirname(tmp), { recursive: true, force: true })
+  const entries = zipEntryList(jar)
+  if (entries.length === 0) throw new Error(`${url}: no entries could be read out of the jar`)
+  for (const name of ['install_profile.json', 'version.json']) {
+    const data = readZipEntry(jar, name)
+    if (data) save(`${dir}/${name}`, data, `${url}!/${name}`)
+    else if (name === 'install_profile.json' || !legacy) throw new Error(`${url}: ${name} could not be read out of the jar`)
   }
+  const info = { url, sha1: actual, publishedSha1: published, bytes: jar.length, entries }
+  save(`${dir}/installer.json`, Buffer.from(JSON.stringify(info, null, 2) + '\n'), url)
 }
 
 // group:artifact:version[:classifier][@ext] to its path in a maven
