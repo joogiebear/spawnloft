@@ -68,7 +68,14 @@ async function main() {
   if (!scenarios.length) usage('no scenario to run')
   // a short base: Windows paths have a length limit, and the scratch folder is in every path
   // the real path (no /var -> /private/var, no Windows 8.3 short names), so a golden file's <run> is found
-  const base = flags.scratch ? path.resolve(flags.scratch) : fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'sl-parity-')))
+  // the same folder every run: some names are made from the data root's path (a scheduled task's
+  // `spawnloft-<hash>-` prefix, a loader step cache key), so a frozen record holds only for the
+  // path it was made in. CI runs with TMPDIR set to the runner's temp folder, the same each run.
+  const base = flags.scratch ? path.resolve(flags.scratch) : path.join(fs.realpathSync.native(os.tmpdir()), 'sl-parity')
+  if (!flags.scratch) {
+    fs.rmSync(base, { recursive: true, force: true })
+    fs.mkdirSync(base, { recursive: true })
+  }
   const results = []
   let failed = 0
   for (const s of scenarios) {

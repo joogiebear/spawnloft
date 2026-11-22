@@ -1,0 +1,525 @@
+{
+ "about": "What the Node core did in scenario c6-data on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c6-data",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 6 (task add a --daily 04:00)",
+   "args": [
+    "task",
+    "add",
+    "a",
+    "--daily",
+    "04:00"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"a-backup\" - Take a backup, daily 04:00.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (data)",
+   "args": [
+    "data"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft data move <folder> [--yes] [--thorough] [--set-aside-private-copies] | status | finish [--yes] | rollback\n"
+  },
+  {
+   "label": "step 8 (data move)",
+   "args": [
+    "data",
+    "move"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft data move <folder> [--yes] [--thorough] [--set-aside-private-copies] | status | finish [--yes] | rollback\n"
+  },
+  {
+   "label": "step 9 (data frob)",
+   "args": [
+    "data",
+    "frob"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft data move <folder> [--yes] [--thorough] [--set-aside-private-copies] | status | finish [--yes] | rollback\n"
+  },
+  {
+   "label": "step 10 (data move {run}/moved --bogus)",
+   "args": [
+    "data",
+    "move",
+    "{run}/moved",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 11 (data status extra)",
+   "args": [
+    "data",
+    "status",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft data move <folder> [--yes] [--thorough] [--set-aside-private-copies] | status | finish [--yes] | rollback\n"
+  },
+  {
+   "label": "step 12 (data move {data}/inner)",
+   "args": [
+    "data",
+    "move",
+    "{data}/inner"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/data/inner\nhow:   rename it: same drive, instant, nothing is copied\nsize:  7 files, <size>\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - <run>/data/inner is inside the folder being moved\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (data move {run})",
+   "args": [
+    "data",
+    "move",
+    "{run}"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>\nhow:   rename it: same drive, instant, nothing is copied\nsize:  7 files, <size>\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - the data folder is inside <run>, which would have to be emptied first\n  - <run> is not empty; choose a folder that is new, or empty\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (data move {run}/full)",
+   "args": [
+    "data",
+    "move",
+    "{run}/full"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/full\nhow:   rename it: same drive, instant, nothing is copied\nsize:  7 files, <size>\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - <run>/full is not empty; choose a folder that is new, or empty\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (data move {run}/full/somebody.txt)",
+   "args": [
+    "data",
+    "move",
+    "{run}/full/somebody.txt"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/full/somebody.txt\nhow:   rename it: same drive, instant, nothing is copied\nsize:  7 files, <size>\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - <run>/full/somebody.txt exists and is not a folder\n  - cannot write to <run>/full/somebody.txt (<run>/full/somebody.txt is not a folder)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (data move {data})",
+   "args": [
+    "data",
+    "move",
+    "{data}"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/data\nhow:   rename it: same drive, instant, nothing is copied\nsize:  7 files, <size>\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - that is the data folder already\n  - <run>/data is not empty; choose a folder that is new, or empty\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (data move {run}/moved --json)",
+   "args": [
+    "data",
+    "move",
+    "{run}/moved",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"move\",\"executed\":false,\"from\":\"<run>/data\",\"to\":\"<run>/moved\",\"mode\":\"rename\",\"files\":7,\"bytes\":1167,\"problems\":[],\"warnings\":[\"1 scheduled task will be paused for the move and switched back on after\",\"close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\"],\"result\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (data move {run}/moved)",
+   "args": [
+    "data",
+    "move",
+    "{run}/moved"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/moved\nhow:   rename it: same drive, instant, nothing is copied\nsize:  7 files, <size>\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nNothing was changed. Run it again with --yes to move the data.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (data finish)",
+   "args": [
+    "data",
+    "finish"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no move is recorded for <run>/data\n"
+  },
+  {
+   "label": "step 20 (data rollback)",
+   "args": [
+    "data",
+    "rollback"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no move is recorded for <run>/data, so there is nothing to put back\n"
+  },
+  {
+   "label": "step 21 (data status)",
+   "args": [
+    "data",
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "data folder:  <run>/data\nis:           an ordinary folder\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (data status --json)",
+   "args": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"status\",\"root\":\"<run>/data\",\"isLink\":false,\"target\":null,\"dangling\":false,\"move\":null,\"leftovers\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (data move {run}/moved --yes)",
+   "args": [
+    "data",
+    "move",
+    "{run}/moved",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  moving...\n  checking the link...\n\nMoved in <n>s. The data is now at <run>/moved, and <run>/data is a link to it.\nOpen the SpawnLoft app again.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (data move {run}/again)",
+   "args": [
+    "data",
+    "move",
+    "{run}/again"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/again\nhow:   rename it: same drive, instant, nothing is copied\nsize:  -\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - <run>/data is already a link to <run>/moved, so the data has been moved; `spawnloft data status` says where it is\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (data status)",
+   "args": [
+    "data",
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "data folder:  <run>/data\nis:           a link to <run>/moved\n\nLast move: <run>/data -> <run>/moved, finished.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (data status --json)",
+   "args": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"status\",\"root\":\"<run>/data\",\"isLink\":true,\"target\":\"<run>/moved\",\"dangling\":false,\"move\":{\"version\":1,\"from\":\"<run>/data\",\"to\":\"<run>/moved\",\"mode\":\"rename\",\"step\":\"done\",\"destExisted\":false,\"parked\":null,\"pausedTasks\":[],\"privateAside\":[],\"startedAt\":\"<time>\",\"finishedAt\":\"<time>\"},\"leftovers\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (data rollback)",
+   "args": [
+    "data",
+    "rollback"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: that move finished, and the data has been used since: putting the old folder back would lose what was written. Move the data again with `spawnloft data move`, or run `spawnloft data finish` to delete the old copy\n"
+  },
+  {
+   "label": "step 28 (task list)",
+   "args": [
+    "task",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID        INSTANCE  DOES    WHEN         STATE  LAST     NEXT\na-backup  a         backup  daily 04:00  Ready  unknown  <time>\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (data finish)",
+   "args": [
+    "data",
+    "finish"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "There is no parked original to delete (the move was a rename); this only clears the record of it.\nRun it again with --yes to go ahead.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (data finish --yes)",
+   "args": [
+    "data",
+    "finish",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Cleared the record of the move.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (data status)",
+   "args": [
+    "data",
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "data folder:  <run>/data\nis:           a link to <run>/moved\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\na     stopped  47891  47892  1G   -       <run>/data/instances/a\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (data status)",
+   "args": [
+    "data",
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "data folder:  <run>/data\nis:           a link to <run>/moved\n\nLast move: <run>/data -> <run>/moved, stopped at \"moving\".\n`spawnloft data rollback` puts everything back.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (data move {run}/third)",
+   "args": [
+    "data",
+    "move",
+    "{run}/third"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Move the data folder\nfrom:  <run>/data\nto:    <run>/third\nhow:   rename it: same drive, instant, nothing is copied\nsize:  -\nA link is left at the old path, so every path SpawnLoft has stored stays true.\n  note: 1 scheduled task will be paused for the move and switched back on after\n  note: close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\n\nCannot move yet:\n  - <run>/data is already a link to <run>/moved, so the data has been moved; `spawnloft data status` says where it is\n  - an earlier move was interrupted at \"moving\"; `spawnloft data rollback` puts everything back, and then this can be run again\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (data rollback)",
+   "args": [
+    "data",
+    "rollback"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Put back. The data folder is where it was.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (data status)",
+   "args": [
+    "data",
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "data folder:  <run>/data\nis:           an ordinary folder\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (data status --json)",
+   "args": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"status\",\"root\":\"<run>/data\",\"isLink\":false,\"target\":null,\"dangling\":false,\"move\":null,\"leftovers\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\na     stopped  47891  47892  1G   -       <run>/data/instances/a\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"schedule-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"schedule-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/a": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/a/notes.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "n"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/a/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "w"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"a\": {\n      \"dir\": \"<run>/data/instances/a\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47891,\n      \"rcon\": {\n        \"port\": 47892,\n        \"password\": \"test\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/schedules.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"tasks\": {\n    \"a-backup\": {\n      \"instance\": \"a\",\n      \"name\": \"Take a backup\",\n      \"action\": {\n        \"type\": \"backup\",\n        \"keep\": null\n      },\n      \"schedule\": {\n        \"kind\": \"daily\",\n        \"at\": \"04:00\"\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/tasks": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/tasks/a-backup.sh": {
+   "kind": "file",
+   "mode": "700",
+   "text": "#!/bin/sh\nexport SPAWNLOFT_DATA_ROOT='<run>/data'\nexport HOME='<run>/home'\nexport APPDATA='<run>/home/AppData/Roaming'\nexport XDG_CONFIG_HOME='<run>/home/.config'\nexport XDG_DATA_HOME='<run>/home/.local/share'\nexec '<core>' task run 'a-backup'\n"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "full": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "full/somebody.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "theirs"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd/user": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd/user/spawnloft-23187ff88681d15d-a-backup.service": {
+   "kind": "file",
+   "mode": "600",
+   "text": "[Unit]\nDescription=SpawnLoft task a-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<run>/data/tasks/a-backup.sh\"\nWorkingDirectory=<run>/data\nKillMode=process\nStandardOutput=append:<run>/data/tasks/a-backup.stdout.log\nStandardError=append:<run>/data/tasks/a-backup.stderr.log\n"
+  },
+  "home/.config/systemd/user/spawnloft-23187ff88681d15d-a-backup.timer": {
+   "kind": "file",
+   "mode": "600",
+   "text": "[Unit]\nDescription=SpawnLoft schedule a-backup\n\n[Timer]\nOnCalendar=*-*-* 04:00:00\nPersistent=true\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
+  },
+  "scheduler": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "scheduler/calls.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "systemctl --user disable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable spawnloft-23187ff88681d15d-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable spawnloft-23187ff88681d15d-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable spawnloft-23187ff88681d15d-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-23187ff88681d15d-a-backup.timer\n"
+  },
+  "scheduler/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"systemd\": {\n    \"spawnloft-23187ff88681d15d-a-backup.timer\": true\n  }\n}\n"
+  }
+ }
+}

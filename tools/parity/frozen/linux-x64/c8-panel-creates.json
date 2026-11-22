@@ -1,0 +1,901 @@
+{
+ "about": "What the Node core did in scenario c8-panel-creates on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c8-panel-creates",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 8 (panel, 52 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "POST /api/instances\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'name')\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"name is required\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no server jar specified.\\n  Pick one with --jar <file>. Available: (none - use \\\"spawnloft jars import <path>\\\")\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"invalid instance name \\\"bad name\\\" - use letters, digits, dash, underscore (max 32 chars)\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"jobId must be 1 to 64 letters, digits, dashes or underscores\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"a Minecraft version is required for a NeoForge server\"\n}\n\nGET /api/jobs/j0/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j0\",\n \"stage\": \"start\",\n \"percent\": null,\n \"message\": \"Starting\",\n \"done\": false\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"a Minecraft version is required for a Purpur server\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"<run>/nope/java could not be run: Java is not installed, or not on PATH.\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Minecraft 1.21.4 needs Java 21, and <run>/old/java is Java 17. Pick a newer Java, or pass --force to use it anyway.\",\n \"code\": \"java-too-old\"\n}\n\nGET /api/jobs/j1/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j1\",\n \"stage\": \"error\",\n \"percent\": null,\n \"message\": \"Minecraft 1.21.4 needs Java 21, and <run>/old/java is Java 17. Pick a newer Java, or pass --force to use it anyway.\",\n \"done\": true\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"My-Server\",\n \"dir\": \"<run>/data/instances/My-Server\",\n \"jar\": \"paper-1.21.4-15.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"2G\",\n \"loader\": \"paper\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 26400,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"label\": \"My Server!\",\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/My-Server/state.json\",\n \"consoleLog\": \"<run>/data/run/My-Server/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25575,\n \"onlineMode\": false,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nGET /api/jobs/j2/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j2\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created My-Server\",\n \"done\": true\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"My-Server-2\",\n \"dir\": \"<run>/data/instances/My-Server-2\",\n \"jar\": \"paper-1.21.4-15.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"paper\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25565,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"label\": \"My Server!\",\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/My-Server-2/state.json\",\n \"consoleLog\": \"<run>/data/run/My-Server-2/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25576,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nGET /api/jobs/j3/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j3\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created My-Server-2\",\n \"done\": true\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"old\",\n \"dir\": \"<run>/data/instances/old\",\n \"jar\": \"paper-1.21.4-15.jar\",\n \"java\": \"<run>/old/java\",\n \"memory\": \"4G\",\n \"loader\": \"paper\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25566,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/old/state.json\",\n \"consoleLog\": \"<run>/data/run/old/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25577,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"pu\",\n \"dir\": \"<run>/data/instances/pu\",\n \"jar\": \"purpur-1.21.4-2400.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"purpur\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25567,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/pu/state.json\",\n \"consoleLog\": \"<run>/data/run/pu/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25578,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nGET /api/jobs/j4/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j4\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created pu\",\n \"done\": true\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"the Purpur API answered 404\"\n}\n\nGET /api/jobs/j5/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j5\",\n \"stage\": \"error\",\n \"percent\": null,\n \"message\": \"the Purpur API answered 404\",\n \"done\": true\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"va\",\n \"dir\": \"<run>/data/instances/va\",\n \"jar\": \"vanilla-1.21.4.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"vanilla\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25568,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/va/state.json\",\n \"consoleLog\": \"<run>/data/run/va/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25579,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"sp\",\n \"dir\": \"<run>/data/instances/sp\",\n \"jar\": \"spigot-1.21.4.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"spigot\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25569,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/sp/state.json\",\n \"consoleLog\": \"<run>/data/run/sp/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25580,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nGET /api/jobs/j6/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j6\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created sp\",\n \"done\": true\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"sp2\",\n \"dir\": \"<run>/data/instances/sp2\",\n \"jar\": \"spigot-1.21.4.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"spigot\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25570,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/sp2/state.json\",\n \"consoleLog\": \"<run>/data/run/sp2/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25581,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nGET /api/jobs/j7/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j7\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created sp2\",\n \"done\": true\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"instance \\\"pu\\\" already exists\"\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no server jar specified.\\n  Pick one with --jar <file>. Available: paper-1.21.4-15.jar, purpur-1.21.4-2400.jar, spigot-1.21.4.jar, vanilla-1.21.4.jar\"\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"withjar\",\n \"dir\": \"<run>/data/instances/withjar\",\n \"jar\": \"paper-1.21.4-15.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"paper\",\n \"port\": 26401,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/withjar/state.json\",\n \"consoleLog\": \"<run>/data/run/withjar/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25582,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"server jar \\\"missing.jar\\\" is not in <run>/data/jars.\\n  Stored jars: paper-1.21.4-15.jar, purpur-1.21.4-2400.jar, spigot-1.21.4.jar, vanilla-1.21.4.jar\\n  Download one with \\\"spawnloft paper fetch <version>\\\" or add one with \\\"spawnloft jars import <path>\\\".\"\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"nf\",\n \"dir\": \"<run>/data/instances/nf\",\n \"jar\": \"server.jar\",\n \"java\": \"<run>/bin/java\",\n \"memory\": \"4G\",\n \"loader\": \"neoforge\",\n \"mcVersion\": \"26.1\",\n \"port\": 25571,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/nf/state.json\",\n \"consoleLog\": \"<run>/data/run/nf/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25583,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 25,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nGET /api/jobs/j8/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j8\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created nf\",\n \"done\": true\n}\n\nPOST /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"mp\",\n \"dir\": \"<run>/data/instances/mp\",\n \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n \"java\": \"java\",\n \"memory\": \"4G\",\n \"loader\": \"fabric\",\n \"mcVersion\": \"1.21.4\",\n \"port\": 25572,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"scratch\": true\n },\n \"label\": \"Alpha\",\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/mp/state.json\",\n \"consoleLog\": \"<run>/data/run/mp/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25584,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 21,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ],\n \"pack\": {\n  \"name\": \"mp\",\n  \"pack\": \"Alpha Pack\",\n  \"packVersion\": \"2.0\",\n  \"mc\": \"1.21.4\",\n  \"loader\": {\n   \"kind\": \"fabric\",\n   \"version\": \"0.16.10\"\n  },\n  \"files\": 3,\n  \"skippedClientOnly\": 1,\n  \"port\": 25572\n }\n}\n\nGET /api/jobs/j9/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j9\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Created mp\",\n \"done\": true\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"instance \\\"mp\\\" already exists\"\n}\n\nGET /api/jobs/j9/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j9\",\n \"stage\": \"error\",\n \"percent\": null,\n \"message\": \"instance \\\"mp\\\" already exists\",\n \"done\": true\n}\n\nPOST /api/instances\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"that pack has no Fabric or NeoForge release SpawnLoft can install\"\n}\n\nGET /api/jobs/j10/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"j10\",\n \"stage\": \"error\",\n \"percent\": null,\n \"message\": \"that pack has no Fabric or NeoForge release SpawnLoft can install\",\n \"done\": true\n}\n\nPOST /api/jobs/j9/cancel\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"cancelling\": false\n}\n\nPOST /api/jobs/nope/cancel\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"cancelling\": false\n}\n\nGET /api/jobs/never/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"never\",\n \"stage\": \"start\",\n \"percent\": null,\n \"message\": \"\",\n \"done\": false\n}\n\nGET /api/jobs/bad%20id/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"bad%20id\",\n \"stage\": \"start\",\n \"percent\": null,\n \"message\": \"\",\n \"done\": false\n}\n\nGET /api/jobs/j9\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no such instance\"\n}\n\nPOST /api/instances/adopt\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'name')\"\n}\n\nPOST /api/instances/adopt\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"name is required\"\n}\n\nPOST /api/instances/adopt\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"a server folder is required\"\n}\n\nPOST /api/instances/adopt\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"directory not found: <run>/nowhere\"\n}\n\nPOST /api/instances/adopt\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"invalid memory value \\\"lots\\\" - use e.g. 4G or 6144M\"\n}\n\nPOST /api/instances/adopt\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"Found-one\",\n \"dir\": \"<run>/found\",\n \"jar\": \"server.jar\",\n \"java\": \"java\",\n \"memory\": \"3G\",\n \"loader\": \"paper\",\n \"port\": 26500,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"adopted\": \"<run>/found\"\n },\n \"label\": \"Found one\",\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/Found-one/state.json\",\n \"consoleLog\": \"<run>/data/run/Found-one/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25585,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": null,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nPOST /api/instances/adopt\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"name\": \"Found-one-2\",\n \"dir\": \"<run>/found2\",\n \"jar\": \"paper-1.20.jar\",\n \"java\": \"java\",\n \"memory\": \"4G\",\n \"loader\": \"paper\",\n \"port\": 25573,\n \"createdAt\": \"<time>\",\n \"origin\": {\n  \"adopted\": \"<run>/found2\"\n },\n \"label\": \"Found one\",\n \"status\": \"stopped\",\n \"javaPid\": null,\n \"daemonPid\": null,\n \"startedAt\": null,\n \"exitCode\": null,\n \"crashed\": false,\n \"restarts\": 0,\n \"stoppedAt\": null,\n \"lastError\": null,\n \"uptimeMs\": null,\n \"stateFile\": \"<run>/data/run/Found-one-2/state.json\",\n \"consoleLog\": \"<run>/data/run/Found-one-2/console.log\",\n \"javaAlive\": false,\n \"rconPort\": 25586,\n \"onlineMode\": true,\n \"levelName\": \"world\",\n \"javaNeeds\": 17,\n \"defaultJvmFlags\": [\n  \"-XX:+UseG1GC\",\n  \"-XX:+ParallelRefProcEnabled\",\n  \"-XX:MaxGCPauseMillis=200\",\n  \"-XX:+UnlockExperimentalVMOptions\",\n  \"-XX:+DisableExplicitGC\",\n  \"-XX:+AlwaysPreTouch\",\n  \"-XX:G1NewSizePercent=30\",\n  \"-XX:G1MaxNewSizePercent=40\",\n  \"-XX:G1HeapRegionSize=8M\",\n  \"-XX:G1ReservePercent=20\",\n  \"-XX:G1HeapWastePercent=5\",\n  \"-XX:G1MixedGCCountTarget=4\",\n  \"-XX:InitiatingHeapOccupancyPercent=15\",\n  \"-XX:G1MixedGCLiveThresholdPercent=90\",\n  \"-XX:G1RSetUpdatingPauseTimePercent=5\",\n  \"-XX:SurvivorRatio=32\",\n  \"-XX:+PerfDisableSharedMem\",\n  \"-XX:MaxTenuringThreshold=1\",\n  \"-Dusing.aikars.flags=https://mcflags.emc.gs\",\n  \"-Daikars.new.flags=true\"\n ]\n}\n\nPOST /api/instances/adopt\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"instance \\\"pu\\\" already exists\"\n}\n\nGET /api/instances\n  200\n  cache-control: no-store\n  content-type: application/json\n(application/json, not compared)\n\nGET /api/activity\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"entries\": [\n  {\n   \"at\": \"<time>\",\n   \"server\": \"Found-one-2\",\n   \"action\": \"adopt\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"<run>/found2\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"Found-one\",\n   \"action\": \"adopt\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"<run>/found\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"mp\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"nf\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"server.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"withjar\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"paper-1.21.4-15.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"sp2\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"spigot-1.21.4.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"sp\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"spigot-1.21.4.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"va\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"vanilla-1.21.4.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"pu\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"purpur-1.21.4-2400.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"old\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"paper-1.21.4-15.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"My-Server-2\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"paper-1.21.4-15.jar\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"My-Server\",\n   \"action\": \"create\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"paper-1.21.4-15.jar\"\n  }\n ],\n \"more\": false\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"Found-one\",\"label\":\"Found one\",\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/found\",\"jar\":\"server.jar\",\"memory\":\"3G\",\"port\":26500,\"rconPort\":25585,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/Found-one/console.log\"},{\"name\":\"Found-one-2\",\"label\":\"Found one\",\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/found2\",\"jar\":\"paper-1.20.jar\",\"memory\":\"4G\",\"port\":25573,\"rconPort\":25586,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/Found-one-2/console.log\"},{\"name\":\"mp\",\"label\":\"Alpha\",\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/mp\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"4G\",\"port\":25572,\"rconPort\":25584,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/mp/console.log\"},{\"name\":\"My-Server\",\"label\":\"My Server!\",\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/My-Server\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":26400,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/My-Server/console.log\"},{\"name\":\"My-Server-2\",\"label\":\"My Server!\",\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/My-Server-2\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"4G\",\"port\":25565,\"rconPort\":25576,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/My-Server-2/console.log\"},{\"name\":\"nf\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/nf\",\"jar\":\"server.jar\",\"memory\":\"4G\",\"port\":25571,\"rconPort\":25583,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/nf/console.log\"},{\"name\":\"old\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/old\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"4G\",\"port\":25566,\"rconPort\":25577,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/old/console.log\"},{\"name\":\"pu\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/pu\",\"jar\":\"purpur-1.21.4-2400.jar\",\"memory\":\"4G\",\"port\":25567,\"rconPort\":25578,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/pu/console.log\"},{\"name\":\"sp\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/sp\",\"jar\":\"spigot-1.21.4.jar\",\"memory\":\"4G\",\"port\":25569,\"rconPort\":25580,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/sp/console.log\"},{\"name\":\"sp2\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/sp2\",\"jar\":\"spigot-1.21.4.jar\",\"memory\":\"4G\",\"port\":25570,\"rconPort\":25581,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/sp2/console.log\"},{\"name\":\"va\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/va\",\"jar\":\"vanilla-1.21.4.jar\",\"memory\":\"4G\",\"port\":25568,\"rconPort\":25579,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/va/console.log\"},{\"name\":\"withjar\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/withjar\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"4G\",\"port\":26401,\"rconPort\":25582,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/withjar/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/empty/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4/2400",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4/2400/download",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/9.9.9",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/alpha/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/alpha/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_lithium.properties",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_lithium.properties",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_lithium.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_lithium.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_nested_deep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_nested_deep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/15/paper-1.21.4-15.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hub.spigotmc.org",
+   "method": "GET",
+   "url": "/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar.sha256",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.21.4/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/aaa/server.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/r/1.21.4.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bin/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"25.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  },
+  "bin/javac": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\necho 'javac 25.0.1'\n"
+  },
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"My-Server\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"My-Server-2\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"old\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"pu\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"purpur-1.21.4-2400.jar\"}\n{\"at\":\"<time>\",\"server\":\"va\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"vanilla-1.21.4.jar\"}\n{\"at\":\"<time>\",\"server\":\"sp\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"spigot-1.21.4.jar\"}\n{\"at\":\"<time>\",\"server\":\"sp2\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"spigot-1.21.4.jar\"}\n{\"at\":\"<time>\",\"server\":\"withjar\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"nf\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"server.jar\"}\n{\"at\":\"<time>\",\"server\":\"mp\",\"action\":\"create\",\"by\":{\"kind\":\"panel\"},\"detail\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\"}\n{\"at\":\"<time>\",\"server\":\"Found-one\",\"action\":\"adopt\",\"by\":{\"kind\":\"panel\"},\"detail\":\"<run>/found\"}\n{\"at\":\"<time>\",\"server\":\"Found-one-2\",\"action\":\"adopt\",\"by\":{\"kind\":\"panel\"},\"detail\":\"<run>/found2\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/My-Server": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/My-Server/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'My-Server'\n"
+  },
+  "data/instances/My-Server/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/My-Server/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/My-Server/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=26400\nenable-rcon=true\nrcon.port=25575\nrcon.password=<password>\nserver-ip=\nonline-mode=false\nmotd=Hi\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/My-Server/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'My-Server' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'My-Server'\n"
+  },
+  "data/instances/My-Server/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'My-Server'\n"
+  },
+  "data/instances/My-Server-2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/My-Server-2/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'My-Server-2'\n"
+  },
+  "data/instances/My-Server-2/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/My-Server-2/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/My-Server-2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25565\nenable-rcon=true\nrcon.port=25576\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=My-Server-2 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/My-Server-2/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'My-Server-2' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'My-Server-2'\n"
+  },
+  "data/instances/My-Server-2/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'My-Server-2'\n"
+  },
+  "data/instances/jarless": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/mp": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/mp/.mcctl-pack.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"project\": \"alpha\",\n  \"versionId\": \"alpha-2\",\n  \"versionNumber\": \"2.0\",\n  \"name\": \"Alpha Pack\",\n  \"mc\": \"1.21.4\",\n  \"loader\": {\n    \"kind\": \"fabric\",\n    \"version\": \"0.16.10\"\n  },\n  \"installedAt\": \"<time>\",\n  \"files\": [\n    \"mods/lithium.jar\",\n    \"config/lithium.properties\",\n    \"mods/nested/deep.jar\",\n    \"config/shared.toml\",\n    \"server.properties\",\n    \"config/shared.toml\",\n    \"config/server-only.txt\"\n  ],\n  \"skippedClientOnly\": 1\n}\n"
+  },
+  "data/instances/mp/config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/mp/config/lithium.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# lithium config\nmixin.ai=false\n"
+  },
+  "data/instances/mp/config/server-only.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "yes\n"
+  },
+  "data/instances/mp/config/shared.toml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "shared = 2\n"
+  },
+  "data/instances/mp/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'mp'\n"
+  },
+  "data/instances/mp/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/mp/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/instances/mp/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/mp/mods/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"lithium.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"alpha\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/instances/mp/mods/lithium.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2000,
+   "sha256": "83c2b88910d7841e10ecdb5c108fab5bb3bb96eb7ad07a99c1123b586201857c"
+  },
+  "data/instances/mp/mods/nested": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/mp/mods/nested/deep.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 700,
+   "sha256": "a458eeed7dd9ca57d2e2a68af3c8ade0742ce55f3e73af51d451a7ae759aad18"
+  },
+  "data/instances/mp/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=from the pack\n"
+  },
+  "data/instances/mp/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'mp' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'mp'\n"
+  },
+  "data/instances/mp/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'mp'\n"
+  },
+  "data/instances/nf": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/nf/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'nf'\n"
+  },
+  "data/instances/nf/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/nf/libraries": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/nf/libraries/net": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/nf/libraries/net/neoforged": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/nf/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad"
+  },
+  "data/instances/nf/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25571\nenable-rcon=true\nrcon.port=25583\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=nf (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/nf/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'nf' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'nf'\n"
+  },
+  "data/instances/nf/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'nf'\n"
+  },
+  "data/instances/nojar": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/old": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/old/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'old'\n"
+  },
+  "data/instances/old/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/old/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/old/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25566\nenable-rcon=true\nrcon.port=25577\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=old (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/old/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'old' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'old'\n"
+  },
+  "data/instances/old/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'old'\n"
+  },
+  "data/instances/pu": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/pu/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'pu'\n"
+  },
+  "data/instances/pu/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/pu/purpur-1.21.4-2400.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "402d122b79d4065c9d641f8231828ca004fcb820b5bf66711f6da3921143c9e4"
+  },
+  "data/instances/pu/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25567\nenable-rcon=true\nrcon.port=25578\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=pu (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/pu/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'pu' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'pu'\n"
+  },
+  "data/instances/pu/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'pu'\n"
+  },
+  "data/instances/server": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/sp": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/sp/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'sp'\n"
+  },
+  "data/instances/sp/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/sp/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25569\nenable-rcon=true\nrcon.port=25580\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=sp (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/sp/spigot-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/instances/sp/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'sp' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'sp'\n"
+  },
+  "data/instances/sp/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'sp'\n"
+  },
+  "data/instances/sp2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/sp2/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'sp2'\n"
+  },
+  "data/instances/sp2/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/sp2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25570\nenable-rcon=true\nrcon.port=25581\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=sp2 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/sp2/spigot-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/instances/sp2/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'sp2' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'sp2'\n"
+  },
+  "data/instances/sp2/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'sp2'\n"
+  },
+  "data/instances/va": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/va/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'va'\n"
+  },
+  "data/instances/va/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/va/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25568\nenable-rcon=true\nrcon.port=25579\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=va (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/va/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'va' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'va'\n"
+  },
+  "data/instances/va/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'va'\n"
+  },
+  "data/instances/va/vanilla-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "19f1bba7a0862476778d8811fd2fe48eb59d77cdd3762e4db8049f300b03dc00"
+  },
+  "data/instances/withjar": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/withjar/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'withjar'\n"
+  },
+  "data/instances/withjar/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/withjar/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/withjar/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=26401\nenable-rcon=true\nrcon.port=25582\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=withjar (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/withjar/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'withjar' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'withjar'\n"
+  },
+  "data/instances/withjar/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'withjar'\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"My-Server\": {\n      \"dir\": \"<run>/data/instances/My-Server\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"2G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 26400,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      },\n      \"label\": \"My Server!\"\n    },\n    \"My-Server-2\": {\n      \"dir\": \"<run>/data/instances/My-Server-2\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      },\n      \"label\": \"My Server!\"\n    },\n    \"old\": {\n      \"dir\": \"<run>/data/instances/old\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/old/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25577,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"pu\": {\n      \"dir\": \"<run>/data/instances/pu\",\n      \"jar\": \"purpur-1.21.4-2400.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"purpur\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25567,\n      \"rcon\": {\n        \"port\": 25578,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"va\": {\n      \"dir\": \"<run>/data/instances/va\",\n      \"jar\": \"vanilla-1.21.4.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"vanilla\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25568,\n      \"rcon\": {\n        \"port\": 25579,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"sp\": {\n      \"dir\": \"<run>/data/instances/sp\",\n      \"jar\": \"spigot-1.21.4.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"spigot\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25569,\n      \"rcon\": {\n        \"port\": 25580,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"sp2\": {\n      \"dir\": \"<run>/data/instances/sp2\",\n      \"jar\": \"spigot-1.21.4.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"spigot\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25570,\n      \"rcon\": {\n        \"port\": 25581,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"withjar\": {\n      \"dir\": \"<run>/data/instances/withjar\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 26401,\n      \"rcon\": {\n        \"port\": 25582,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"nf\": {\n      \"dir\": \"<run>/data/instances/nf\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"neoforge\",\n      \"mcVersion\": \"26.1\",\n      \"port\": 25571,\n      \"rcon\": {\n        \"port\": 25583,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"mp\": {\n      \"dir\": \"<run>/data/instances/mp\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25572,\n      \"rcon\": {\n        \"port\": 25584,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      },\n      \"label\": \"Alpha\"\n    },\n    \"Found-one\": {\n      \"dir\": \"<run>/found\",\n      \"jar\": \"server.jar\",\n      \"java\": \"java\",\n      \"memory\": \"3G\",\n      \"loader\": \"paper\",\n      \"port\": 26500,\n      \"rcon\": {\n        \"port\": 25585,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/found\"\n      },\n      \"label\": \"Found one\"\n    },\n    \"Found-one-2\": {\n      \"dir\": \"<run>/found2\",\n      \"jar\": \"paper-1.20.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25573,\n      \"rcon\": {\n        \"port\": 25586,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/found2\"\n      },\n      \"label\": \"Found one\"\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/buildtools": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/buildtools/BuildTools.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "2830b994c823883ac16b97dfe5131aa7f6c00913a7e7455c2dad44a5927cd53c"
+  },
+  "data/jars/buildtools/out": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/jars/neoforge-26.1.0.6-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 5000,
+   "sha256": "6fed287ccffa43763bbcb945f6f8612838f0eec9a9557e0655cf1731699827f9"
+  },
+  "data/jars/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/jars/purpur-1.21.4-2400.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "402d122b79d4065c9d641f8231828ca004fcb820b5bf66711f6da3921143c9e4"
+  },
+  "data/jars/spigot-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/jars/vanilla-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "19f1bba7a0862476778d8811fd2fe48eb59d77cdd3762e4db8049f300b03dc00"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/panel.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[<time>] installation moved: rewrote 0 task shim(s) and launchers for 0 server(s)\n"
+  },
+  "data/run/runtime.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<repo>\"\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "found": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "found/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'Found-one'\n"
+  },
+  "found/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "found/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "jar"
+  },
+  "found/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-port=26500\nmotd=found\n"
+  },
+  "found/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'Found-one' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'Found-one'\n"
+  },
+  "found/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'Found-one'\n"
+  },
+  "found2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "found2/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'Found-one-2'\n"
+  },
+  "found2/paper-1.20.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "jar"
+  },
+  "found2/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'Found-one-2' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'Found-one-2'\n"
+  },
+  "found2/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'Found-one-2'\n"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "old": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "old/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 17, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"17.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  }
+ }
+}
