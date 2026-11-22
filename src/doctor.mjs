@@ -11,6 +11,7 @@ import { rconExposure } from './exposure.mjs'
 import * as java from './java.mjs'
 import { checkClientProfiles } from './doctor-client.mjs'
 import { checkPrivateFiles } from './private-files.mjs'
+import { tarBinary } from './tar.mjs'
 import { ACCOUNTS_FILE, clientStateFile } from './client-paths.mjs'
 import { listProfiles as listClientProfiles } from './client.mjs'
 import { humanBytes, dirSize, isPortFree } from './util.mjs'
@@ -48,7 +49,8 @@ export async function runDoctor({ repair = false } = {}) {
     if (other.path !== javaCheck.path) notes.push(`java (also): ${other.version} at ${other.path}`)
   }
 
-  const tarCheck = spawnSync('tar', ['--version'], { encoding: 'utf8', windowsHide: true })
+  // the tar snapshots run (System32's on Windows), not whichever is first on PATH
+  const tarCheck = spawnSync(tarBinary(), ['--version'], { encoding: 'utf8', windowsHide: true })
   if (tarCheck.error) problems.push('tar is not on PATH (needed for snapshots)')
   else notes.push(`tar: ${(tarCheck.stdout || '').split('\n')[0].trim()}`)
 

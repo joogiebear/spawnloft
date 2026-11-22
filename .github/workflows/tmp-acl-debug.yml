@@ -1,0 +1,27 @@
+name: tmp-acl-debug
+on:
+  pull_request:
+    paths: ['.github/workflows/tmp-acl-debug.yml']
+jobs:
+  acl:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: probe
+        shell: bash
+        run: |
+          D=$(node -e "const fs=require('fs'),os=require('os'),p=require('path');console.log(fs.realpathSync.native(fs.mkdtempSync(p.join(os.tmpdir(),'sl-acl-'))))")
+          mkdir -p "$D/data/client"
+          echo '{"version":1,"instances":{}}' > "$D/data/instances.json"
+          echo '{}' > "$D/data/client/accounts.json"
+          echo "== raw icacls"
+          /c/Windows/System32/icacls.exe "$(cygpath -w "$D/data/instances.json")"
+          echo "== node inspect"
+          node --input-type=module -e "import('./src/private-files.mjs').then(m=>{const f=process.argv[1];console.log(JSON.stringify(m.currentPrincipal()));const r=m.privateFilesPlatform();console.log(r, JSON.stringify(m.inspectPrivateFile(f)))})" "$(cygpath -w "$D/data/instances.json")"
+          echo "== node doctor --json, rig env"
+          SPAWNLOFT_DATA_ROOT="$(cygpath -w "$D/data")" NODE_ENV=test HOME="$(cygpath -w "$D")" USERPROFILE="$(cygpath -w "$D")" node spawnloft.mjs doctor --json || true
+          echo "== node doctor --json, plain env"
+          SPAWNLOFT_DATA_ROOT="$(cygpath -w "$D/data")" node spawnloft.mjs doctor --json || true

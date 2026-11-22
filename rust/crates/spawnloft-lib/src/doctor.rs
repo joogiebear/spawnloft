@@ -113,9 +113,10 @@ fn port_key(v: &Value, unique: &str) -> String {
     }
 }
 
-/// `tar --version`'s first line, or `None` when there is no tar on PATH.
+/// `tar --version`'s first line from the tar snapshots run (`tarBinary()`), or `None` when it
+/// could not be started.
 fn tar_version() -> Option<String> {
-    let mut cmd = std::process::Command::new("tar");
+    let mut cmd = std::process::Command::new(crate::tar::tar_binary());
     cmd.arg("--version")
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
