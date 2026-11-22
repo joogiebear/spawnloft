@@ -576,31 +576,6 @@ fn metrics_route(layout: &Layout, req: &Request, name: &str) -> Result<Reply, Fa
     })))
 }
 
-/// `settingWords(key, value)` for a server's own settings: a change for the Activity list,
-/// under the name the Settings page gives it.
-fn setting_words(key: &str, value: &Value) -> String {
-    let label = match key {
-        "memory" => "Memory",
-        "port" => "Port",
-        "java" => "Java",
-        "jar" => "Server file",
-        "label" => "Display name",
-        "autoRestart" => "Restart it automatically",
-        "autoStart" => "Start with this computer",
-        other => other,
-    };
-    let said = match value {
-        Value::Bool(true) => "on".to_string(),
-        Value::Bool(false) => "off".to_string(),
-        Value::String(s) if s == "true" => "on".to_string(),
-        Value::String(s) if s == "false" => "off".to_string(),
-        Value::String(s) if s.is_empty() => "cleared".to_string(),
-        Value::Null => "cleared".to_string(),
-        v => js::string(Some(v)),
-    };
-    format!("{label}: {said}")
-}
-
 /// `started()`: `supervisor.start` waits for ready and reports whether it got there.
 fn started(layout: &Layout, name: &str) -> Result<Reply, Failure> {
     let out = supervisor::start(layout, &Panel::actor(), name, StartOptions::default())?;
@@ -838,7 +813,7 @@ fn settings(layout: &Layout, req: &mut Request, name: &str) -> Result<Option<Rep
                 ),
                 None => "Java arguments back to the recommended ones".to_string(),
             },
-            _ => setting_words(k, v),
+            _ => super::server_props::setting_words(k, Some(v)),
         })
         .collect();
     if !said.is_empty() {
