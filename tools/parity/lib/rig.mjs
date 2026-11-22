@@ -280,7 +280,12 @@ async function runSide(scenario, side, o) {
     acl: Boolean(scenario.acl),
     normalizePath: (p) => normalizeText(p, extra),
     // a file's text is evened out as the output of every command the scenario ran would be
-    normalize: (t) => [...commands].reduce((acc, c) => applyDeclared(acc, c), normalizeText(t, extra)),
+    normalize: (t, rel) => {
+      const even = [...commands].reduce((acc, c) => applyDeclared(acc, c), normalizeText(t, extra))
+      // the Rust daemon logs from two threads (the server's exit and its control socket), so a
+      // daemon.log is compared as its set of lines
+      return /(^|\/)daemon\.log$/.test(rel) ? even.split('\n').sort().join('\n') : even
+    },
   })
   if (o.keep) {
     const kept = path.join(o.scratch, side)
