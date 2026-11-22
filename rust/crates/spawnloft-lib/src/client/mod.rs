@@ -7,6 +7,8 @@
 pub mod accounts;
 pub mod auth;
 pub mod fabric;
+pub mod forge;
+pub mod forge_install;
 pub mod harness;
 pub mod harness_index;
 pub mod http;

@@ -702,6 +702,19 @@ pub fn refresh(
     Ok(record("accepted", None, Some(&fresh)))
 }
 
+/// `harnessIndexStatus()`'s `outcome` and `reason`: how the last refresh went.
+pub fn last_outcome(paths: &Paths) -> (Value, Value) {
+    let dir = paths.cache_dir();
+    let s = read_json_file(&file(&dir, STATUS_FILE));
+    // the status also loads the verified copy, as Node's does
+    index_rows(Opts::new(&dir));
+    let f = status_fields(s.as_ref());
+    (
+        f.get("outcome").cloned().unwrap_or(Value::Null),
+        f.get("reason").cloned().unwrap_or(Value::Null),
+    )
+}
+
 /// `refreshHarnessIndex()` for the profile store's cache folder, on the clock.
 pub fn refresh_default(paths: &Paths, force: bool) -> Result<&'static str, Failure> {
     let dir = paths.cache_dir();

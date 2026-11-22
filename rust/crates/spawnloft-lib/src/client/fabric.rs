@@ -216,7 +216,12 @@ pub fn pick(loader: &str, builds: &[Build], wanted: Option<&str>) -> Result<Buil
 }
 
 /// The id of a loader's version file.
+/// The version id a loader's build is kept under (`mod.versionId`): Forge's and NeoForge's own
+/// shape, `<loader>-loader-<build>-<mc>` for Fabric and Quilt.
 pub fn version_id(loader: &str, mc: &str, build: &str) -> String {
+    if super::forge::handles(loader) {
+        return super::forge::version_id(loader, mc, build);
+    }
     format!("{loader}-loader-{build}-{mc}")
 }
 
@@ -462,7 +467,10 @@ pub fn handles(loader: &str) -> bool {
 pub struct Fetchers<'a> {
     pub json: FetchJson<'a>,
     pub file: super::install::Fetch<'a>,
+    /// the .sha1 beside a Quilt library
     pub sha1: FetchSha1<'a>,
+    /// the .sha1 beside a Forge or NeoForge installer, or an older Forge installer's library
+    pub maven_sha1: FetchSha1<'a>,
 }
 
 impl Fetchers<'static> {
@@ -471,12 +479,13 @@ impl Fetchers<'static> {
             json: &super::meta::default_fetch,
             file: &super::install::default_fetch,
             sha1: &default_fetch_sha1,
+            maven_sha1: &super::forge_install::published_sha1,
         }
     }
 }
 
-/// `prepareVersion(name, { onStage })` for a vanilla, Fabric or Quilt profile: the version file
-/// on disk, a first Play's loader build picked and pinned. The version id to install.
+/// `prepareVersion(name, { onStage })`: the version file on disk, a first Play's loader build
+/// picked and pinned. The version id to install.
 pub fn prepare_version(
     paths: &Paths,
     name: &str,
@@ -493,7 +502,8 @@ pub fn prepare_version(
     if loader == "vanilla" {
         return Ok(mc);
     }
-    if !handles(&loader) {
+    let forge = super::forge::handles(&loader);
+    if !handles(&loader) && !forge {
         return Err(Failure::Internal {
             head: "Error".into(),
             message: format!("unknown loader \"{loader}\""),
@@ -504,9 +514,14 @@ pub fn prepare_version(
         None | Some(Value::Null) => None,
         Some(v) => Some(js::string(Some(v))),
     };
-    let installed = build
-        .as_ref()
-        .is_some_and(|b| Path::new(&paths.version_json(&version_id(&loader, &mc, b))).exists());
+    // a loader profile already on disk was made for this version, so the loader has it
+    let installed = build.as_ref().is_some_and(|b| {
+        if forge {
+            super::forge::is_installed(paths, &loader, &mc, b)
+        } else {
+            Path::new(&paths.version_json(&version_id(&loader, &mc, b))).exists()
+        }
+    });
     if !installed {
         // `readJson(versionJson(mc), null)?.type ?? 'release'`: a damaged file throws
         let vanilla = read_json(&paths.version_json(&mc))?;
@@ -521,21 +536,26 @@ pub fn prepare_version(
     if build.is_none() {
         let label = super::loaders::display_name(&loader);
         on_stage(&format!("Finding a {label} loader for Minecraft {mc}"));
-        let builds = if loader == "fabric" {
-            fabric_builds(&mc, f.json)?
+        let version = if forge {
+            json!(
+                super::forge::pick(&loader, &super::forge::builds(paths, &loader, &mc, f.json)?, None)?
+                    .version
+            )
         } else {
-            quilt_builds(&mc, f.json)?
+            let builds = if loader == "fabric" {
+                fabric_builds(&mc, f.json)?
+            } else {
+                quilt_builds(&mc, f.json)?
+            };
+            pick(&loader, &builds, None)?.version
         };
-        let picked = pick(&loader, &builds, None)?;
-        super::profiles::update_with(
-            paths,
-            name,
-            vec![("loaderVersion".into(), picked.version.clone())],
-            true,
-        )?;
-        build = Some(picked.text());
+        super::profiles::update_with(paths, name, vec![("loaderVersion".into(), version.clone())], true)?;
+        build = Some(js::string(Some(&version)));
     }
     let build = build.unwrap_or_default();
+    if forge {
+        return super::forge::ensure_installed(paths, &loader, &mc, &build, on_stage, f);
+    }
     if loader == "fabric" {
         ensure_fabric_profile(paths, &mc, &build, f.json)
     } else {

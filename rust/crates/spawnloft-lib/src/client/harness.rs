@@ -1,6 +1,7 @@
 //! The harness mod's side of `client-harness.mjs`: the file the mod writes in the game folder
 //! (`spawnloft-harness.json`, its port and pid) and the line-delimited JSON channel to it on
-//! 127.0.0.1, opened with the launch's token.
+//! 127.0.0.1, opened with the launch's token; and which build of the mod a version takes, put in
+//! a profile's mods folder before a launch.
 
 use serde_json::{Map, Value, json};
 use std::io::{BufRead, BufReader, Write};
@@ -47,6 +48,195 @@ pub fn read_file(paths: &Paths, profile: &str, pid: Option<&Value>) -> Result<Op
 /// `removeHarnessFile(name)`.
 pub fn remove_file(paths: &Paths, profile: &str) -> Result<(), Failure> {
     super::rm_force(&harness_file(paths, profile))
+}
+
+// ---- the builds ------------------------------------------------------------------------------
+
+/// A build this SpawnLoft ships knowing, in the signed list's row shape (`HARNESS_RELEASES`).
+/// More arrive through that list without a release; these win on a conflict, so the list can add
+/// a version but never swap the jar of one listed here.
+#[derive(Debug)]
+pub struct Release {
+    pub minecraft: &'static [&'static str],
+    pub version: &'static str,
+    pub tag: &'static str,
+    pub file: &'static str,
+    pub sha256: &'static str,
+}
+
+pub const HARNESS_RELEASES: &[Release] = &[Release {
+    minecraft: &["1.21.11"],
+    version: "0.1.0",
+    tag: "v0.1.0-mc1.21.11",
+    file: "spawnloft-harness-0.1.0+1.21.11.jar",
+    sha256: "6e97b92cfde87bbd948f8ef4733979ba556337be79ed334b02c6942f2dae0d63",
+}];
+
+impl Release {
+    fn row(&self) -> super::harness_index::Row {
+        super::harness_index::Row {
+            minecraft: self.minecraft.iter().map(|s| s.to_string()).collect(),
+            version: self.version.into(),
+            tag: self.tag.into(),
+            file: self.file.into(),
+            sha256: self.sha256.into(),
+        }
+    }
+}
+
+/// `harnessFor(mc)`'s answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Build {
+    pub minecraft: String,
+    pub version: String,
+    pub url: String,
+    pub sha256: String,
+}
+
+fn listed(paths: &Paths) -> Vec<super::harness_index::Row> {
+    let dir = paths.cache_dir();
+    super::harness_index::index_rows(super::harness_index::Opts::new(&dir))
+}
+
+/// `harnessFor(mc)`: the build for one Minecraft id, or None. Never waits for the network: the
+/// signed list is the copy already verified and cached.
+pub fn harness_for(paths: &Paths, mc: &str) -> Option<Build> {
+    let row = HARNESS_RELEASES
+        .iter()
+        .find(|r| r.minecraft.contains(&mc))
+        .map(Release::row)
+        .or_else(|| {
+            listed(paths)
+                .into_iter()
+                .find(|r| r.minecraft.iter().any(|m| m == mc))
+        })?;
+    Some(Build {
+        minecraft: mc.to_string(),
+        version: row.version.clone(),
+        url: super::harness_index::jar_url(&row),
+        sha256: row.sha256,
+    })
+}
+
+/// `publishedHarnessIds()`: every id a build is published for, built-in and listed.
+pub fn published_ids(paths: &Paths) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let rows: Vec<super::harness_index::Row> = HARNESS_RELEASES
+        .iter()
+        .map(Release::row)
+        .chain(listed(paths))
+        .collect();
+    for r in rows {
+        for m in r.minecraft {
+            if !out.contains(&m) {
+                out.push(m);
+            }
+        }
+    }
+    out
+}
+
+/// `harnessNotPublished(mc)`: the refusal for a harness profile on a version with no build, with
+/// why the published list may not have been read.
+pub fn not_published(paths: &Paths, mc: &str) -> String {
+    let ids = published_ids(paths);
+    let (outcome, reason) = super::harness_index::last_outcome(paths);
+    let unread = match outcome.as_str() {
+        Some("accepted" | "unchanged") => String::new(),
+        _ if crate::js::truthy(Some(&outcome)) => {
+            format!(
+                " (the published list could not be read: {})",
+                crate::js::string(Some(&reason))
+            )
+        }
+        _ => String::new(),
+    };
+    let which = if ids.len() == 1 {
+        ids[0].clone()
+    } else {
+        "one of those versions".into()
+    };
+    format!(
+        "The harness mod is not published for Minecraft {mc} yet (published: {}){unread}. Turn the harness off on this profile to play (harness=false), or use {which} for harness work.",
+        ids.join(", ")
+    )
+}
+
+/// How the jar is fetched: `downloadFile(url, dest, { hash: 'sha256', expected, label })`.
+pub type Download<'a> = &'a (dyn Fn(&str, &std::path::Path, &str, &str) -> Result<(), Failure> + Sync);
+
+pub fn default_download(url: &str, dest: &std::path::Path, sha256: &str, label: &str) -> Result<(), Failure> {
+    crate::download::download_file(
+        url,
+        dest,
+        crate::download::Options {
+            hash: Some(crate::download::Hash::Sha256),
+            expected: Some(sha256.to_string()),
+            label: Some(label.to_string()),
+            ..crate::download::Options::default()
+        },
+    )
+    .map(|_| ())
+}
+
+/// `ensureHarnessJar(name, mc)`: this version's build in the profile's mods folder, any other
+/// build of the mod taken out.
+pub fn ensure_harness_jar(
+    paths: &Paths,
+    profile: &str,
+    mc: &str,
+    on_progress: super::install::OnProgress<'_>,
+    download: Download<'_>,
+) -> Result<(), Failure> {
+    let Some(row) = harness_for(paths, mc) else {
+        return Err(Failure::user(format!(
+            "no harness mod is published for Minecraft {mc}; the profile can still launch without the harness"
+        )));
+    };
+    let mods_dir = jspath::join(&[&paths.profile_dir(profile), "mods"]);
+    let base = format!("spawnloft-harness-{}+{}.jar", row.version, row.minecraft);
+    let dest = jspath::join(&[&mods_dir, &base]);
+    let dest_path = std::path::Path::new(&dest);
+    if dest_path.exists() {
+        use sha2::Digest;
+        let buf = std::fs::read(dest_path).map_err(|e| Failure::read(&e, dest_path))?;
+        let hash = sha2::Sha256::digest(&buf);
+        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        if hex == row.sha256 {
+            return Ok(());
+        }
+    }
+    std::fs::create_dir_all(&mods_dir)
+        .map_err(|e| Failure::io(&e, "mkdir", Some(std::path::Path::new(&mods_dir))))?;
+    let entries = std::fs::read_dir(&mods_dir)
+        .map_err(|e| Failure::io(&e, "scandir", Some(std::path::Path::new(&mods_dir))))?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name == base {
+            continue;
+        }
+        // /^spawnloft-harness-.*\.jar$/i
+        let lower = name.to_ascii_lowercase();
+        if lower.starts_with("spawnloft-harness-") && lower.ends_with(".jar") && !lower.contains('\n') {
+            super::rm_force(&jspath::join(&[&mods_dir, &name]))?;
+        }
+    }
+    download(
+        &row.url,
+        dest_path,
+        &row.sha256,
+        &format!("harness mod {}", row.version),
+    )?;
+    let size = std::fs::metadata(dest_path)
+        .map_err(|e| Failure::read(&e, dest_path))?
+        .len();
+    on_progress(&super::install::Progress {
+        phase: "harness mod",
+        done: 1,
+        total: 1,
+        bytes: size as f64,
+    });
+    Ok(())
 }
 
 const GONE: &str = "the client's harness went away";
@@ -279,5 +469,49 @@ mod tests {
         server.join().unwrap();
         assert_eq!(ch.call("x", Map::new(), 200).unwrap_err().message(), GONE);
         std::fs::remove_dir_all(d).unwrap();
+    }
+
+    #[test]
+    fn the_jar_for_the_version_replaces_other_builds() {
+        let d = std::env::temp_dir().join(format!("sl-harness-jar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let paths = Paths::under(&d.to_string_lossy());
+        let mods = std::path::Path::new(&paths.profile_dir("p")).join("mods");
+        std::fs::create_dir_all(&mods).unwrap();
+        std::fs::write(mods.join("spawnloft-harness-0.0.9+1.21.10.JAR"), "old").unwrap();
+        std::fs::write(mods.join("spawnloft-harness-0.1.0+1.21.11.jar"), "damaged").unwrap();
+        std::fs::write(mods.join("sodium.jar"), "kept").unwrap();
+        let got = std::sync::Mutex::new(Vec::<String>::new());
+        let download = |url: &str, dest: &std::path::Path, sum: &str, label: &str| -> Result<(), Failure> {
+            got.lock().unwrap().push(format!("{url} {sum} {label}"));
+            std::fs::write(dest, "jar").unwrap();
+            Ok(())
+        };
+        let seen = std::sync::Mutex::new(Vec::new());
+        let progress = |p: &super::super::install::Progress| {
+            seen.lock().unwrap().push((p.phase, p.done, p.total, p.bytes))
+        };
+        ensure_harness_jar(&paths, "p", "1.21.11", &progress, &download).unwrap();
+        assert_eq!(
+            *got.lock().unwrap(),
+            [format!(
+                "https://github.com/joogiebear/spawnloft-harness-mod/releases/download/v0.1.0-mc1.21.11/spawnloft-harness-0.1.0%2B1.21.11.jar {} harness mod 0.1.0",
+                HARNESS_RELEASES[0].sha256
+            )]
+        );
+        assert_eq!(*seen.lock().unwrap(), [("harness mod", 1, 1, 3.0)]);
+        let mut left: Vec<String> = std::fs::read_dir(&mods)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["sodium.jar", "spawnloft-harness-0.1.0+1.21.11.jar"]);
+
+        let e = ensure_harness_jar(&paths, "p", "1.20.1", &progress, &download).unwrap_err();
+        assert!(
+            e.message()
+                .starts_with("no harness mod is published for Minecraft 1.20.1")
+        );
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

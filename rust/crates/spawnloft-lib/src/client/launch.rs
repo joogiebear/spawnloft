@@ -2,9 +2,9 @@
 //! and game start, and `pickClientJava` from java.mjs. The game runs detached with its output in
 //! the profile's log and its record in state.json, which the Node core reads as its own.
 //!
-//! A mod loader's profile (and one with the harness, which needs Fabric) is still launched by the
-//! Node core until the loaders move (part 4): the command line hands those over before anything
-//! is printed, and `launch` refuses them as a guard.
+//! A Forge or NeoForge profile is still launched by the Node core until their installers move
+//! (part 4b): the command line hands those over before anything is printed, and `launch` refuses
+//! them as a guard.
 
 use std::path::Path;
 use std::sync::LazyLock;
@@ -22,7 +22,7 @@ use super::{accounts, auth, http, library, meta, prop, read_json, runtime, serve
 use crate::failure::Failure;
 use crate::registry::{self, Instance};
 use crate::settings::Layout;
-use crate::{java, js, jsjson, jspath};
+use crate::{cancel, java, js, jsjson, jspath};
 
 fn user(message: impl Into<String>) -> Failure {
     Failure::user(message)
@@ -689,6 +689,7 @@ pub fn build_command(
     account: &Value,
     java: &str,
     os: &Os,
+    harness_token: Option<&str>,
     join: Option<&Address>,
     assets_dir: Option<&str>,
 ) -> Result<Command, Failure> {
@@ -812,6 +813,9 @@ pub fn build_command(
     }
     let mut args = jvm;
     args.push(format!("-Xmx{}", js::string(profile.get("memory"))));
+    if let Some(t) = harness_token.filter(|t| !t.is_empty()) {
+        args.push(format!("-Dspawnloft.harness.token={t}"));
+    }
     args.push(js::string(prop(Some(version), "mainClass")));
     args.extend(game);
     Ok(Command {
@@ -832,6 +836,8 @@ pub struct StateFacts {
     pub server: Option<String>,
     pub address: Option<String>,
     pub launched_by: &'static str,
+    /// `{ token, port: null }` for a game started with the harness
+    pub harness: Option<Value>,
     pub launch: Value,
 }
 
@@ -916,7 +922,7 @@ pub fn spawn_client(
         "account": facts.account,
         "javaPid": pid,
         "procStart": state::proc_start_ticks(Some(&json!(pid))),
-        "harness": null,
+        "harness": facts.harness.clone().unwrap_or(Value::Null),
         "server": facts.server,
         "address": facts.address,
         "launchedBy": facts.launched_by,
@@ -1006,17 +1012,17 @@ pub fn fake_client_java() -> Option<String> {
     crate::paths::env_var("FAKE_CLIENT")
 }
 
-/// Whether a profile is one the Node core still launches: a mod loader's, or one with the
-/// harness (which needs Fabric).
+/// Whether a profile is one the Node core still launches: none now (kept for the command line's
+/// hand-over until the whole `client` command moves).
 pub fn node_launches(profile: &Profile) -> bool {
-    node_installs(profile) || js::truthy(profile.get("harness"))
+    node_installs(profile)
 }
 
-/// Whether a profile's loader is one the Node core still sets up (Forge and NeoForge, whose
-/// installers part 4b ports).
+/// Whether a profile's loader is one the Node core still sets up: none since Forge and NeoForge
+/// moved (part 4c).
 pub fn node_installs(profile: &Profile) -> bool {
-    !matches!(profile.get("loader"), None | Some(Value::Null))
-        && !matches!(profile.text("loader"), Some("vanilla" | "fabric" | "quilt"))
+    let _ = profile;
+    false
 }
 
 /// The profile's loader, `None` for vanilla.
@@ -1168,20 +1174,213 @@ pub fn materialise_assets(paths: &Paths, index: &Value, dest: &str, copy: bool) 
 }
 
 /// `launchFacts(resolved, picked, profile, installed, assetsDir)`.
+/// `javaFor(profile, resolved)`: the profile's own Java, one found on this machine, or Mojang's
+/// runtime for the version's component. A loader may narrow the version's Java (Forge on a Java
+/// 8 version runs on 8 only, Mojang's first). With the bounds it was picked for.
+pub fn java_for(
+    paths: &Paths,
+    profile: &Profile,
+    resolved: &Resolved,
+    on_stage: &dyn Fn(&str),
+    on_progress: install::OnProgress<'_>,
+) -> Result<(Picked, JavaRequirement), Failure> {
+    let req = resolved.java.clone();
+    let runtime = || -> Result<String, Failure> {
+        on_stage(&format!(
+            "Getting Mojang's Java {}",
+            js::number_to_string(req.major)
+        ));
+        runtime::mojang_java(
+            paths,
+            &req.component,
+            req.major,
+            &resolved.os.name,
+            &resolved.os.arch,
+            &install::default_fetch,
+            &meta::default_fetch,
+            on_progress,
+        )
+        .map(|(path, _)| path)
+    };
+    let loader = loader_of(profile);
+    let (requirement, mojang_first) = match loader.as_deref() {
+        Some("forge") => super::forge::forge_java(&req),
+        _ => (req.clone(), false),
+    };
+    let explicit = match profile.get("java") {
+        v if js::truthy(v) => Some(js::string(v)),
+        _ => None,
+    };
+    // Mojang's Java first where the loader asks it, before any installed one; when it cannot be
+    // had (offline, none for this machine), the usual choice
+    if mojang_first && explicit.is_none() {
+        match runtime() {
+            Ok(path) => {
+                return Ok((
+                    Picked {
+                        path,
+                        warning: None,
+                        source: "mojang-runtime",
+                    },
+                    requirement,
+                ));
+            }
+            Err(err) => {
+                if !matches!(
+                    code_of(&err),
+                    Some("no-runtime-for-this-machine" | "runtime-offline" | "download-failed")
+                ) {
+                    return Err(err);
+                }
+            }
+        }
+    }
+    let mc = js::string(profile.get("mc"));
+    let mut picked = pick_client_java(
+        explicit.as_deref(),
+        &requirement,
+        Some(&resolved.os.arch),
+        &format!("Minecraft {mc}"),
+        None,
+        Some(&runtime),
+    )?;
+    if loader.is_some()
+        && let Some(w) = &picked.warning
+    {
+        picked.warning = Some(format!("{w} Mods often fail on a newer Java."));
+    }
+    Ok((picked, requirement))
+}
+
+/// The part of `installProfile(name)` after the version file, for a loader with an installer:
+/// the game's Java found and the loader's build steps run on it. Nothing for other profiles.
+pub fn install_loader(
+    paths: &Paths,
+    name: &str,
+    version_id: &str,
+    verify: bool,
+    on_stage: &dyn Fn(&str),
+    on_progress: install::OnProgress<'_>,
+    on_note: &mut dyn FnMut(&str),
+) -> Result<(), Failure> {
+    let profile = profiles::get(paths, name)?;
+    if !loader_of(&profile).is_some_and(|l| super::forge::handles(&l)) {
+        return Ok(());
+    }
+    let os = rules::current_os();
+    let read_version = |id: &str| -> Result<Value, Failure> {
+        let file = paths.version_json(id);
+        let text = std::fs::read(&file).map_err(|e| Failure::read(&e, Path::new(&file)))?;
+        crate::jsjson::parse(&String::from_utf8_lossy(&text)).map_err(Failure::syntax)
+    };
+    let mut version = read_version(version_id)?;
+    if let Some(Value::String(parent)) = prop(Some(&version), "inheritsFrom").cloned()
+        && !parent.is_empty()
+    {
+        version = library::merge_inherited(&version, &read_version(&parent)?)?;
+    }
+    let caps = (!library::native_arches(&version, &os)?.contains(&os.arch)).then(|| host_x64(&os));
+    let resolved = version::resolve_version(
+        &version,
+        &os,
+        &version::launch_features(false),
+        caps,
+        version::LAUNCHER_FORMAT,
+    )?;
+    if let Some(refused) = version::resolved_refusal(&resolved) {
+        return Err(refused);
+    }
+    on_stage("Finding Java");
+    let (picked, _) = java_for(paths, &profile, &resolved, on_stage, on_progress)?;
+    if let Some(w) = &picked.warning {
+        on_note(w);
+    }
+    finish_loader(
+        paths,
+        name,
+        &picked.path,
+        &resolved.os,
+        verify,
+        &[],
+        &mut |m| on_stage(m),
+        on_progress,
+        on_note,
+    )
+}
+
+/// `finishLoader(name, { java, os })`: what a loader sets up once the game's Java is picked: an
+/// installer's build steps, which read the vanilla game's jar, so the vanilla game is downloaded
+/// first when the loader is not set up yet.
+#[allow(clippy::too_many_arguments)]
+pub fn finish_loader(
+    paths: &Paths,
+    name: &str,
+    java: &str,
+    os: &Os,
+    verify: bool,
+    keep_natives: &[String],
+    on_stage: &mut dyn FnMut(&str),
+    on_progress: install::OnProgress<'_>,
+    on_note: &mut dyn FnMut(&str),
+) -> Result<(), Failure> {
+    let profile = profiles::get(paths, name)?;
+    let Some(loader) = loader_of(&profile).filter(|l| super::forge::handles(l)) else {
+        return Ok(());
+    };
+    let mc = js::string(profile.get("mc"));
+    let build = js::string(profile.get("loaderVersion"));
+    if !super::forge::is_installed(paths, &loader, &mc, &build)
+        || !Path::new(&paths.version_jar(&mc)).exists()
+    {
+        let fetch: Fetch<'_> = &install::default_fetch;
+        install::ensure_version(
+            paths,
+            &mc,
+            &install::Ensure {
+                os: os.clone(),
+                on_progress,
+                fetch,
+                keep_natives,
+                verify: false,
+            },
+        )?;
+    }
+    let f = super::fabric::Fetchers::real();
+    super::forge::finish_install(
+        paths,
+        &loader,
+        &mc,
+        &build,
+        super::forge::Finish {
+            name,
+            java,
+            verify,
+            f: &f,
+            spawn: &super::forge_install::default_spawn,
+            on_stage,
+            on_progress,
+            on_note,
+        },
+    )?;
+    Ok(())
+}
+
 fn launch_facts(
     resolved: &Resolved,
     picked: &Picked,
+    bounds: Option<&JavaRequirement>,
     installed: Option<&Value>,
     assets_dir: Option<&str>,
 ) -> Value {
     let req = &resolved.java;
+    let b = bounds.unwrap_or(req);
     json!({
         "id": resolved.id,
         "java": {
             "major": jsjson::num(req.major),
             "component": req.component,
-            "min": jsjson::num(req.min),
-            "max": req.max.map(jsjson::num),
+            "min": jsjson::num(b.min),
+            "max": b.max.map(jsjson::num),
             "chosenPath": picked.path,
             "source": picked.source,
             "warning": picked.warning,
@@ -1292,9 +1491,7 @@ fn launch_locked(
     if node_launches(&profile) {
         return Err(Failure::Internal {
             head: "Error".into(),
-            message: format!(
-                "profile \"{name}\" uses a mod loader or the harness, which the Node core launches"
-            ),
+            message: format!("profile \"{name}\" uses a mod loader the Node core launches"),
             code: None,
         });
     }
@@ -1325,6 +1522,18 @@ fn launch_locked(
         return Err(user(format!(
             "\"{t}\" is a database, not a Minecraft server; point the profile at a server"
         )));
+    }
+    let mc_id = js::string(profile.get("mc"));
+    if js::truthy(profile.get("harness")) && super::harness::harness_for(paths, &mc_id).is_none() {
+        // a build published since the signed list was last read is found before refusing (no
+        // wait when it was read within the day)
+        super::harness_index::refresh_default(paths, false)?;
+        if super::harness::harness_for(paths, &mc_id).is_none() {
+            return Err(coded(
+                super::harness::not_published(paths, &mc_id),
+                "harness-not-published",
+            ));
+        }
     }
 
     // --as names an offline player; a signed-in account brings its own name
@@ -1446,52 +1655,44 @@ fn launch_locked(
     }
     let run_os = resolved.os.clone();
 
-    let picked = match &fake {
-        Some(f) => Picked {
-            path: f.clone(),
-            warning: None,
-            source: "installed",
-        },
+    let (picked, bounds) = match &fake {
+        Some(f) => (
+            Picked {
+                path: f.clone(),
+                warning: None,
+                source: "installed",
+            },
+            None,
+        ),
         None => {
-            let req = resolved.java.clone();
-            let runtime = || -> Result<String, Failure> {
-                runtime::mojang_java(
-                    paths,
-                    &req.component,
-                    req.major,
-                    &resolved.os.name,
-                    &resolved.os.arch,
-                    &install::default_fetch,
-                    &meta::default_fetch,
-                    opts.on_progress,
-                )
-                .map(|(path, _)| path)
-            };
-            let explicit = match profile.get("java") {
-                v if js::truthy(v) => Some(js::string(v)),
-                _ => None,
-            };
-            pick_client_java(
-                explicit.as_deref(),
-                &req,
-                Some(&resolved.os.arch),
-                &format!("Minecraft {mc}"),
-                None,
-                Some(&runtime),
-            )?
+            let (p, r) = java_for(paths, &profile, &resolved, &|_| {}, opts.on_progress)?;
+            (p, Some(r))
         }
     };
-    let mut picked = picked;
-    if loader.is_some()
-        && fake.is_none()
-        && let Some(w) = &picked.warning
-    {
-        picked.warning = Some(format!("{w} Mods often fail on a newer Java."));
-    }
     if let Some(w) = &picked.warning {
         warn(&mut warnings, w.clone());
     }
 
+    cancel::check_cancelled()?;
+    // a loader's own build steps, on the Java just picked (the fake game has none to run)
+    if fake.is_none() {
+        let keep = versions_in_use(paths, name)?;
+        // each note is told as it is raised, as Node's onWarning is: before the steps' progress, and
+        // also when a step then fails
+        finish_loader(
+            paths,
+            name,
+            &picked.path,
+            &run_os,
+            false,
+            &keep,
+            &mut |_| {},
+            opts.on_progress,
+            &mut |w| warn(&mut warnings, w.to_string()),
+        )?;
+    }
+
+    cancel::check_cancelled()?;
     let installed = if fake_installed {
         None
     } else {
@@ -1545,6 +1746,15 @@ fn launch_locked(
             &install::default_fetch,
         )?;
     }
+    if fake.is_none() && js::truthy(profile.get("harness")) {
+        super::harness::ensure_harness_jar(
+            paths,
+            name,
+            &mc,
+            opts.on_progress,
+            &super::harness::default_download,
+        )?;
+    }
 
     let account = match &selector {
         None => offline_account(&match opts.player_name.as_deref().filter(|p| !p.is_empty()) {
@@ -1581,6 +1791,20 @@ fn launch_locked(
             format!("the game's Multiplayer list was not brought up to date: {skipped}"),
         );
     }
+    let harness_token = if js::truthy(profile.get("harness")) {
+        let mut b = [0u8; 16];
+        getrandom::fill(&mut b).map_err(|e| Failure::Internal {
+            head: "Error".into(),
+            message: format!("the system gave no random bytes: {e}"),
+            code: None,
+        })?;
+        // a file from a crashed run would otherwise be read as this run's, before the mod
+        // replaces it
+        super::harness::remove_file(paths, name)?;
+        Some(b.iter().map(|x| format!("{x:02x}")).collect::<String>())
+    } else {
+        None
+    };
     let command = build_command(
         paths,
         &version_json,
@@ -1589,6 +1813,7 @@ fn launch_locked(
         &account,
         &picked.path,
         &run_os,
+        harness_token.as_deref(),
         join.as_ref(),
         assets_dir.as_deref(),
     )?;
@@ -1606,7 +1831,16 @@ fn launch_locked(
             server: target.clone(),
             address: None,
             launched_by: "cli",
-            launch: launch_facts(&resolved, &picked, installed.as_ref(), assets_dir.as_deref()),
+            harness: harness_token
+                .as_ref()
+                .map(|t| json!({ "token": t, "port": null })),
+            launch: launch_facts(
+                &resolved,
+                &picked,
+                bounds.as_ref(),
+                installed.as_ref(),
+                assets_dir.as_deref(),
+            ),
         },
     )?;
     Ok(Launched {
