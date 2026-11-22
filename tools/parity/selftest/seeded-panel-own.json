@@ -1,0 +1,17 @@
+{
+  "about": "Self-test: a step marked own asks for a path no route of the Rust panel fits. Handed to the Node panel it would agree with the Node side by being it; marked own, the Rust side answers 502 and the rig must report it.",
+  "expect": "differ",
+  "expectDifferences": [
+    "step 1 (panel, 2 requests): stdout"
+  ],
+  "ignore": ["home/**/panel.key"],
+  "steps": [
+    {
+      "own": true,
+      "panel": [
+        { "get": "/api/appearance" },
+        { "get": "/api/appearance/more" }
+      ]
+    }
+  ]
+}

@@ -82,6 +82,8 @@ const UPSTREAM_START_TIMEOUT: Duration = Duration::from_secs(60);
 /// finishes one would otherwise hold a thread for ever. Bodies and responses have no limit, since
 /// uploads are slow and the panel's event streams stay open for hours.
 const HEAD_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long one write of an answer made here may wait on a client that is not reading.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Runs until killed (or stdin closes with `exit_with_stdin`). Returns an exit code only when it
 /// could not start.
@@ -574,8 +576,11 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream, panel: &Pa
     }
     conn.set_read_timeout(None)?;
     // The routes that have moved (rust/PLAN-CORE-PORT.md C8) are answered here; the rest still go
-    // to the Node panel. A target Node's URL would refuse goes there too, to be refused.
-    if let Some((path, query)) = http::parse_target(head.path()) {
+    // to the Node panel. A target that is not a path (`x:api/settings`, CONNECT's host and port)
+    // or that Node's URL would refuse goes there too, to be refused as it always was.
+    if head.path().starts_with('/')
+        && let Some((path, query)) = http::parse_target(head.path())
+    {
         let expects_continue = head
             .header("expect")
             .is_some_and(|v| v.eq_ignore_ascii_case("100-continue"));
@@ -594,10 +599,22 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream, panel: &Pa
         if let routes::Routed::Reply(reply) = routes::route(panel, &mut req) {
             let head_only = req.method == "HEAD";
             let conn = req.body.into_conn();
+            // a client that stops reading does not hold the thread: each write has this long
+            conn.set_write_timeout(Some(WRITE_TIMEOUT))?;
             let sent = http::send(conn, reply, proof.as_deref(), head_only);
             linger(conn);
             return sent;
         }
+    }
+    // the parity rig's check that a route it replays has moved: nothing is handed on
+    #[cfg(feature = "test-hooks")]
+    if std::env::var_os("SPAWNLOFT_TEST_PANEL_OWN").is_some() {
+        return respond(
+            &mut conn,
+            502,
+            "application/json",
+            br#"{"error":"this route has not moved to the Rust panel"}"#,
+        );
     }
     let addr = match upstream {
         Upstream::Node(addr) => *addr,
@@ -633,10 +650,15 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream, panel: &Pa
 /// coming is read and dropped, for a short while and up to a size.
 fn linger(conn: &mut TcpStream) {
     let _ = conn.shutdown(Shutdown::Write);
-    let _ = conn.set_read_timeout(Some(Duration::from_secs(2)));
+    // two seconds in all, not per read
+    let until = std::time::Instant::now() + Duration::from_secs(2);
     let mut sink = [0u8; 16 * 1024];
     let mut dropped = 0usize;
     while dropped < 4 * 1024 * 1024 {
+        let left = until.saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() || conn.set_read_timeout(Some(left)).is_err() {
+            break;
+        }
         match conn.read(&mut sink) {
             Ok(n) if n > 0 => dropped += n,
             _ => break,
@@ -970,11 +992,12 @@ mod tests {
 
     #[test]
     fn a_request_whose_length_reads_two_ways_is_refused_before_anything() {
-        let addr = front_of(panel_in("framing", false), nowhere(), 4);
+        let addr = front_of(panel_in("framing", false), nowhere(), 5);
         let p = addr.port();
         for lines in [
             "Content-Length: 2\r\nTransfer-Encoding: chunked\r\n",
             "Content-Length: 2\r\nContent-Length: 3\r\n",
+            "Content-Length: 2\r\ncontent-length: 2\r\n",
             "Content-Length: two\r\n",
             "Transfer-Encoding: gzip\r\n",
         ] {
@@ -986,6 +1009,21 @@ mod tests {
                 ),
             );
             assert!(out.starts_with("HTTP/1.1 400"), "{lines}: {out}");
+        }
+    }
+
+    #[test]
+    fn a_target_that_is_not_a_path_is_never_routed_here() {
+        // WHATWG reads `x:api/software` against a base as the path `api/software`; Node's parser
+        // never let such a request line reach a route, so it goes on to be refused there
+        let addr = front_of(panel_in("target", false), Upstream::Missing("no node".into()), 2);
+        let p = addr.port();
+        for line in ["GET x:api/software", "CONNECT 127.0.0.1:443"] {
+            let out = exchange(
+                addr,
+                &format!("{line} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n", api_header(p)),
+            );
+            assert!(out.starts_with("HTTP/1.1 503"), "{line}: {out}");
         }
     }
 

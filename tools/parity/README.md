@@ -118,7 +118,10 @@ Not isolated: the Windows user PATH.
   with `"body": "sha256"`, and `"body": "skip"` leaves it out. The panel's port reads
   `<panel-port>` wherever it shows. `"waitMs"` waits before a request. `"window": true` on the
   step runs both panels as the desktop window does (`SPAWNLOFT_SHELL=tauri`). `expect.includes`
-  is text the answers must hold on both sides. The install's key is made by each side, so a
+  is text the answers must hold on both sides. `"own": true` says the Rust panel answers every
+  request of the step itself: while some routes are still handed to the Node panel behind it,
+  such a request would agree with the Node side by being it, so on an `own` step the Rust side
+  answers 502 instead of handing on (`SPAWNLOFT_TEST_PANEL_OWN`, a `test-hooks` build only). The install's key is made by each side, so a
   scenario with a panel step ignores `home/**/panel.key`.
 - `golden`: the Node side's steps, with this machine's paths replaced by `<run>` and `<repo>`,
   must equal the file. A step with `"golden": false` is compared between the sides but kept out
@@ -139,7 +142,7 @@ apart as `name` and `name#2`.
 marked `"side": "rust"`, and names the difference in `expectDifferences`. The rig passes such a
 scenario only when it reports that exact difference. They cover stdout, the exit code and stderr,
 an extra and a changed file in the tree, a file mode, a tar member's bytes, the fake-host
-request list, and a panel's answer. A
+request list, a panel's answer, and a request an `own` step would have handed on. A
 `side`-only step anywhere else is refused, so a real scenario can never run different steps on
 the two sides. `test/parity-rig.test.mjs` tests the rig's parts with no binary, and runs the
 self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
@@ -192,7 +195,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c7-client-loaders` | Fabric and Quilt profiles over faked Mojang, Fabric and Quilt hosts, made by `make-c7-loader-scenario.mjs`: the stable Fabric build picked and pinned, a pinned build, a meta answering for another build or game version, a library checksum mismatch, a build the meta lacks, a snapshot and an old release with no loader; Quilt's newest non-beta from a list out of order, checksums from the `.sha1` beside each library, and its refusals (another host, an unknown shape, a checksum file with none, a wrong id); version files damaged and made again; and the fake game launched on loader profiles. Not on Linux arm64 |
 | `c6b-doctor` | C6b's `doctor`, text and `--json`, and its usage checks (only `--json` checks flags and arguments): a missing folder, a missing jar, an EULA not accepted (and one accepted over CRLF), a port that collides with another server's RCON port, a port given as text, a stale state file reported by `--json` and cleared by the text form, a data-format marker from a newer release, world-readable secrets files made owner-only by the text form, and a client profile pinned to a missing Java |
 | `c6b-diag` | `diag`: its usage and refusals, and bundles for a server, a client profile and both, text and `--json`, with every cleaning (secrets, player IPs, the account folder, the Microsoft account, harness, access, session and panel tokens). Zips are compared by entry names and order; sizes and checksums are evened out (summary.json's version, the deflate) |
-| `c8-panel-basics` | the panel over HTTP, the routes the Rust panel answers itself (C8 group a): the three pages and their headers, with `/setup` only behind the window; who may call (no credential, another Host or Origin, a token for another port, a probe and its proof); the first-run wizard's calls and every refusal of a save; appearance, jars, the MCP command, health, the Java list and what versions need, the software list and version lists over faked hosts (one of them down), diagnostics and the feedback links for a server, a database and nothing, and each thing a settings save can be asked. Longer paths and other methods, which fit no moved route, still reach the Node panel on both sides |
+| `c8-panel-basics` | the panel over HTTP, the routes the Rust panel answers itself (C8 group a): the three pages and their headers, with `/setup` only behind the window; who may call (no credential, another Host or Origin, a token for another port, a probe and its proof); the first-run wizard's calls and every refusal of a save; appearance, jars, the MCP command, health, the Java list and what versions need, the software list and version lists over faked hosts (one of them down), diagnostics and the feedback links for a server, a database and nothing, and each thing a settings save can be asked. Those steps are `own`; a last one sends longer paths and other methods, which fit no moved route and still reach the Node panel on both sides |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

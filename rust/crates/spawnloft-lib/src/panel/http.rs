@@ -8,6 +8,7 @@
 
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
@@ -40,7 +41,8 @@ pub fn framing(headers: &[(String, String)]) -> Result<Framing, &'static str> {
                 return Err("bad content-length");
             }
             let n: u64 = v.parse().map_err(|_| "bad content-length")?;
-            if length.is_some_and(|had| had != n) {
+            // a second length is refused even when it says the same, as Node's parser does
+            if length.is_some() {
                 return Err("bad content-length");
             }
             length = Some(n);
@@ -68,7 +70,17 @@ pub struct Body<'c> {
     state: State,
     /// Sent before the first read when the client waits for it (`Expect: 100-continue`).
     proceed: bool,
+    /// When the whole body must have arrived.
+    deadline: Instant,
+    /// Bytes of trailer lines read so far.
+    trailers: usize,
 }
+
+/// How long a request may take to send its body, the whole of it: Node's `requestTimeout`. A
+/// body that never comes would otherwise hold its thread, and its session open, for ever.
+pub const BODY_TIMEOUT: Duration = Duration::from_secs(300);
+/// The most a chunked body's trailers may come to.
+const TRAILER_LIMIT: usize = 16 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum State {
@@ -95,6 +107,8 @@ impl<'c> Body<'c> {
             conn,
             proceed: expects_continue && state != State::Done,
             state,
+            deadline: Instant::now() + BODY_TIMEOUT,
+            trailers: 0,
         }
     }
 
@@ -124,6 +138,12 @@ impl<'c> Body<'c> {
             self.conn.write_all(b"HTTP/1.1 100 Continue\r\n\r\n")?;
             self.conn.flush()?;
         }
+        // one deadline for the body, not one per read: a byte now and then must not hold on
+        let left = self.deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(io::ErrorKind::TimedOut.into());
+        }
+        self.conn.set_read_timeout(Some(left))?;
         self.conn.read(buf)
     }
 
@@ -217,7 +237,12 @@ impl Read for Body<'_> {
                     self.state = State::ChunkSize;
                 }
                 State::Trailers => {
-                    if self.line()?.is_empty() {
+                    let line = self.line()?;
+                    self.trailers += line.len() + 2;
+                    if self.trailers > TRAILER_LIMIT {
+                        return Err(io::ErrorKind::InvalidData.into());
+                    }
+                    if line.is_empty() {
                         self.state = State::Done;
                     }
                 }
@@ -336,8 +361,9 @@ pub fn has_own(body: &Value, key: &str) -> Result<bool, Failure> {
     }
 }
 
-/// A route that writes its own response.
-pub type Writer = Box<dyn FnOnce(&mut TcpStream) -> io::Result<()> + Send>;
+/// A route that writes its own response, the head included. It is handed the proof to send in
+/// that head, when the caller asked for one.
+pub type Writer = Box<dyn FnOnce(&mut TcpStream, Option<&str>) -> io::Result<()> + Send>;
 
 /// What a route answers.
 pub enum Reply {
@@ -423,7 +449,11 @@ pub fn reason(status: u16) -> &'static str {
     match status {
         100 => "Continue",
         200 => "OK",
+        201 => "Created",
         202 => "Accepted",
+        204 => "No Content",
+        206 => "Partial Content",
+        304 => "Not Modified",
         400 => "Bad Request",
         401 => "Unauthorized",
         403 => "Forbidden",
@@ -431,6 +461,8 @@ pub fn reason(status: u16) -> &'static str {
         405 => "Method Not Allowed",
         409 => "Conflict",
         413 => "Payload Too Large",
+        416 => "Range Not Satisfiable",
+        429 => "Too Many Requests",
         500 => "Internal Server Error",
         502 => "Bad Gateway",
         503 => "Service Unavailable",
@@ -523,7 +555,13 @@ pub fn send(conn: &mut TcpStream, reply: Reply, proof: Option<&str>, head_only: 
             }
             // opened before the head goes out: a file that went away is an error answer, not a
             // 200 with nothing behind it
-            let source = std::fs::File::open(&file)?;
+            let source = match std::fs::File::open(&file) {
+                Ok(f) => f,
+                Err(e) => {
+                    let gone = Reply::error(500, crate::jspath::node_error(&e, "open", Some(&file)));
+                    return send(conn, gone, proof, head_only);
+                }
+            };
             write_head(conn, 200, &with_proof(headers), Some(len))?;
             if head_only {
                 return conn.flush();
@@ -535,7 +573,7 @@ pub fn send(conn: &mut TcpStream, reply: Reply, proof: Option<&str>, head_only: 
             }
             conn.flush()
         }
-        Reply::Stream(run) => run(conn),
+        Reply::Stream(run) => run(conn, proof),
     }
 }
 
@@ -562,10 +600,7 @@ mod tests {
     fn framing_rules() {
         assert_eq!(framing(&h(&[])), Ok(Framing::None));
         assert_eq!(framing(&h(&[("Content-Length", "12")])), Ok(Framing::Length(12)));
-        assert_eq!(
-            framing(&h(&[("content-length", "3"), ("Content-Length", "3")])),
-            Ok(Framing::Length(3))
-        );
+        assert!(framing(&h(&[("content-length", "3"), ("Content-Length", "3")])).is_err());
         assert_eq!(
             framing(&h(&[("Transfer-Encoding", "Chunked")])),
             Ok(Framing::Chunked)

@@ -15,7 +15,8 @@ use crate::{java, js, jspath};
 pub fn needs_setup() -> bool {
     let (saved, _) = settings::load();
     let root = saved.get("dataRoot");
-    !(js::truthy(root) && Path::new(&js::string(root)).exists())
+    // `existsSync` of anything but a path is false
+    !matches!(root, Some(Value::String(s)) if !s.is_empty() && Path::new(s).exists())
 }
 
 /// `getSetup()`.
@@ -75,12 +76,13 @@ pub fn save_setup(body: &Value) -> Value {
         ("separateInstances", json!(separate)),
         ("instancesDir", json!(instances_dir)),
     ];
-    if let Err(e) = settings::save(&patch, true) {
+    // read back: a write that did not land (a read-only roaming profile, a sync client holding
+    // the file) would silently restart on the default location. Read before another save in
+    // this process can land, so it is this write that is checked.
+    let mut written: Map<String, Value> = Map::new();
+    if let Err(e) = settings::save_then(&patch, true, || written = settings::load().0) {
         return refused(e.message().to_string());
     }
-    // read back: a write that did not land (a read-only roaming profile, a sync client holding
-    // the file) would silently restart on the default location
-    let (written, _): (Map<String, Value>, _) = settings::load();
     let got = written.get("dataRoot");
     let got_text = match got {
         None | Some(Value::Null) => String::new(),

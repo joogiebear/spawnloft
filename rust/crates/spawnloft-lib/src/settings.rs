@@ -111,6 +111,31 @@ pub fn save(
     patch: &[(&str, Value)],
     replace_unreadable: bool,
 ) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
+    save_then(patch, replace_unreadable, || ())
+}
+
+/// One save at a time in this process. The Node core saved on its one thread; the panel here
+/// answers each connection on its own, and two saves at once would read the same old file (the
+/// second losing the first's change) and write through the same temp file.
+static SAVING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// [`save`], then `after` before any other save in this process can start: for a caller that
+/// reads back what it wrote.
+pub fn save_then<T>(
+    patch: &[(&str, Value)],
+    replace_unreadable: bool,
+    after: impl FnOnce() -> T,
+) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
+    let _one = SAVING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let saved = save_unlocked(patch, replace_unreadable)?;
+    after();
+    Ok(saved)
+}
+
+fn save_unlocked(
+    patch: &[(&str, Value)],
+    replace_unreadable: bool,
+) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
     use crate::failure::Failure;
     let file = link_target(Path::new(&settings_file_text()));
     let shown = file.display().to_string();

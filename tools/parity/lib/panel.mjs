@@ -160,7 +160,9 @@ function describe(req, res, port) {
   } else body = text
   lines.push(body)
   // this run's port, wherever it shows (a cookie's name, a redirect address)
-  return lines.join('\n').replaceAll(String(port), '<panel-port>') + '\n'
+  // (not any run of the same digits: a size or a pid may hold them)
+  const p = String(port)
+  return lines.join('\n').replaceAll(`spawnloft_${p}`, 'spawnloft_<panel-port>').replaceAll(`:${p}`, ':<panel-port>') + '\n'
 }
 
 // Replays `requests` against a panel started with `args`. Returns the text to compare and any

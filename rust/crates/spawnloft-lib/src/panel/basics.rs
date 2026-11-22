@@ -132,7 +132,12 @@ pub fn java_needs(req: &Request) -> Reply {
     let asked = req.q("versions").unwrap_or("");
     let best = java::discover().best;
     let mut needs = Map::new();
-    for v in asked.split(',').filter(|v| !v.is_empty()).take(500) {
+    // `needs['__proto__'] = ...` sets no key in JavaScript
+    for v in asked
+        .split(',')
+        .filter(|v| !v.is_empty() && *v != "__proto__")
+        .take(500)
+    {
         needs.insert(v.to_string(), json!(java::required_major(Some(v))));
     }
     let mut ordered = Value::Object(needs);

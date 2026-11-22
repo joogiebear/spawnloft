@@ -1,5 +1,5 @@
 {
- "about": "C8's first routes, answered by the Rust panel itself and compared with the Node panel's answers over HTTP: the three pages with their headers (and /setup only behind the window), who may call (no credential, another Host, another Origin, a token for another port, a probe and its proof), the first-run wizard's calls with every refusal of a save, appearance, jars, the MCP command, health, the Java list and what versions need, the software list and three version lists (one of them down), diagnostics and the feedback links for a server, a database and nothing, and settings with each thing a save can be asked. Paths that fit no moved route (a longer path, another method) still reach the Node panel on both sides.",
+ "about": "C8's first routes, answered by the Rust panel itself and compared with the Node panel's answers over HTTP: the three pages with their headers (and /setup only behind the window), who may call (no credential, another Host, another Origin, a token for another port, a probe and its proof), the first-run wizard's calls with every refusal of a save, appearance, jars, the MCP command, health, the Java list and what versions need, the software list and three version lists (one of them down), diagnostics and the feedback links for a server, a database and nothing, and settings with each thing a save can be asked. Those steps are marked own: the Rust side answers 502 rather than hand a request on, so each is proven to be answered by the Rust panel. A last step sends paths that fit no moved route (a longer path, another method), which still reach the Node panel on both sides.",
  "hosts": {
   "https://fill.papermc.io": {
    "routes": {
@@ -140,19 +140,10 @@
      "get": "/index.html"
     },
     {
-     "get": "/api"
-    },
-    {
-     "get": "/api/"
-    },
-    {
      "get": "//api/health"
     },
     {
      "get": "/./api/../api/appearance"
-    },
-    {
-     "get": "/api/%61ppearance"
     },
     {
      "get": "/api/appearance?x=1#y"
@@ -293,9 +284,6 @@
      }
     },
     {
-     "get": "/api/appearance/more"
-    },
-    {
      "post": "/api/appearance",
      "json": {
       "theme": "classic"
@@ -308,13 +296,7 @@
      "get": "/api/jars/more"
     },
     {
-     "post": "/api/jars"
-    },
-    {
      "get": "/api/mcp"
-    },
-    {
-     "get": "/api/mcp/more"
     },
     {
      "get": "/api/health"
@@ -323,13 +305,7 @@
      "get": "/api/health/more"
     },
     {
-     "post": "/api/health"
-    },
-    {
      "get": "/api/java"
-    },
-    {
-     "get": "/api/java/more"
     },
     {
      "get": "/api/java/needs"
@@ -344,9 +320,6 @@
      "get": "/api/software"
     },
     {
-     "get": "/api/software/more"
-    },
-    {
      "get": "/api/paper/versions"
     },
     {
@@ -354,15 +327,6 @@
     },
     {
      "get": "/api/folia/versions"
-    },
-    {
-     "get": "/api/nope/versions"
-    },
-    {
-     "get": "/api/paper/versions/more"
-    },
-    {
-     "post": "/api/paper/versions"
     },
     {
      "get": "/api/diagnostics"
@@ -500,9 +464,6 @@
      }
     },
     {
-     "delete": "/api/settings"
-    },
-    {
      "get": "/api/settings/more"
     }
    ],
@@ -511,7 +472,51 @@
      "x-spawnloft-proof: ",
      "\"theme\": \"spawnloft\""
     ]
-   }
+   },
+   "own": true
+  },
+  {
+   "panel": [
+    {
+     "get": "/api"
+    },
+    {
+     "get": "/api/"
+    },
+    {
+     "get": "/api/%61ppearance"
+    },
+    {
+     "get": "/api/appearance/more"
+    },
+    {
+     "post": "/api/jars"
+    },
+    {
+     "get": "/api/mcp/more"
+    },
+    {
+     "post": "/api/health"
+    },
+    {
+     "get": "/api/java/more"
+    },
+    {
+     "get": "/api/software/more"
+    },
+    {
+     "get": "/api/nope/versions"
+    },
+    {
+     "get": "/api/paper/versions/more"
+    },
+    {
+     "post": "/api/paper/versions"
+    },
+    {
+     "delete": "/api/settings"
+    }
+   ]
   },
   {
    "panel": [
@@ -611,7 +616,8 @@
     "includes": [
      "\"ok\": true"
     ]
-   }
+   },
+   "own": true
   },
   {
    "panel": [
@@ -624,7 +630,8 @@
     {
      "get": "/setup"
     }
-   ]
+   ],
+   "own": true
   }
  ]
 }
