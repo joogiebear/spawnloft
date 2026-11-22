@@ -425,7 +425,10 @@ pub fn table_rows(rows: &[VersionRow], show: &str, limit: usize) -> Vec<Vec<Stri
 fn availability(mc: &str, lists: Option<&Lists>) -> (Value, Map<String, Value>) {
     let loaders = match lists {
         Some(l) => loaders::loaders_for(mc, l),
-        None => loaders::MODS.iter().map(|l| (l.to_string(), Value::Null)).collect(),
+        None => loaders::MODS
+            .iter()
+            .map(|l| (l.to_string(), Value::Null))
+            .collect(),
     };
     (super::or_null(loaders.get("fabric")), loaders)
 }
@@ -563,7 +566,14 @@ pub fn list_for_picker(
             ("fabric", Some(fabric_has)),
             ("loaders", Some(Value::Object(loaders))),
             ("refusal", Some(refusal)),
-            ("note", Some(if notes.is_empty() { Value::Null } else { json!(notes.join("; ")) })),
+            (
+                "note",
+                Some(if notes.is_empty() {
+                    Value::Null
+                } else {
+                    json!(notes.join("; "))
+                }),
+            ),
         ]);
         rows.push((parse_time(Some(&release)), row));
     }
@@ -613,7 +623,10 @@ pub fn describe_version(
     let (fabric_has, loaders) = availability(&mc, Some(&lists));
     let java = &resolved.java;
     let (refusal, code) = match &refused {
-        Some(Failure::User { message, code }) => (json!(message), super::or_null(code.as_ref().map(|c| json!(c)).as_ref())),
+        Some(Failure::User { message, code }) => (
+            json!(message),
+            super::or_null(code.as_ref().map(|c| json!(c)).as_ref()),
+        ),
         Some(other) => (json!(other.message()), Value::Null),
         None => (Value::Null, Value::Null),
     };

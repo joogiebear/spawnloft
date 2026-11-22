@@ -8,7 +8,7 @@ use std::path::Path;
 use serde_json::{Map, Value, json};
 
 use super::paths::Paths;
-use super::{accounts, object, prop, profiles};
+use super::{accounts, object, profiles, prop};
 use crate::failure::Failure;
 use crate::js;
 
@@ -80,7 +80,9 @@ pub fn set_default_account(paths: &Paths, uuid: Option<&str>) -> Result<Value, F
                 )));
             };
             let again = accounts::load(paths)?;
-            doc.set_default_account(Some(super::or_null(again.get(i).and_then(|a| prop(Some(a), "uuid")))));
+            doc.set_default_account(Some(super::or_null(
+                again.get(i).and_then(|a| prop(Some(a), "uuid")),
+            )));
         }
     }
     profiles::save(paths, &mut doc)?;
@@ -155,7 +157,9 @@ pub fn assert_name_free(doc: &profiles::Doc, name: &str, except: Option<&str>) -
     for existing in doc.names() {
         if Some(existing.as_str()) != except && existing.to_lowercase() == lower {
             return Err(coded(
-                format!("a profile named \"{existing}\" already exists (names must differ in more than case)"),
+                format!(
+                    "a profile named \"{existing}\" already exists (names must differ in more than case)"
+                ),
                 "name-taken",
             ));
         }
@@ -270,7 +274,11 @@ fn copy_name_for(paths: &Paths, name: &str, doc: &profiles::Doc) -> String {
     let used: Vec<String> = doc.names().iter().map(|n| n.to_lowercase()).collect();
     let mut i = 1;
     loop {
-        let tail = if i == 1 { "-copy".to_string() } else { format!("-copy-{i}") };
+        let tail = if i == 1 {
+            "-copy".to_string()
+        } else {
+            format!("-copy-{i}")
+        };
         let units: Vec<u16> = name.encode_utf16().take(32 - tail.len()).collect();
         let made = format!("{}{tail}", String::from_utf16_lossy(&units));
         if !used.contains(&made.to_lowercase()) && !Path::new(&paths.profile_dir(&made)).exists() {
@@ -293,7 +301,11 @@ const DUPLICATE_TAKES: &[&str] = &[
 
 /// `duplicateProfile(name, wanted)`: a second profile with this one's settings, mods and
 /// options; assistantAccount starts off, as for every new profile.
-pub fn duplicate_profile(paths: &Paths, name: &str, wanted: Option<&str>) -> Result<profiles::Profile, Failure> {
+pub fn duplicate_profile(
+    paths: &Paths,
+    name: &str,
+    wanted: Option<&str>,
+) -> Result<profiles::Profile, Failure> {
     let from = profiles::get(paths, name)?;
     let new_name = match wanted {
         Some(w) => w.to_string(),
@@ -313,7 +325,10 @@ pub fn duplicate_profile(paths: &Paths, name: &str, wanted: Option<&str>) -> Res
             loader: from.get("loader").cloned().unwrap_or(json!("vanilla")),
             loader_version: f("loaderVersion"),
             java: f("java"),
-            memory: from.get("memory").cloned().unwrap_or(json!(profiles::DEFAULT_MEMORY)),
+            memory: from
+                .get("memory")
+                .cloned()
+                .unwrap_or(json!(profiles::DEFAULT_MEMORY)),
             harness: from.get("harness").cloned().unwrap_or(json!(false)),
             server: f("server"),
             account: f("account"),
@@ -361,11 +376,11 @@ pub fn check_java(given: Option<&Value>) -> Result<Value, Failure> {
         }
         _ => return Err(Failure::user("send the Java's \"path\"")),
     };
-    let no = |message: &str| {
-        json!({ "path": p, "found": false, "major": null, "version": null, "arch": null, "message": message })
-    };
+    let no = |message: &str| json!({ "path": p, "found": false, "major": null, "version": null, "arch": null, "message": message });
     if p != "java" && !crate::jspath::is_absolute(&p) {
-        return Ok(no("Give the whole path to java, starting from the drive or from /."));
+        return Ok(no(
+            "Give the whole path to java, starting from the drive or from /.",
+        ));
     }
     if p != "java" {
         let Ok(meta) = std::fs::metadata(&p) else {
@@ -493,11 +508,19 @@ mod tests {
     #[test]
     fn an_exit_is_marked_seen_only_by_its_own_end_time() {
         let (d, p) = scratch("exit");
-        std::fs::write(p.profiles_file(), r#"{"version":1,"profiles":{"a":{"mc":"1.21.4"}}}"#).unwrap();
+        std::fs::write(
+            p.profiles_file(),
+            r#"{"version":1,"profiles":{"a":{"mc":"1.21.4"}}}"#,
+        )
+        .unwrap();
         assert_eq!(last_exit(&p, "a"), Value::Null);
         assert_eq!(mark_exit_seen(&p, "a", "x").unwrap(), json!({ "seen": false }));
         std::fs::create_dir_all(p.run_dir("a")).unwrap();
-        std::fs::write(p.last_exit("a"), r#"{"pid":1,"code":0,"signal":null,"startedAt":"s","endedAt":"e"}"#).unwrap();
+        std::fs::write(
+            p.last_exit("a"),
+            r#"{"pid":1,"code":0,"signal":null,"startedAt":"s","endedAt":"e"}"#,
+        )
+        .unwrap();
         assert_eq!(mark_exit_seen(&p, "a", "x").unwrap(), json!({ "seen": false }));
         assert_eq!(mark_exit_seen(&p, "a", "e").unwrap(), json!({ "seen": true }));
         assert_eq!(
@@ -513,7 +536,11 @@ mod tests {
         std::fs::write(p.profiles_file(), r#"{"version":1,"profiles":{"a":{"mc":"1.21.4","loader":"vanilla","loaderVersion":null,"java":null,"memory":"2G","harness":false,"server":null,"account":null}}}"#).unwrap();
         std::fs::create_dir_all(crate::jspath::join(&[&p.profile_dir("a"), "mods"])).unwrap();
         std::fs::write(crate::jspath::join(&[&p.profile_dir("a"), "mods", "x.jar"]), "j").unwrap();
-        std::fs::write(crate::jspath::join(&[&p.profile_dir("a"), "options.txt"]), "fov:1\n").unwrap();
+        std::fs::write(
+            crate::jspath::join(&[&p.profile_dir("a"), "options.txt"]),
+            "fov:1\n",
+        )
+        .unwrap();
         let made = duplicate_profile(&p, "a", None).unwrap();
         assert_eq!(made.name(), "a-copy");
         assert!(Path::new(&crate::jspath::join(&[&p.profile_dir("a-copy"), "mods", "x.jar"])).exists());
@@ -526,15 +553,29 @@ mod tests {
         assert_eq!(renamed.name(), "b");
         assert!(Path::new(&p.profile_dir("b")).exists());
         assert_eq!(profiles::load(&p).unwrap().names(), vec!["a", "b", "a-copy-2"]);
-        assert_eq!(rename_profile(&p, "b", "A").unwrap_err().message(), "a profile named \"a\" already exists (names must differ in more than case)");
+        assert_eq!(
+            rename_profile(&p, "b", "A").unwrap_err().message(),
+            "a profile named \"a\" already exists (names must differ in more than case)"
+        );
         std::fs::remove_dir_all(d).unwrap();
     }
 
     #[test]
     fn a_java_path_must_be_whole_and_a_file() {
-        assert_eq!(check_java(None).unwrap_err().message(), "send the Java's \"path\"");
-        assert_eq!(check_java(Some(&json!("bin/java"))).unwrap()["message"], json!("Give the whole path to java, starting from the drive or from /."));
+        assert_eq!(
+            check_java(None).unwrap_err().message(),
+            "send the Java's \"path\""
+        );
+        assert_eq!(
+            check_java(Some(&json!("bin/java"))).unwrap()["message"],
+            json!("Give the whole path to java, starting from the drive or from /.")
+        );
         let dir = std::env::temp_dir();
-        assert!(check_java(Some(&json!(dir.to_string_lossy()))).unwrap()["message"].as_str().unwrap().starts_with("That is a folder."));
+        assert!(
+            check_java(Some(&json!(dir.to_string_lossy()))).unwrap()["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("That is a folder.")
+        );
     }
 }

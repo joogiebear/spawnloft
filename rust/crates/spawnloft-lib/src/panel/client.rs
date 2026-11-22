@@ -67,7 +67,11 @@ fn decode_component(s: &str) -> Option<String> {
     while i < b.len() {
         if b[i] == b'%' {
             let hex = s.get(i + 1..i + 3)?;
-            out.push(u8::from_str_radix(hex, 16).ok().filter(|_| hex.bytes().all(|c| c.is_ascii_hexdigit()))?);
+            out.push(
+                u8::from_str_radix(hex, 16)
+                    .ok()
+                    .filter(|_| hex.bytes().all(|c| c.is_ascii_hexdigit()))?,
+            );
             i += 3;
         } else {
             out.push(b[i]);
@@ -109,17 +113,34 @@ fn handle_client(panel: &Panel, layout: &Layout, paths: &Paths, req: &mut Reques
     if s2 == "versions" && n == 3 && get {
         // loaders=1 reads every mod loader's list; fabric=1 is what pages from before it send
         let fabric = asked(req, "loaders") || asked(req, "fabric");
-        return Ok(Reply::ok(versions::list_for_picker(paths, &rules::current_os(), fabric, false, fetch)?));
+        return Ok(Reply::ok(versions::list_for_picker(
+            paths,
+            &rules::current_os(),
+            fabric,
+            false,
+            fetch,
+        )?));
     }
     // Mojang's and the loaders' lists read again now, for a release out within the hour
     if s2 == "versions" && s3.as_deref() == Some("refresh") && n == 4 && post {
-        return Ok(Reply::ok(versions::list_for_picker(paths, &rules::current_os(), false, true, fetch)?));
+        return Ok(Reply::ok(versions::list_for_picker(
+            paths,
+            &rules::current_os(),
+            false,
+            true,
+            fetch,
+        )?));
     }
     if s2 == "versions" && n == 4 && get {
         let Some(id) = decode_component(s3.as_deref().unwrap_or("")) else {
             return Err(Failure::user("the version id in the address is not valid"));
         };
-        return Ok(Reply::ok(versions::describe_version(paths, &rules::current_os(), &json!(id), fetch)?));
+        return Ok(Reply::ok(versions::describe_version(
+            paths,
+            &rules::current_os(),
+            &json!(id),
+            fetch,
+        )?));
     }
     // one mod loader's builds for one version: /api/client/loaders/<loader>/<mc>/builds
     if s2 == "loaders" && req.seg(5) == Some("builds") && n == 6 && get {
@@ -238,7 +259,8 @@ fn handle_client(panel: &Panel, layout: &Layout, paths: &Paths, req: &mut Reques
         // and crash reports to; `what` is matched against that list, never used as a path.
         ("reveal", _, true) => {
             let body = body_or_empty(req)?;
-            let (target, fell_back) = launcher::reveal_target(paths, &profile_name, opt_field(&body, "what"))?;
+            let (target, fell_back) =
+                launcher::reveal_target(paths, &profile_name, opt_field(&body, "what"))?;
             let dir = crate::manage::open_folder(&target)?;
             Ok(Reply::ok(json!({ "dir": dir, "fellBack": fell_back })))
         }
@@ -250,7 +272,11 @@ fn handle_client(panel: &Panel, layout: &Layout, paths: &Paths, req: &mut Reques
                 _ => return Err(Failure::user("send the exit's \"endedAt\"")),
             };
             let _w = writing();
-            Ok(Reply::ok(launcher::mark_exit_seen(paths, &profile_name, &ended_at)?))
+            Ok(Reply::ok(launcher::mark_exit_seen(
+                paths,
+                &profile_name,
+                &ended_at,
+            )?))
         }
         // a new name for the setup, or a second setup with this one's settings, mods and options
         ("rename" | "duplicate", _, true) => {
@@ -346,7 +372,10 @@ fn create_profile(paths: &Paths, body: &Value) -> Result<Reply, Failure> {
             server_list: server_list != json!(false),
         },
     )?;
-    Ok(Reply::ok(profile_row(paths, &profiles::get(paths, &made.name())?)?))
+    Ok(Reply::ok(profile_row(
+        paths,
+        &profiles::get(paths, &made.name())?,
+    )?))
 }
 
 /// `PATCH /api/client/profiles/<name>`: a new version, or a new loader, is checked against
@@ -364,7 +393,9 @@ fn patch_profile(paths: &Paths, name: &str, body: &Value) -> Result<Reply, Failu
         Some(v @ Value::String(_)) => Some(v.clone()),
         _ => before.get("loader").cloned(),
     };
-    if !client::strict_eq(mc.as_ref(), before.get("mc")) || !client::strict_eq(loader.as_ref(), before.get("loader")) {
+    if !client::strict_eq(mc.as_ref(), before.get("mc"))
+        || !client::strict_eq(loader.as_ref(), before.get("loader"))
+    {
         versions::check_profile_version(
             paths,
             mc.as_ref().unwrap_or(&Value::Null),
@@ -429,7 +460,10 @@ fn profile_row(paths: &Paths, p: &profiles::Profile) -> Result<Value, Failure> {
         // `{ name: value }` with value undefined is no key
         ("accountName", account.map(|_| account_name)),
         ("accountType", Some(account_type)),
-        ("accountUuid", Some(profiles::account_uuid(paths, account)?.unwrap_or(Value::Null))),
+        (
+            "accountUuid",
+            Some(profiles::account_uuid(paths, account)?.unwrap_or(Value::Null)),
+        ),
         ("assistantAccount", g("assistantAccount")),
         ("serverList", g("serverList")),
         ("running", s("running")),
@@ -460,7 +494,9 @@ fn launcher_summary(layout: &Layout, paths: &Paths) -> Result<Value, Failure> {
     let wanted = client::or_null(profiles::load(paths)?.default_account());
     let mut servers = Vec::new();
     for inst in crate::registry::list_instances(Path::new(&layout.registry_file))? {
-        let row = match super::shared::status_row(layout, &inst.name).and_then(|r| super::shared::safe_instance(&r)) {
+        let row = match super::shared::status_row(layout, &inst.name)
+            .and_then(|r| super::shared::safe_instance(&r))
+        {
             Ok(r) => r,
             Err(_) => {
                 let mut m = Map::new();
@@ -502,7 +538,10 @@ fn launcher_summary(layout: &Layout, paths: &Paths) -> Result<Value, Failure> {
         .map(|p| profile_row(paths, p))
         .collect::<Result<Vec<Value>, Failure>>()?;
     // a uuid no longer signed in is no default at all
-    let default = if accounts.iter().any(|a| client::strict_eq(a.get("uuid"), Some(&wanted))) {
+    let default = if accounts
+        .iter()
+        .any(|a| client::strict_eq(a.get("uuid"), Some(&wanted)))
+    {
         wanted
     } else {
         Value::Null

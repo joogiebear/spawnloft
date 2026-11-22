@@ -99,7 +99,9 @@ fn handle(panel: &Panel, paths: &Paths, req: &mut Request) -> Result<Reply, Fail
             let mut doc = profiles::load(paths)?;
             profiles::save(paths, &mut doc)?;
         }
-        return Ok(Reply::ok(json!({ "removed": gone, "defaultAccount": default_account(paths)? })));
+        return Ok(Reply::ok(
+            json!({ "removed": gone, "defaultAccount": default_account(paths)? }),
+        ));
     }
     Ok(Reply::method_not_allowed())
 }
@@ -113,7 +115,10 @@ fn sign_in(panel: &Panel, paths: &Paths, req: &mut Request) -> Result<Reply, Fai
         }
         // The panel is the address the browser comes back to (in the window too: the Rust
         // panel is the port the window knows). Microsoft matches localhost on any port.
-        let redirect = format!("http://localhost:{}/api/client/accounts/login/callback", panel.port);
+        let redirect = format!(
+            "http://localhost:{}/api/client/accounts/login/callback",
+            panel.port
+        );
         return Ok(match login::start_login(&redirect)? {
             login::Started::Started {
                 login_id,
@@ -133,7 +138,10 @@ fn sign_in(panel: &Panel, paths: &Paths, req: &mut Request) -> Result<Reply, Fai
         return Ok(callback_page(ok));
     }
     let login_id = req.seg(4).unwrap_or("").to_string();
-    let shaped = login_id.len() == 32 && login_id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    let shaped = login_id.len() == 32
+        && login_id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
     if !shaped {
         return Ok(Reply::error(404, "no such sign-in"));
     }

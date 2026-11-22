@@ -8,7 +8,7 @@ use std::sync::mpsc::channel;
 
 use serde_json::{Value, json};
 
-use crate::client::launch::{self, LaunchOpts, Launched, PanelOpts};
+use crate::client::launch::{self, EnsureServer, LaunchOpts, Launched, PanelOpts};
 use crate::client::paths::Paths;
 use crate::client::{install, profiles};
 use crate::failure::Failure;
@@ -40,7 +40,13 @@ fn nonempty(v: Option<&Value>) -> Option<String> {
     }
 }
 
-pub fn launch(panel: &Panel, layout: &Layout, paths: &Paths, req: &mut Request, name: &str) -> Result<Reply, Failure> {
+pub fn launch(
+    panel: &Panel,
+    layout: &Layout,
+    paths: &Paths,
+    req: &mut Request,
+    name: &str,
+) -> Result<Reply, Failure> {
     let body = body_or_empty(req)?;
     let asked = Asked {
         server_off: opt_field(&body, "server") == Some(&json!(false)),
@@ -56,8 +62,18 @@ pub fn launch(panel: &Panel, layout: &Layout, paths: &Paths, req: &mut Request, 
         v => Some(js::string(v)),
     };
     let Some(job_id) = job else {
-        let (pid, version, account, warnings) =
-            run(layout, paths, name, &asked, "panel", &|_, _| {}, &|_| {}, None)?;
+        let (pid, version, account, warnings) = run(
+            layout,
+            paths,
+            name,
+            &asked,
+            &Hear {
+                launched_by: "panel",
+                on_stage: &|_, _| {},
+                on_progress: &|_| {},
+                ensure_server: None,
+            },
+        )?;
         return Ok(Reply::ok(json!({
             "pid": pid,
             "version": version,
@@ -66,7 +82,9 @@ pub fn launch(panel: &Panel, layout: &Layout, paths: &Paths, req: &mut Request, 
         })));
     };
     if !is_job_id(&job_id) {
-        return Err(Failure::user("jobId must be 1 to 64 letters, digits, dashes or underscores"));
+        return Err(Failure::user(
+            "jobId must be 1 to 64 letters, digits, dashes or underscores",
+        ));
     }
     if panel.jobs.running(&job_id) {
         return Err(Failure::user("that job is already running"));
@@ -82,16 +100,15 @@ type Out = (u32, String, Value, Vec<String>);
 
 /// `client.launch(name, opts)`, and the game's exit heard as the Node panel hears it: the exit
 /// record and the time played are written when the game it started ends.
-fn run(
-    layout: &Layout,
-    paths: &Paths,
-    name: &str,
-    asked: &Asked,
+/// Who asked, and what hears the launch's steps.
+struct Hear<'a> {
     launched_by: &'static str,
-    on_stage: &(dyn Fn(&str, &str) + Sync),
-    on_progress: install::OnProgress<'_>,
-    ensure_server: Option<&(dyn Fn(&str) -> Result<(), Failure> + Sync)>,
-) -> Result<Out, Failure> {
+    on_stage: &'a (dyn Fn(&str, &str) + Sync),
+    on_progress: install::OnProgress<'a>,
+    ensure_server: Option<EnsureServer<'a>>,
+}
+
+fn run(layout: &Layout, paths: &Paths, name: &str, asked: &Asked, hear: &Hear<'_>) -> Result<Out, Failure> {
     let out = launch::launch_with(
         paths,
         layout,
@@ -100,16 +117,16 @@ fn run(
             player_name: None,
             account: asked.account.clone(),
             server: asked.server.clone(),
-            on_progress,
+            on_progress: hear.on_progress,
             on_warning: &|_| {},
             fake_java: launch::fake_client_java(),
         },
         &PanelOpts {
             server_off: asked.server_off,
             address: asked.address.clone(),
-            launched_by,
-            on_stage,
-            ensure_server,
+            launched_by: hear.launched_by,
+            on_stage: hear.on_stage,
+            ensure_server: hear.ensure_server,
         },
     )?;
     let Launched {
@@ -134,7 +151,7 @@ fn grouped(n: usize) -> String {
     let digits = n.to_string();
     let mut out = String::new();
     for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -144,7 +161,15 @@ fn grouped(n: usize) -> String {
 
 /// `launchJob(jobId, profileName, { startServer, ...opts })`: the launch on a thread of its own,
 /// its steps and downloads told to the job, cancellable until the game is started.
-fn launch_job(jobs: &Arc<Jobs>, layout: &Layout, paths: &Paths, id: &str, name: &str, asked: Asked, start_server: bool) {
+fn launch_job(
+    jobs: &Arc<Jobs>,
+    layout: &Layout,
+    paths: &Paths,
+    id: &str,
+    name: &str,
+    asked: Asked,
+    start_server: bool,
+) {
     // a reused id must not carry the last run's outcome into this one
     jobs.update(
         Some(id),
@@ -172,7 +197,11 @@ fn launch_job(jobs: &Arc<Jobs>, layout: &Layout, paths: &Paths, id: &str, name: 
     std::thread::spawn(move || {
         let stage = |stage: &str, message: &str| jobs.stage(Some(&id), stage, None, message);
         let progress = |p: &install::Progress| {
-            let phase = if p.phase == "harness mod" { "harness" } else { p.phase };
+            let phase = if p.phase == "harness mod" {
+                "harness"
+            } else {
+                p.phase
+            };
             // nothing fetched so far in this step: the files on disk are being checked
             let message = if p.bytes > 0.0 {
                 format!(
@@ -183,18 +212,29 @@ fn launch_job(jobs: &Arc<Jobs>, layout: &Layout, paths: &Paths, id: &str, name: 
                     crate::text::human_bytes(Some(p.bytes))
                 )
             } else {
-                format!("Checking {} · {} of {} files", p.phase, grouped(p.done), grouped(p.total))
+                format!(
+                    "Checking {} · {} of {} files",
+                    p.phase,
+                    grouped(p.done),
+                    grouped(p.total)
+                )
             };
-            let percent = (p.total > 0).then(|| (100.0f64).min((p.done as f64 / p.total as f64 * 100.0).round()));
+            let percent =
+                (p.total > 0).then(|| (100.0f64).min((p.done as f64 / p.total as f64 * 100.0).round()));
             jobs.stage(Some(&id), phase, percent, &message);
         };
         let ensure = |server: &str| start_server_for_launch(&layout, server);
         // without "Start server and launch" a stopped server is only a warning
-        let ensure_server: Option<&(dyn Fn(&str) -> Result<(), Failure> + Sync)> =
-            start_server.then_some(&ensure);
+        let ensure_server: Option<EnsureServer<'_>> = start_server.then_some(&ensure);
         let result = jobs.cancellable(Some(&id), || {
             let _ = registered.send(());
-            run(&layout, &paths, &name, &asked, "launcher", &stage, &progress, ensure_server)
+            let hear = Hear {
+                launched_by: "launcher",
+                on_stage: &stage,
+                on_progress: &progress,
+                ensure_server,
+            };
+            run(&layout, &paths, &name, &asked, &hear)
         });
         match result {
             Ok((pid, version, account, warnings)) => jobs.update(

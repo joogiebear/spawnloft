@@ -43,8 +43,11 @@ pub struct Hooks {
     pub log: Arc<dyn Fn(&str) + std::marker::Send + Sync>,
     /// Keeps the account: re-read the list, upsert this one entry by uuid, and make it the
     /// default when there is none.
-    pub save: Arc<dyn Fn(&Value) -> Result<(), Failure> + std::marker::Send + Sync>,
+    pub save: Save,
 }
+
+/// How a finished sign-in's account is kept.
+pub type Save = Arc<dyn Fn(&Value) -> Result<(), Failure> + std::marker::Send + Sync>;
 
 struct Record {
     id: String,
@@ -156,7 +159,10 @@ pub fn start_browser_login(redirect_uri: &str) -> Result<(String, String, String
 /// What [`start_login`] answers.
 #[derive(Debug)]
 pub enum Started {
-    Started { login_id: String, authorize_url: String },
+    Started {
+        login_id: String,
+        authorize_url: String,
+    },
     /// `LoginInProgress`: another sign-in's stream is still open.
     InProgress(String),
 }
@@ -198,7 +204,9 @@ pub fn start_login(redirect_uri: &str) -> Result<Started, Failure> {
         drop_record(
             &mut records(),
             &expiring,
-            Some(json!({ "status": "failed", "message": "the sign-in took longer than 10 minutes; start it again" })),
+            Some(
+                json!({ "status": "failed", "message": "the sign-in took longer than 10 minutes; start it again" }),
+            ),
         );
     });
     Ok(Started::Started {
@@ -269,7 +277,14 @@ fn callback_error(query: &[(String, String)]) -> String {
     if error == "access_denied" {
         return "the sign-in was cancelled on Microsoft's page".into();
     }
-    let said = units(get(query, "error_description").unwrap_or("").split('\n').next().unwrap_or(""), 200);
+    let said = units(
+        get(query, "error_description")
+            .unwrap_or("")
+            .split('\n')
+            .next()
+            .unwrap_or(""),
+        200,
+    );
     format!(
         "Microsoft refused the sign-in: {}",
         if said.is_empty() { error } else { &said }
@@ -313,7 +328,11 @@ pub fn handle_callback(query: &[(String, String)], hooks: &Hooks) -> Result<bool
     record.consumed = true;
     if query.iter().any(|(k, _)| k == "error") {
         let message = callback_error(query);
-        drop_record(&mut recs, &id, Some(json!({ "status": "failed", "message": message })));
+        drop_record(
+            &mut recs,
+            &id,
+            Some(json!({ "status": "failed", "message": message })),
+        );
         return Ok(true);
     }
     // Microsoft's part is over: a window closed from here on is no cancel
@@ -331,7 +350,11 @@ fn finish_failed(id: &str, message: &str) {
     if let Some(r) = recs.list.iter_mut().find(|r| r.id == id) {
         r.finished = true;
     }
-    drop_record(&mut recs, id, Some(json!({ "status": "failed", "message": message })));
+    drop_record(
+        &mut recs,
+        id,
+        Some(json!({ "status": "failed", "message": message })),
+    );
 }
 
 fn finish(id: &str, code: Option<String>, verifier: &str, redirect_uri: &str, hooks: &Hooks) {
@@ -359,7 +382,10 @@ fn finish(id: &str, code: Option<String>, verifier: &str, redirect_uri: &str, ho
         let message = match &err {
             Failure::User { message, .. } => message.clone(),
             other => {
-                (hooks.log)(&format!("sign-in: could not save the account: {}", other.message()));
+                (hooks.log)(&format!(
+                    "sign-in: could not save the account: {}",
+                    other.message()
+                ));
                 "the account could not be saved; see panel.log".into()
             }
         };
@@ -372,7 +398,11 @@ fn finish(id: &str, code: Option<String>, verifier: &str, redirect_uri: &str, ho
     if let Some(r) = recs.list.iter_mut().find(|r| r.id == id) {
         r.finished = true;
     }
-    drop_record(&mut recs, id, Some(json!({ "status": "done", "account": public })));
+    drop_record(
+        &mut recs,
+        id,
+        Some(json!({ "status": "done", "account": public })),
+    );
 }
 
 /// `finishBrowserLogin({ code, verifier, redirectUri })`: the code exchanged with the verifier
@@ -465,7 +495,9 @@ mod tests {
                 let body = match req.url.as_str() {
                     auth::TOKEN_URL => json!({ "access_token": "ms", "refresh_token": "r" }),
                     auth::XBL_URL => json!({ "Token": "x", "DisplayClaims": { "xui": [{ "uhs": "u" }] } }),
-                    auth::XSTS_URL => json!({ "Token": "xs", "DisplayClaims": { "xui": [{ "uhs": "u", "xid": "1" }] } }),
+                    auth::XSTS_URL => {
+                        json!({ "Token": "xs", "DisplayClaims": { "xui": [{ "uhs": "u", "xid": "1" }] } })
+                    }
                     auth::MC_LOGIN_URL => json!({ "access_token": "mc", "expires_in": 86400 }),
                     _ => json!({ "id": "0123456789abcdef0123456789abcdef", "name": "Mia" }),
                 };
@@ -496,7 +528,9 @@ mod tests {
         assert_eq!(verifier.len(), 43);
         assert!(url.starts_with(&format!("{AUTHORIZE_URL}?client_id=")));
         let challenge = crate::panel_auth::b64url_encode(&Sha256::digest(verifier.as_bytes()));
-        assert!(url.contains(&format!("&code_challenge={challenge}&code_challenge_method=S256&state={state}&prompt=select_account")));
+        assert!(url.contains(&format!(
+            "&code_challenge={challenge}&code_challenge_method=S256&state={state}&prompt=select_account"
+        )));
         assert!(start_browser_login("http://evil.example/api/client/accounts/login/callback").is_err());
     }
 
@@ -506,18 +540,30 @@ mod tests {
         reset();
         let saved = Arc::new(StdMutex::new(Vec::new()));
         let h = hooks(saved.clone());
-        let Started::Started { login_id, authorize_url } = start_login(URI).unwrap() else {
+        let Started::Started {
+            login_id,
+            authorize_url,
+        } = start_login(URI).unwrap()
+        else {
             panic!("refused");
         };
         let listening = listen_login(&login_id).unwrap();
         assert_eq!(listening.events.recv().unwrap(), json!({ "status": "pending" }));
         assert!(matches!(start_login(URI).unwrap(), Started::InProgress(_)));
         let state = state_of(&authorize_url);
-        let q = |pairs: &[(&str, &str)]| pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<Vec<_>>();
+        let q = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect::<Vec<_>>()
+        };
         assert!(!handle_callback(&q(&[("state", "nope")]), &h).unwrap());
         assert!(!handle_callback(&q(&[("code", "c")]), &h).unwrap());
         assert!(handle_callback(&q(&[("state", &state), ("code", "c")]), &h).unwrap());
-        assert!(!handle_callback(&q(&[("state", &state), ("code", "c")]), &h).unwrap(), "used once");
+        assert!(
+            !handle_callback(&q(&[("state", &state), ("code", "c")]), &h).unwrap(),
+            "used once"
+        );
         assert_eq!(listening.events.recv().unwrap(), json!({ "status": "finishing" }));
         let done = listening.events.recv().unwrap();
         assert_eq!(done["status"], json!("done"));
@@ -533,7 +579,11 @@ mod tests {
         let _serial = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         reset();
         let h = hooks(Arc::new(StdMutex::new(Vec::new())));
-        let Started::Started { login_id, authorize_url } = start_login(URI).unwrap() else {
+        let Started::Started {
+            login_id,
+            authorize_url,
+        } = start_login(URI).unwrap()
+        else {
             panic!("refused");
         };
         let listening = listen_login(&login_id).unwrap();

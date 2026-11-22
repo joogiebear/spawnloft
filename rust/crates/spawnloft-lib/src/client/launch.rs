@@ -1041,8 +1041,11 @@ pub struct PanelOpts<'a> {
     pub launched_by: &'static str,
     /// `onStage({ stage, message })`.
     pub on_stage: &'a (dyn Fn(&str, &str) + Sync),
-    pub ensure_server: Option<&'a (dyn Fn(&str) -> Result<(), Failure> + Sync)>,
+    pub ensure_server: Option<EnsureServer<'a>>,
 }
+
+/// Starts a stopped server and waits for it (`ensureServer(target)`).
+pub type EnsureServer<'a> = &'a (dyn Fn(&str) -> Result<(), Failure> + Sync);
 
 impl PanelOpts<'_> {
     /// A launch from the command line: none of it.
@@ -1551,11 +1554,11 @@ fn launch_locked(
         None
     } else {
         match &opts.server {
-        Some(s) => Some(s.clone()),
-        None => match profile.get("server") {
-            None | Some(Value::Null) => None,
-            Some(v) => Some(js::string(Some(v))),
-        },
+            Some(s) => Some(s.clone()),
+            None => match profile.get("server") {
+                None | Some(Value::Null) => None,
+                Some(v) => Some(js::string(Some(v))),
+            },
         }
     }
     .filter(|t| !t.is_empty());
@@ -1633,7 +1636,11 @@ fn launch_locked(
         }
         // a server this launch will start is not worth a warning
         let starts = was_stopped && extra.ensure_server.is_some();
-        warnings.extend(found.into_iter().filter(|w| !(starts && w.contains("is not running"))));
+        warnings.extend(
+            found
+                .into_iter()
+                .filter(|w| !(starts && w.contains("is not running"))),
+        );
         let server_mc = crate::plugins::mc_version_of(&instance(layout, t)?);
         let mc = js::string(profile.get("mc"));
         if let Some(smc) = server_mc.filter(|s| !s.is_empty() && *s != mc) {
@@ -1653,7 +1660,13 @@ fn launch_locked(
         (opts.on_warning)(w);
     }
 
-    let lookup = || if fake.is_some() { Lookup::Fake } else { Lookup::System };
+    let lookup = || {
+        if fake.is_some() {
+            Lookup::Fake
+        } else {
+            Lookup::System
+        }
+    };
     let join = match (&address, &target) {
         (Some(at), _) => {
             let text = extra.address.as_deref().unwrap_or("");
