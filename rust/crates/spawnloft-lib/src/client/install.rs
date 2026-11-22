@@ -1302,6 +1302,15 @@ mod tests {
         assert!(lock(&ledger).dropped.is_empty());
         // a file that fails its hash loses its line, as Node's needsFetch drops it
         std::fs::write(&lib, "abd").unwrap();
+        // the same size written in the same clock tick (Windows' is coarse) would match the line,
+        // as it would in Node: the change is dated a minute on
+        let later = std::fs::metadata(&lib).unwrap().modified().unwrap() + std::time::Duration::from_secs(60);
+        std::fs::File::options()
+            .write(true)
+            .open(&lib)
+            .unwrap()
+            .set_modified(later)
+            .unwrap();
         assert!(needs_fetch(&p, &file, &good, &json!(3), &ledger));
         assert!(lock(&ledger).dropped.contains("libraries/a.jar"));
         lock(&ledger).save(&p);
