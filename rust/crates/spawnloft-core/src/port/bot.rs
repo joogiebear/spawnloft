@@ -76,6 +76,9 @@ pub fn bot(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                     "mineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)".to_string(),
                 );
             }
+            if let Some(p) = bots::host_node_problem() {
+                problems.push(p);
+            }
             if is_true(ctx.args.get("json")) {
                 let data = json!({
                     "name": name,

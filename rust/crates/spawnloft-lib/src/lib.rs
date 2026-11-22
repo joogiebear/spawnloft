@@ -48,7 +48,6 @@ pub mod metrics;
 pub mod modrinth;
 pub mod mrpack;
 pub mod mysql;
-pub mod nodecore;
 pub mod notify;
 pub mod panel;
 pub mod panel_auth;

@@ -1,5 +1,5 @@
 {
- "about": "A start that fails, for a server and a database under each daemon: the reason, the advice and the console's last lines. The activity log is left out: the daemon's crash entry and the command's failed-start entry are written by two processes in either order, on either side.",
+ "about": "A start that fails, for a server and a database under the daemon (the steps that asked for the Node daemon now get the Rust one, and are not frozen): the reason, the advice and the console's last lines. The activity log is left out: the daemon's crash entry and the command's failed-start entry are written by two processes in either order, on either side.",
  "ignore": [
   "data/run/**",
   "data/activity.jsonl",

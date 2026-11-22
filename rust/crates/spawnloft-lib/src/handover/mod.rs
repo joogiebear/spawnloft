@@ -21,7 +21,7 @@
 //!
 //! The engines here take the 1.x side ([`Legacy`]), the scheduled tasks ([`Tasks`]) and the 2.0
 //! side ([`resume::Starter`]) as traits, so the order, the deadline and the abort path are tested
-//! on any platform with fakes; `legacy`, `tasks` and `crate::nodecore` hold the real ones.
+//! on any platform with fakes; `legacy` and `tasks` hold the real ones.
 
 pub mod api;
 pub mod cleanup;

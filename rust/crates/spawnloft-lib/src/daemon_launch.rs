@@ -1,7 +1,6 @@
-//! `daemon-launch.mjs`: which daemon supervises a server and how it is started. `SPAWNLOFT_DAEMON`,
-//! the `daemon` setting or the build's `internal-defaults.json` saying `rust` start
-//! `spawnloft-core daemon <name>`; anything else starts the Node daemon (`daemon.mjs`) on the
-//! bundled Node, as the Node supervisor does, until C10 removes it. A database's launch spec is
+//! `daemon-launch.mjs`: how a server's daemon is started: `spawnloft-core daemon <name>`, the only
+//! daemon since the Node one left with the Node core (C10; `SPAWNLOFT_DAEMON` and the `daemon`
+//! setting mean nothing now, and `doctor` says so of a leftover `"daemon": "node"`). A database's launch spec is
 //! worked out here by its engine module and handed to the Rust daemon on stdin, so no password
 //! is on disk or in a process list.
 
@@ -34,12 +33,13 @@ pub fn set_env(env: &mut Env, name: &str, value: String) {
     }
 }
 
-/// The environment the Node core runs with when `spawnloft-core` forwards to it
-/// (`runtime::prepare`): this process's, with `SPAWNLOFT_ENTRY` naming this binary and the Node
-/// variables removed. What the Node supervisor's children inherit, so ours inherit it too.
+/// The process environment an engine's launch spec is compared against (`env_delta`): this
+/// process's, with `SPAWNLOFT_ENTRY` naming this binary (as it did when the Node core ran behind
+/// it) and the Node variables removed. (The daemon itself is started without `SPAWNLOFT_ENTRY`;
+/// nothing it runs reads it.)
 fn base_value(name: &str) -> Option<String> {
     match name {
-        crate::runtime::ENTRY_ENV => std::env::current_exe()
+        crate::entry::ENTRY_ENV => std::env::current_exe()
             .ok()
             .map(|p| p.to_string_lossy().into_owned()),
         "ELECTRON_RUN_AS_NODE" | "NODE_OPTIONS" | "NODE_PATH" => None,
@@ -85,9 +85,9 @@ pub struct LaunchSpec {
 }
 
 /// The Node that runs a `.mjs` stand-in (the tests' fake JVM and engines), `process.execPath`
-/// in the Node core: the bundled Node, else `SPAWNLOFT_NODE` or `node` on PATH (runtime.rs).
+/// in the Node core: `SPAWNLOFT_NODE` or `node` on PATH, in a `test-hooks` build only.
 pub fn script_runtime() -> Result<String, Failure> {
-    crate::runtime::node()
+    crate::runtime::script_node()
         .map(|p| p.to_string_lossy().into_owned())
         .map_err(|e| Failure::user(format!("a test stand-in program needs the Node runtime: {e}")))
 }
@@ -147,31 +147,6 @@ pub fn launch_spec(layout: &Layout, inst: &Instance) -> Result<LaunchSpec, Failu
     }
 }
 
-/// `daemonChoice()`: `rust` or `node`.
-pub fn daemon_choice(settings: &Map<String, Value>) -> &'static str {
-    let said = std::env::var("SPAWNLOFT_DAEMON")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .map(Value::String)
-        .or_else(|| settings.get("daemon").filter(|v| js::truthy(Some(v))).cloned())
-        .or_else(build_default);
-    if said == Some(Value::String("rust".into())) {
-        "rust"
-    } else {
-        "node"
-    }
-}
-
-/// An internal 2.0 build's own default, `<core>/internal-defaults.json`.
-fn build_default() -> Option<Value> {
-    let dir = crate::runtime::core_dir()?;
-    let text = std::fs::read(dir.join("internal-defaults.json")).ok()?;
-    match crate::jsjson::parse(&String::from_utf8_lossy(&text)).ok()? {
-        Value::Object(m) => m.get("daemon").cloned(),
-        _ => None,
-    }
-}
-
 /// `coreBinary()`: `SPAWNLOFT_CORE_BIN`, else this binary.
 pub fn core_binary() -> String {
     match std::env::var("SPAWNLOFT_CORE_BIN").ok().filter(|v| !v.is_empty()) {
@@ -183,7 +158,7 @@ pub fn core_binary() -> String {
 }
 
 /// `rustDaemonArgs(name, { database })`. `--node` names the Node that runs a `.mjs` stand-in,
-/// when there is one.
+/// in a test build that has one.
 pub fn rust_daemon_args(layout: &Layout, name: &str, database: bool) -> Vec<String> {
     let mut args = vec![
         "daemon".to_string(),
@@ -191,7 +166,7 @@ pub fn rust_daemon_args(layout: &Layout, name: &str, database: bool) -> Vec<Stri
         "--data-root".into(),
         layout.data_root.clone(),
     ];
-    if let Ok(node) = crate::runtime::node() {
+    if let Ok(node) = crate::runtime::script_node() {
         args.push("--node".into());
         args.push(node.to_string_lossy().into_owned());
     }
@@ -201,37 +176,12 @@ pub fn rust_daemon_args(layout: &Layout, name: &str, database: bool) -> Vec<Stri
     args
 }
 
-/// The folder the Node supervisor starts daemons in: the Node core's `src`.
+/// The folder daemons start in: this binary's own, so a daemon holds no other folder open.
 pub fn daemon_cwd() -> PathBuf {
-    match crate::runtime::core_dir() {
-        Some(d) if d.join("src").is_dir() => d.join("src"),
-        _ => std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(Path::to_path_buf))
-            .unwrap_or_else(|| ".".into()),
-    }
-}
-
-/// `noteFallback(name, message)`: never silent, a line to panel.log and the server's daemon.log.
-pub fn note_fallback(layout: &Layout, name: &str, message: &str) {
-    let line = format!("[{}] daemon: {message}\n", crate::time::iso_now());
-    let roots = crate::paths::Roots::new(&layout.data_root);
-    for file in [
-        Path::new(&layout.run_dir).join("panel.log"),
-        roots.daemon_log(name),
-    ] {
-        let _ = (|| -> std::io::Result<()> {
-            if let Some(d) = file.parent() {
-                std::fs::create_dir_all(d)?;
-            }
-            use std::io::Write;
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&file)?
-                .write_all(line.as_bytes())
-        })();
-    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        .unwrap_or_else(|| ".".into())
 }
 
 #[cfg(test)]

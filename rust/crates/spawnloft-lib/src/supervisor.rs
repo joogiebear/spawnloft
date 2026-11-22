@@ -557,11 +557,9 @@ fn launch(layout: &Layout, name: &str, opts: StartOptions, launched: &mut bool) 
     Ok(out)
 }
 
-/// The spawn errors that prove nothing was launched (`FALLBACK_CODES`).
-const FALLBACK_CODES: [&str; 4] = ["ENOENT", "EACCES", "ENOEXEC", "UNKNOWN"];
-
-/// The environment the Node supervisor gives a daemon: its own (as forwarding prepared it) and
-/// `ELECTRON_RUN_AS_NODE`.
+/// The environment a daemon gets: this process's, without the machine's Node settings, and, in a
+/// `test-hooks` build only, `ELECTRON_RUN_AS_NODE`, which the Node supervisor gave it and a
+/// `.mjs` stand-in still reads (a release daemon runs none, so its server never sees it).
 fn daemon_command(program: &str, args: &[String]) -> std::process::Command {
     let mut cmd = std::process::Command::new(program);
     cmd.args(args)
@@ -569,7 +567,9 @@ fn daemon_command(program: &str, args: &[String]) -> std::process::Command {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     crate::runtime::prepare(&mut cmd);
-    cmd.env("ELECTRON_RUN_AS_NODE", "1");
+    if cfg!(feature = "test-hooks") {
+        cmd.env("ELECTRON_RUN_AS_NODE", "1");
+    }
     crate::platform::detach(&mut cmd);
     cmd
 }
@@ -584,39 +584,9 @@ fn reap(mut child: std::process::Child) -> u32 {
     pid
 }
 
-fn spawn_node_daemon(name: &str) -> Result<u32, Failure> {
-    let node = crate::runtime::node().map_err(|e| {
-        Failure::user(format!(
-            "\"{name}\" could not start: the Node daemon needs the Node runtime ({e})"
-        ))
-    })?;
-    let script = daemon_launch::daemon_cwd().join("daemon.mjs");
-    // without the Node core there is nothing to run: say so now, not after the 15 s wait
-    if !script.is_file() {
-        return Err(Failure::user(format!(
-            "\"{name}\" could not start: the Node daemon is not installed ({} is missing)",
-            script.display()
-        )));
-    }
-    let mut cmd = daemon_command(
-        &node.to_string_lossy(),
-        &[script.to_string_lossy().into_owned(), name.to_string()],
-    );
-    cmd.stdin(std::process::Stdio::null());
-    let child = cmd
-        .spawn()
-        .map_err(|e| Failure::io(&e, &format!("spawn {}", node.display()), None))?;
-    Ok(reap(child))
-}
-
-/// `spawnDaemon(name, inst, database)`: the Node or the Rust daemon. A Rust binary that could
-/// not be run at all falls back to the Node daemon with a logged line; once it ran, its failures
-/// are its own.
+/// `spawnDaemon(name, inst, database)`: `spawnloft-core daemon <name>`, with a database's launch
+/// spec on its stdin.
 fn spawn_daemon(layout: &Layout, name: &str, inst: &Instance, database: bool) -> Result<u32, Failure> {
-    let (settings, _) = crate::settings::load();
-    if daemon_launch::daemon_choice(&settings) != "rust" {
-        return spawn_node_daemon(name);
-    }
     let bin = daemon_launch::core_binary();
     // worked out before the spawn, so a missing engine fails the start with its own message
     let spec = if database {
@@ -632,33 +602,12 @@ fn spawn_daemon(layout: &Layout, name: &str, inst: &Instance, database: bool) ->
     } else {
         std::process::Stdio::null()
     });
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => {
-            let (code, _) = crate::jspath::error_code(&e);
-            // libuv's names where the generic mapping has none: ENOEXEC on Unix; on Windows
-            // EFTYPE for a file that is not a program (193) or not for this machine (216), which
-            // Node does not fall back on either
-            let code = match e.raw_os_error() {
-                Some(8) if cfg!(unix) => "ENOEXEC",
-                Some(193 | 216) if cfg!(windows) => "EFTYPE",
-                _ => code,
-            };
-            if !FALLBACK_CODES.contains(&code) {
-                return Err(Failure::user(format!(
-                    "\"{name}\" could not start: the Rust daemon at {bin} could not be run (spawn {bin} {code})"
-                )));
-            }
-            daemon_launch::note_fallback(
-                layout,
-                name,
-                &format!(
-                    "SPAWNLOFT_DAEMON=rust, but {bin} could not be run ({code}); started the Node daemon instead"
-                ),
-            );
-            return spawn_node_daemon(name);
-        }
-    };
+    let mut child = cmd.spawn().map_err(|e| {
+        let (code, _) = crate::jspath::error_code(&e);
+        Failure::user(format!(
+            "\"{name}\" could not start: the daemon at {bin} could not be run (spawn {bin} {code})"
+        ))
+    })?;
     if let (Some(spec), Some(mut stdin)) = (spec, child.stdin.take()) {
         use std::io::Write;
         let _ = stdin.write_all(spec.as_bytes());

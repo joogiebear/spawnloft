@@ -1,5 +1,5 @@
-//! The per-server daemon (R1): `spawnloft-core daemon <name>`, spawned detached by the Node
-//! supervisor in place of `daemon.mjs` when `SPAWNLOFT_DAEMON=rust`. It owns the server process,
+//! The per-server daemon (R1): `spawnloft-core daemon <name>`, spawned detached by the
+//! supervisor (supervisor.rs), the only daemon since the Node one left in C10. It owns the server process,
 //! mirrors its output into `console.log`, serves the control channel (ping, send, stop, kill),
 //! writes `state.json`, samples `metrics.log`, and relaunches after a crash under the crash guard.
 //!

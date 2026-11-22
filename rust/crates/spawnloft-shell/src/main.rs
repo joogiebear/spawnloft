@@ -190,7 +190,7 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Where the bundle puts the core binary and the Node core: `<exe dir>/resources` on Windows and
+/// Where the bundle puts the core binary: `<exe dir>/resources` on Windows and
 /// Linux, as 1.x does; `Contents/Resources/resources` in a macOS `.app` (Tauri's resource dir).
 fn resources_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
@@ -211,14 +211,6 @@ fn core_binary() -> Option<PathBuf> {
         "spawnloft-core"
     };
     Some(resources_dir()?.join("bin").join(name))
-}
-
-/// The Node core (`mcctl.mjs`, `spawnloft.mjs`, `src/`): `SPAWNLOFT_CORE_DIR`, then the bundled copy.
-fn core_dir() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("SPAWNLOFT_CORE_DIR").filter(|p| !p.is_empty()) {
-        return Some(PathBuf::from(p));
-    }
-    Some(resources_dir()?.join("core"))
 }
 
 /// After a 1.x handover whose resume never ran (installer closed, power lost; design 2.5): the
@@ -267,15 +259,14 @@ fn retry_core(app: &tauri::AppHandle) {
 }
 
 pub(crate) fn start_core(app: tauri::AppHandle) {
-    let (Some(bin), Some(dir)) = (core_binary(), core_dir()) else {
+    let Some(bin) = core_binary() else {
         cannot_start(&app, "this installation has no core program (resources/bin)");
         return;
     };
     let mut cmd = Command::new(&bin);
-    // the core's stderr, and the Node panel's under it, go where `doctor` already looks
+    // the core's stderr goes where `doctor` already looks
     let stderr = local::panel_log().map_or_else(Stdio::null, Stdio::from);
-    cmd.args(["ui", "--port", "0", "--exit-with-stdin", "--core-dir"])
-        .arg(&dir)
+    cmd.args(["ui", "--port", "0", "--exit-with-stdin"])
         .env("SPAWNLOFT_SHELL", "tauri")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -438,8 +429,8 @@ fn message_box(title: &str, text: &str) {
 
 /// `SpawnLoft.exe <path ending in mcctl.mjs or spawnloft.mjs> <command...>`: what 1.x task shims,
 /// server launchers and MCP configs run (with ELECTRON_RUN_AS_NODE, ignored here). Forwarded to
-/// `spawnloft-core <command...>`, the install's one entry point, which runs it on the bundled
-/// Node; `None` when the command line is not that form. The first `repair` rewrites those files
+/// `spawnloft-core <command...>`, the install's one entry point (the `.mjs` argument is dropped,
+/// never run); `None` when the command line is not that form. The first `repair` rewrites those files
 /// to name `spawnloft-core` directly (RUNTIME_FORMAT 2), so this form only carries the time
 /// between the handover and that repair, and MCP configs a user copied from 1.x.
 fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
@@ -467,7 +458,7 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
 }
 
 /// The forwarded core in a kill-on-close job on Windows (a killed `SpawnLoft.exe` takes the core
-/// and its Node with it; PLAN-2.0-REMAINING.md A6), a plain child elsewhere. A release
+/// with it; PLAN-2.0-REMAINING.md A6), a plain child elsewhere. A release
 /// `SpawnLoft.exe` has no console, so the core is started without a window: otherwise every
 /// launch of a 1.x MCP config (Claude Desktop starts one at each sign-in) or task shim opened a
 /// terminal window that stayed until the command ended.

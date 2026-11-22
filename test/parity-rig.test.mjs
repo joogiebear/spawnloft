@@ -143,14 +143,14 @@ test('the comparison reports output, exit code, requests and tree differences', 
   assert.deepEqual(compareSides(side(), side({ steps: [] })).map(d => d.detail), ['ran on one side only'])
 })
 
-test('each side runs in the scratch folder, with the switch on the Node side only', () => {
+test('a side runs in the scratch folder, on the Rust daemon, with no switch', () => {
   const ctx = { run: '/s/run', data: '/s/run/data', home: '/s/run/home', repo: '/repo' }
   process.env.SPAWNLOFT_DATA_ROOT_LEAK_CHECK = 'x'
-  const node = sideEnv(ctx, 'node', { origins: null })
+  const node = sideEnv(ctx, 'rust', { origins: null })
   const rust = sideEnv(ctx, 'rust', { origins: '{"https://a.b":"http://127.0.0.1:1"}', extra: { FOO: 'bar', HOME: null } })
   delete process.env.SPAWNLOFT_DATA_ROOT_LEAK_CHECK
-  assert.equal(node.SPAWNLOFT_CORE_IMPL, 'node')
   assert.equal('SPAWNLOFT_CORE_IMPL' in rust, false)
+  assert.equal(rust.SPAWNLOFT_DAEMON, 'rust')
   assert.equal(node.SPAWNLOFT_DATA_ROOT_LEAK_CHECK, undefined, 'the machine\'s own SPAWNLOFT_ variables never reach a side')
   assert.equal(node.SPAWNLOFT_DATA_ROOT, '/s/run/data')
   assert.equal(node.MCCTL_DATA_ROOT, '/s/run/data')

@@ -22,8 +22,10 @@ pub fn needs_setup() -> bool {
 /// `getSetup()`.
 pub fn get_setup() -> Result<Value, crate::failure::Failure> {
     let (saved, _) = settings::load();
-    let core_dir = crate::nodecore::core_dir()
-        .map(|p| p.to_string_lossy().into_owned())
+    // the core's own folder: no Node core ships
+    let core_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_string_lossy().into_owned()))
         .unwrap_or_default();
     Ok(json!({
         "needed": needs_setup(),

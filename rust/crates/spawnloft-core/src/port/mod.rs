@@ -1,7 +1,7 @@
-//! The SpawnLoft command line in Rust: the commands the core port has moved from the Node core
-//! (`cli::PORTED`), answered as `mcctl.mjs` answers them. `run` is `main()` of mcctl.mjs for
-//! those commands: the same settings warning, the same order of checks, the same `--json`
-//! envelope and exit codes (0, 1 for a failed operation, 2 for a usage error).
+//! The SpawnLoft command line in Rust: every command the Node core's `mcctl.mjs` answered,
+//! answered as it answered them (it left in C10). `run` is `main()` of mcctl.mjs: the same
+//! settings warning, the same order of checks, the same `--json` envelope and exit codes (0, 1
+//! for a failed operation, 2 for a usage error).
 //!
 //! C1 (rust/PLAN-CORE-PORT.md section 4) moved the read-only group: `help`, `list`, `status`,
 //! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,
@@ -71,6 +71,69 @@ fn query_alias(command: &str) -> Option<&'static str> {
     })
 }
 
+/// Every name `COMMANDS` in mcctl.mjs answers.
+const COMMANDS: &[&str] = &[
+    "list",
+    "ls",
+    "status",
+    "start",
+    "stop",
+    "restart",
+    "kill",
+    "logs",
+    "log",
+    "cmd",
+    "rcon",
+    "send",
+    "console",
+    "attach",
+    "players",
+    "new",
+    "clone",
+    "adopt",
+    "rm",
+    "remove",
+    "set",
+    "props",
+    "backup",
+    "snapshot",
+    "snapshots",
+    "backups",
+    "restore",
+    "prune",
+    "verify",
+    "templates",
+    "template",
+    "jars",
+    "paper",
+    "config",
+    "data",
+    "rename",
+    "rebuild",
+    "reveal",
+    "open",
+    "plugins",
+    "upgrade",
+    "pack",
+    "worlds",
+    "why",
+    "diagnostics",
+    "diag",
+    "metrics",
+    "launchers",
+    "ui",
+    "panel",
+    "task",
+    "doctor",
+    "repair",
+    "db",
+    "mcp",
+    "bot",
+    "client",
+    "uninstall",
+    "help",
+];
+
 /// The commands whose own handler takes `--json` (mcctl.mjs main).
 const JSON_HANDLERS: &[&str] = &[
     "backup", "snapshot", "doctor", "repair", "metrics", "data", "bot", "diag", "client",
@@ -136,6 +199,12 @@ fn dispatch(
         }
         Some(c) => c,
     };
+    // mcctl.mjs looks the handler up first: an unknown command is that, with or without --json
+    if !COMMANDS.contains(&command) {
+        return Err(Failure::usage(format!(
+            "Unknown command \"{command}\". Run \"spawnloft help\" for usage."
+        )));
+    }
     if parsed.get("csv").is_some() && command != "metrics" {
         return Err(Failure::usage("--csv is supported only for metrics"));
     }
