@@ -87,7 +87,7 @@ export const DECLARED = [
     id: 'runtime-pattern-syntax',
     // C1 added the last three: a lone surrogate escape cannot be a Rust char, a count beyond
     // 2^32 cannot be a Rust repetition, and the crate caps a pattern's compiled size and nesting
-    where: 'a run-time pattern using lookaround, a backreference, a lone surrogate escape (`\\uD83D`), a repetition count beyond 2^32, or more than the matcher\'s size or nesting allows (`logs --grep`, MCP `get_logs`, bot scenarios)',
+    where: 'a run-time pattern using lookaround, a backreference, a lone surrogate escape (`\\uD83D`), a repetition count beyond 2^32, or more than the matcher\'s size or nesting allows (`logs --grep`, MCP `get_logs`; not bot scenarios, whose patterns the host matches in JavaScript)',
     node: 'accepted',
     rust: 'refused with a clear message',
     apply: null,

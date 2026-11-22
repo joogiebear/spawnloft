@@ -407,9 +407,9 @@ fn regexp_error(source: &str, flags: &str) -> Option<String> {
         Err(jsregex::PatternError::Invalid(why)) => Some(format!(
             "Invalid regular expression: /{source}/{flags}: regex parse error: {why}"
         )),
-        Err(jsregex::PatternError::Unsupported(what)) => Some(format!(
-            "the pattern /{source}/{flags} uses {what}, which SpawnLoft cannot run; write the pattern another way"
-        )),
+        // valid JavaScript the core's matcher cannot run (lookaround, a backreference): the
+        // host matches in JavaScript, so it is accepted as Node accepts it
+        Err(jsregex::PatternError::Unsupported(_)) => None,
     }
 }
 
@@ -1295,11 +1295,17 @@ mod tests {
                 "step 1: \"present\" is not a valid regular expression: Invalid regular expression: /[/: "
             )
         );
-        // lookaround is the declared refusal (runtime-pattern-syntax)
-        assert!(
-            step_refusal(json!([{ "bot": "alice", "expectMessage": "/a(?=b)/" }]))
-                .contains("which SpawnLoft cannot run")
-        );
+        // lookaround and backreferences pass the check: the host matches in JavaScript
+        for pattern in ["/a(?=b)/", "/(?<!x)y/", "/(a)\\1/"] {
+            assert!(
+                validate_scenario(
+                    &with(json!({ "steps": [{ "bot": "alice", "expectMessage": pattern }] })),
+                    None
+                )
+                .is_ok(),
+                "{pattern}"
+            );
+        }
         let ok = with(json!({ "steps": [
             { "bot": "alice", "expectMessage": "/hello/i" },
             { "bot": "alice", "expectMessage": "/a/b/dimsu" },
