@@ -187,7 +187,12 @@ fn gui_fallback_dirs() -> Vec<PathBuf> {
         if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
             let mut versions: Vec<(Vec<u32>, PathBuf)> = entries
                 .flatten()
-                .map(|e| (version_key(&e.file_name().to_string_lossy()), e.path().join("bin")))
+                .map(|e| {
+                    (
+                        version_key(&e.file_name().to_string_lossy()),
+                        e.path().join("bin"),
+                    )
+                })
                 .collect();
             versions.sort();
             dirs.extend(versions.into_iter().rev().map(|(_, dir)| dir));
@@ -246,7 +251,11 @@ mod tests {
 
     #[test]
     fn nvm_versions_sort_by_number() {
-        let mut v = [version_key("v9.11.2"), version_key("v22.1.0"), version_key("v18.20.4")];
+        let mut v = [
+            version_key("v9.11.2"),
+            version_key("v22.1.0"),
+            version_key("v18.20.4"),
+        ];
         v.sort();
         assert_eq!(v.last().unwrap(), &vec![22, 1, 0]);
     }
