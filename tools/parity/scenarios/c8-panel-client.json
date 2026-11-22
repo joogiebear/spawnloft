@@ -220,6 +220,10 @@
    "replace": "\"size\": <n>,$1"
   },
   {
+   "pattern": "pid \\d+",
+   "replace": "pid <pid>"
+  },
+  {
    "pattern": "\"(totalMemory|freeMemory)\": \\d+",
    "replace": "\"$1\": <n>"
   }
@@ -926,6 +930,297 @@
     }
    ],
    "own": true
+  },
+  {
+   "write": "data/client/accounts.json",
+   "mode": "600",
+   "json": {
+    "version": 1,
+    "accounts": [
+     {
+      "type": "microsoft",
+      "name": "Mia",
+      "uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+      "accessToken": "mia-token",
+      "refreshToken": "mia-refresh",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "xuid": "123",
+      "clientId": "cid"
+     },
+     {
+      "type": "offline",
+      "name": "Alex",
+      "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+     }
+    ]
+   }
+  },
+  {
+   "write": "data/client/profiles.json",
+   "json": {
+    "version": 1,
+    "defaultAccount": "aaaaaaaa-1111-2222-3333-444444444444",
+    "profiles": {
+     "p1": {
+      "mc": "1.21.11",
+      "loader": "vanilla",
+      "loaderVersion": null,
+      "java": null,
+      "memory": "1G",
+      "harness": false,
+      "server": null,
+      "account": null
+     },
+     "ms": {
+      "mc": "1.21.11",
+      "memory": "2G",
+      "account": "Mia",
+      "server": "s1"
+     },
+     "old": {
+      "mc": "1.21.11",
+      "account": "offline:Zed"
+     }
+    }
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {}
+    },
+    {
+     "get": "/api/client/profiles/p1/status"
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "jx"
+     }
+    },
+    {
+     "get": "/api/jobs/jx/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/stop"
+    },
+    {
+     "get": "/api/client/profiles",
+     "waitMs": 800
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "bad id"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    },
+    {
+     "post": "/api/client/profiles/nope/launch",
+     "json": {
+      "jobId": "j0"
+     }
+    },
+    {
+     "post": "/api/client/profiles/nope/launch",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "address": "example.net",
+      "server": "s1"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j1",
+      "server": "s1"
+     }
+    },
+    {
+     "get": "/api/jobs/j1/stream",
+     "waitMs": 2000,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/profiles/p1/status"
+    },
+    {
+     "post": "/api/client/profiles/p1/stop"
+    },
+    {
+     "post": "/api/client/profiles/ms/launch",
+     "json": {
+      "jobId": 5
+     }
+    },
+    {
+     "get": "/api/jobs/5/stream",
+     "waitMs": 2000,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/launcher"
+    },
+    {
+     "post": "/api/client/profiles/ms/stop"
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j3",
+      "address": "nowhere.invalid"
+     }
+    },
+    {
+     "get": "/api/jobs/j3/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j4",
+      "account": "Nobody"
+     }
+    },
+    {
+     "get": "/api/jobs/j4/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j5",
+      "address": "bad_host:1"
+     }
+    },
+    {
+     "get": "/api/jobs/j5/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/old/launch",
+     "json": {
+      "server": false,
+      "account": "offline:Kid"
+     }
+    },
+    {
+     "get": "/api/client/profiles/old/status"
+    },
+    {
+     "post": "/api/client/profiles/old/stop"
+    },
+    {
+     "post": "/api/client/profiles/old/launch",
+     "json": {
+      "address": "127.0.0.1:25599",
+      "jobId": "j6"
+     }
+    },
+    {
+     "get": "/api/jobs/j6/stream",
+     "waitMs": 2000,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/profiles/old/status"
+    },
+    {
+     "post": "/api/client/profiles/old/stop"
+    },
+    {
+     "post": "/api/jobs/j6/cancel"
+    },
+    {
+     "post": "/api/jobs/zz/cancel"
+    },
+    {
+     "get": "/api/client/profiles",
+     "waitMs": 800
+    }
+   ],
+   "own": true,
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "c1"
+     }
+    },
+    {
+     "get": "/api/jobs/c1/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/profiles/p1/status",
+     "waitMs": 1000
+    },
+    {
+     "get": "/api/client/profiles"
+    },
+    {
+     "post": "/api/client/profiles/p1/log"
+    },
+    {
+     "get": "/api/client/profiles/p1/log"
+    }
+   ],
+   "own": true,
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs",
+    "FAKE_CLIENT_FAIL": "window"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "status",
+    "p1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
   }
  ]
 }

@@ -39,9 +39,6 @@ pub fn route(panel: &Panel, layout: &Layout, req: &mut Request) -> Result<Routed
     if req.seg(2) == Some("accounts") {
         return accounts::route(panel, &paths, req);
     }
-    if req.seg.len() == 5 && req.seg(2) == Some("profiles") && req.seg(4) == Some("launch") && req.method == "POST" {
-        return Ok(Routed::NotPorted);
-    }
     handle_client(panel, layout, &paths, req).map(Routed::Reply)
 }
 
