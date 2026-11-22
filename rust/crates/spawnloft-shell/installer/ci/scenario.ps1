@@ -403,10 +403,11 @@ switch ($Name) {
     Check "2.x a installs (exit 0)" ($run.code -eq 0) "exit $($run.code)"
     Kill-Everything
     $dataRoot = Use-Layout 'new'
-    # a server made by 2.0 (its registry, through the checkout's Node core on the harness's Node)
+    # a server in 2.0's registry, written through the 1.x core's source (CORE_1X) on the harness's
+    # Node: the same instances.json 2.0 writes
     $spec = @{ servers = @(@{ name = 'live' }); databases = @(); fixtures = $fixtures } | ConvertTo-Json -Depth 4
     Set-Content (Join-Path $env:RUNNER_TEMP 'seed2.json') $spec
-    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", $script:checkoutCore, (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
+    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", $script:core1x, (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
     Check 'seeded through 2.0' ($r.code -eq 0) "$($r.out)$($r.err)"
     $seed = ($r.out.Trim() -split "`n")[-1] | ConvertFrom-Json
     Cli2 @('task', 'add', 'live', '--do', 'backup', '--daily', '03:00') | Out-Null
@@ -487,8 +488,8 @@ switch ($Name) {
     Check '2.x installs (exit 0)' ($run.code -eq 0) "exit $($run.code)"
     # the install puts resources\bin on the user PATH (user_path.rs), once
     Check '  resources\bin on the user PATH once' ((User-Path-Count "$inst\resources\bin") -eq 1) (Reg 'HKCU:\Environment' 'Path')
-    # from a folder of its own: cmd.exe looks in the current folder before PATH, and the checkout's
-    # root holds the source tree's spawnloft.cmd (which runs a node from PATH)
+    # from a folder of its own: cmd.exe looks in the current folder before PATH, so nothing in the
+    # folder the job runs in can answer for the installed spawnloft.cmd
     Push-Location $env:RUNNER_TEMP
     try {
       $r = Run-Captured "$env:WINDIR\System32\cmd.exe" @('/d', '/c', 'spawnloft', '--version') 60 @{ PATH = "$([Environment]::ExpandEnvironmentVariables((Reg 'HKCU:\Environment' 'Path')));$env:WINDIR\System32" }
@@ -498,7 +499,7 @@ switch ($Name) {
     $dataRoot = Use-Layout 'new'
     $spec = @{ servers = @(@{ name = 'keep' }); databases = @(); fixtures = $fixtures } | ConvertTo-Json -Depth 4
     Set-Content (Join-Path $env:RUNNER_TEMP 'seed2.json') $spec
-    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", $script:checkoutCore, (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
+    $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", $script:core1x, (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
     Check 'seeded through 2.0' ($r.code -eq 0) "$($r.out)$($r.err)"
     $seed = ($r.out.Trim() -split "`n")[-1] | ConvertFrom-Json
     Cli2 @('task', 'add', 'keep', '--do', 'backup', '--daily', '03:00') | Out-Null

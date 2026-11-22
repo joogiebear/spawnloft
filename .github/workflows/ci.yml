@@ -1,6 +1,7 @@
 # The other half of verify-build.mjs's complaint that "there is no CI on this repository".
-# This runs what can run without secrets: the test suite and a CLI smoke check. Building,
-# signing and publishing stay on the release machine - the signing profile lives there.
+# This runs what can run without secrets: the Node test suite (the packaging, release and panel
+# page tests; the core is Rust, checked by rust-internal.yml). Building, signing and publishing
+# stay on the release machine - the signing profile lives there.
 name: ci
 
 on:
@@ -47,8 +48,8 @@ jobs:
           esac
 
   test:
-    # Windows has its own scheduler (schtasks), control channel (a named pipe), paths (drive
-    # letters) and process table, none of which the Linux job below exercises.
+    # Windows has its own paths (drive letters), shells and line endings, which the Linux job
+    # below does not exercise.
     # A draft pull request runs only the Linux tests, so a long-running branch gets a quick check
     # without the Windows job until it is marked ready for review.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -60,16 +61,10 @@ jobs:
           node-version: 22
       - name: Test
         run: npm test
-      - name: Smoke-check the CLI
-        run: |
-          node mcctl.mjs help
-          node mcctl.mjs list
 
-  # Linux is a platform SpawnLoft ships for, with code of its own that only runs here: the
-  # systemd scheduler's unit files, /proc sampling against a live process, the zip reader and
-  # writer checked against Python's, process-group kills, and unix socket path limits. Both
-  # jobs count; neither stands in for the other. The job keeps its name because branch
-  # protection on main requires a check called test-linux.
+  # Linux is a platform SpawnLoft ships for, with packaging of its own (the .deb and .rpm, the
+  # CLI package). Both jobs count; neither stands in for the other. The job keeps its name
+  # because branch protection on main requires a check called test-linux.
   test-linux:
     # GitHub-hosted: the repository is public, so hosted minutes are free. Node 22 and 24 run as
     # steps of one job, so they never overlap on ports and sockets.
@@ -81,12 +76,6 @@ jobs:
           node-version: 22
       - name: Test
         run: npm test
-      - name: Smoke-check the CLI
-        run: |
-          node mcctl.mjs help
-          node mcctl.mjs list
-          # The checkout's shell entry point: present, executable, and with LF line endings.
-          ./spawnloft config
       # The tools and the other workflows run on .node-version (Node 24), and Node 24 is not Node 22:
       # it names its main thread, which is what `ps` reports as the process name, and that alone
       # once made every server ORPHANED. Nothing in this job noticed, because this job only ran 22.

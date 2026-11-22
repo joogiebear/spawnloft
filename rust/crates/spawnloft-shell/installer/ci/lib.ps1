@@ -15,9 +15,12 @@ $script:failures = 0
 # the harness's own Node (setup-node), by full path: seeding and list.mjs run on it; nothing of
 # 2.0 may (the scenarios hide every other Node from 2.0, see Set-NodeMode)
 $script:harnessNode = (Get-Command node).Source
-# the checkout's Node core (src\), which the harness's own readers import: 2.0 ships none
-# (rust/PLAN-CORE-PORT.md 5.1), and its registry and state files are the same as 2.0's
-$script:checkoutCore = $env:GITHUB_WORKSPACE
+# a 1.x Node core's source (src\ beside mcctl.mjs and package.json), which the harness's own
+# readers and seeder import on the harness's Node: the checkout has none since C10, and 2.0 ships
+# none (rust/PLAN-CORE-PORT.md 5.1). installer.yml unpacks the v1.6.0-beta.413 tag's, the build
+# the -Beta setup installs, and names it in CORE_1X. Its registry, data root and readState are the
+# ones 2.0 keeps (test/fixtures/contracts), so its view of 2.0's files is 2.0's own.
+$script:core1x = $env:CORE_1X
 $script:nodeMode = 'none'
 $script:decoyLog = Join-Path $env:RUNNER_TEMP 'decoy-node.log'
 
@@ -28,6 +31,7 @@ function Start-Scenario($name) {
   # the fixtures live outside the install folder and the data root, at a path both 1.x and 2.0
   # daemons can run them from
   New-Item -ItemType Directory -Force -Path $fixtures | Out-Null
+  if (-not $script:core1x -or -not (Test-Path (Join-Path $script:core1x 'src\registry.mjs'))) { throw "CORE_1X does not name a 1.x core's source: '$($env:CORE_1X)'" }
   # the JVM stand-in is native (spawnloft-fakes' fake-java, which installer.yml builds and names
   # in FAKE_JAVA_EXE): 1.x's daemon and 2.0's both run it as they run a real java, where a
   # release 2.0 core runs no .mjs stand-in
@@ -227,10 +231,10 @@ function Cli2([string[]] $cliArgs, [switch] $AllowFail) {
   $r
 }
 
-# 2.0's view (readState of the checkout's Node core, run on the harness's Node, over the same
-# files 2.0 writes: orphaned and stale included)
+# 2.0's view (readState of the 1.x core's source in CORE_1X, run on the harness's Node, over the
+# same files 2.0 writes: orphaned and stale included)
 function Status2 {
-  Parse-List (Run-Captured $script:harnessNode @("$PSScriptRoot\list.mjs", $script:checkoutCore) 120)
+  Parse-List (Run-Captured $script:harnessNode @("$PSScriptRoot\list.mjs", $script:core1x) 120)
 }
 
 # `spawnloft list --json` the way a person runs it in a terminal: the 1.x path's spawnloft.cmd
