@@ -4,7 +4,8 @@
 //! machine's own Node, and in a `test-hooks` build so do the tests' `.mjs` stand-ins (the fake
 //! JVM and engines).
 //!
-//! Which Node: the `bot.node` setting (`{"bot": {"node": "<path>"}}`) when it names one, else
+//! Which Node: the `bot.node` setting (`{"bot": {"node": "<path>"}}`, or the flat
+//! `{"bot.node": "<path>"}`; a full path) when it names one, else
 //! `SPAWNLOFT_NODE`, else the first `node` on PATH (then the places a GUI-started app misses on
 //! macOS). The bot host also needs it to be recent enough for mineflayer ([`checked_node`]).
 
@@ -14,12 +15,13 @@ use std::process::{Command, Stdio};
 /// The oldest Node major mineflayer runs on (its `engines`, and minecraft-protocol's).
 pub const MIN_NODE_MAJOR: u32 = 22;
 
-/// The `bot.node` setting, when it is a non-empty string.
+/// The `bot.node` setting, when it is a non-empty string: nested under `bot`, or the flat key.
 fn setting_node() -> Option<PathBuf> {
     let (settings, _) = crate::settings::load();
     settings
         .get("bot")
         .and_then(|b| b.get("node"))
+        .or_else(|| settings.get("bot.node"))
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(PathBuf::from)
@@ -43,6 +45,14 @@ pub fn node_with(
     on_path: Option<PathBuf>,
 ) -> Result<PathBuf, String> {
     if let Some(p) = setting {
+        // a bare name would resolve against whatever folder this process started in (a
+        // terminal's, a task's, the MCP client's)
+        if !p.is_absolute() {
+            return Err(format!(
+                "the bot.node setting names {}; give the full path to the node program",
+                p.display()
+            ));
+        }
         return if p.is_file() {
             Ok(p)
         } else {
@@ -78,18 +88,7 @@ pub fn major_of(version: &str) -> Option<u32> {
 /// Returns the path and the version it gave.
 pub fn checked_node() -> Result<(PathBuf, String), String> {
     let node = node()?;
-    let mut cmd = Command::new(&node);
-    cmd.arg("--version").stdin(Stdio::null()).stderr(Stdio::null());
-    prepare(&mut cmd);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000);
-    }
-    let out = cmd
-        .output()
-        .map_err(|e| format!("{} could not be run: {e}", node.display()))?;
-    let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let version = version_of(&node)?;
     match major_of(&version) {
         Some(major) if major >= MIN_NODE_MAJOR => Ok((node, version)),
         Some(_) => Err(format!(
@@ -98,6 +97,56 @@ pub fn checked_node() -> Result<(PathBuf, String), String> {
         )),
         None => Err(format!("{} did not say which Node.js it is", node.display())),
     }
+}
+
+/// How long `node --version` may take before the program is taken not to be Node.
+const VERSION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// What `<node> --version` prints, read with a time limit (doctor and `bot check` run this on
+/// whatever the setting names) and at most 4 KB of it.
+fn version_of(node: &std::path::Path) -> Result<String, String> {
+    use std::io::Read;
+    let mut cmd = Command::new(node);
+    cmd.arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    prepare(&mut cmd);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("{} could not be run: {e}", node.display()))?;
+    let stdout = child.stdout.take();
+    let reader = std::thread::spawn(move || {
+        let mut text = String::new();
+        if let Some(out) = stdout {
+            let _ = out.take(4096).read_to_string(&mut text);
+        }
+        text
+    });
+    let until = std::time::Instant::now() + VERSION_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if std::time::Instant::now() < until => {
+                std::thread::sleep(std::time::Duration::from_millis(20))
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "{} did not answer --version within {} seconds",
+                    node.display(),
+                    VERSION_TIMEOUT.as_secs()
+                ));
+            }
+        }
+    }
+    Ok(reader.join().unwrap_or_default().trim().to_string())
 }
 
 /// What every Node started by this binary gets: none of the machine's own Node settings
@@ -134,14 +183,25 @@ fn gui_fallback_dirs() -> Vec<PathBuf> {
     ];
     if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
         dirs.push(home.join(".volta/bin"));
-        // nvm keeps one folder per version: the newest name first
+        // nvm keeps one folder per version (`v22.11.0`): the newest version first, by number
         if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
-            let mut versions: Vec<PathBuf> = entries.flatten().map(|e| e.path().join("bin")).collect();
+            let mut versions: Vec<(Vec<u32>, PathBuf)> = entries
+                .flatten()
+                .map(|e| (version_key(&e.file_name().to_string_lossy()), e.path().join("bin")))
+                .collect();
             versions.sort();
-            dirs.extend(versions.into_iter().rev());
+            dirs.extend(versions.into_iter().rev().map(|(_, dir)| dir));
         }
     }
     dirs
+}
+
+/// `v22.11.0` as `[22, 11, 0]`, for sorting nvm's folders by version rather than by name.
+fn version_key(name: &str) -> Vec<u32> {
+    name.trim_start_matches('v')
+        .split('.')
+        .map(|p| p.parse().unwrap_or(0))
+        .collect()
 }
 
 #[cfg(test)]
@@ -176,6 +236,35 @@ mod tests {
         );
         let e = node_with(None, None, None).unwrap_err();
         assert!(e.contains("Node.js 22 or later"), "{e}");
+    }
+
+    #[test]
+    fn a_relative_setting_is_refused() {
+        let e = node_with(Some("node".into()), None, Some("/x/path-node".into())).unwrap_err();
+        assert!(e.contains("full path"), "{e}");
+    }
+
+    #[test]
+    fn nvm_versions_sort_by_number() {
+        let mut v = [version_key("v9.11.2"), version_key("v22.1.0"), version_key("v18.20.4")];
+        v.sort();
+        assert_eq!(v.last().unwrap(), &vec![22, 1, 0]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_program_that_never_answers_times_out() {
+        let dir = std::env::temp_dir().join(format!("sl-node-hang-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("node");
+        std::fs::write(&script, "#!/bin/sh\nexec sleep 30\n").unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let started = std::time::Instant::now();
+        let e = version_of(&script).unwrap_err();
+        assert!(e.contains("did not answer"), "{e}");
+        assert!(started.elapsed() < std::time::Duration::from_secs(20));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -557,8 +557,9 @@ fn launch(layout: &Layout, name: &str, opts: StartOptions, launched: &mut bool) 
     Ok(out)
 }
 
-/// The environment a daemon gets: this process's, without the machine's Node settings, and
-/// `ELECTRON_RUN_AS_NODE`, which the Node supervisor gave it and a `.mjs` stand-in still reads.
+/// The environment a daemon gets: this process's, without the machine's Node settings, and, in a
+/// `test-hooks` build only, `ELECTRON_RUN_AS_NODE`, which the Node supervisor gave it and a
+/// `.mjs` stand-in still reads (a release daemon runs none, so its server never sees it).
 fn daemon_command(program: &str, args: &[String]) -> std::process::Command {
     let mut cmd = std::process::Command::new(program);
     cmd.args(args)
@@ -566,7 +567,9 @@ fn daemon_command(program: &str, args: &[String]) -> std::process::Command {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     crate::runtime::prepare(&mut cmd);
-    cmd.env("ELECTRON_RUN_AS_NODE", "1");
+    if cfg!(feature = "test-hooks") {
+        cmd.env("ELECTRON_RUN_AS_NODE", "1");
+    }
     crate::platform::detach(&mut cmd);
     cmd
 }

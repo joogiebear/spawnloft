@@ -153,8 +153,25 @@ pub fn host_is_pinned(layout: &Layout) -> bool {
         .is_ok_and(|b| String::from_utf8_lossy(&b) == pinned_stamp())
 }
 
-fn npm_command() -> &'static str {
-    if cfg!(windows) { "npm.cmd" } else { "npm" }
+/// The npm that installs the host: the one beside the Node the host runs on (the `bot.node`
+/// setting may name one off PATH), with that Node's folder first on PATH so npm's own
+/// `#!/usr/bin/env node` finds the same one; else npm on PATH.
+fn npm_command() -> Command {
+    let name = if cfg!(windows) { "npm.cmd" } else { "npm" };
+    if let Ok(node) = crate::runtime::node()
+        && let Some(dir) = node.parent()
+        && dir.join(name).is_file()
+    {
+        let mut cmd = Command::new(dir.join(name));
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        if let Ok(joined) =
+            std::env::join_paths(std::iter::once(dir.to_path_buf()).chain(std::env::split_paths(&path)))
+        {
+            cmd.env("PATH", joined);
+        }
+        return cmd;
+    }
+    Command::new(name)
 }
 
 fn hide_window(cmd: &mut Command) {
@@ -188,8 +205,7 @@ pub fn ensure_host(layout: &Layout, force: bool, on_progress: &dyn Fn(&str)) -> 
         let dest = jspath::join(&[&dir, name]);
         std::fs::write(&dest, text).map_err(|e| Failure::io(&e, "copyfile", Some(Path::new(&dest))))?;
     }
-    let npm = npm_command();
-    let mut probe = Command::new(npm);
+    let mut probe = npm_command();
     probe.arg("--version").stdin(Stdio::null());
     hide_window(&mut probe);
     let probed = probe.output().ok().filter(|o| o.status.code() == Some(0));
@@ -208,7 +224,7 @@ pub fn ensure_host(layout: &Layout, force: bool, on_progress: &dyn Fn(&str)) -> 
         mineflayer_version(),
         js::trim(&String::from_utf8_lossy(&probed.stdout))
     ));
-    let mut ci = Command::new(npm);
+    let mut ci = npm_command();
     ci.args([
         "ci",
         "--omit=dev",

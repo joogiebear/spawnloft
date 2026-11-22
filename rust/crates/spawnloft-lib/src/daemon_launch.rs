@@ -33,8 +33,10 @@ pub fn set_env(env: &mut Env, name: &str, value: String) {
     }
 }
 
-/// The environment a daemon inherits: this process's, with `SPAWNLOFT_ENTRY` naming this binary
-/// (as it did when the Node core ran behind it) and the Node variables removed.
+/// The process environment an engine's launch spec is compared against (`env_delta`): this
+/// process's, with `SPAWNLOFT_ENTRY` naming this binary (as it did when the Node core ran behind
+/// it) and the Node variables removed. (The daemon itself is started without `SPAWNLOFT_ENTRY`;
+/// nothing it runs reads it.)
 fn base_value(name: &str) -> Option<String> {
     match name {
         crate::entry::ENTRY_ENV => std::env::current_exe()
