@@ -101,15 +101,14 @@ fn listed(paths: &Paths) -> Vec<super::harness_index::Row> {
 /// `harnessFor(mc)`: the build for one Minecraft id, or None. Never waits for the network: the
 /// signed list is the copy already verified and cached.
 pub fn harness_for(paths: &Paths, mc: &str) -> Option<Build> {
+    // `listed = indexRows()` is a default parameter in Node, so the cached list is loaded (and a
+    // copy that no longer verifies dropped, with its status written) on every call
+    let listed = listed(paths);
     let row = HARNESS_RELEASES
         .iter()
         .find(|r| r.minecraft.contains(&mc))
         .map(Release::row)
-        .or_else(|| {
-            listed(paths)
-                .into_iter()
-                .find(|r| r.minecraft.iter().any(|m| m == mc))
-        })?;
+        .or_else(|| listed.into_iter().find(|r| r.minecraft.iter().any(|m| m == mc)))?;
     Some(Build {
         minecraft: mc.to_string(),
         version: row.version.clone(),

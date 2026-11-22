@@ -1,6 +1,4 @@
-//! `client` (C7): `cmdClient` in mcctl.mjs, over spawnloft-lib's `client`. The ownership table
-//! sends a subcommand here once it is ported (`cli::CLIENT_PORTED`); the rest stay with the
-//! Node core until the whole command flips.
+//! `client` (C7): `cmdClient` in mcctl.mjs, over spawnloft-lib's `client`.
 
 use serde_json::{Value, json};
 
@@ -58,34 +56,6 @@ const SET_KEYS: &[&str] = &[
     "assistantAccount",
     "serverList",
 ];
-
-/// A loader the Node core still sets up (Forge and NeoForge).
-fn uses_loader(profile: &profiles::Profile) -> bool {
-    launch::node_installs(profile)
-}
-
-/// Whether this `client` line is one the Node core still answers although its subcommand is
-/// ported: `install` and `launch` of a Forge or NeoForge profile, set up by the Node core until
-/// their installers move (part 4b). Decided before the Rust side prints anything, so a settings warning is not printed
-/// twice. Anything that fails here is left to the Rust side, which reports it as Node would.
-pub fn hands_to_node(args: &super::args::Parsed, layout: &spawnloft_lib::settings::Layout) -> bool {
-    let pos = &args.positional;
-    if pos.len() != 2 {
-        return false;
-    }
-    let (allowed, hands): (&[&str], fn(&profiles::Profile) -> bool) = match pos[0].as_str() {
-        "install" => (&["json", "verify"], uses_loader),
-        "launch" => (
-            &["as", "account", "server", "wait", "json"],
-            launch::node_launches,
-        ),
-        _ => return false,
-    };
-    if check_flags(args, allowed).is_err() {
-        return false;
-    }
-    profiles::get(&Paths::new(layout), &pos[1]).is_ok_and(|p| hands(&p))
-}
 
 pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     let paths = Paths::new(ctx.layout);

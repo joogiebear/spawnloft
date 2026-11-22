@@ -1012,19 +1012,6 @@ pub fn fake_client_java() -> Option<String> {
     crate::paths::env_var("FAKE_CLIENT")
 }
 
-/// Whether a profile is one the Node core still launches: none now (kept for the command line's
-/// hand-over until the whole `client` command moves).
-pub fn node_launches(profile: &Profile) -> bool {
-    node_installs(profile)
-}
-
-/// Whether a profile's loader is one the Node core still sets up: none since Forge and NeoForge
-/// moved (part 4c).
-pub fn node_installs(profile: &Profile) -> bool {
-    let _ = profile;
-    false
-}
-
 /// The profile's loader, `None` for vanilla.
 fn loader_of(profile: &Profile) -> Option<String> {
     match profile.get("loader") {
@@ -1488,13 +1475,6 @@ fn launch_locked(
     let fake = opts.fake_java.clone();
     let os = launch_os(fake.is_some())?;
     let profile = profiles::get(paths, name)?;
-    if node_launches(&profile) {
-        return Err(Failure::Internal {
-            head: "Error".into(),
-            message: format!("profile \"{name}\" uses a mod loader the Node core launches"),
-            code: None,
-        });
-    }
     let st = state::status(paths, name)?;
     if st.running {
         return Err(coded(

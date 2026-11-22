@@ -1,0 +1,13 @@
+{
+  "about": "C7 part 4d: the lines that stayed with the Node core until client moved whole, so the usage text and its exit code come from the Rust side: no subcommand, an unknown one, only flags, a flag of the wrong kind before the subcommand, and an install and a launch with one argument too many.",
+  "steps": [
+    { "run": ["client"], "expect": { "code": 2 } },
+    { "run": ["client", "--json"], "expect": { "code": 2 } },
+    { "run": ["client", "doctor"], "expect": { "code": 2 } },
+    { "run": ["client", "doctor", "--json"], "expect": { "code": 2 } },
+    { "run": ["client", "--n=3", "list"] },
+    { "run": ["client", "install", "a", "b"], "expect": { "code": 2 } },
+    { "run": ["client", "launch", "a", "b", "--json"], "expect": { "code": 2 } },
+    { "run": ["client", "install", "missing", "--bogus"], "expect": { "code": 2 } }
+  ]
+}

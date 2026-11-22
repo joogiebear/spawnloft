@@ -11,7 +11,7 @@
 //! `--modpack`, C5), `clone`, `adopt`, `templates`, `jars`, `launchers`, `reveal` and `rebuild`. C5
 //! moves plugins and modpacks: `plugins`, then `pack` and `new --modpack`. C6 moves the scheduled
 //! tasks and what moves or drops a server with them: `task`, `rm` (and `remove`) and `rename`. C7
-//! moves the client launcher, one group of `client` subcommands at a time.
+//! moves the client launcher, `client`, whole.
 
 pub mod args;
 mod backup;
@@ -77,11 +77,6 @@ pub fn run(argv: &[String], out: &mut Out) -> u8 {
     let (loaded, warning) = settings::load();
     let command = argv.first().map(String::as_str);
     let parsed = args::parse(argv.get(1..).unwrap_or(&[]));
-    if command == Some("client") && Layout::resolve(&loaded).is_ok_and(|l| client::hands_to_node(&parsed, &l))
-    {
-        let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-        return spawnloft_lib::runtime::forward(&raw);
-    }
     if let Some(w) = warning {
         out.err(&w);
     }
