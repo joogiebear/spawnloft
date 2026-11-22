@@ -46,41 +46,8 @@ configuration for this install, with its real paths, and has a button to copy it
 Open Settings → Developer → Edit Config, add the `spawnloft` entry under `mcpServers`, save the file
 and restart Claude Desktop.
 
-Windows (the default per-user install):
-
-```json
-{
-  "mcpServers": {
-    "spawnloft": {
-      "command": "C:\\Users\\YOU\\AppData\\Local\\Programs\\SpawnLoft\\SpawnLoft.exe",
-      "args": ["C:\\Users\\YOU\\AppData\\Local\\Programs\\SpawnLoft\\resources\\core\\spawnloft.mjs", "mcp"],
-      "env": { "ELECTRON_RUN_AS_NODE": "1" }
-    }
-  }
-}
-```
-
-Mac:
-
-```json
-{
-  "mcpServers": {
-    "spawnloft": {
-      "command": "/Applications/SpawnLoft.app/Contents/MacOS/SpawnLoft",
-      "args": ["/Applications/SpawnLoft.app/Contents/Resources/core/spawnloft.mjs", "mcp"],
-      "env": { "ELECTRON_RUN_AS_NODE": "1" }
-    }
-  }
-}
-```
-
-`ELECTRON_RUN_AS_NODE` runs the app's built-in runtime as a plain command line instead of opening a
-window. The `spawnloft.cmd` launcher in `resources\bin` does the same, but an app that starts
-programs without a shell cannot run a `.cmd` file on Windows, so point at the executable.
-
-SpawnLoft 2.0 (not released yet) needs no environment variable: the entry is the one console
-binary every 2.x release keeps, and Settings shows it ready to copy. The 1.x entry above keeps
-working after the update to 2.0.
+The entry is the one console binary every 2.x release keeps, `spawnloft-core`, with `mcp` as its
+argument. It needs no Node and no environment variable. Windows (the default per-user install):
 
 ```json
 {
@@ -94,12 +61,19 @@ working after the update to 2.0.
 ```
 
 On a Mac the command is
-`/Applications/SpawnLoft.app/Contents/Resources/resources/bin/spawnloft-core`.
+`/Applications/SpawnLoft.app/Contents/Resources/resources/bin/spawnloft-core`; Settings shows the
+exact path for your install.
+
+A configuration written by 1.x keeps working after the update: one that runs `SpawnLoft.exe` (or
+`.../bin/node`) with `...\core\spawnloft.mjs mcp` and `ELECTRON_RUN_AS_NODE` still starts the MCP
+server, because `spawnloft-core` drops a first argument ending in `mcctl.mjs` or `spawnloft.mjs`
+and never runs it. The `.mjs` file no longer exists; the argument is only recognised. New
+configurations should use the entry above.
 
 ### Claude Code
 
 ```bash
-claude mcp add --transport stdio --scope user --env ELECTRON_RUN_AS_NODE=1 spawnloft -- "C:\Users\YOU\AppData\Local\Programs\SpawnLoft\SpawnLoft.exe" "C:\Users\YOU\AppData\Local\Programs\SpawnLoft\resources\core\spawnloft.mjs" mcp
+claude mcp add --transport stdio --scope user spawnloft -- "C:\Users\YOU\AppData\Local\Programs\SpawnLoft\resources\bin\spawnloft-core.exe" mcp
 ```
 
 On Linux, where the package puts `spawnloft` on your PATH (the desktop `.deb` or `.rpm`, or
@@ -117,7 +91,8 @@ tend to call the wrong tool or invent server names.
 
 ### From a source checkout
 
-`node spawnloft.mjs mcp`, with Node 20 or later. No `ELECTRON_RUN_AS_NODE` is needed.
+Build the core (`cd rust && cargo build --release -p spawnloft-core`) and use
+`rust/target/release/spawnloft-core` as the command, with `mcp` as its argument.
 
 ### If the server list or backups look out of date (Windows)
 

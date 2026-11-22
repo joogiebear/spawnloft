@@ -19,7 +19,7 @@ sign-in and a Play button, including for servers SpawnLoft does not run; `spawnl
 opens the same launcher as a page of its own in the browser.
 See [CLIENT.md](CLIENT.md) for the launcher and when to use which.
 
-Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is
+One program, `spawnloft-core`, written in Rust, with no Node.js inside it, and the `tar` the system already has. Where that `tar` is
 GNU tar, which cannot read or write a zip, world import and export use a zip reader and
 writer of SpawnLoft's own.
 
@@ -39,10 +39,12 @@ writer of SpawnLoft's own.
   version nothing installed can run is refused before the download, with the download link.
   `--force` on `new` and `start` goes ahead anyway. The game client is different: when no installed
   Java fits the version, it downloads Mojang's own (see [CLIENT.md](CLIENT.md#java)).
-- **Node 20+**, for the CLI from a checkout. The desktop app and the Linux command-line package
-  carry their own runtime and do not need it.
+- **Node.js 22 or newer**, only for test players (`spawnloft bot`, the mineflayer bots; see
+  [BOTS.md](BOTS.md)). Everything else, the CLI, the panel, the game launcher, the daemons and the
+  MCP server, runs in the `spawnloft-core` binary and needs no Node. Which Node the bots use is
+  the `bot.node` setting (a full path), else `SPAWNLOFT_NODE`, else `node` on your PATH.
 - **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb` for Ubuntu 22.04+ and Debian 12+, an `.rpm` for Fedora,
-  the RHEL family and openSUSE; x64 and arm64) for the desktop app. The CLI runs anywhere Node does. On Linux, scheduling needs a systemd user
+  the RHEL family and openSUSE; x64 and arm64) for the desktop app. The command line is the same binary. On Linux, scheduling needs a systemd user
   session, and tasks only run while you are logged in unless lingering is on for your account -
   the panel says so and offers to turn it on.
 
@@ -58,7 +60,7 @@ start it, read what it printed, talk to it, and shut it down cleanly.
 ## Quickstart
 
 ```bash
-node mcctl.mjs list
+spawnloft list
 ```
 
 Register a server directory you already have, in place — nothing is moved or
@@ -66,32 +68,32 @@ rewritten, and its existing ports and RCON password are read from its own
 `server.properties`:
 
 ```bash
-node mcctl.mjs adopt survival "S:\Claude\minecraft\Server" --memory 6G
+spawnloft adopt survival "S:\Claude\minecraft\Server" --memory 6G
 ```
 
 Start it and wait until Paper reports ready:
 
 ```bash
-node mcctl.mjs start survival
+spawnloft start survival
 ```
 
 Talk to it:
 
 ```bash
-node mcctl.mjs cmd survival "tps"
+spawnloft cmd survival "tps"
 ```
 
 Spin up a disposable copy of its plugins and config on its own port, with fresh
 worlds, for reproducing a bug without touching the real server:
 
 ```bash
-node mcctl.mjs clone survival ecotest && node mcctl.mjs start ecotest
+spawnloft clone survival ecotest && spawnloft start ecotest
 ```
 
 ### On a server with no screen
 
 Linux has a package that is the command line alone: `spawnloft-cli`, a `.deb` and an `.rpm` for
-x64 and arm64, about 30 MB, with its own Node and none of the desktop app's graphical
+x64 and arm64, with `spawnloft-core` alone: no Node and none of the desktop app's graphical
 dependencies. It installs `spawnloft` on PATH and conflicts with the desktop package, which
 already contains it.
 
@@ -110,8 +112,8 @@ still works** through an SSH tunnel, without opening a port; see
 Updates are a newer package installed the same way; there is no updater on a machine with
 nobody to prompt.
 
-From a checkout on Linux or macOS, `./spawnloft` does the same. On Windows `spawnloft.cmd` wraps the above, so `spawnloft list` works once this folder is
-on your PATH.
+From a checkout, build the core once (`cd rust && cargo build --release -p spawnloft-core`) and run
+`rust/target/release/spawnloft-core <command>`, or `cargo run -p spawnloft-core -- <command>` while you work on it.
 
 ## Commands
 
@@ -322,7 +324,7 @@ only hide the link is renamed, never deleted, when you add `--set-aside-private-
 ```
 spawnloft (short-lived CLI)
    │
-   ├─ spawns detached ──▶ src/daemon.mjs (one per instance)
+   ├─ spawns detached ──▶ spawnloft-core daemon (one per instance)
    │                        │
    │                        ├─ owns the java child process
    │                        ├─ mirrors stdout/stderr ──▶ run/<name>/console.log
@@ -362,21 +364,14 @@ cannot silently desync an instance from what SpawnLoft believes about it. Pass
 
 ### Layout
 
+The program is `spawnloft-core`, in the Rust workspace under `rust/` (`spawnloft-lib` holds the
+commands, the daemon, the panel and the MCP server; `spawnloft-core` is the binary). `spawnloft`
+and `mcctl` are launchers for it. The panel pages are in `src/` and the bot host's files in
+`src/bot-host/`; both are compiled into the binary. The data folder holds what the program writes:
+
 ```
-spawnloft/
-├── mcctl.mjs           CLI
-├── mcctl.cmd           Windows shim
-├── instances.json      Registry: ports, memory, RCON credentials  (gitignored)
-├── src/
-│   ├── daemon.mjs      Per-instance supervisor
-│   ├── supervisor.mjs  start/stop/kill/ready-detection/log tailing
-│   ├── control.mjs     Named-pipe client, state reconciliation
-│   ├── rcon.mjs        Source RCON protocol client
-│   ├── registry.mjs    Instance registry, Aikar JVM flags
-│   ├── backup.mjs      tar-based snapshots
-│   ├── create.mjs      new/clone/adopt/templates/jars
-│   ├── props.mjs       server.properties reader/writer (preserves comments)
-│   └── util.mjs        Ports, pids, tables, formatting
+<data>/
+├── instances.json      Registry: ports, memory, RCON credentials
 ├── instances/          Instance data for servers spawnloft created
 ├── templates/          Saved plugin+config sets
 ├── jars/               Server jar store
@@ -478,9 +473,9 @@ banner artwork partner sites embed lives there too, under `public/banner/`.
 spawnloft ui        # starts the panel on 127.0.0.1:8770 and signs your browser in to it
 ```
 
-One HTML file, served by Node's own http module. No framework, no build step, no npm packages —
-the panel that ships is the file in `src/ui.html`, and it works offline because nothing is fetched
-from anywhere.
+One HTML file, served by `spawnloft-core`'s own HTTP server. No framework, no build step, no npm packages —
+the panel that ships is the file in `src/ui.html`, compiled into the binary, and it works offline
+because nothing is fetched from anywhere.
 
 The same page runs in a browser tab and inside the desktop app. `window.spawnloftDesktop` exists only in
 Electron, and everything that depends on it is additive: a Browse button beside a path field, a
@@ -640,6 +635,8 @@ request with the install's key: an `api` token, good for 60 seconds, for one por
 `Authorization: SpawnLoft <token>` header. Anything running as you can read the key, and nothing
 else should.
 
+Any language can sign a request; this one is Node, which you run yourself.
+
 ```js
 // node sign.mjs 8770   (prints a header value good for 60 seconds)
 import crypto from 'node:crypto'
@@ -670,16 +667,19 @@ your panels. The full rule is in [rust/PANEL-AUTH-DESIGN.md](rust/PANEL-AUTH-DES
 
 A window around the same panel, plus a native folder picker and first-run setup.
 
+On 2.0 the window is the Tauri shell (`rust/crates/spawnloft-shell`) around the panel that
+`spawnloft-core ui` serves. There is no Node in it, and none is shipped in any package. To run it
+against a checkout (`SPAWNLOFT_CORE_DIR` makes a debug build read the pages from `src/` instead of
+the copies compiled in):
+
 ```bash
-cd desktop
-npm install
-npm start                  # runs the bundled core
-npm start -- --core ..     # develop against this checkout (or set SPAWNLOFT_CORE_DIR)
+cd rust
+cargo build -p spawnloft-core -p spawnloft-shell
+SPAWNLOFT_CORE_BIN=target/debug/spawnloft-core SPAWNLOFT_CORE_DIR=.. ./target/debug/SpawnLoft
 ```
 
-The core runs **inside** the Electron process. Electron is already a Node runtime, so importing
-SpawnLoft directly is what bundling means here: one process, no second Node to ship, and no orphaned
-child if the window dies.
+The `desktop/` folder holds the release and packaging scripts and the 1.x Electron main process,
+which the 2.0 line no longer builds.
 
 Closing the window does **not** stop your servers. They are detached daemons that do not belong to
 the app.

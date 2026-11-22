@@ -14,11 +14,13 @@ cannot be merged.
 
 ## Ground rules
 
-- **Zero runtime dependencies.** The core is plain Node (>= 20) and ships nothing from
-  npm. If a feature seems to need a package, it probably needs a smaller feature —
-  the zip reader, the YAML-lite and the TOML-lite in `src/plugins.mjs` exist for
-  exactly this reason.
-- **No build step.** The panel is served from source; the wizard is loaded from disk.
+- **Few dependencies, all pinned.** The core is Rust (`rust/`), built with `--locked` and checked
+  by `cargo deny`; no Node runs in it or ships with it. If a feature seems to need a new crate, it
+  probably needs a smaller feature — the zip reader and the YAML-lite and TOML-lite in
+  `spawnloft-lib` exist for exactly this reason. Node.js is a tool for the tests and the release
+  scripts, and for test players on a user's machine (`BOTS.md`).
+- **No build step for the pages.** The panel, the launcher and the wizard are single HTML files in
+  `src/`, compiled into the binary as they are.
 - **Honesty over polish.** Errors name what went wrong and the way out. Nothing is
   silently capped, silently skipped, or silently retried.
 - **Comments say why, not what.** Write one when a line is the way it is for a reason the code
@@ -29,25 +31,40 @@ cannot be merged.
 
 ```
 git clone https://github.com/joogiebear/spawnloft
-cd spawnloft
-npm test                 # node:test, no dependencies, ~a second
-node mcctl.mjs ui --no-open --port 8771    # the panel, from source
+cd spawnloft/rust
+cargo build -p spawnloft-core --features test-hooks    # the core, with the hooks the tests use
+cargo test --workspace --locked                         # the Rust tests
+cd ..
+node tools/run-tests.mjs                                # the black-box tests (Node 22+), against that build
+node tools/parity/run.mjs                               # the parity rig, below
+rust/target/debug/spawnloft-core ui --no-open --port 8771    # the panel, from source
 ```
 
-`npm test` runs `tools/run-tests.mjs`, which lists the test files itself because Node 20's `--test` does not expand a glob (21 and later do); extra arguments go through, e.g. `npm test -- --test-name-pattern=client`. To run one file, use `node --test test/<file>`. `MCCTL_FAKE_CLIENT` (a stand-in game for the client tests) is honoured only with `NODE_ENV=test`; it is not a user setting.
+Before a pull request, from `rust/`: `cargo fmt --all --check`, `cargo clippy --workspace
+--all-targets --locked -- -D warnings` and `cargo deny check` too (see `rust/README.md`).
 
-Tests live in `test/` and run on every push and pull request, on Windows and on
-Linux. Both count: each platform has a scheduler, a control channel and a process table of
+`node tools/run-tests.mjs` (`npm test` runs the same) lists the test files in `test/` itself and
+runs them under `node --test`; extra arguments go through, e.g. `node tools/run-tests.mjs --test-name-pattern=client`. To run one file, use `node --test test/<file>`. The tests drive the
+built `spawnloft-core`: `SPAWNLOFT_CORE_BIN` names it, else the newest build under `rust/target`; a
+test that needs it is skipped, with the command that builds it, when there is none. `MCCTL_FAKE_CLIENT` (a stand-in game for the client tests) is honoured only by a `test-hooks` build; it is not a user setting.
+
+**The parity rig** (`tools/parity/`, `tools/parity/README.md`) runs scenarios, each a list of
+command lines or panel and MCP requests with fake download hosts, on the Rust core and compares
+every output, exit code, request and file left behind with a record frozen per platform in
+`tools/parity/frozen/` (made from the Node core before it left in 2.0). A change to a record is a
+change to what a person sees, made on purpose: re-record it with `--record` on each platform and
+say why in the pull request.
+
+Tests live in `test/` and `rust/`, and run on every push and pull request, on Windows, macOS and
+Linux. All count: each platform has a scheduler, a control channel and a process table of
 its own, and code that only runs there. New behaviour that has a pure core should come with tests for
 it; the existing files show the shape.
 
-One rule that is easy to break without noticing: **nothing synchronous and slow on the
-panel's request path.** The panel is one Node process, so a `spawnSync`, a
-`readdirSync` walk of a world, or anything else that holds the event loop holds every
-request and the console stream with it, and shows up for the person as the panel
-hesitating. Use `execFile`/`spawn` and `fs.promises` there; `run/panel.log` records
-every time the loop was held for more than a quarter of a second, so a regression is
-visible.
+One rule that is easy to break without noticing: **nothing slow while the panel's request
+threads hold something shared.** The panel serves each request on its own thread, so a
+long walk of a world or a blocking call under a lock holds the other requests and the console
+stream behind it, and shows up for the person as the panel hesitating. Do slow work on its own thread or
+as a job, and keep locks short.
 
 ## Where things go
 
