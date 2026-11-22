@@ -1,5 +1,5 @@
 {
-  "about": "C9's `bot setup` with no npm on PATH: the pinned package.json and lockfile copied into the host folder before npm is looked for, the refusal naming the folder, an install that is not this lockfile's (no marker, a marker that differs) replaced, and one whose marker matches the shipped stamp byte for byte accepted unless --force. Linux and macOS only: PATH is the scenario's own there, while a Windows step's PATH would sit beside the inherited Path.",
+  "about": "C9's `bot setup` with no npm on PATH: the pinned package.json and lockfile copied into the host folder before npm is looked for, the refusal naming the folder, an install that is not this lockfile's (no marker, a marker that differs) replaced, and one whose marker matches the shipped stamp byte for byte accepted unless --force. Linux and macOS only: PATH is the scenario's own there, while a Windows step's PATH would sit beside the inherited Path. SPAWNLOFT_NODE names a node in that empty folder too, since the core looks for npm beside the Node it would use.",
   "platforms": [
     "linux",
     "darwin"
@@ -14,7 +14,8 @@
         "setup"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 1,
@@ -28,7 +29,8 @@
         "--force"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 1,
@@ -48,7 +50,8 @@
         "setup"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 1,
@@ -65,7 +68,8 @@
         "setup"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 1,
@@ -82,7 +86,8 @@
         "setup"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 0,
@@ -96,7 +101,8 @@
         "--force=yes"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 0,
@@ -110,7 +116,8 @@
         "--force"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 1,
@@ -123,7 +130,8 @@
         "setup"
       ],
       "env": {
-        "PATH": "{run}/nobin"
+        "PATH": "{run}/nobin",
+        "SPAWNLOFT_NODE": "{run}/nobin/node"
       },
       "expect": {
         "code": 1,
