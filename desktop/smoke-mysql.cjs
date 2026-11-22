@@ -5,8 +5,34 @@ const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
 const { authorization } = require('./smoke-panel-auth.cjs')
 
+// One of the managed engine's own tools (bin/mysql, bin/mysqldump), connected over TCP as `who`
+// the way the core connects (spawnloft-lib mariadb.rs root_args, the password in MYSQL_PWD):
+// its stdout, or a rejection with what it said. `input` is a file for its stdin, `out` one for
+// its stdout.
+function tool(engine, toolName, db, who, args, { input = null, out = null } = {}) {
+  const exe = path.join(engine, 'bin', toolName + (process.platform === 'win32' ? '.exe' : ''))
+  const all = ['--no-defaults', '--protocol=TCP', `--host=${db.host || '127.0.0.1'}`, `--port=${db.port}`, `--user=${who.user || 'root'}`, ...args]
+  return new Promise((resolve, reject) => {
+    const stdout = out ? fs.openSync(out, 'w') : 'pipe'
+    const stdin = input ? fs.openSync(input, 'r') : 'ignore'
+    const child = spawn(exe, all, { env: { ...process.env, MYSQL_PWD: who.password ?? '' }, stdio: [stdin, stdout, 'pipe'], windowsHide: true })
+    let text = ''
+    let said = ''
+    child.stdout?.on('data', c => { text += c })
+    child.stderr.on('data', c => { said += c })
+    const timer = setTimeout(() => child.kill('SIGKILL'), 60000)
+    child.once('error', error => { clearTimeout(timer); reject(error) })
+    child.once('close', code => {
+      clearTimeout(timer)
+      if (typeof stdout === 'number') fs.closeSync(stdout)
+      if (typeof stdin === 'number') fs.closeSync(stdin)
+      code === 0 ? resolve(text) : reject(Error(`${toolName} exit ${code}: ${said || text}`))
+    })
+  })
+}
+
 // native Oracle binaries, created through the packaged GUI from an empty engine store
-module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record, openDatabaseSettings }) {
+module.exports = async function smokeMySQL({ page, api, cli, env, data, name, output, record, openDatabaseSettings }) {
   const dbName = `${name}-db`
   await openDatabaseSettings()
   const create = page.locator('#settingsBody').getByRole('button', { name: 'Create a database', exact: true })
@@ -53,46 +79,32 @@ module.exports = async function smokeMySQL({ page, api, cli, core, executable, e
   assert.equal(fs.existsSync(path.join(data, 'services', dbName, 'bootstrap.sql')), false)
   record('PASS: managed MySQL downloaded, verified, initialized and attached through the native GUI; panel stayed responsive and plugin configs stayed manual')
 
-  const script = path.join(output, 'mysql-statements.mjs')
-  fs.writeFileSync(script, `
-import assert from 'node:assert/strict';
-import path from 'node:path';
-import fs from 'node:fs';
-import { pathToFileURL } from 'node:url';
-const [core, name, server, phase, output] = process.argv.slice(2);
-const mysql = await import(pathToFileURL(path.join(core, 'src/mysql.mjs')));
-const maria = await import(pathToFileURL(path.join(core, 'src/mariadb.mjs')));
-const registry = await import(pathToFileURL(path.join(core, 'src/registry.mjs')));
-const db = registry.getInstance(name);
-const record = db.attachments[server];
-const user = { ...db, root: { user: record.user, password: record.password } };
-assert.equal(maria.findTools(), mysql.engineDir(db.version), 'external tools discovery finds the managed engine');
-const table = String.fromCharCode(96) + record.database + String.fromCharCode(96) + '.spawnloft_smoke';
-if (phase === 'write') {
-  await mysql.sql(user, 'CREATE TABLE ' + table + ' (id INT PRIMARY KEY, value VARCHAR(32)); INSERT INTO ' + table + " VALUES (1, 'persisted');");
-  await assert.rejects(mysql.sql(user, 'SELECT User FROM mysql.user'), /denied/i);
-  await assert.rejects(mysql.sql({ ...user, root: { ...user.root, password: 'wrong-password' } }, 'SELECT 1'), /denied/i);
-} else {
-  assert.equal((await mysql.sql(user, 'SELECT value FROM ' + table)).trim(), 'persisted');
-  const dump = path.join(output, 'mysql-roundtrip.sql');
-  await mysql.dump(db, record.database, dump);
-  await mysql.sql(user, 'DELETE FROM ' + table);
-  await mysql.importSql(db, dump);
-  assert.equal((await mysql.sql(user, 'SELECT value FROM ' + table)).trim(), 'persisted');
-}
-console.log('PASS: MySQL ' + phase + ' and scoped credentials');
-`)
-  const statements = phase => new Promise((resolve, reject) => {
-    const child = spawn(executable, [script, core, dbName, name, phase, output], {
-      env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
-    })
-    let text = ''
-    child.stdout.on('data', c => { text += c })
-    child.stderr.on('data', c => { text += c })
-    const timer = setTimeout(() => child.kill('SIGKILL'), 60000)
-    child.once('error', error => { clearTimeout(timer); reject(error) })
-    child.once('close', code => { clearTimeout(timer); if (code === 0) { record(text.trim()); resolve() } else reject(Error(text)) })
-  })
+  // the registry record the panel wrote, read as any program reads instances.json, and the
+  // engine store's one MySQL, which holds the tools the core runs for it
+  const engines = path.join(data, 'engines')
+  const statements = async phase => {
+    const db = JSON.parse(fs.readFileSync(path.join(data, 'instances.json'), 'utf8')).instances[dbName]
+    const engine = path.join(engines, `mysql-${db.version}-${process.platform}-${process.arch}`)
+    assert.deepEqual(fs.readdirSync(engines).filter(e => e.startsWith('mysql-') || e.startsWith('mariadb-')), [path.basename(engine)], 'the engine store holds the managed MySQL alone')
+    const attached = db.attachments[name]
+    const user = { user: attached.user, password: attached.password }
+    const root = { user: db.root.user, password: db.root.password }
+    const sql = (who, statement) => tool(engine, 'mysql', db, who, ['--batch', '--skip-column-names', '--execute', statement])
+    const table = '`' + attached.database + '`.spawnloft_smoke'
+    if (phase === 'write') {
+      await sql(user, 'CREATE TABLE ' + table + " (id INT PRIMARY KEY, value VARCHAR(32)); INSERT INTO " + table + " VALUES (1, 'persisted');")
+      await assert.rejects(sql(user, 'SELECT User FROM mysql.user'), /denied/i)
+      await assert.rejects(sql({ ...user, password: 'wrong-password' }, 'SELECT 1'), /denied/i)
+    } else {
+      assert.equal((await sql(user, 'SELECT value FROM ' + table)).trim(), 'persisted')
+      const dump = path.join(output, 'mysql-roundtrip.sql')
+      await tool(engine, 'mysqldump', db, root, ['--single-transaction', '--routines', '--triggers', '--events', '--databases', attached.database], { out: dump })
+      await sql(user, 'DELETE FROM ' + table)
+      await tool(engine, 'mysql', db, root, [], { input: dump })
+      assert.equal((await sql(user, 'SELECT value FROM ' + table)).trim(), 'persisted')
+    }
+    record('PASS: MySQL ' + phase + ' and scoped credentials')
+  }
   await statements('write')
   await api(`instances/${dbName}/stop`, {})
   assert.equal((await api('databases')).find(row => row.name === dbName).status, 'stopped')

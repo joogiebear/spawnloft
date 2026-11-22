@@ -1,12 +1,7 @@
 # Shell scripts must keep LF: "#!/bin/sh\r" is not a program. Everything else follows the checkout.
-/spawnloft text eol=lf
 *.sh text eol=lf
 /desktop/build/linux/spawnloft text eol=lf
 # The bot host's pinned package.json and lockfile: setup compares them, so they read the same on every OS.
 /src/bot-host/*.json text eol=lf
-# The Java runtime fixtures: java-runtime-all.json names the two manifests by the sha1 of their bytes.
-/test/fixtures/client/java-runtime-*.json text eol=lf
-/test/fixtures/client/jre-legacy-*.json text eol=lf
-/test/fixtures/client/harness-index/* text eol=lf
 # The loaders' captured files: manifest.json names each by the sha1 of its bytes, as published.
 /test/fixtures/client/loaders/** -text

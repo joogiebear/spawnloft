@@ -282,6 +282,7 @@ download from C1 on. Node follows redirects one hop at a time, so a redirect can
 the map. Such a build adds `"testHooks":"spawnloft-test-hooks:on"` to `--version --json`;
 `desktop/release-gate.mjs` refuses a core that reports it, and `desktop/build-trust.mjs` refuses
 a binary that contains the marker. Not covered: the Node daemon's own webhook post
-(`src/daemon.mjs`), since the Node daemon is not the default and is frozen. Both sides are held to
-`test/fixtures/contracts/test-origins.json`. To change the rules, change
-`make-test-origins-fixture.mjs` and regenerate the fixture from the Node module.
+(`src/daemon.mjs`), since the Node daemon is not the default and is frozen. The rules are
+`test/fixtures/contracts/test-origins.json`, which the Node module's generator wrote before the
+Node core left (C10) and `test_origins.rs`'s tests still hold the Rust side to. To change the
+rules, change the fixture and those tests together.

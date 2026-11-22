@@ -1,7 +1,8 @@
 /**
  * Seeds a 1.x install for the installer scenarios, through that install's own modules: run by
  * the installed SpawnLoft.exe as Node (ELECTRON_RUN_AS_NODE=1), so the registry, data root and
- * database setup are exactly 1.x's.
+ * database setup are exactly 1.x's. For a 2.0 install it runs on the harness's Node over a 1.x
+ * core's source (CORE_1X, see lib.ps1): 2.0 keeps the same registry.
  *
  *   SpawnLoft.exe seed-1x.mjs <1.x core dir> <spec json file>
  *

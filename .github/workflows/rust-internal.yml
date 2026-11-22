@@ -1,8 +1,11 @@
 name: rust-internal
 
-# The checks of the v2 branch (the 2.0 line): the Rust workspace, cargo deny, the daemon suites
-# under both daemons, the core port's parity rig, the Node suite, the Tauri window driven over
-# WebDriver (Linux) and the panel in a real browser on all three platforms. It runs on pull requests into v2 and on pushes to v2.
+# The checks of the v2 branch (the 2.0 line): the Rust workspace, cargo deny, the core port's
+# parity rig against the frozen records, the black-box tests on spawnloft-core, the Node tests of
+# the packaging and the panel pages, the Tauri window driven over WebDriver (Linux) and the panel
+# in a real browser on all three platforms. It runs on pull requests into v2 and on pushes to v2.
+# There is no Node core to test (rust/PLAN-CORE-PORT.md C10): Node runs only the tests and tools
+# here, and the bot host.
 # It packages nothing and publishes nothing; the 2.0 packages are built by installer.yml,
 # installer-mac.yml and installer-linux.yml.
 #
@@ -20,10 +23,6 @@ on:
   pull_request:
     branches: [v2]
   workflow_dispatch:
-    inputs:
-      repeat:
-        description: Times to run the daemon suites in a row in one job (5 for the R1 gate)
-        default: '1'
 
 permissions:
   contents: read
@@ -138,80 +137,13 @@ jobs:
           cargo deny --version
           cargo deny check
 
-  daemons:
-    # R1 (P0-D): the daemon suites under both daemons, on Windows and Linux. The rust leg builds
-    # spawnloft-core and points the supervisor at it; daemon-contract.test.mjs checks that the
-    # daemon answering ping really is the Rust one, so a silent fallback to daemon.mjs fails here.
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-24.04, windows-latest]
-        daemon: [node, rust]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    env:
-      SPAWNLOFT_DAEMON: ${{ matrix.daemon }}
-      REPEAT: ${{ inputs.repeat || '1' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          # the Node the tests and tools run on; SpawnLoft ships none (rust/PLAN-CORE-PORT.md 5.5)
-          node-version-file: .node-version
-      - name: Install the pinned toolchain
-        if: matrix.daemon == 'rust'
-        working-directory: rust
-        run: rustup toolchain install
-      # a pull request restores v2's cache but saves none: a PR's cache is scoped to its own ref,
-      # so it would only take space (10 GB per repository) from v2's
-      - uses: actions/cache@v4
-        if: matrix.daemon == 'rust' && github.event_name != 'pull_request'
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            rust/target
-          key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
-          restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - uses: actions/cache/restore@v4
-        if: matrix.daemon == 'rust' && github.event_name == 'pull_request'
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            rust/target
-          key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
-          restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core
-        if: matrix.daemon == 'rust'
-        working-directory: rust
-        run: |
-          cargo build --release --locked -p spawnloft-core
-          exe=spawnloft-core; [ "$RUNNER_OS" = Windows ] && exe=spawnloft-core.exe
-          echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/release/$exe" >> "$GITHUB_ENV"
-      - name: Daemon suites under the ${{ matrix.daemon }} daemon
-        env:
-          TMPDIR: /tmp
-        run: |
-          files="lifecycle active-guard active-guard-uninstall databases databases-garnet metrics metrics-linux crashguard notify daemon-contract contracts-daemon"
-          for i in $(seq 1 "$REPEAT"); do
-            echo "::group::run $i of $REPEAT"
-            for f in $files; do
-              node --test --test-concurrency=1 "test/$f.test.mjs" || { echo "::error::run $i: $f failed under the ${{ matrix.daemon }} daemon"; exit 1; }
-            done
-            echo "::endgroup::"
-            echo "run $i of $REPEAT green"
-          done
-
   parity:
     # The core port's parity rig (tools/parity/, rust/PLAN-CORE-PORT.md section 6): every scenario
     # run on the Rust core and compared with what the Node core did, frozen per platform before
     # it left (tools/parity/frozen/): outputs, exit codes, fake-host requests and data trees; the
     # self-tests must find the differences they seed; the golden --json and MCP files must still
-    # match. Plus the lock, registry and zip contracts across a Node and a Rust process, while the
-    # Node modules they read exist. On every pull request, on the three platforms and on Linux
-    # arm64.
+    # match. Plus the black-box CLI and MCP tests on the same core. On every pull request, on the
+    # three platforms and on Linux arm64.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
@@ -247,16 +179,13 @@ jobs:
             rust/target
           key: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core with the test hooks, and the lock, registry and zip probes
+      - name: Build spawnloft-core with the test hooks, and the scheduler stand-in
         working-directory: rust
         run: |
           cargo build --locked -p spawnloft-core --features test-hooks
-          cargo build --locked -p spawnloft-fakes --bin lock-probe --bin registry-probe --bin zip-probe --bin fake-scheduler
+          cargo build --locked -p spawnloft-fakes --bin fake-scheduler
           exe=; [ "$RUNNER_OS" = Windows ] && exe=.exe
           echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV"
-          echo "SPAWNLOFT_LOCK_PROBE=$GITHUB_WORKSPACE/rust/target/debug/lock-probe$exe" >> "$GITHUB_ENV"
-          echo "SPAWNLOFT_REGISTRY_PROBE=$GITHUB_WORKSPACE/rust/target/debug/registry-probe$exe" >> "$GITHUB_ENV"
-          echo "SPAWNLOFT_ZIP_PROBE=$GITHUB_WORKSPACE/rust/target/debug/zip-probe$exe" >> "$GITHUB_ENV"
       - name: The library's tests with the test hooks on
         working-directory: rust
         run: cargo test --locked -p spawnloft-lib --features test-hooks
@@ -264,10 +193,10 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: node tools/parity/run.mjs --core "$SPAWNLOFT_CORE_BIN" --out parity-report
-      - name: The rig's own tests, the cross-process lock, registry, zip and backup tests, and the MCP tests on the Rust core
+      - name: The rig's own tests, and the CLI and MCP tests on the Rust core
         env:
           TMPDIR: ${{ runner.temp }}
-        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs test/registry-cross-process.test.mjs test/zip-cross-process.test.mjs test/parity-frozen.test.mjs test/mcp.test.mjs test/mcp-client.test.mjs
+        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/parity-frozen.test.mjs test/mcp.test.mjs test/cli.test.mjs test/data-command.test.mjs test/diag-cli.test.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -277,7 +206,7 @@ jobs:
 
   zip-fuzz:
     # The cargo-fuzz targets of the zip readers (rust/fuzz), a minute each, seeded with archives
-    # both writers make. Nightly is pinned by date; the targets never ship.
+    # the Rust writer makes. Nightly is pinned by date; the targets never ship.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -286,16 +215,13 @@ jobs:
       CARGO_FUZZ_VERSION: 0.13.2
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
       - name: Install the pinned nightly and cargo-fuzz
         working-directory: rust
         run: |
           rustup toolchain install "$NIGHTLY" --profile minimal
           rustup toolchain install
           cargo install cargo-fuzz --locked --version "$CARGO_FUZZ_VERSION"
-      - name: Seed archives from both writers
+      - name: Seed archives from the Rust writer
         working-directory: rust
         run: |
           cargo build --locked -p spawnloft-fakes --bin zip-probe
@@ -303,7 +229,6 @@ jobs:
           printf 'level %.0s' $(seq 500) > "$seed/src/w/level.dat"
           echo hi > "$seed/src/w/d/ü.txt"; : > "$seed/src/w/empty"
           for z in "" --zip64; do
-            node ../test/fixtures/zip-node-probe.mjs create "fuzz/corpus/zip_read/node$z.zip" "$seed/src" $z -- w
             target/debug/zip-probe create "fuzz/corpus/zip_read/rust$z.zip" "$seed/src" $z -- w
           done
       - name: Fuzz the zip readers
@@ -384,9 +309,6 @@ jobs:
     timeout-minutes: 30
     env:
       SPAWNLOFT_DATA_ROOT: ${{ github.workspace }}/../sl-real/data
-      # no Node core to forward to: every command here must be answered by the Rust core
-      SPAWNLOFT_CORE_DIR: /nonexistent/spawnloft-core
-      SPAWNLOFT_NODE: /nonexistent/node
       MC: 1.21.4
     steps:
       - uses: actions/checkout@v4
@@ -423,7 +345,9 @@ jobs:
           done
 
   node:
-    # The whole Node suite, once per platform, on the default daemon.
+    # The Node tests that remain (packaging, the panel pages, the rig's own; the ones that need a
+    # spawnloft-core skip without one and run in the parity job), and the desktop tests, once per
+    # platform.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
@@ -449,8 +373,9 @@ jobs:
     # The panel in a real browser on each platform (desktop/smoke-panel.cjs): signing in through
     # `spawnloft ui`, the console, live performance charts, backups, the file editor, the console
     # window, managed MySQL and Redis, the scheduler on macOS, a restart that ends the old tab's
-    # session, and `spawnloft ui --link`, on the Rust daemon. It took these checks over from the
-    # retired Electron package job (desktop/smoke-desktop.cjs), which 2.0 does not ship.
+    # session, and `spawnloft ui --link`, all on spawnloft-core. It took these checks over from the
+    # retired Electron package job (desktop/smoke-desktop.cjs), which 2.0 does not ship. The core is
+    # built with the test hooks, so the server's java can be the .mjs stand-in.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
@@ -487,10 +412,10 @@ jobs:
             rust/target
           key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core
+      - name: Build spawnloft-core with the test hooks
         working-directory: rust
         run: |
-          cargo build --release --locked -p spawnloft-core
+          cargo build --release --locked -p spawnloft-core --features test-hooks
           exe=spawnloft-core; [ "$RUNNER_OS" = Windows ] && exe=spawnloft-core.exe
           echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/release/$exe" >> "$GITHUB_ENV"
       - name: Install the isolated browser test tool and its Chromium
@@ -501,7 +426,6 @@ jobs:
       - name: The panel in a browser
         env:
           NODE_PATH: ${{ runner.temp }}/panel-smoke/node_modules
-          SPAWNLOFT_DAEMON: rust
         run: node desktop/smoke-panel.cjs "smoke-panel-${{ runner.os }}"
       - uses: actions/upload-artifact@v4
         if: always()

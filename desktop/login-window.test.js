@@ -34,9 +34,9 @@ function authorize(params = {}) {
 }
 
 test('the callback path is the panel\'s', () => {
-  const ui = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui.mjs'), 'utf8')
-  // publicPort() is panelPort in Electron (no proxy in front), the proxy's port behind spawnloft-core
-  assert.ok(ui.includes(`http://localhost:\${publicPort()}${CALLBACK_PATH}`))
+  // the redirect the panel (spawnloft-core) gives Microsoft: its own port and this path
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'rust', 'crates', 'spawnloft-lib', 'src', 'panel', 'client', 'accounts.rs'), 'utf8')
+  assert.ok(panel.includes(`"http://localhost:{}${CALLBACK_PATH}"`))
 })
 
 test('the panel\'s authorize URL is accepted', () => {

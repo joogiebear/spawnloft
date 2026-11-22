@@ -120,7 +120,7 @@ fn tree(root: &std::path::Path) -> std::collections::BTreeMap<std::path::PathBuf
 
 /// No GET writes (rust/PANEL-AUTH-DESIGN.md 3.4): a signed-in browser's cookie goes with any GET
 /// another loopback page makes, and without `Sec-Fetch-Site` the panel cannot tell. The updater's and
-/// the handover's routes are checked here; the Node panel's were in test/panel-get-writes.test.mjs.
+/// the handover's routes are checked here.
 /// `GET /api/update/rollbacks` reads the release list from the internet and is left out; it
 /// only reads. The list below must name every route in the route tables at the top of
 /// `update/api.rs` and `handover/api.rs`, which this test reads, so a new route is not missed.

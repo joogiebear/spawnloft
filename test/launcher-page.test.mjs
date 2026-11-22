@@ -72,16 +72,14 @@ test('the launch strip puts every job stage on a step', () => {
   assert.deepEqual(splitMessage(undefined), ['', ''])
 })
 
-test('the address field agrees with the panel on what a server address is', async () => {
+test('the address field agrees with the panel on what a server address is', () => {
   const { addressProblem } = lifted(['HOSTNAME_RE', 'addressProblem'])
-  const { parseServerAddress } = await import('../src/client.mjs')
-  const cases = ['play.example.net', 'play.example.net:25565', '192.168.1.20:25566', '[::1]:25565', '[::1]', 'localhost',
-    'play example net', '-oops', 'a:b:c', 'host:0', 'host:70000', 'host:', 'http://x', '[nothex]', '', '   ', 'x'.repeat(300)]
-  for (const text of cases) {
-    let panelOk = true
-    try { parseServerAddress(text) } catch { panelOk = false }
-    assert.equal(addressProblem(text) === null, panelOk, `"${text.slice(0, 40)}": page and panel disagree`)
-  }
+  // what the panel's parser accepts (spawnloft-lib client/launch.rs parse_server_address, as
+  // parseServerAddress in the Node core answered before it left)
+  const accepted = ['play.example.net', 'play.example.net:25565', '192.168.1.20:25566', '[::1]:25565', '[::1]', 'localhost']
+  const refused = ['play example net', '-oops', 'a:b:c', 'host:0', 'host:70000', 'host:', 'http://x', '[nothex]', '', '   ', 'x'.repeat(300)]
+  for (const text of accepted) assert.equal(addressProblem(text), null, `"${text}": the page refuses what the panel takes`)
+  for (const text of refused) assert.notEqual(addressProblem(text), null, `"${text.slice(0, 40)}": the page takes what the panel refuses`)
   assert.match(addressProblem(''), /Type the address/)
   assert.match(addressProblem('host:0'), /port/)
 })

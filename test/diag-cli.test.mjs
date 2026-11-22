@@ -5,8 +5,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { findCore } from '../tools/parity/lib/rig.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// spawnloft-core: SPAWNLOFT_CORE_BIN, else the newest build under rust/target
+const CORE = findCore(root)
+const skip = !CORE && 'build spawnloft-core (cd rust && cargo build -p spawnloft-core) or set SPAWNLOFT_CORE_BIN'
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-diag-cli-'))
 const data = path.join(scratch, 'data')
 const instDir = path.join(data, 'instances', 'diagtest')
@@ -40,7 +44,7 @@ after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
 function cli(args) {
   try {
-    return { code: 0, stdout: execFileSync(process.execPath, [path.join(root, 'mcctl.mjs'), ...args],
+    return { code: 0, stdout: execFileSync(CORE, args,
       { env, encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' }
   } catch (error) {
     if (!Number.isInteger(error.status)) throw error
@@ -48,7 +52,7 @@ function cli(args) {
   }
 }
 
-test('diag writes a zip and prints its path', () => {
+test('diag writes a zip and prints its path', { skip }, () => {
   const res = cli(['diag', 'diagtest'])
   assert.equal(res.code, 0, res.stderr)
   const match = res.stdout.match(/Written: (.+)/)
@@ -57,7 +61,7 @@ test('diag writes a zip and prints its path', () => {
   assert.ok(fs.existsSync(file), `file ${file} does not exist`)
 })
 
-test('diag --json yields one parseable line with the file present', () => {
+test('diag --json yields one parseable line with the file present', { skip }, () => {
   const res = cli(['diag', 'diagtest', '--json'])
   assert.equal(res.code, 0, res.stderr)
   const lines = res.stdout.trim().split('\n')
@@ -67,7 +71,7 @@ test('diag --json yields one parseable line with the file present', () => {
   assert.ok(fs.existsSync(parsed.data.file), `file ${parsed.data.file} does not exist`)
 })
 
-test('diag with no name exits 2', () => {
+test('diag with no name exits 2', { skip }, () => {
   const res = cli(['diag'])
   assert.equal(res.code, 2)
 })

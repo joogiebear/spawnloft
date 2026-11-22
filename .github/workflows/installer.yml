@@ -17,8 +17,6 @@ on:
     paths:
       - 'rust/**'
       - 'src/**'
-      - 'mcctl.mjs'
-      - 'spawnloft.mjs'
       - 'package.json'
       - '.github/workflows/installer.yml'
   workflow_dispatch:
@@ -138,11 +136,25 @@ jobs:
           gh release download v1.6.0-beta.413 -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/beta"
           gh release download v1.5.0 -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/stable"
           ls -la "$RUNNER_TEMP/beta" "$RUNNER_TEMP/stable"
+      # The harness seeds 2.0's registry and reads every status through a 1.x core's own modules,
+      # on the harness's Node (lib.ps1, list.mjs, seed-1x.mjs). The checkout has had no Node core
+      # since C10, so they come from the source of the 1.x build the -Beta setup installs: the
+      # v1.6.0-beta.413 tag's mcctl.mjs, package.json and src.
+      - name: The 1.x core's source the harness reads with (v1.6.0-beta.413)
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin refs/tags/v1.6.0-beta.413
+          if ($LASTEXITCODE -ne 0) { throw "could not fetch the v1.6.0-beta.413 tag" }
+          git archive --format=zip -o "$env:RUNNER_TEMP\core-1x.zip" FETCH_HEAD mcctl.mjs package.json src
+          if ($LASTEXITCODE -ne 0) { throw "git archive failed" }
+          Expand-Archive "$env:RUNNER_TEMP\core-1x.zip" -DestinationPath "$env:RUNNER_TEMP\core-1x"
+          Get-Item "$env:RUNNER_TEMP\core-1x\src\registry.mjs", "$env:RUNNER_TEMP\core-1x\src\control.mjs", "$env:RUNNER_TEMP\core-1x\src\services.mjs" | Out-Null
       - name: Scenario ${{ matrix.name }} (Node on PATH ${{ matrix.node }})
         shell: pwsh
         env:
           FAKE_JAVA_EXE: ${{ runner.temp }}\fakes\fake-java.exe
           FAKE_MARIADB_EXE: ${{ runner.temp }}\fakes\fake-mariadb.exe
+          CORE_1X: ${{ runner.temp }}\core-1x
         run: |
           $beta = Get-ChildItem "$env:RUNNER_TEMP\beta" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
           $stable = Get-ChildItem "$env:RUNNER_TEMP\stable" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1

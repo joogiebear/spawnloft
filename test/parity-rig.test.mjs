@@ -269,10 +269,11 @@ test('every scenario file loads and keeps to the rules', () => {
   assert.ok(all.filter(s => s.expect === 'differ').length >= 4, 'self-tests for output, exit code, tree and requests')
 })
 
-test('the --json scenario runs every command name mcctl.mjs answers', () => {
-  const src = fs.readFileSync(path.join(repo, 'mcctl.mjs'), 'utf8')
-  const table = src.slice(src.indexOf('const COMMANDS = {'))
-  const names = [...table.slice(0, table.indexOf('}')).matchAll(/^\s+([a-z]+):/gm)].map(m => m[1])
+test('the --json scenario runs every command name the core answers', () => {
+  // COMMANDS in spawnloft-core's port/mod.rs: every name mcctl.mjs's table answered
+  const src = fs.readFileSync(path.join(repo, 'rust', 'crates', 'spawnloft-core', 'src', 'port', 'mod.rs'), 'utf8')
+  const table = src.slice(src.indexOf('const COMMANDS: &[&str] = &['))
+  const names = [...table.slice(0, table.indexOf('];')).matchAll(/^\s+"([a-z]+)",/gm)].map(m => m[1])
   assert.ok(names.length >= 59, `found ${names.length} names`)
   const scenario = JSON.parse(fs.readFileSync(path.join(parity, 'scenarios', 'cli-json.json'), 'utf8'))
   const ran = new Set(scenario.steps.filter(s => s.run && s.run.length === 2 && s.run[1] === '--json').map(s => s.run[0]))

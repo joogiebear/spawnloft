@@ -5,16 +5,18 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
-import { hideIps } from '../src/mcp-tools.mjs'
-import { validate } from '../src/mcp.mjs'
+import { findCore } from '../tools/parity/lib/rig.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-// The Node core by default; the Rust core when SPAWNLOFT_CORE_BIN names a built spawnloft-core
-// (rust-internal.yml's parity job), so the same cases hold whichever core serves MCP (C9):
+// spawnloft-core's MCP server: SPAWNLOFT_CORE_BIN (rust-internal.yml's parity job), else the
+// newest build under rust/target. Skipped when there is none:
 //   (cd rust && cargo build -p spawnloft-core --features test-hooks)
 //   SPAWNLOFT_CORE_BIN=$PWD/rust/target/debug/spawnloft-core node --test test/mcp.test.mjs
-const CORE = process.env.SPAWNLOFT_CORE_BIN
-const mcpCommand = (args) => CORE ? [CORE, ['mcp', ...args]] : [process.execPath, [path.join(root, 'spawnloft.mjs'), 'mcp', ...args]]
+// hideIps and the schema validator have their unit tests in spawnloft-lib scrubber.rs and
+// spawnloft-core port/mcp/server.rs.
+const CORE = findCore(root)
+const skip = !CORE && 'build spawnloft-core (cd rust && cargo build -p spawnloft-core --features test-hooks) or set SPAWNLOFT_CORE_BIN'
+const mcpCommand = (args) => [CORE, ['mcp', ...args]]
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-mcp-'))
 const data = path.join(scratch, 'data')
 const instance = path.join(data, 'instances', 'royalplugins')
@@ -73,7 +75,7 @@ function session(messages, args = []) {
 const call = (id, name, args = {}, extraMeta) => ({ id, method: 'tools/call',
   params: { name, arguments: args, ...(extraMeta ? { _meta: extraMeta } : {}) } })
 
-test('legacy clients get the initialize handshake and the non-destructive tool set', async () => {
+test('legacy clients get the initialize handshake and the non-destructive tool set', { skip }, async () => {
   const s = await session([
     { id: 1, method: 'initialize', params: LEGACY },
     { method: 'notifications/initialized' },
@@ -95,12 +97,12 @@ test('legacy clients get the initialize handshake and the non-destructive tool s
   assert.deepEqual(s.byId.get(3).result, {})
 })
 
-test('an unknown legacy version is answered with the newest legacy one', async () => {
+test('an unknown legacy version is answered with the newest legacy one', { skip }, async () => {
   const s = await session([{ id: 1, method: 'initialize', params: { ...LEGACY, protocolVersion: '2023-01-01' } }])
   assert.equal(s.byId.get(1).result.protocolVersion, '2025-11-25')
 })
 
-test('--allow-destructive adds restore, kill and upgrade_minecraft, marked destructive', async () => {
+test('--allow-destructive adds restore, kill and upgrade_minecraft, marked destructive', { skip }, async () => {
   const s = await session([{ id: 1, method: 'tools/list', params: { _meta: meta() } }], ['--allow-destructive'])
   const tools = s.byId.get(1).result.tools
   for (const n of ['restore', 'kill', 'upgrade_minecraft']) {
@@ -112,7 +114,7 @@ test('--allow-destructive adds restore, kill and upgrade_minecraft, marked destr
   assert.ok(!tools.some((t) => t.name === 'rm'))
 })
 
-test('a modern tools/list says how long it may be cached; a legacy one carries no cache fields', async () => {
+test('a modern tools/list says how long it may be cached; a legacy one carries no cache fields', { skip }, async () => {
   const s = await session([
     { id: 'm', method: 'tools/list', params: { _meta: meta() } },
     { id: 'l', method: 'tools/list' },
@@ -127,7 +129,7 @@ test('a modern tools/list says how long it may be cached; a legacy one carries n
   assert.equal(legacy.cacheScope, undefined)
 })
 
-test('modern requests are served statelessly, with resultType and serverInfo', async () => {
+test('modern requests are served statelessly, with resultType and serverInfo', { skip }, async () => {
   const s = await session([
     { id: 'd', method: 'server/discover', params: { _meta: meta() } },
     call('l', 'list_servers', {}, meta()),
@@ -148,7 +150,7 @@ test('modern requests are served statelessly, with resultType and serverInfo', a
   assert.equal(s.byId.get('m').error.code, -32601)
 })
 
-test('no credential or webhook leaves, even from a console line that printed one', async () => {
+test('no credential or webhook leaves, even from a console line that printed one', { skip }, async () => {
   const s = await session([
     call(1, 'list_servers'), call(2, 'server_status', { name: 'royalplugins' }),
     call(3, 'get_logs', { name: 'royalplugins' }), call(4, 'diagnostics', { name: 'royalplugins' }),
@@ -159,7 +161,7 @@ test('no credential or webhook leaves, even from a console line that printed one
   assert.match(s.byId.get(3).result.content[0].text, /password=\[redacted\]/)
 })
 
-test('player IP addresses are hidden unless --show-ips is passed', async () => {
+test('player IP addresses are hidden unless --show-ips is passed', { skip }, async () => {
   const hidden = await session([call(1, 'get_logs', { name: 'royalplugins' })])
   const text = hidden.byId.get(1).result.content[0].text
   assert.ok(!text.includes('203.0.113.7'))
@@ -170,7 +172,7 @@ test('player IP addresses are hidden unless --show-ips is passed', async () => {
   assert.ok(!shown.stdout.includes(secret), 'showing IPs never shows secrets')
 })
 
-test('get_logs filters by level the way Paper writes it, and caps its size', async () => {
+test('get_logs filters by level the way Paper writes it, and caps its size', { skip }, async () => {
   const s = await session([
     call(1, 'get_logs', { name: 'royalplugins', level: 'error' }),
     call(2, 'get_logs', { name: 'royalplugins', level: 'warn' }),
@@ -185,7 +187,7 @@ test('get_logs filters by level the way Paper writes it, and caps its size', asy
   assert.equal(s.byId.get(5).result.isError, true)
 })
 
-test('run_command refuses the commands that bypass the supervisor, before touching RCON', async () => {
+test('run_command refuses the commands that bypass the supervisor, before touching RCON', { skip }, async () => {
   const s = await session(['stop', '/minecraft:stop', 'restart now', 'bukkit:reload confirm', 'rl']
     .map((command, i) => call(i + 1, 'run_command', { name: 'royalplugins', command })))
   for (let id = 1; id <= 5; id++) {
@@ -197,7 +199,7 @@ test('run_command refuses the commands that bypass the supervisor, before touchi
   assert.match(idle.byId.get(1).result.content[0].text, /not running/)
 })
 
-test('mistakes come back as tool errors; unknown tools as protocol errors', async () => {
+test('mistakes come back as tool errors; unknown tools as protocol errors', { skip }, async () => {
   const s = await session([
     call(1, 'server_status', { name: 'nope' }),
     call(2, 'server_status', {}),
@@ -216,7 +218,7 @@ test('mistakes come back as tool errors; unknown tools as protocol errors', asyn
   assert.equal(s.byId.get(null).error.code, -32700)
 })
 
-test('destructive tools describe what they would do until confirmed', async () => {
+test('destructive tools describe what they would do until confirmed', { skip }, async () => {
   const s = await session([
     call(1, 'kill', { name: 'royalplugins' }),
     call(2, 'restore', { name: 'royalplugins' }),
@@ -233,7 +235,7 @@ test('destructive tools describe what they would do until confirmed', async () =
   assert.equal(fs.readFileSync(path.join(data, 'instances.json'), 'utf8').includes('paper-1.21.4-100.jar'), true)
 })
 
-test('backup works through MCP and reports progress to a client that asked for it', async () => {
+test('backup works through MCP and reports progress to a client that asked for it', { skip }, async () => {
   const s = await session([call(1, 'backup', { name: 'royalplugins', scope: 'config' }, { progressToken: 'p1' })])
   const r = s.byId.get(1).result
   assert.equal(r.isError, undefined, r.content[0].text)
@@ -243,7 +245,7 @@ test('backup works through MCP and reports progress to a client that asked for i
   assert.equal(listed.byId.get(1).result.structuredContent.snapshots.length, 1)
 })
 
-test('the restore preview reads the archive, and a broken one is refused before and after confirming', async () => {
+test('the restore preview reads the archive, and a broken one is refused before and after confirming', { skip }, async () => {
   const snapshot = (await session([call(1, 'list_snapshots', { name: 'royalplugins' })]))
     .byId.get(1).result.structuredContent.snapshots[0].name
   const sound = (await session([call(1, 'restore', { name: 'royalplugins' })], ['--allow-destructive'])).byId.get(1).result
@@ -267,7 +269,7 @@ test('the restore preview reads the archive, and a broken one is refused before 
   fs.rmSync(file.replace(/\.tar\.gz$/, '.json'))
 })
 
-test('results read as sentences, with the structured data beside them', async () => {
+test('results read as sentences, with the structured data beside them', { skip }, async () => {
   const s = await session([
     call(1, 'server_status', { name: 'royalplugins' }),
     call(2, 'diagnostics', { name: 'royalplugins' }),
@@ -284,7 +286,7 @@ test('results read as sentences, with the structured data beside them', async ()
   assert.match(s.byId.get(3).result.content[0].text, /has not installed any plugins/)
 })
 
-test('diagnostics with bundle: true writes a zip and the secret is absent', async () => {
+test('diagnostics with bundle: true writes a zip and the secret is absent', { skip }, async () => {
   const s = await session([call(1, 'diagnostics', { name: 'royalplugins', bundle: true })])
   const r = s.byId.get(1).result
   assert.equal(r.isError, undefined, r.content[0].text)
@@ -294,27 +296,7 @@ test('diagnostics with bundle: true writes a zip and the secret is absent', asyn
   assert.ok(!s.stdout.includes(secret), 'secret must not appear in the response')
 })
 
-test('hideIps masks socket addresses and leaves versions and times alone', () => {
-  assert.equal(hideIps('Steve[/10.0.0.2:5000] logged in'), 'Steve[/[ip hidden]:5000] logged in')
-  assert.equal(hideIps('/0:0:0:0:0:0:0:1:25565 lost connection'), '/[ip hidden]:25565 lost connection')
-  for (const kept of ['Paper 1.21.4-100', '[12:00:01 INFO]', 'Java 21.0.4.7', 'https://example.com:443/x']) {
-    assert.equal(hideIps(kept), kept)
-  }
-})
-
-test('validate enforces what the tool schemas declare', () => {
-  const schema = { type: 'object', additionalProperties: false, required: ['a'],
-    properties: { a: { type: 'string', minLength: 1 }, n: { type: 'integer', minimum: 1, maximum: 5 }, e: { type: 'string', enum: ['x'] } } }
-  assert.equal(validate(schema, { a: 'ok', n: 3, e: 'x' }), null)
-  assert.match(validate(schema, {}), /required/)
-  assert.match(validate(schema, { a: '' }), /empty/)
-  assert.match(validate(schema, { a: 'ok', n: 1.5 }), /whole number/)
-  assert.match(validate(schema, { a: 'ok', n: 9 }), /at most/)
-  assert.match(validate(schema, { a: 'ok', e: 'y' }), /one of/)
-  assert.match(validate(schema, []), /object/)
-})
-
-test('config files: listed, read with secrets hidden, changed with a one-file snapshot that restores', async () => {
+test('config files: listed, read with secrets hidden, changed with a one-file snapshot that restores', { skip }, async () => {
   fs.writeFileSync(path.join(instance, 'server.properties'), `motd=Fixture\nserver-port=45611\nrcon.port=45612\nrcon.password=${secret}\n`)
   const cfg = path.join(instance, 'plugins', 'Example', 'config.yml')
   fs.mkdirSync(path.dirname(cfg), { recursive: true })
@@ -366,7 +348,7 @@ test('config files: listed, read with secrets hidden, changed with a one-file sn
   assert.equal(fs.readFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'utf8'), 'untouched: changed later\n')
 })
 
-test('what an assistant does is in the activity log, under the name its app gives', async () => {
+test('what an assistant does is in the activity log, under the name its app gives', { skip }, async () => {
   const s = await session([
     { id: 1, method: 'initialize', params: { ...LEGACY, clientInfo: { name: 'Fixture Assistant', version: '1' } } },
     { method: 'notifications/initialized' },

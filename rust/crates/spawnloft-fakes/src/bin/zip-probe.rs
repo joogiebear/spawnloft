@@ -1,7 +1,5 @@
-//! Reads and writes zips from a Rust process through spawnloft-lib's `zip` module, so
-//! test/zip-cross-process.test.mjs can set it against `zip.mjs` and the jar readers of
-//! `plugins.mjs` (its twin is test/fixtures/zip-node-probe.mjs, with the same commands and
-//! output). Test-only; never shipped.
+//! Reads and writes zips from a Rust process through spawnloft-lib's `zip` module; the zip-fuzz
+//! job of rust-internal.yml makes its seed corpus with it. Test-only; never shipped.
 //!
 //!   zip-probe create <zip> <cwd> [--zip64] [--exclude <name>]... -- <member>...   createZip
 //!   zip-probe list <zip>                    zipEntries, as JSON

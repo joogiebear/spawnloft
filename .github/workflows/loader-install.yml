@@ -4,30 +4,15 @@
 # game window. Runs on pull requests that change the loaders' code, weekly, and by hand.
 #
 # The profiles are set up by the Rust core's client (spawnloft-core, rust/PLAN-CORE-PORT.md C7b);
-# the checks read what it wrote with the Node core's readers. By hand, `core: node` runs the
-# Node core's client instead, until it leaves in C10.
+# the checks read what it wrote on disk: the stamp, a second setup, the libraries.
 name: loader-install
 
 on:
   workflow_dispatch:
-    inputs:
-      core:
-        description: Which core sets the loaders up
-        type: choice
-        options: [rust, node]
-        default: rust
   schedule:
     - cron: '17 5 * * 1'
   pull_request:
     paths:
-      - src/client-forge-install.mjs
-      - src/client-neoforge.mjs
-      - src/client-forge.mjs
-      - src/client-forge-legacy.mjs
-      - src/client-loaders.mjs
-      - src/client-install.mjs
-      - src/client-meta.mjs
-      - src/client.mjs
       - rust/crates/spawnloft-lib/src/client/**
       - rust/crates/spawnloft-core/src/port/client.rs
       - rust/crates/spawnloft-lib/src/zip.rs
@@ -68,7 +53,6 @@ jobs:
           node-version-file: .node-version
       # the check job's cache from v2 (rust-internal.yml), restored only: this workflow saves none
       - uses: actions/cache/restore@v4
-        if: inputs.core != 'node'
         with:
           path: |
             ~/.cargo/registry
@@ -77,10 +61,9 @@ jobs:
           key: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Build spawnloft-core
-        if: inputs.core != 'node'
         working-directory: rust
         run: |
           rustup toolchain install
           cargo build -p spawnloft-core --locked
       - name: Set ${{ matrix.loader }} ${{ matrix.build }} up for Minecraft ${{ matrix.mc }}
-        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }} ${{ matrix.and && format('--and {0}', matrix.and) || '' }} ${{ inputs.core != 'node' && '--core rust/target/debug/spawnloft-core' || '' }}
+        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }} ${{ matrix.and && format('--and {0}', matrix.and) || '' }} --core rust/target/debug/spawnloft-core
