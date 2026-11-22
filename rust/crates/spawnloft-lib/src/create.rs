@@ -88,7 +88,7 @@ pub fn stray_jars(dir: &str, current: &str) -> Vec<(String, u64)> {
 
 /// Whether two names are one file: libuv's copyfile returns early then, on every system.
 #[cfg(unix)]
-fn same_file(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_file(a: &Path, b: &Path) -> bool {
     use std::os::unix::fs::MetadataExt;
     matches!(
         (std::fs::metadata(a), std::fs::metadata(b)),
@@ -97,7 +97,7 @@ fn same_file(a: &Path, b: &Path) -> bool {
 }
 
 #[cfg(windows)]
-use crate::platform::same_file;
+pub(crate) use crate::platform::same_file;
 
 /// `fs.copyFileSync(src, dest)`, with Node's error: `ENOENT: ..., copyfile 'a' -> 'b'`.
 pub fn copyfile(src: &Path, dest: &Path) -> Result<(), Failure> {
