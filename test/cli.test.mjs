@@ -7,11 +7,19 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync, spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { metricCursor, metricsCsv } from '../src/cli-metrics.mjs'
+import { findCore } from '../tools/parity/lib/rig.mjs'
 import { createRequire } from 'node:module'
 const { writeCliLaunchers } = createRequire(import.meta.url)('../desktop/cli-launchers.cjs')
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// spawnloft-core: SPAWNLOFT_CORE_BIN, else the newest build under rust/target. `spawnloft` and
+// `mcctl` are both forwarders to it in every package, so both names run it here.
+const CORE = findCore(root)
+const skip = !CORE && 'build spawnloft-core (cd rust && cargo build -p spawnloft-core) or set SPAWNLOFT_CORE_BIN'
+// the CSV the metrics command writes: one row per sample, quoted name and run
+const csvField = value => '"' + String(value ?? '').replaceAll('"', '""') + '"'
+const metricsCsv = data => 'instance,run_id,timestamp,cpu_percent,rss_mib,cores\n' + data.samples.map(row =>
+  [csvField(data.instance), csvField(data.runId), row.timestamp, row.cpuPercent, row.rssMiB, data.cores].join(',') + '\n').join('')
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-cli-'))
 const data = path.join(scratch, 'data')
 const instance = path.join(data, 'instances', 'royalplugins')
@@ -36,14 +44,14 @@ const at = Math.floor(Date.now() / 1000)
 fs.writeFileSync(metrics, `${at - 20} 12.5 128\n${at - 10} 6.25 256\n`)
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-function cli(args, name = 'spawnloft') {
-  try { return { code: 0, stdout: execFileSync(process.execPath, [path.join(root, `${name}.mjs`), ...args],
+function cli(args) {
+  try { return { code: 0, stdout: execFileSync(CORE, args,
     { env, encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' } }
   catch (error) { if (!Number.isInteger(error.status)) throw error
     return { code: error.status, stdout: String(error.stdout), stderr: String(error.stderr) } }
 }
-function json(args, code = 0, name) {
-  const result = cli(args, name)
+function json(args, code = 0) {
+  const result = cli(args)
   assert.equal(result.code, code, JSON.stringify(result))
   assert.equal(result.stderr, '')
   assert.equal(result.stdout.trim().split('\n').length, 1)
@@ -53,9 +61,9 @@ function json(args, code = 0, name) {
   return parsed
 }
 
-test('both CLI names return the same versioned status without registry credentials', () => {
+test('status returns the same versioned status whatever the flag order, without registry credentials', { skip }, () => {
   const old = json(['status', 'royalplugins', '--json'])
-  const next = json(['status', '--json', 'royalplugins'], 0, 'spawnloft')
+  const next = json(['status', '--json', 'royalplugins'])
   assert.deepEqual(next, old)
   assert.equal(next.command, 'status')
   assert.equal(next.data.status, 'stopped')
@@ -69,7 +77,7 @@ test('both CLI names return the same versioned status without registry credentia
   assert.ok(!JSON.stringify(next).includes(secret))
 })
 
-test('both CLI names reject removed database config commands without changing plugin files or credentials', () => {
+test('removed database config commands are refused without changing plugin files or credentials', { skip }, () => {
   const folder = path.join(instance, 'plugins', 'LuckPerms')
   fs.mkdirSync(folder, { recursive: true })
   const config = path.join(folder, 'config.yml')
@@ -77,24 +85,22 @@ test('both CLI names reject removed database config commands without changing pl
   fs.writeFileSync(config, original)
   const registry = path.join(data, 'instances.json')
   const before = fs.readFileSync(registry, 'utf8')
-  for (const name of ['spawnloft', 'mcctl']) {
-    for (const args of [['db', 'apply', 'externaldb', 'royalplugins', 'luckperms'], ['db', 'plugins', 'royalplugins']]) {
-      const result = cli(args, name)
-      assert.notEqual(result.code, 0)
-      assert.match(result.stderr, /usage:/)
-      assert.ok(!result.stdout.includes(secret))
-      assert.equal(fs.readFileSync(config, 'utf8'), original)
-      assert.equal(fs.readFileSync(registry, 'utf8'), before)
-    }
-    const credentials = cli(['db', 'creds', 'externaldb', 'royalplugins'], name)
-    assert.equal(credentials.code, 0, JSON.stringify(credentials))
-    assert.ok(credentials.stdout.includes(secret), 'explicit credential display remains available')
-    assert.match(credentials.stdout, /Configure your plugins manually/)
+  for (const args of [['db', 'apply', 'externaldb', 'royalplugins', 'luckperms'], ['db', 'plugins', 'royalplugins']]) {
+    const result = cli(args)
+    assert.notEqual(result.code, 0)
+    assert.match(result.stderr, /usage:/)
+    assert.ok(!result.stdout.includes(secret))
     assert.equal(fs.readFileSync(config, 'utf8'), original)
+    assert.equal(fs.readFileSync(registry, 'utf8'), before)
   }
+  const credentials = cli(['db', 'creds', 'externaldb', 'royalplugins'])
+  assert.equal(credentials.code, 0, JSON.stringify(credentials))
+  assert.ok(credentials.stdout.includes(secret), 'explicit credential display remains available')
+  assert.match(credentials.stdout, /Configure your plugins manually/)
+  assert.equal(fs.readFileSync(config, 'utf8'), original)
 })
 
-test('JSON inventories and diagnostics retain useful fields and aliases agree', () => {
+test('JSON inventories and diagnostics retain useful fields and aliases agree', { skip }, () => {
   const plugins = json(['plugins', 'royalplugins', '--json'])
   assert.equal(plugins.data.plugins[0].file, 'manual.jar')
   assert.equal(plugins.data.plugins[0].managed, false)
@@ -107,7 +113,7 @@ test('JSON inventories and diagnostics retain useful fields and aliases agree', 
   assert.deepEqual(json(['why', 'royalplugins', '--json']), diagnostics)
 })
 
-test('usage errors are JSON and occur before unsupported mutations; operation failures use exit 1', () => {
+test('usage errors are JSON and occur before unsupported mutations; operation failures use exit 1', { skip }, () => {
   for (const args of [['plugins', 'royalplugins', 'disable', 'manual', '--json'],
     ['remove', 'royalplugins', '--json'], ['status', 'royalplugins', '--json', '--typo'],
     ['metrics', 'royalplugins', '--json', '--csv'], ['metrics', 'royalplugins', '--json', '--seconds=zero'],
@@ -118,7 +124,7 @@ test('usage errors are JSON and occur before unsupported mutations; operation fa
   assert.equal(json(['status', 'missing', '--json'], 1).error.code, 'COMMAND_FAILED')
 })
 
-test('backup creation emits one JSON result and inventory reports the finished archive', () => {
+test('backup creation emits one JSON result and inventory reports the finished archive', { skip }, () => {
   const made = json(['backup', 'royalplugins', '--scope=plugins', '--json'])
   assert.ok(fs.existsSync(made.data.path))
   assert.ok(made.data.sizeBytes > 0)
@@ -128,7 +134,7 @@ test('backup creation emits one JSON result and inventory reports the finished a
   assert.equal(history.data.backups[0].path, made.data.path)
 })
 
-test('metrics JSON and CSV export the same numbers; explicit output never overwrites a run', () => {
+test('metrics JSON and CSV export the same numbers; explicit output never overwrites a run', { skip }, () => {
   const snapshot = json(['metrics', 'royalplugins', '--json'])
   assert.deepEqual(snapshot.data.samples.map(row => [row.cpuPercent, row.rssMiB]), [[12.5, 128], [6.25, 256]])
   assert.equal(snapshot.data.cpuScale, 'whole-machine')
@@ -143,7 +149,7 @@ test('metrics JSON and CSV export the same numbers; explicit output never overwr
   assert.equal(fs.readFileSync(output, 'utf8'), csv.stdout)
 })
 
-test('doctor JSON reports checks without clearing stale runtime state', () => {
+test('doctor JSON reports checks without clearing stale runtime state', { skip }, () => {
   const file = path.join(run, 'state.json')
   const stale = JSON.stringify({ daemonPid: 2147483647, javaPid: 2147483646, startedAt: 1, running: true })
   fs.writeFileSync(file, stale)
@@ -155,20 +161,8 @@ test('doctor JSON reports checks without clearing stale runtime state', () => {
   } finally { fs.unlinkSync(file) }
 })
 
-test('follow cursor avoids duplicates across trimming and marks a new server run', () => {
-  const cursor = metricCursor()
-  const frame = (runId, times) => ({ runId, samples: times.map(at => ({ at })) })
-  assert.equal(cursor(frame('a', [1, 2])).rows.length, 2)
-  assert.deepEqual(cursor(frame('a', [1, 2])).rows, [])
-  assert.deepEqual(cursor(frame('a', [])).rows, [])
-  assert.deepEqual(cursor(frame('a', [1, 2])).rows, [])
-  assert.deepEqual(cursor(frame('a', [2, 3])).rows, [{ at: 3 }])
-  assert.equal(cursor(frame('b', [])).reset, true)
-  assert.deepEqual(cursor(frame('b', [4])).rows, [{ at: 4 }])
-})
-
-test('follow emits parseable JSON Lines, only new samples, and reset events', { timeout: 15000 }, async () => {
-  const child = spawn(process.execPath, [path.join(root, 'spawnloft.mjs'), 'metrics', '--follow', 'royalplugins', '--json'],
+test('follow emits parseable JSON Lines, only new samples, and reset events', { timeout: 15000, skip }, async () => {
+  const child = spawn(CORE, ['metrics', '--follow', 'royalplugins', '--json'],
     { env, stdio: ['ignore', 'pipe', 'pipe'] })
   const closed = once(child, 'close')
   const frames = []

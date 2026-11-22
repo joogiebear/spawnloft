@@ -13,16 +13,37 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { parseArgs } from '../../src/args.mjs'
 import { runScenario, findCore, SIDES } from './lib/rig.mjs'
 import { declaredTable } from './declared-differences.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repo = path.resolve(here, '..', '..')
 
+const USAGE = 'Usage: node tools/parity/run.mjs [scenario.json | folder ...] [--core <bin>] [--only <name>] [--keep] [--out <dir>] [--update-golden] [--record] [--frozen check|off]\n'
+
 function usage(msg) {
-  process.stderr.write(`${msg}\nUsage: node tools/parity/run.mjs [scenario.json | folder ...] [--core <bin>] [--only <name>] [--keep] [--out <dir>] [--update-golden] [--record] [--frozen check|off]\n`)
+  process.stderr.write(`${msg}\n${USAGE}`)
   process.exit(2)
+}
+
+// The rig's own options: --key value (the next argument unless it starts with "-"), --key=value,
+// --two-words as twoWords, and "--" makes the rest positional. Boolean ones never take a value.
+export function parseArgs(argv, booleanFlags = []) {
+  const flags = {}
+  const positional = []
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]
+    if (arg === '--') { positional.push(...argv.slice(i + 1)); break }
+    if (arg === '-h') { flags.help = true; continue }
+    if (!arg.startsWith('--')) { positional.push(arg); continue }
+    const [rawKey, inline] = arg.slice(2).split(/=(.*)/s)
+    const key = rawKey.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+    if (inline !== undefined) flags[key] = inline
+    else if (booleanFlags.includes(key)) flags[key] = true
+    else if (argv[i + 1] && !argv[i + 1].startsWith('-')) flags[key] = argv[++i]
+    else flags[key] = true
+  }
+  return { flags, positional }
 }
 
 export function loadScenarios(targets) {
@@ -44,9 +65,10 @@ export function loadScenarios(targets) {
 }
 
 async function main() {
-  const { flags, positional } = parseArgs(process.argv.slice(2), { booleanFlags: ['keep', 'updateGolden', 'declared', 'record'] })
+  const { flags, positional } = parseArgs(process.argv.slice(2), ['keep', 'updateGolden', 'declared', 'record', 'help'])
+  if (flags.help) { process.stdout.write(USAGE); return }
   if (flags.declared) { process.stdout.write(declaredTable() + '\n'); return }
-  const known = ['core', 'only', 'keep', 'out', 'sides', 'updateGolden', 'declared', 'scratch', 'record', 'recordFrom', 'frozen']
+  const known = ['core', 'only', 'keep', 'out', 'sides', 'updateGolden', 'declared', 'scratch', 'record', 'recordFrom', 'frozen', 'help']
   for (const k of Object.keys(flags)) if (!known.includes(k)) usage(`unknown option --${k}`)
   const core = flags.core ? path.resolve(flags.core) : findCore(repo)
   if (!core || !fs.existsSync(core)) usage('no spawnloft-core found: build it (cd rust && cargo build -p spawnloft-core --features test-hooks) or pass --core')

@@ -6,49 +6,17 @@
   which keeps Mojang's files unchanged; the 1.5.2, 1.7.10, 1.12.2 and 1.17.1 files are
   byte-identical to the ones fetched earlier for the Log4Shell fix. The mirror's `1.18.1` is
   stale (it still names log4j 2.14.1), so it is not used.
-- `version_manifest_eras.json`: Mojang's `version_manifest_v2.json` from the same mirror, cut
-  down to the era ids plus the odd id shapes (`1.21.11-rc3`, `25w46a`, `3D Shareware v1.34`,
-  `1.RV-Pre1`, `1.14.2 Pre-Release 4`).
-- `1.21.11.json` (top level): a trimmed 1.21.11 with a made-up old-style natives row, used by the
-  tests that pin the natives arch rules. `versions/1.21.11.json` is the real one.
+- `1.21.11.json` (top level): a trimmed 1.21.11 with a made-up old-style natives row. The parity
+  scenarios copy it into a data folder, and spawnloft-lib's `client/library.rs` tests read it.
+  `versions/1.21.11.json` is the real one.
 - `fabric-profile.json`: Fabric's own profile for loader 0.19.5 on 1.21.11.
-  `fabric-profile-26.3.json` and `fabric-profile-1.14.4.json` are made from it by changing the
-  id, `inheritsFrom` and the intermediary coordinate, which are the only parts of a Fabric profile
-  that depend on the game version (meta.fabricmc.net could not be reached from where these were
-  made).
-- `fabric-game-versions.json`: synthetic, in the shape of Fabric's `/v2/versions/game` list
-  (`{ version, stable }`, newest first), holding the era ids Fabric builds for (1.14 on) and the
-  spaced `1.14.2 Pre-Release 4`; nothing before 1.14.
 - `future.json`: synthetic. `26.4-snapshot-6` turned into `27.1` with one of each thing SpawnLoft
   cannot know: `minimumLauncherVersion` 22, a `${render_backend}` game argument, a rule with an
   `os.kernel` key, an osx rule with a `versionRange`, natives under `${natives_directory}/native/libs`,
-  and an asset index (`assets/future-pack.json`) with a `layout` flag.
-- `assets/`: synthetic asset indexes with three entries each, one per layout Mojang has used:
-  `objects.json` (no flag), `legacy.json` (`virtual: true`, the 1.6.1 to 1.7.2 index),
-  `pre-1.6.json` (`map_to_resources: true`), plus `bad.json` (a `../x` entry) and
-  `future-pack.json`. The flags match Mojang's files; the entries and hashes are made up.
-- `java-runtime-all.json`: synthetic, in the shape of Mojang's Java runtime list (`all.json`):
-  the eight platforms and every component, with the gaps the real file has (nothing for
-  `jre-legacy` or `java-runtime-alpha` on `mac-os-arm64`, no `delta` or `epsilon` on
-  `windows-x86`, only `jre-legacy` on `linux-i386`) plus `gamecore` and `minecraft-java-exe`,
-  which SpawnLoft ignores. Two rows differ from the real file and are read by no code: the real
-  `windows-arm64` has no `java-runtime-beta`, and the real `windows-x86` has
-  `java-runtime-gamma-snapshot`. Version names and every hash but two are made up; the
-  `java-runtime-epsilon`/`windows-x64` and `jre-legacy`/`mac-os` rows point at the two manifests
-  below by their real sha1.
-- `java-runtime-epsilon-windows-x64.json`, `jre-legacy-mac-os.json`: synthetic component
-  manifests (directories, files with `raw` and `lzma`, one file without `lzma`, executables, and
-  on macOS the `jre.bundle` layout with one link inside it). Each file's body is
-  `runtime file <path>\n`, which is what its sha1 and size are of. The tests make the bad
-  variants (lzma only, links out of the folder or on Windows, `..`) from them.
-  Made by a one-off script, since piston-meta could not be reached from where these were made.
+  and an asset index with a `layout` flag.
 
-`../client-fixtures.mjs` loads all of these and lists the seven OS/arch pairs. It imports the
-client code, so a test sets `MCCTL_DATA_ROOT` before it imports the loader.
-
-A test file that removes its scratch folder in `after()` does every top-level `await` before its
-first `test()`: an await between tests lets the tests above it finish, and `after()` runs, before
-the tests below it are registered, which then run against a folder that is gone.
+`versions/`, `1.21.11.json`, `future.json` and `fabric-profile.json` are what spawnloft-lib's
+`client/library.rs` `meta_dump` test (ignored by default) resolves for every OS and arch.
 
 ## Mod loaders (`loaders/`)
 
@@ -71,9 +39,4 @@ sha1, and when it was captured.
 - `quilt/`: Quilt meta's game and loader lists, the loader list and profile for Quilt Loader
   0.30.2 on 1.20.1 and 26.3, and `sidecars-*.json`: per profile library, the `.sha1` file its maven
   publishes (Quilt's rows carry no checksum).
-- `fabric/`: Fabric meta's real game list and the loader lists for 1.21.11 and 26.3, beside the
-  synthetic ones above.
-
-`expected/eras/`: the command line of every era (vanilla) and every Fabric profile on every
-machine, made with the launcher as it was before the loader groundwork; the groundwork must
-reproduce them byte for byte.
+- `fabric/`: Fabric meta's real game list and the loader lists for 1.21.11 and 26.3.
