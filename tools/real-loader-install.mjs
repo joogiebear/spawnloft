@@ -72,7 +72,10 @@ function runCore(args, { onLine = () => {} } = {}) {
     })
     child.on('error', reject)
     child.on('close', (code) => {
-      if (carry) console.log(`[${secs()}] ${carry}`)
+      if (carry) {
+        console.log(`[${secs()}] ${carry}`)
+        try { onLine(carry) } catch (err) { failure ??= err }
+      }
       if (failure) reject(failure)
       else if (code !== 0) reject(new Error(`spawnloft-core ${args.join(' ')} exited ${code}`))
       else resolve(stdout)

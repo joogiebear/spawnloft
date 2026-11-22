@@ -30,6 +30,10 @@ on:
       - src/client.mjs
       - rust/crates/spawnloft-lib/src/client/**
       - rust/crates/spawnloft-core/src/port/client.rs
+      - rust/crates/spawnloft-lib/src/zip.rs
+      - rust/crates/spawnloft-lib/src/download.rs
+      - rust/crates/spawnloft-lib/src/download/**
+      - rust/crates/spawnloft-lib/src/java.rs
       - tools/real-loader-install.mjs
       - .github/workflows/loader-install.yml
 

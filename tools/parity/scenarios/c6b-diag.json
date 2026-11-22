@@ -1,5 +1,5 @@
 {
-  "about": "C6b's `diag`: its usage and refusals (no target, two names, --lines 0, bare --lines, --client and --out with no value, an unknown server, a database, an unknown profile), and bundles for a server, a client profile and both, in text and --json: the console, daemon log, server.properties with its secrets out, crash reports, plugins, the client's latest.log, its process capture back from log4j XML with what latest.log already has dropped, mods, options.txt, the timeline, the failure shapes of both, and every cleaning (MCP secrets, player IPs, the account folder in paths, the Microsoft account's name and uuid, harness, access, session and panel tokens). The zips are compared by their entry names and order; their sizes and checksums differ by summary.json's version and by the deflate (declared), and their contents are what --json and the text form print.",
+  "about": "C6b's `diag`: its usage and refusals (no target, two names, --lines 0, bare --lines, --client and --out with no value, an unknown server, a database, an unknown profile, an empty --client), and bundles for a server, a client profile and both, in text and --json: the console, daemon log, server.properties with its secrets out, crash reports, plugins, the client's latest.log, its process capture back from log4j XML with what latest.log already has dropped, mods, options.txt, the timeline, the failure shapes of both, and every cleaning (MCP secrets, player IPs, the account folder in paths, the Microsoft account's name and uuid, harness, access, session and panel tokens). The zips are compared by their entry names and order; their sizes and checksums differ by summary.json's version and by the deflate (declared), and their contents are what --json and the text form print.",
   "normalize": [
     {
       "pattern": "size=\\d+ csize=\\d+ crc=[0-9a-f]+",
@@ -76,7 +76,7 @@
     },
     {
       "write": "data/run/alpha/console.log",
-      "text": "[12:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[12:00:01] [Server thread/INFO]: UUID of player Wunga_ is 0123abcd-0000-1111-2222-333344445555\n[12:00:02] [Server thread/INFO]: Wunga_[/203.0.113.5:51234] logged in\n[12:00:03] [Server thread/INFO]: loaded from /home/bob/servers/alpha and C:\\Users\\bob\\x\n[12:00:04] [Server thread/INFO]: panel v1.api.1.2.abc.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA and -Dspawnloft.harness.token=abc123 --accessToken xyz token:sess:u\n[12:00:05] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\njava.net.BindException: Address already in use\n\tat sun.nio.ch.Net.bind(Native Method)\n[12:00:06] [Server thread/INFO]: Stopping server\n",
+      "text": "[12:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[12:00:01] [Server thread/INFO]: UUID of player Wunga_ is 0123abcd-0000-1111-2222-333344445555\n[12:00:02] [Server thread/INFO]: Wunga_[/203.0.113.5:51234] logged in\n[12:00:03] [Server thread/INFO]: loaded from /home/bob/servers/alpha and C:\\Users\\bob\\x\n[12:00:04] [Server thread/INFO]: panel v1.api.1.2.abc.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA and -Dspawnloft.harness.token=abc123 --accessToken xyz token:sess:u\n[12:00:05] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\njava.net.BindException: Address already in use\n\tat sun.nio.ch.Net.bind(Native Method)\n[12:00:06] [Server thread/INFO]: chained v1.api.1.2.a.v1.api.3.4.b.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA end\n[12:00:07] [Server thread/INFO]: Stopping server\n",
       "mtime": "2026-11-01T12:00:06Z"
     },
     {
@@ -117,7 +117,7 @@
     },
     {
       "write": "data/client/profiles/p/logs/latest.log",
-      "text": "[12:10:00] [Render thread/INFO]: Setting user: Wunga_\n[12:10:01] [Render thread/INFO]: Connecting to localhost, 47961\n[12:10:02] [Render thread/ERROR]: Failed to connect to the server\n[12:10:03] [Render thread/INFO]: Stopping!\n",
+      "text": "[12:10:00] [Render thread/INFO]: Setting user: Wunga_\n[12:10:01] [Render thread/INFO]: Connecting to localhost, 47961\n[12:10:02] [Render thread/ERROR]: Failed to connect to the server\n[12:10:03] [Render thread/ERROR]: Failed to verify username Wunga_ from /203.0.113.7:25565 via C:\\Users\\alice\\x\n[12:10:04] [Render thread/INFO]: Stopping!\n",
       "mtime": "2026-11-01T12:10:03Z"
     },
     {
@@ -267,6 +267,28 @@
     {
       "run": [
         "diag",
+        "--client="
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--client=",
+        "--json",
+        "--out",
+        "{run}/empty-client"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "diag",
         "alpha",
         "--out",
         "{run}/reports"
@@ -341,7 +363,9 @@
         "p",
         "--json",
         "--lines",
-        "0x10"
+        "0x10",
+        "--out",
+        "{run}/hex"
       ],
       "expect": {
         "code": 0

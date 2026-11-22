@@ -208,8 +208,9 @@ fn collect_server(layout: &Layout, name: &str, lines: usize, now: f64) -> Result
         timeline = log_timeline::merge_timelines(vec![server, daemon]);
     }
 
+    // path.join(inst.dir, 'crash-reports') refuses a folder that is not text
+    let dir = registry::dir_text(&inst)?;
     let findings = diagnose::diagnose(&console_lines, &diagnose::Context::of(&inst));
-    let dir = js::string(inst.get("dir"));
     let (_, crashes) = diagnose::crash_reports(&dir, 3)?;
 
     let health = java::health();
@@ -411,18 +412,34 @@ fn collect_client(layout: &Layout, name: &str, lines: usize, now: f64) -> Result
 /// `v1.<kind>.[redacted]`. `(?![\w-])` after the 43-character tail is read as "the tail, taken
 /// whole, is 43 long": nothing before it can hold a dot, so no other split could match.
 fn redact_panel_tokens(s: &str) -> String {
+    // anchored at its start, so each place a token could begin is tried on its own, as
+    // JavaScript's scan does: a failed candidate does not hide one that starts inside it
     static RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?-u:\b)v1\.(login|api)\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]*\.([A-Za-z0-9_-]+)")
+        Regex::new(r"^v1\.(login|api)\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]*\.([A-Za-z0-9_-]+)")
             .expect("panel token pattern")
     });
-    RE.replace_all(s, |c: &regex::Captures| {
-        if c[2].len() == 43 {
-            format!("v1.{}.[redacted]", &c[1])
-        } else {
-            c[0].to_string()
+    let bytes = s.as_bytes();
+    let mut out = String::with_capacity(s.len());
+    let mut copied = 0;
+    let mut i = 0;
+    while let Some(off) = s[i..].find("v1.") {
+        let at = i + off;
+        // \b before the v: the character before it is not a word character
+        let boundary = at == 0 || !is_word(bytes[at - 1] as char);
+        if boundary
+            && let Some(c) = RE.captures(&s[at..])
+            && c[2].len() == 43
+        {
+            out.push_str(&s[copied..at]);
+            out.push_str(&format!("v1.{}.[redacted]", &c[1]));
+            copied = at + c[0].len();
+            i = copied;
+            continue;
         }
-    })
-    .into_owned()
+        i = at + 1;
+    }
+    out.push_str(&s[copied..]);
+    out
 }
 
 fn is_word(c: char) -> bool {
@@ -489,6 +506,9 @@ pub fn build_bundle(
     lines: usize,
     scrub: &dyn Fn(&str) -> String,
 ) -> Result<Bundle, Failure> {
+    // `if (server)`, `if (client)`: an empty name is no name
+    let server = server.filter(|s| !s.is_empty());
+    let client = client.filter(|c| !c.is_empty());
     if server.is_none() && client.is_none() {
         return Err(Failure::user("diag needs a server or a client profile"));
     }
@@ -565,7 +585,7 @@ pub fn build_bundle(
     for f in &mut bundle.files {
         f.text = clean(&f.text);
     }
-    let finding = |f: &Finding| json!({ "id": f.id, "title": clean(f.title), "advice": clean(&f.advice), "line": f.line, "at": f.at });
+    let finding = |f: &Finding| json!({ "id": f.id, "title": clean(f.title), "advice": clean(&f.advice), "line": clean(&f.line), "at": f.at });
     bundle.findings_server = server_findings.iter().map(finding).collect();
     bundle.findings_client = client_findings.iter().map(finding).collect();
     for e in &mut bundle.timeline {
@@ -584,7 +604,23 @@ pub fn build_bundle(
     {
         *j = clean_value(j);
     }
+    // the Java and the folders the last run was launched with: paths that name the account
+    if let Some(c) = bundle.client.as_mut()
+        && let Some(Some(launch)) = c.get_mut("launch")
+    {
+        *launch = clean_deep(launch, &clean);
+    }
     Ok(bundle)
+}
+
+/// Every string inside a value cleaned, keys and shape kept.
+fn clean_deep(v: &Value, clean: &dyn Fn(&str) -> String) -> Value {
+    match v {
+        Value::String(s) => Value::String(clean(s)),
+        Value::Array(items) => Value::Array(items.iter().map(|x| clean_deep(x, clean)).collect()),
+        Value::Object(m) => Value::Object(m.iter().map(|(k, x)| (k.clone(), clean_deep(x, clean))).collect()),
+        other => other.clone(),
+    }
 }
 
 impl Bundle {
@@ -789,6 +825,11 @@ mod tests {
         assert_eq!(redact_panel_tokens(&long), long);
         let word = format!("xv1.api.1.2.abc.{tail}");
         assert_eq!(redact_panel_tokens(&word), word);
+        // a candidate that fails does not hide a token that starts inside it
+        assert_eq!(
+            redact_panel_tokens(&format!("v1.api.1.2.a.v1.api.3.4.b.{tail}")),
+            "v1.api.1.2.a.v1.api.[redacted]"
+        );
     }
 
     #[test]

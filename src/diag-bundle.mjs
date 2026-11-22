@@ -255,17 +255,20 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   const clean = (s) => (typeof s === 'string' ? hideIdentities(scrub(redactAccountName(s))).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]').replace(/(--accessToken[\s=]+)\S+/g, '$1[redacted]').replace(/\btoken:[^:\s]+:/g, 'token:[redacted]:').replace(PANEL_TOKEN, 'v1.$1.[redacted]') : s)
   if (facts.client?.account?.type === 'microsoft') facts.client.account = { type: 'microsoft', name: MICROSOFT_PLACEHOLDER }
   for (const f of files) f.text = clean(f.text)
-  for (const finding of findings.server) {
+  // the matched line too: it is a console line like any other
+  for (const finding of [...findings.server, ...findings.client]) {
     finding.title = clean(finding.title)
     finding.advice = clean(finding.advice)
-  }
-  for (const finding of findings.client) {
-    finding.title = clean(finding.title)
-    finding.advice = clean(finding.advice)
+    finding.line = clean(finding.line)
   }
   timeline = timeline.map(e => ({ ...e, text: clean(e.text), raw: clean(e.raw), thread: clean(e.thread) }))
   if (facts.server?.java) facts.server.java.path = clean(facts.server.java.path)
   if (facts.client?.java) facts.client.java = clean(facts.client.java)
+  // the Java and the folders the last run was launched with: paths that name the account
+  const cleanDeep = (v) => (typeof v === 'string' ? clean(v)
+    : Array.isArray(v) ? v.map(cleanDeep)
+      : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cleanDeep(x)])) : v)
+  if (facts.client?.launch) facts.client.launch = cleanDeep(facts.client.launch)
 
   return { facts, timeline, findings, files }
 }

@@ -173,22 +173,7 @@ pub fn diagnose_context(inst: &Instance) -> diagnose::Context {
 
 /// `inst.dir` where Node passes it to `path.join`, which refuses anything but a string.
 pub fn dir_text(inst: &Instance) -> Result<String, Failure> {
-    match inst.get("dir") {
-        Some(Value::String(s)) => Ok(s.clone()),
-        other => Err(Failure::Internal {
-            head: "TypeError [ERR_INVALID_ARG_TYPE]".into(),
-            message: format!(
-                "The \"path\" argument must be of type string. {}",
-                received(other)
-            ),
-            code: Some("ERR_INVALID_ARG_TYPE".into()),
-        }),
-    }
-}
-
-/// The tail of Node's ERR_INVALID_ARG_TYPE message.
-pub fn received(v: Option<&Value>) -> String {
-    spawnloft_lib::js::received(v)
+    registry::dir_text(inst)
 }
 
 /// `crashReports(inst, { limit })` as JSON.

@@ -61,7 +61,7 @@ pub fn private_files(layout: &Layout) -> Result<Vec<Secret>, Failure> {
     ];
     for inst in registry::list_instances(Path::new(&layout.registry_file))? {
         files.push(secret(
-            jspath::join(&[&dir_of(&inst), "server.properties"]).into(),
+            jspath::join(&[&registry::dir_text(&inst)?, "server.properties"]).into(),
             format!("{}: server.properties (RCON password)", inst.name),
         ));
     }

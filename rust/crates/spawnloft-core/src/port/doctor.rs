@@ -93,7 +93,8 @@ pub fn diag(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         Some(None) => return Err(Failure::user("--client needs a profile name")),
         Some(Some(c)) => Some(c.to_string()),
     };
-    if name.is_none() && client.is_none() {
+    // `!name && !flags.client`: an empty name is no name
+    if name.as_deref().is_none_or(str::is_empty) && client.as_deref().is_none_or(str::is_empty) {
         return Err(Failure::usage(
             "Usage: spawnloft diag <server> [--client <profile>] [--lines N] [--out <dir>]",
         ));
