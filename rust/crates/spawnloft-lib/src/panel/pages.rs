@@ -1,8 +1,7 @@
 //! The three pages the panel serves (`/`, `/launcher`, `/setup`). They are compiled into the
 //! binary, so a page can never be a different version from the API behind it and a headless
-//! package is one file. A development build (no bundled runtime beside it) with
-//! `SPAWNLOFT_CORE_DIR` set reads them from that checkout's `src/` instead, so a page can be
-//! edited without a rebuild.
+//! package is one file. A debug or `test-hooks` build with `SPAWNLOFT_CORE_DIR` set (a checkout)
+//! reads them from that checkout's `src/` instead, so a page can be edited without a rebuild.
 
 use std::path::PathBuf;
 
@@ -36,11 +35,10 @@ impl Page {
     }
 }
 
-/// The checkout to read pages from: only for a development build, as `SPAWNLOFT_NODE` and the
-/// core folder are (`runtime::core_dir`). An installed build never reads a page from disk.
+/// The checkout to read pages from: only in a debug or `test-hooks` build. A release build, which
+/// every package is, never reads a page from disk.
 fn dev_dir() -> Option<PathBuf> {
-    let installed = crate::runtime::runtime_dir().is_some_and(|r| r.exists());
-    if installed {
+    if !(cfg!(debug_assertions) || cfg!(feature = "test-hooks")) {
         return None;
     }
     std::env::var_os("SPAWNLOFT_CORE_DIR")

@@ -875,8 +875,8 @@ pub fn spawn_client(
         lower.ends_with(".js") || lower.ends_with(".mjs")
     };
     let (cmd, args): (String, Vec<String>) = if script {
-        let node =
-            crate::runtime::node().map_err(|e| user(format!("could not start {}: {e}", command.bin)))?;
+        let node = crate::runtime::script_node()
+            .map_err(|e| user(format!("could not start {}: {e}", command.bin)))?;
         let mut a = vec![command.bin.clone()];
         a.extend(command.args.iter().cloned());
         (node.to_string_lossy().into_owned(), a)

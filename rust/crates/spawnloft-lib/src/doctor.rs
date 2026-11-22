@@ -189,6 +189,16 @@ pub fn run(layout: &Layout, repair: bool) -> Result<Report, Failure> {
             layout.settings_file
         ));
     }
+    // what left with the Node core (rust/PLAN-CORE-PORT.md 5.1, 5.4): notes, since nothing a
+    // server needs is broken
+    if stored.settings.get("daemon").and_then(Value::as_str) == Some("node") {
+        notes.push(
+            "settings: \"daemon\": \"node\" is ignored; the Node daemon left with the Node core and every server runs on spawnloft-core's".into(),
+        );
+    }
+    if let Err(e) = crate::runtime::checked_node() {
+        notes.push(format!("bots: test players need Node.js ({e})"));
+    }
     let registry_file = Path::new(&layout.registry_file);
     let instances = registry::list_instances(registry_file)?;
     if instances.is_empty() {

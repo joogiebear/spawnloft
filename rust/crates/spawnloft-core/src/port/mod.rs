@@ -1,7 +1,6 @@
-//! The SpawnLoft command line in Rust: the commands the core port has moved from the Node core
-//! (`cli::PORTED`), answered as `mcctl.mjs` answers them. `run` is `main()` of mcctl.mjs for
-//! those commands: the same settings warning, the same order of checks, the same `--json`
-//! envelope and exit codes (0, 1 for a failed operation, 2 for a usage error).
+//! The SpawnLoft command line in Rust: every command the Node core's `mcctl.mjs` answered,
+//! answered as it answered them (it left in C10). `run` is `main()` of mcctl.mjs: the same
+//! settings warning, the same order of checks, the same `--json` envelope and exit codes (0, 1 for a failed operation, 2 for a usage error).
 //!
 //! C1 (rust/PLAN-CORE-PORT.md section 4) moved the read-only group: `help`, `list`, `status`,
 //! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,

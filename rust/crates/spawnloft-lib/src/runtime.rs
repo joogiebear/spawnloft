@@ -1,191 +1,117 @@
-//! The Node.js runtime the 2.0 package carries until the core port (2.1) removes it, and the one
-//! way into the Node core: `spawnloft-core <command>` forwards every command it does not own here
-//! (PLAN-2.0-REMAINING.md section 4, items 1 and 2).
+//! The Node.js the few JavaScript parts left still run on (rust/PLAN-CORE-PORT.md sections 5.4
+//! and 5.5). The core itself runs none and 2.0 carries none: the bot host (mineflayer, npm
+//! packages `bot setup` installs) and the V8 check of a bot scenario's patterns run on the
+//! machine's own Node, and in a `test-hooks` build so do the tests' `.mjs` stand-ins (the fake
+//! JVM and engines).
 //!
-//! Layout, relative to the resources folder (`resources\` on Windows and Linux,
-//! `Contents/Resources/resources/` in a macOS `.app`), the same on every platform:
-//!
-//! ```text
-//! resources/bin/spawnloft-core[.exe]
-//! resources/core/spawnloft.mjs, src/ ...          the Node core
-//! resources/runtime/runtime.json                  {"node":"<ver>","exe":"node-<ver>/bin/node"}
-//! resources/runtime/node-<ver>/bin/node           (Windows: node-<ver>/node.exe)
-//! ```
-//!
-//! The folder is versioned so a 2.x update that moves Node writes a new folder instead of
-//! overwriting a `node.exe` a long-lived process (`spawnloft mcp`, the bot host, a console) still
-//! runs; the installer removes old folders once nothing holds them (A6).
-//!
-//! Which Node runs: the bundled one whenever there is a `resources/runtime` folder, whatever the
-//! environment says (an installed copy runs only what was tested; a stray `SPAWNLOFT_NODE` or
-//! system Node is never picked up). Only without that folder (a `cargo build` run from the
-//! repository, the 1.x Electron internal builds) `SPAWNLOFT_NODE`, then the first `node` on PATH.
+//! Which Node: the `bot.node` setting (`{"bot": {"node": "<path>"}}`) when it names one, else
+//! `SPAWNLOFT_NODE`, else the first `node` on PATH (then the places a GUI-started app misses on
+//! macOS). The bot host also needs it to be recent enough for mineflayer ([`checked_node`]).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-/// What forwarding sets for the Node core: the absolute path of the `spawnloft-core` that ran
-/// it. The Node core writes this path, never a Node path, into task shims, server launchers, the
-/// launchd and systemd units, `runtime.json` and the MCP config (A5), so everything a user copies
-/// keeps working when 2.1 removes Node.
-pub const ENTRY_ENV: &str = "SPAWNLOFT_ENTRY";
+/// The oldest Node major mineflayer runs on (its `engines`, and minecraft-protocol's).
+pub const MIN_NODE_MAJOR: u32 = 22;
 
-/// The resources folder this binary sits in (`resources/bin/<exe>` -> `resources`).
-pub fn resources_dir() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    Some(exe.parent()?.parent()?.to_path_buf())
+/// The `bot.node` setting, when it is a non-empty string.
+fn setting_node() -> Option<PathBuf> {
+    let (settings, _) = crate::settings::load();
+    settings
+        .get("bot")
+        .and_then(|b| b.get("node"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
 }
 
-/// `resources/runtime` beside this binary's folder.
-pub fn runtime_dir() -> Option<PathBuf> {
-    Some(resources_dir()?.join("runtime"))
-}
-
-/// Where the bundled Node is, read from `<runtime>/runtime.json`; `Err` says why there is none.
-pub fn bundled_node(runtime: &Path) -> Result<PathBuf, String> {
-    let record = runtime.join("runtime.json");
-    let text = std::fs::read_to_string(&record).map_err(|e| format!("{}: {e}", record.display()))?;
-    let v: serde_json::Value = serde_json::from_str(text.trim_start_matches('\u{feff}'))
-        .map_err(|e| format!("{}: {e}", record.display()))?;
-    let exe = v
-        .get("exe")
-        .and_then(|e| e.as_str())
-        .ok_or_else(|| format!("{} names no exe", record.display()))?;
-    // a relative path inside the runtime folder, nothing else
-    let rel = Path::new(exe);
-    if rel.is_absolute()
-        || rel
-            .components()
-            .any(|c| !matches!(c, std::path::Component::Normal(_)))
-    {
-        return Err(format!(
-            "{}: `{exe}` is not a path inside the runtime folder",
-            record.display()
-        ));
-    }
-    let path = runtime.join(rel);
-    if !path.is_file() {
-        return Err(format!("{} is missing", path.display()));
-    }
-    Ok(path)
-}
-
-/// The Node the core runs on (see the module text for the order), or why there is none.
+/// The machine's Node (see the module text for the order), or why there is none.
 pub fn node() -> Result<PathBuf, String> {
     node_with(
+        setting_node(),
         std::env::var_os("SPAWNLOFT_NODE")
             .filter(|p| !p.is_empty())
             .map(PathBuf::from),
-        runtime_dir(),
+        path_node(),
     )
 }
 
 /// [`node`] with its inputs given, for tests.
-pub fn node_with(env: Option<PathBuf>, runtime: Option<PathBuf>) -> Result<PathBuf, String> {
-    if let Some(runtime) = runtime
-        && runtime.exists()
-    {
-        return bundled_node(&runtime)
-            .map_err(|e| format!("the bundled Node.js is damaged ({e}); reinstall SpawnLoft"));
+pub fn node_with(
+    setting: Option<PathBuf>,
+    env: Option<PathBuf>,
+    on_path: Option<PathBuf>,
+) -> Result<PathBuf, String> {
+    if let Some(p) = setting {
+        return if p.is_file() {
+            Ok(p)
+        } else {
+            Err(format!(
+                "the bot.node setting names {}, which is not there",
+                p.display()
+            ))
+        };
     }
-    if let Some(p) = env {
-        return Ok(p);
-    }
-    path_node().ok_or_else(|| {
-        "Node.js was not found: this is a development build with no bundled runtime \
-         (install Node 20 or later, or set SPAWNLOFT_NODE)"
-            .to_string()
+    env.or(on_path).ok_or_else(|| {
+        format!(
+            "Node.js was not found: install Node.js {MIN_NODE_MAJOR} or later from https://nodejs.org, \
+             or name one in the bot.node setting"
+        )
     })
 }
 
-/// The Node core's folder: `resources/core` beside this binary's folder; `SPAWNLOFT_CORE_DIR`
-/// only counts without a bundled runtime (a development build), as `SPAWNLOFT_NODE` does.
-pub fn core_dir() -> Option<PathBuf> {
-    let installed = runtime_dir().is_some_and(|r| r.exists());
-    if !installed && let Some(p) = std::env::var_os("SPAWNLOFT_CORE_DIR").filter(|p| !p.is_empty()) {
-        return Some(PathBuf::from(p));
+/// The Node a test stand-in (a `.mjs` "java" or engine) runs on: only in a `test-hooks` build,
+/// which release packages are built without (plan section 5.5).
+pub fn script_node() -> Result<PathBuf, String> {
+    if !cfg!(feature = "test-hooks") {
+        return Err("a .mjs program stands in for one only in a test build of SpawnLoft".into());
     }
-    Some(resources_dir()?.join("core"))
+    node()
 }
 
-/// Sets what every Node core started by this binary needs: who to name as the entry point, no
-/// Electron switch left over from a 1.x environment, and none of the machine's own Node settings
-/// (`NODE_OPTIONS` could `--require` foreign code or open an inspector port in every SpawnLoft
-/// process; `NODE_PATH` changes what resolves).
+/// The major version in `node --version`'s answer (`v22.11.0`).
+pub fn major_of(version: &str) -> Option<u32> {
+    version.trim().strip_prefix('v')?.split('.').next()?.parse().ok()
+}
+
+/// [`node`], refused when it is older than [`MIN_NODE_MAJOR`] or does not answer `--version`.
+/// Returns the path and the version it gave.
+pub fn checked_node() -> Result<(PathBuf, String), String> {
+    let node = node()?;
+    let mut cmd = Command::new(&node);
+    cmd.arg("--version").stdin(Stdio::null()).stderr(Stdio::null());
+    prepare(&mut cmd);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let out = cmd
+        .output()
+        .map_err(|e| format!("{} could not be run: {e}", node.display()))?;
+    let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    match major_of(&version) {
+        Some(major) if major >= MIN_NODE_MAJOR => Ok((node, version)),
+        Some(_) => Err(format!(
+            "{} is Node.js {version}; mineflayer needs {MIN_NODE_MAJOR} or later",
+            node.display()
+        )),
+        None => Err(format!("{} did not say which Node.js it is", node.display())),
+    }
+}
+
+/// What every Node started by this binary gets: none of the machine's own Node settings
+/// (`NODE_OPTIONS` could `--require` foreign code or open an inspector port; `NODE_PATH` changes
+/// what resolves), no Electron switch left over from a 1.x environment, and no entry point
+/// inherited from someone else.
 pub fn prepare(cmd: &mut Command) {
-    match std::env::current_exe() {
-        Ok(exe) => cmd.env(ENTRY_ENV, exe),
-        // never pass on an entry inherited from someone else
-        Err(_) => cmd.env_remove(ENTRY_ENV),
-    };
+    cmd.env_remove(crate::entry::ENTRY_ENV);
     for var in ["ELECTRON_RUN_AS_NODE", "NODE_OPTIONS", "NODE_PATH"] {
         cmd.env_remove(var);
     }
 }
 
-/// `spawnloft-core <command...>` for a command the Rust core does not own (the CLI, `mcp`,
-/// `task run`, `console`): the Node core runs it with this process's stdin, stdout and stderr,
-/// and its exit code becomes ours. On Unix this process becomes Node (exec), so signals and the
-/// terminal go straight to it. On Windows the child is held in a kill-on-close job object, so a
-/// killed forwarder (an MCP client ending `spawnloft mcp`) never leaves Node behind; Ctrl+C is
-/// left to Node, which gets it from the shared console.
-pub fn forward(args: &[std::ffi::OsString]) -> u8 {
-    let node = match node() {
-        Ok(n) => n,
-        Err(e) => {
-            eprintln!("{}: {e}", crate::build::NAME);
-            return 127;
-        }
-    };
-    let Some(dir) = core_dir() else {
-        eprintln!(
-            "{}: the Node core folder could not be worked out",
-            crate::build::NAME
-        );
-        return 1;
-    };
-    let entry = dir.join("spawnloft.mjs");
-    if !entry.is_file() {
-        eprintln!(
-            "{}: {} is missing; reinstall SpawnLoft",
-            crate::build::NAME,
-            entry.display()
-        );
-        return 1;
-    }
-    let mut cmd = Command::new(&node);
-    cmd.arg(&entry)
-        .args(args)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
-    prepare(&mut cmd);
-    run_forwarded(cmd, &node)
-}
-
-#[cfg(unix)]
-fn run_forwarded(mut cmd: Command, node: &Path) -> u8 {
-    use std::os::unix::process::CommandExt;
-    // only returns when the exec failed
-    let e = cmd.exec();
-    eprintln!("{}: could not run {}: {e}", crate::build::NAME, node.display());
-    126
-}
-
-#[cfg(windows)]
-fn run_forwarded(cmd: Command, node: &Path) -> u8 {
-    crate::platform::ignore_ctrl_c();
-    match crate::platform::run_in_kill_job(cmd) {
-        Ok(code) => u8::try_from(code).unwrap_or(1),
-        Err(e) => {
-            eprintln!("{}: could not run {}: {e}", crate::build::NAME, node.display());
-            126
-        }
-    }
-}
-
-/// The first `node` on PATH (then the places a GUI-started app misses on macOS): what a
-/// development build with no bundled runtime runs on.
+/// The first `node` on PATH, then the places a GUI-started app misses on macOS.
 fn path_node() -> Option<PathBuf> {
     let exe = if cfg!(windows) { "node.exe" } else { "node" };
     let path = std::env::var_os("PATH").unwrap_or_default();
@@ -196,8 +122,8 @@ fn path_node() -> Option<PathBuf> {
 }
 
 /// An app started from Finder or launchd gets PATH=/usr/bin:/bin:/usr/sbin:/sbin, without the
-/// places Node is installed (found on the Mac mini in P0-F); Electron never needed this because it
-/// carries Node. Checked after PATH, so a PATH entry still wins.
+/// places Node is installed (found on the Mac mini in P0-F). Checked after PATH, so a PATH entry
+/// still wins.
 fn gui_fallback_dirs() -> Vec<PathBuf> {
     if !cfg!(target_os = "macos") {
         return Vec::new();
@@ -208,7 +134,7 @@ fn gui_fallback_dirs() -> Vec<PathBuf> {
     ];
     if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
         dirs.push(home.join(".volta/bin"));
-        // nvm keeps one folder per version; any of them will do for the spike (sorted by name)
+        // nvm keeps one folder per version: the newest name first
         if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
             let mut versions: Vec<PathBuf> = entries.flatten().map(|e| e.path().join("bin")).collect();
             versions.sort();
@@ -222,65 +148,41 @@ fn gui_fallback_dirs() -> Vec<PathBuf> {
 mod tests {
     use super::*;
 
-    fn temp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("spawnloft-runtime-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        std::fs::create_dir_all(&d).unwrap();
-        d
-    }
-
     #[test]
-    fn env_counts_only_without_a_runtime_folder() {
-        let rt = temp("env");
-        let missing = rt.join("no-runtime-here");
-        let got = node_with(Some("/x/node".into()), Some(missing)).unwrap();
-        assert_eq!(got, PathBuf::from("/x/node"));
-        // an installed copy ignores it: a damaged runtime is reported, not replaced
-        let e = node_with(Some("/x/node".into()), Some(rt.clone())).unwrap_err();
-        assert!(e.contains("damaged"), "{e}");
-        let _ = std::fs::remove_dir_all(rt);
-    }
-
-    #[test]
-    fn bundled_from_the_record() {
-        let rt = temp("bundled");
-        std::fs::create_dir_all(rt.join("node-24.21.0/bin")).unwrap();
-        std::fs::write(rt.join("node-24.21.0/bin/node"), b"").unwrap();
-        std::fs::write(
-            rt.join("runtime.json"),
-            "\u{feff}{\"node\":\"24.21.0\",\"exe\":\"node-24.21.0/bin/node\"}",
-        )
-        .unwrap();
+    fn the_setting_wins_and_must_exist() {
+        let here = std::env::current_exe().unwrap();
         assert_eq!(
-            node_with(None, Some(rt.clone())).unwrap(),
-            rt.join("node-24.21.0/bin/node")
+            node_with(
+                Some(here.clone()),
+                Some("/x/env-node".into()),
+                Some("/x/path-node".into())
+            )
+            .unwrap(),
+            here
         );
-        let _ = std::fs::remove_dir_all(rt);
+        let e = node_with(Some("/no/such/node".into()), Some("/x/env-node".into()), None).unwrap_err();
+        assert!(e.contains("bot.node setting"), "{e}");
     }
 
     #[test]
-    fn a_runtime_folder_never_falls_back_to_path() {
-        let rt = temp("broken");
-        // no record
-        let e = node_with(None, Some(rt.clone())).unwrap_err();
-        assert!(e.contains("damaged"), "{e}");
-        // a record naming a missing file
-        std::fs::write(rt.join("runtime.json"), "{\"exe\":\"node-1/bin/node\"}").unwrap();
-        assert!(node_with(None, Some(rt.clone())).unwrap_err().contains("missing"));
-        let _ = std::fs::remove_dir_all(rt);
+    fn the_variable_then_path() {
+        assert_eq!(
+            node_with(None, Some("/x/env-node".into()), Some("/x/path-node".into())).unwrap(),
+            PathBuf::from("/x/env-node")
+        );
+        assert_eq!(
+            node_with(None, None, Some("/x/path-node".into())).unwrap(),
+            PathBuf::from("/x/path-node")
+        );
+        let e = node_with(None, None, None).unwrap_err();
+        assert!(e.contains("Node.js 22 or later"), "{e}");
     }
 
     #[test]
-    fn the_record_cannot_point_outside_the_folder() {
-        let rt = temp("escape");
-        for exe in ["../node", "/usr/bin/node", "node-1/../../node", "C:\\\\node.exe"] {
-            std::fs::write(rt.join("runtime.json"), format!("{{\"exe\":\"{exe}\"}}")).unwrap();
-            let e = bundled_node(&rt).unwrap_err();
-            assert!(
-                e.contains("not a path inside") || e.contains("missing"),
-                "{exe}: {e}"
-            );
-        }
-        let _ = std::fs::remove_dir_all(rt);
+    fn majors() {
+        assert_eq!(major_of("v22.11.0\n"), Some(22));
+        assert_eq!(major_of("v8.0.0"), Some(8));
+        assert_eq!(major_of("22.1.0"), None);
+        assert_eq!(major_of(""), None);
     }
 }

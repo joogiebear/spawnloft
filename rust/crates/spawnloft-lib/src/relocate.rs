@@ -18,13 +18,13 @@ use crate::{create, entry, jspath, registry};
 /// `RUNTIME_FORMAT`. 2: 2.0's files run spawnloft-core, the install's one entry point.
 pub const RUNTIME_FORMAT: u32 = 2;
 
-/// `{ format, exe, root }`: what the shims and launchers run, and the code folder. `root` is
-/// the Node core's folder while one ships (the panel compares it), else this binary's folder.
+/// `{ format, exe, root }`: what the shims and launchers run, and the code folder, which is this
+/// binary's folder now that no Node core ships. `root` is still written for a 1.x build after a
+/// return, which compares it, but no longer compared here (plan section 3.4): an install that
+/// ran the Node core wrote `<resources>/core`, and its shims are already right.
 pub fn runtime_signature() -> Map<String, Value> {
     let exe = entry::cli_command(std::env::var(entry::ENTRY_ENV).ok().as_deref()).exe;
-    let root = crate::nodecore::core_dir()
-        .map(|d| jspath::resolve(&d.to_string_lossy()))
-        .unwrap_or_else(|| jspath::dirname(&exe));
+    let root = jspath::dirname(&exe);
     let mut m = Map::new();
     m.insert("format".into(), json!(RUNTIME_FORMAT));
     m.insert("exe".into(), Value::String(exe));
@@ -45,7 +45,7 @@ pub struct Repaired {
 }
 
 /// `repairAfterMove({ force })`. The record's other fields are kept for whoever wrote them; only
-/// these three are compared.
+/// `format` and `exe` are compared.
 pub fn repair_after_move(
     layout: &Layout,
     sched: &Sched,
@@ -57,7 +57,7 @@ pub fn repair_after_move(
         .ok()
         .and_then(|t| crate::jsjson::parse(&t).ok());
     let same = recorded.as_ref().is_some_and(|r| {
-        ["format", "exe", "root"]
+        ["format", "exe"]
             .iter()
             .all(|k| r.get(*k).is_some() && r.get(*k) == signature.get(*k))
     });

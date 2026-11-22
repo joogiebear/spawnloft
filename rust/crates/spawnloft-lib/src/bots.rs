@@ -7,11 +7,11 @@
 //! bot host (`src/bot-host.cjs`), the one process that loads mineflayer. The host stays
 //! JavaScript: mineflayer is npm packages that `bot setup` installs into the data folder.
 //!
-//! Before C10 the host still runs on a Node.js: the bundled runtime's when this install has one,
-//! else the one on PATH (`runtime::node`), with `NODE_OPTIONS` and `NODE_PATH` removed. The core
-//! carries the host script and the pinned `package.json` and lockfile inside itself and writes
-//! the script into the host folder before a run (the declared difference `bot-host-script`).
-//! TODO(C10): the `bot.node` setting and the minimum-version check of plan section 5.4.
+//! The host runs on the machine's own Node.js: the one the `bot.node` setting names, else
+//! `SPAWNLOFT_NODE`, else the one on PATH, Node 22 or later (`runtime::checked_node`), with
+//! `NODE_OPTIONS` and `NODE_PATH` removed. The core carries the host script and the pinned
+//! `package.json` and lockfile inside itself and writes the script into the host folder before a
+//! run (the declared difference `bot-host-script`).
 
 use serde_json::{Map, Value, json};
 use std::io::{BufRead, Read, Write};
@@ -692,10 +692,18 @@ fn check_step(at: &str, step: &Value, bots: &[String]) -> Result<(), Failure> {
     Ok(())
 }
 
-/// The Node.js the bot host runs on until C10: the bundled runtime's, else `node` on PATH.
+/// The Node.js the bot host runs on (`runtime::checked_node`).
 fn host_node() -> Result<PathBuf, Failure> {
-    crate::runtime::node()
-        .map_err(|e| Failure::user(format!("the bot host runs on Node.js, and none was found: {e}")))
+    crate::runtime::checked_node()
+        .map(|(node, _)| node)
+        .map_err(|e| Failure::user(format!("the bot host runs on Node.js: {e}")))
+}
+
+/// Why the bot host could not run on this machine's Node.js, if it could not: for `bot check`.
+pub fn host_node_problem() -> Option<String> {
+    crate::runtime::checked_node()
+        .err()
+        .map(|e| format!("the bot host runs on Node.js: {e}"))
 }
 
 /// `runScenario(scenario, { instance, onProgress })`: run one scenario end to end and return its

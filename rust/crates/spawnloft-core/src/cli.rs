@@ -2,10 +2,10 @@
 //! handling is part of the CLI's contract (rust/PLAN-CORE-PORT.md rule 8).
 //!
 //! `spawnloft-core` is the one entry point of an install (PLAN-2.0-REMAINING.md section 4): the
-//! commands below are its own, and every other command line is the SpawnLoft CLI, forwarded to
-//! the Node core on the bundled Node ([`forwards`], `spawnloft_lib::runtime::forward`) until the
-//! core port moves it here ([`PORTED`]). The `spawnloft` and `mcctl` launchers, task shims,
-//! server launchers and MCP configs all run this binary.
+//! commands below are its own, and every other command line is the SpawnLoft CLI, answered by
+//! `crate::port` as `mcctl.mjs` answered it before the Node core left (rust/PLAN-CORE-PORT.md,
+//! C10). The `spawnloft` and `mcctl` launchers, task shims, server launchers and MCP configs all
+//! run this binary.
 
 use spawnloft_lib::build;
 
@@ -61,10 +61,7 @@ pub struct Row {
     pub when: When,
 }
 
-/// This binary's own commands, which the Node core has no twin for. They are answered here whatever
-/// `SPAWNLOFT_CORE_IMPL` says. `repair` and `uninstall`, the installer's and uninstaller's
-/// commands, moved to [`PORTED`] in C6; their installer forms stay native
-/// through [`INSTALLER_FORMS`].
+/// This binary's own commands, which the SpawnLoft CLI never had.
 pub const CORE_OWN: &[Row] = &[
     Row {
         names: &["--version", "-V", "version"],
@@ -97,7 +94,7 @@ pub const CORE_OWN: &[Row] = &[
 ];
 
 /// The window's form of `ui`, which the desktop shell starts: answered by [`run`] rather than as
-/// the ported command, whatever `SPAWNLOFT_CORE_IMPL` says. It keeps its own exit codes, signs
+/// the CLI's `ui`. It keeps its own exit codes, signs
 /// nobody in, and still listens when the data cannot be found, so that the window can say why
 /// and the updater still answers.
 pub const WINDOW_FORMS: &[Row] = &[Row {
@@ -105,222 +102,7 @@ pub const WINDOW_FORMS: &[Row] = &[Row {
     when: When::AnyFlag(&["--exit-with-stdin"]),
 }];
 
-/// SpawnLoft CLI commands the core port has moved from the Node core to this binary
-/// (rust/PLAN-CORE-PORT.md section 4), answered by `crate::port`. A phase adds its commands here
-/// only once their parity scenarios (tools/parity/) are green on every platform. A command line
-/// with no command at all is the CLI's usage, which is `help`'s and moved with it.
-pub const PORTED: &[Row] = &[
-    // C1: foundation and status
-    Row {
-        names: &["help", "--help", "-h"],
-        when: When::Always,
-    },
-    Row {
-        names: &["list", "ls"],
-        when: When::Always,
-    },
-    Row {
-        names: &["status"],
-        when: When::Always,
-    },
-    Row {
-        names: &["logs", "log"],
-        when: When::Always,
-    },
-    Row {
-        names: &["why", "diagnostics"],
-        when: When::Always,
-    },
-    Row {
-        names: &["metrics"],
-        when: When::Always,
-    },
-    // C2: the server lifecycle
-    Row {
-        names: &["start"],
-        when: When::Always,
-    },
-    Row {
-        names: &["stop"],
-        when: When::Always,
-    },
-    Row {
-        names: &["restart"],
-        when: When::Always,
-    },
-    Row {
-        names: &["kill"],
-        when: When::Always,
-    },
-    Row {
-        names: &["cmd", "rcon"],
-        when: When::Always,
-    },
-    Row {
-        names: &["send"],
-        when: When::Always,
-    },
-    Row {
-        names: &["console", "attach"],
-        when: When::Always,
-    },
-    Row {
-        names: &["players"],
-        when: When::Always,
-    },
-    Row {
-        names: &["set"],
-        when: When::Always,
-    },
-    Row {
-        names: &["props"],
-        when: When::Always,
-    },
-    Row {
-        names: &["db"],
-        when: When::Always,
-    },
-    // C3: backups, and where the data lives
-    Row {
-        names: &["backup", "snapshot"],
-        when: When::Always,
-    },
-    Row {
-        names: &["snapshots", "backups"],
-        when: When::Always,
-    },
-    Row {
-        names: &["restore"],
-        when: When::Always,
-    },
-    Row {
-        names: &["prune"],
-        when: When::Always,
-    },
-    Row {
-        names: &["verify"],
-        when: When::Always,
-    },
-    Row {
-        names: &["config"],
-        when: When::Always,
-    },
-    Row {
-        names: &["worlds"],
-        when: When::Always,
-    },
-    // C4: making servers and fetching their software (`new --modpack` came with C5)
-    Row {
-        names: &["new"],
-        when: When::Always,
-    },
-    Row {
-        names: &["paper"],
-        when: When::Always,
-    },
-    Row {
-        names: &["upgrade"],
-        when: When::Always,
-    },
-    Row {
-        names: &["clone"],
-        when: When::Always,
-    },
-    Row {
-        names: &["adopt"],
-        when: When::Always,
-    },
-    Row {
-        names: &["templates", "template"],
-        when: When::Always,
-    },
-    Row {
-        names: &["jars"],
-        when: When::Always,
-    },
-    Row {
-        names: &["launchers"],
-        when: When::Always,
-    },
-    Row {
-        names: &["reveal", "open"],
-        when: When::Always,
-    },
-    Row {
-        names: &["rebuild"],
-        when: When::Always,
-    },
-    // C5: plugins and modpacks
-    Row {
-        names: &["plugins"],
-        when: When::Always,
-    },
-    Row {
-        names: &["pack"],
-        when: When::Always,
-    },
-    // C6: scheduled tasks, and what moves or drops a server with its tasks
-    Row {
-        names: &["task"],
-        when: When::Always,
-    },
-    Row {
-        names: &["rm", "remove"],
-        when: When::Always,
-    },
-    Row {
-        names: &["rename"],
-        when: When::Always,
-    },
-    Row {
-        names: &["repair"],
-        when: When::Always,
-    },
-    Row {
-        names: &["uninstall"],
-        when: When::Always,
-    },
-    Row {
-        names: &["data"],
-        when: When::Always,
-    },
-    // C7: the client launcher
-    Row {
-        names: &["client"],
-        when: When::Always,
-    },
-    // C6b: the diagnostics, once both tracks have met
-    Row {
-        names: &["doctor"],
-        when: When::Always,
-    },
-    Row {
-        names: &["diag"],
-        when: When::Always,
-    },
-    // C8: the panel, from a terminal (the window's form is this binary's own, above)
-    Row {
-        names: &["ui", "panel"],
-        when: When::Always,
-    },
-    // C9: the bot harness (the Mineflayer host it drives stays JavaScript)
-    Row {
-        names: &["bot"],
-        when: When::Always,
-    },
-    // C9: the MCP server an AI client launches
-    Row {
-        names: &["mcp"],
-        when: When::Always,
-    },
-];
-
-/// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
-/// ported command to the Node core again, so the parity rig can run one scenario on both sides.
-/// Never written into a shim; removed when the Node core leaves (C10).
-pub const IMPL_ENV: &str = "SPAWNLOFT_CORE_IMPL";
-
-fn row_matches(row: &Row, command: &str, rest: &[std::ffi::OsString]) -> bool {
+fn row_matches(row: &Row, command: &str, rest: &[String]) -> bool {
     row.names.contains(&command)
         && match row.when {
             When::Always => true,
@@ -328,57 +110,28 @@ fn row_matches(row: &Row, command: &str, rest: &[std::ffi::OsString]) -> bool {
         }
 }
 
-/// Whether this command line belongs to the SpawnLoft CLI on the Node core rather than to this
-/// binary, by the ownership table and the process's `SPAWNLOFT_CORE_IMPL`.
-pub fn forwards(args: &[std::ffi::OsString]) -> bool {
-    let force_node = std::env::var_os(IMPL_ENV).is_some_and(|v| v == "node");
-    forwards_with(args, force_node, PORTED)
-}
-
-/// Whether a command line this binary answers is a ported SpawnLoft command (`crate::port`)
-/// rather than one of its own.
-pub fn is_ported(args: &[String]) -> bool {
+/// Whether a command line is the SpawnLoft CLI's (`crate::port`, which also answers an unknown
+/// command and no command at all) rather than one of this binary's own.
+pub fn is_cli(args: &[String]) -> bool {
     match args.split_first() {
         None => true,
         Some((command, rest)) => {
-            let rest: Vec<std::ffi::OsString> = rest.iter().map(Into::into).collect();
-            !CORE_OWN.iter().any(|r| row_matches(r, command, &rest))
-                && !WINDOW_FORMS.iter().any(|r| row_matches(r, command, &rest))
-                && PORTED.iter().any(|r| row_matches(r, command, &rest))
+            !CORE_OWN.iter().any(|r| row_matches(r, command, rest))
+                && !WINDOW_FORMS.iter().any(|r| row_matches(r, command, rest))
         }
     }
 }
 
-/// The installer's and uninstaller's forms of ported commands: answered here even when
-/// `SPAWNLOFT_CORE_IMPL=node`, since Node's `repair` has no `--quiet`, the installer ignores the
-/// exit code, and with no usable Node nothing at all would be done.
-pub const INSTALLER_FORMS: &[Row] = &[
-    Row {
-        names: &["repair"],
-        when: When::AnyFlag(&["--quiet"]),
-    },
-    Row {
-        names: &["uninstall"],
-        when: When::AnyFlag(&["--yes"]),
-    },
-];
-
-/// [`forwards`] with the switch and the ported table given, for tests.
-pub fn forwards_with(args: &[std::ffi::OsString], force_node: bool, ported: &[Row]) -> bool {
-    let Some((command, rest)) = args.split_first() else {
-        // no arguments: the CLI's own usage, which moves with `help`
-        return force_node || !ported.iter().any(|r| r.names.contains(&"help"));
-    };
-    let Some(command) = command.to_str() else {
-        return true;
-    };
-    if CORE_OWN.iter().any(|r| row_matches(r, command, rest))
-        || INSTALLER_FORMS.iter().any(|r| row_matches(r, command, rest))
-        || WINDOW_FORMS.iter().any(|r| row_matches(r, command, rest))
-    {
-        return false;
-    }
-    force_node || !ported.iter().any(|r| row_matches(r, command, rest))
+/// Whether `arg` is the Node entry script a 1.x shim or MCP config still names before the command
+/// (`.../mcctl.mjs list`): dropped, never run (plan section 5.2).
+pub fn is_old_entry(arg: &std::ffi::OsStr) -> bool {
+    let name = std::path::Path::new(arg)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    // a Windows path seen on another system still counts
+    let name = name.rsplit('\\').next().unwrap_or_default();
+    name == "mcctl.mjs" || name == "spawnloft.mjs"
 }
 
 pub fn help() -> String {
@@ -679,211 +432,48 @@ mod tests {
         assert!(out.stderr.contains("unknown command `frobnicate`"));
     }
 
-    fn os(list: &[&str]) -> Vec<std::ffi::OsString> {
-        list.iter().map(|s| s.into()).collect()
-    }
-
     #[test]
-    fn the_impl_switch_forwards_ported_commands_only() {
-        let ported = [Row {
-            names: &["list", "ls"],
-            when: When::Always,
-        }];
-        // ported: answered here, unless the switch asks for the Node core
-        assert!(!forwards_with(&os(&["list", "--json"]), false, &ported));
-        assert!(!forwards_with(&os(&["ls"]), false, &ported));
-        assert!(forwards_with(&os(&["list", "--json"]), true, &ported));
-        // not ported: the Node core either way
-        assert!(forwards_with(&os(&["start", "s"]), false, &ported));
-        assert!(forwards_with(&os(&["start", "s"]), true, &ported));
-        // the core's own commands never move, switch or not
-        for line in [&["--version"][..], &["daemon", "s"], &["update", "check"]] {
-            assert!(!forwards_with(&os(line), true, &ported), "{line:?}");
-        }
-        // the installer's forms of ported commands stay here under the switch; the rest goes
-        for line in [&["repair", "--quiet"][..], &["uninstall", "--yes", "--data"]] {
-            assert!(!forwards_with(&os(line), true, PORTED), "{line:?}");
-        }
-        assert!(forwards_with(&os(&["repair", "--json"]), true, PORTED));
-    }
-
-    #[test]
-    fn c1_commands_are_answered_here_unless_the_switch_says_node() {
-        for line in [
-            &[][..],
-            &["help"],
-            &["--help"],
-            &["-h"],
-            &["list", "--json"],
-            &["ls"],
-            &["status", "alpha"],
-            &["logs", "alpha", "-f"],
-            &["log", "alpha"],
-            &["why", "alpha"],
-            &["diagnostics", "alpha", "--json"],
-            &["metrics", "alpha", "--csv"],
-        ] {
-            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
-            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
-            let strings: Vec<String> = line.iter().map(|s| s.to_string()).collect();
-            assert!(is_ported(&strings), "{line:?}");
-        }
-        assert!(!is_ported(&["--version".to_string()]));
-        assert!(is_ported(&["mcp".to_string()]));
-    }
-
-    #[test]
-    fn new_is_answered_here_with_or_without_a_modpack() {
-        for line in [
-            &["new", "a", "--jar", "x.jar"][..],
-            &["new", "a", "--template", "t"],
-            &["new", "a", "--from", "b", "--with-worlds"],
-            &["new", "a", "--modpack="],
-            &["new", "a", "--no-paper", "--jar", "x.jar"],
-            &["new", "a", "--", "--paper", "1.21"],
-            &["new", "a", "--paper", "1.21.4"],
-            &["new", "a", "--paper"],
-            &["new", "a", "--neoforge=21.1"],
-            &["new", "a", "--fabric", "1.21", "--jar", "x.jar"],
-            &["new", "a", "--spigot", "1.21"],
-            &["new", "a", "--no-modpack", "--paper", "1.21"],
-            &["paper", "fetch", "1.21.4"],
-            &["upgrade", "a", "--check"],
-            &["clone", "a", "b"],
-            &["adopt", "a", "/x"],
-            &["templates"],
-            &["template", "save", "a", "t"],
-            &["jars", "import", "x"],
-            &["launchers"],
-            &["reveal", "a"],
-            &["open", "a"],
-            &["rebuild", "a", "--yes"],
-            &["new", "a", "--modpack", "pack.mrpack"],
-            &["new", "a", "--modpack=x"],
-            &["new", "a", "--paper", "1.21", "--modpack", "x"],
-            &["pack", "a", "update", "--yes"],
-            &["plugins", "a"],
-        ] {
-            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
-            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
-        }
-    }
-
-    #[test]
-    fn client_is_ported_whole() {
-        for line in [
-            &["client", "list"][..],
-            &["client", "list", "--json"],
-            &["client", "status", "p"],
-            &["client", "logs", "p", "-n", "5"],
-            &["client", "--json", "accounts"],
-            &["client", "logout", "Steve"],
-            &["client", "remove", "p", "--purge"],
-            &["client", "stop", "p"],
-            &["client", "new", "p", "--mc", "1.21.11"],
-            &["client", "set", "p", "memory=4G"],
-            &["client", "versions", "--all"],
-            &["client", "login", "--json"],
-            &["client", "install", "p", "--verify"],
-            &["client", "launch", "p", "--wait"],
-            &["client"],
-            &["client", "doctor"],
-            &["client", "--json"],
-        ] {
-            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
-            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
-        }
-    }
-
-    #[test]
-    fn doctor_and_diag_are_ported() {
-        for line in [
-            &["doctor"][..],
-            &["doctor", "--json"],
-            &["diag", "alpha"],
-            &["diag", "--client", "p", "--json"],
-        ] {
-            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
-            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
-        }
-    }
-
-    #[test]
-    fn bot_and_mcp_are_ported() {
-        for line in [
-            &["bot"][..],
-            &["bot", "check"],
-            &["bot", "check", "alpha", "--json"],
-            &["bot", "setup", "--force"],
-            &["bot", "run", "s.json", "--instance", "alpha"],
-            &["mcp"],
-            &["mcp", "--allow-destructive", "--show-ips"],
-        ] {
-            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
-            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
-        }
-    }
-
-    #[test]
-    fn no_command_is_both_the_cores_own_and_ported() {
-        for row in PORTED {
-            for name in row.names {
-                assert!(
-                    !CORE_OWN.iter().any(|own| own.names.contains(name)),
-                    "{name} is in both tables"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn what_is_forwarded_to_the_node_core() {
-        for line in [&["frobnicate"][..], &["frobnicate", "--json"]] {
-            assert!(
-                forwards_with(&os(line), false, PORTED),
-                "{line:?} should be forwarded"
-            );
-        }
+    fn the_cores_own_commands_and_the_cli() {
         for line in [
             &["--version"][..],
             &["-V"],
-            &["version", "--json"],
-            &["--core-help"],
             &["daemon", "s"],
-            &["probe-process", "1"],
-            &["handover", "stop"],
-            &["uninstall", "--yes"],
             &["update", "check"],
-            &["ui"],
-            &["panel", "--port", "8080", "--no-open"],
-            &["ui", "--port", "0", "--exit-with-stdin", "--core-dir", "/c"],
-            &["repair", "--quiet"],
+            &["handover", "stop"],
             &["user-path", "add"],
-            &["start", "survival"],
-            &["console", "survival"],
-            &["db", "list"],
-            &["backup", "survival", "--json"],
-            &["snapshot", "survival"],
-            &["snapshots", "survival"],
-            &["backups", "survival", "--json"],
-            &["restore", "survival", "latest", "--yes"],
-            &["prune", "survival"],
-            &["verify", "survival", "--all"],
-            &["config", "show"],
-            &["worlds", "survival", "list"],
-            &["task", "run", "abc"],
-            &["rm", "survival"],
-            &["rename", "a", "b"],
-            &["repair"],
-            &["repair", "--json"],
-            &["uninstall"],
-            &["uninstall", "--data"],
-            &["data", "status"],
+            &["probe-process", "1"],
+            &["--core-help"],
+            &["ui", "--exit-with-stdin"],
         ] {
-            assert!(
-                !forwards_with(&os(line), false, PORTED),
-                "{line:?} is this binary's own"
-            );
+            assert!(!is_cli(&args(line)), "{line:?}");
+        }
+        for line in [
+            &[][..],
+            &["help"],
+            &["list", "--json"],
+            &["ui"],
+            &["ui", "--port", "8080"],
+            &["repair", "--quiet"],
+            &["uninstall", "--yes"],
+            &["mcp"],
+            &["frobnicate"],
+        ] {
+            assert!(is_cli(&args(line)), "{line:?}");
+        }
+    }
+
+    #[test]
+    fn the_old_entry_script_is_recognised() {
+        for arg in [
+            "/opt/spawnloft-cli/core/mcctl.mjs",
+            "C:\\Program Files\\SpawnLoft\\resources\\core\\mcctl.mjs",
+            "spawnloft.mjs",
+            "MCCTL.MJS",
+        ] {
+            assert!(is_old_entry(std::ffi::OsStr::new(arg)), "{arg}");
+        }
+        for arg in ["list", "mcctl", "mcctl.mjs.bak", "/x/other.mjs", ""] {
+            assert!(!is_old_entry(std::ffi::OsStr::new(arg)), "{arg}");
         }
     }
 }
