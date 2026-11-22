@@ -1,15 +1,29 @@
 # The parity rig
 
-Phase C0 of the core port (`rust/PLAN-CORE-PORT.md`, sections 3.1, 6 and 6.2). It proves that a
-command the Rust core answers behaves exactly as the Node core's twin: the same stdout and
+Built in phase C0 of the core port (`rust/PLAN-CORE-PORT.md`, sections 3.1, 6 and 6.2) to prove
+that a command the Rust core answers behaves exactly as the Node core's twin: the same stdout and
 stderr, the same exit code, the same requests to the download hosts, and the same files left in
 the data folder.
 
-A scenario is a JSON file of steps. The rig runs it twice in one scratch folder, first with
-`SPAWNLOFT_CORE_IMPL=node` (`spawnloft-core` forwards every command to the Node core) and then
-without it (the ownership table in `rust/crates/spawnloft-core/src/cli.rs` decides), and compares
-the two runs. Until C1 moves its first commands into `PORTED`, both runs are the Node core; the
-rig, its fakes and the golden files are what C1 inherits.
+A scenario is a JSON file of steps. Until C10 the rig ran it twice in one scratch folder, once on
+the Node core (`SPAWNLOFT_CORE_IMPL=node`) and once on the Rust core, and compared the two runs.
+Before the Node core left, its side of every scenario was frozen per platform under `frozen/`
+(below); the rig now runs each scenario on the Rust core and compares it with that record in the
+same way.
+
+## Frozen records
+
+`frozen/<platform>-<arch>/<scenario>.json` holds, for each platform the parity job runs (Linux x64
+and arm64, Windows x64, macOS arm64), every step's output and exit code, the fake-host requests
+and the whole data tree of the Node core's run, with the machine's paths (`<run>`, `<repo>`,
+`<node>`, `<core>`), the fake hosts' loopback ports (`<fake https://...>`) and the rig's pid
+(`<rig-pid>`) named. A scenario with no record for the platform it runs on fails, and
+`test/parity-frozen.test.mjs` checks that every scenario has one for each platform.
+
+A record is the CLI's behaviour. A change to it is a change to what a person sees, made on
+purpose: run the scenario with `--record` on each platform (the record is written only when the
+run had no problem) and say why in the pull request. A step with `"frozen": false` is run and its
+`expect` checked, but left out of the record (for output that depends on the machine).
 
 ## Running it
 
@@ -19,12 +33,13 @@ node tools/parity/run.mjs                          # scenarios/ and selftest/
 node tools/parity/run.mjs tools/parity/scenarios/downloads-paper.json --keep
 node tools/parity/run.mjs --only cli-json --update-golden
 node tools/parity/run.mjs --declared               # the declared-differences table below
+node tools/parity/run.mjs --only c1-edges --record # rewrite one scenario's record for this platform
 ```
 
 `--core <bin>` picks the binary (default `SPAWNLOFT_CORE_BIN`, then the newest
-`rust/target/{debug,release}/spawnloft-core`). `--keep` leaves both sides' folders (`node/`
-and `rust/`) for a look. `--out <dir>` writes `report.json` with everything each side printed
-and its whole data tree. `--sides node` runs one side. The core must be a `test-hooks` build:
+`rust/target/{debug,release}/spawnloft-core`). `--keep` leaves the run's folder (`rust/`) for a
+look. `--out <dir>` writes `report.json` with everything the run printed and its whole data
+tree. `--frozen off` skips the records. The core must be a `test-hooks` build:
 without it the Rust side ignores `SPAWNLOFT_TEST_ORIGINS`. `rust-internal.yml`'s `parity` job
 runs all of it on Linux x64 and arm64, Windows and macOS on every pull request. `run.mjs` asks
 the core for `--version --json` first and refuses one that is not a `test-hooks` build.

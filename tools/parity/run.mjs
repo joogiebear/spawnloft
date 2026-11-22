@@ -2,8 +2,8 @@
 // The parity rig's command line (README.md beside this file).
 //
 //   node tools/parity/run.mjs [scenario.json | folder ...] [--core <spawnloft-core>]
-//        [--only <name>] [--keep] [--out <dir>] [--sides node,rust] [--update-golden] [--declared]
-//        [--record [--record-from node|rust]] [--frozen check|off]
+//        [--only <name>] [--keep] [--out <dir>] [--update-golden] [--declared]
+//        [--record] [--frozen check|off]
 //
 // With no scenario named, runs tools/parity/scenarios/ and tools/parity/selftest/. Exit 0 when
 // every scenario passes, 1 when one fails, 2 for a usage error.
@@ -21,7 +21,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const repo = path.resolve(here, '..', '..')
 
 function usage(msg) {
-  process.stderr.write(`${msg}\nUsage: node tools/parity/run.mjs [scenario.json | folder ...] [--core <bin>] [--only <name>] [--keep] [--out <dir>] [--sides node,rust] [--update-golden]\n`)
+  process.stderr.write(`${msg}\nUsage: node tools/parity/run.mjs [scenario.json | folder ...] [--core <bin>] [--only <name>] [--keep] [--out <dir>] [--update-golden] [--record] [--frozen check|off]\n`)
   process.exit(2)
 }
 
@@ -57,7 +57,7 @@ async function main() {
   if (!hooks) usage(`${core} is not a test-hooks build (--version --json has no testHooks): cd rust && cargo build -p spawnloft-core --features test-hooks`)
   const sides = flags.sides ? String(flags.sides).split(',') : SIDES
   if (!sides.every(s => SIDES.includes(s)) || !sides.length) usage(`--sides takes ${SIDES.join(',')}`)
-  const recordFrom = flags.recordFrom ? String(flags.recordFrom) : 'node'
+  const recordFrom = flags.recordFrom ? String(flags.recordFrom) : 'rust'
   if (!SIDES.includes(recordFrom)) usage(`--record-from takes ${SIDES.join(' or ')}`)
   if (flags.record && !sides.includes(recordFrom)) usage(`--record needs the ${recordFrom} side`)
   if (flags.frozen !== undefined && !['check', 'off'].includes(String(flags.frozen))) usage('--frozen takes check or off')

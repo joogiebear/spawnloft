@@ -1,9 +1,9 @@
 // The differential rig (rust/PLAN-CORE-PORT.md section 6, layer 2). A scenario is a list of
-// steps: files to put in place, and command lines to run through `spawnloft-core`. The rig runs
-// it twice in the same scratch folder, once with SPAWNLOFT_CORE_IMPL=node (every ported command
-// forwarded to the Node core) and once without (the ownership table in cli.rs decides), and
-// compares what each command printed, its exit code, the requests it made of the fake hosts,
-// and the data tree left behind.
+// steps: files to put in place, and command lines to run through `spawnloft-core`. Until C10 the
+// rig ran it twice, on the Node core and on the Rust core, and compared the two; the Node side's
+// results were then frozen per platform (tools/parity/frozen/), and the Rust core is now
+// compared with that record: what each command printed, its exit code, the requests it made of
+// the fake hosts, and the data tree left behind.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -14,8 +14,9 @@ import { normalizeText, machineNeutral } from './normalize.mjs'
 import { applyDeclared } from '../declared-differences.mjs'
 import { replay } from './panel.mjs'
 
-export const SIDES = ['node', 'rust']
-export const IMPL_ENV = 'SPAWNLOFT_CORE_IMPL'
+// the sides a scenario can run on: only the Rust core since the Node core left (C10). The code
+// that compares two sides is kept: a self-test seeds a difference against the frozen record.
+export const SIDES = ['rust']
 const STEP_TIMEOUT_MS = 120000
 
 // The core binary: SPAWNLOFT_CORE_BIN, else the newest of rust/target/{debug,release}.
@@ -91,7 +92,6 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
     LC_ALL: 'en_US.UTF-8',
     NO_COLOR: '1',
   })
-  if (side === 'node') env[IMPL_ENV] = 'node'
   for (const [k, v] of Object.entries(extra)) {
     if (v === null) delete env[k]
     else env[k] = String(v)
@@ -484,7 +484,7 @@ export function sideOfRecord(record) {
 //   frozen: 'check' compares a Rust side with this platform's frozen record when there is one
 //   (and fails without one when no Node side ran); 'record' writes the record from the side
 //   `recordFrom` names; 'off' does neither.
-export async function runScenario(scenario, { core, repo, scratch, sides = SIDES, keep = false, baseDir = repo, golden = 'check', frozen = 'check', recordFrom = 'node' }) {
+export async function runScenario(scenario, { core, repo, scratch, sides = SIDES, keep = false, baseDir = repo, golden = 'check', frozen = 'check', recordFrom = 'rust' }) {
   const expect = scenario.expect ?? 'same'
   if (!['same', 'differ'].includes(expect)) throw new Error(`${scenario.name}: expect is "same" or "differ"`)
   if (expect !== 'differ' && scenario.steps.some(s => s.side)) throw new Error(`${scenario.name}: a step for one side only is allowed only in a self-test (expect: "differ")`)
@@ -492,7 +492,7 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   // the switch and the host map are the rig's to set: a scenario that set them could make both
   // sides the same core, or let one side reach the network
   for (const env of [scenario.env, ...scenario.steps.map(s => s.env)]) {
-    for (const k of Object.keys(env ?? {})) if ([IMPL_ENV, 'SPAWNLOFT_TEST_ORIGINS', 'SPAWNLOFT_TEST_SCHEDULER', 'FAKE_SCHEDULER_DIR'].includes(k)) throw new Error(`${scenario.name}: a scenario may not set ${k}`)
+    for (const k of Object.keys(env ?? {})) if (['SPAWNLOFT_CORE_IMPL', 'SPAWNLOFT_TEST_ORIGINS', 'SPAWNLOFT_TEST_SCHEDULER', 'FAKE_SCHEDULER_DIR'].includes(k)) throw new Error(`${scenario.name}: a scenario may not set ${k}`)
   }
   fs.mkdirSync(scratch, { recursive: true })
   const hosts = await startHosts(scenario.hosts ?? {}, { baseDir })
