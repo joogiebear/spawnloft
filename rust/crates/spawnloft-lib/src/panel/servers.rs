@@ -115,70 +115,18 @@ pub fn activity(panel: &Panel, layout: &Layout, req: &mut Request) -> Result<Rou
     done(Reply::ok(json!({ "entries": entries, "more": more })))
 }
 
-/// `backupTasksOf(tasks, name)`: the task behind the Backups page's switch, and the other
-/// enabled tasks that back the server up.
-fn backup_tasks_of<'a>(tasks: &[&'a Value], name: &str) -> (Option<&'a Value>, Vec<&'a Value>) {
-    let kind = |t: &Value| {
-        t.get("action")
-            .and_then(|a| a.get("type"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-    };
-    let mine: Vec<&Value> = tasks
-        .iter()
-        .copied()
-        .filter(|t| t.get("instance").and_then(Value::as_str) == Some(name))
-        .collect();
-    let plain: Vec<&Value> = mine
-        .iter()
-        .copied()
-        .filter(|t| kind(t).as_deref() == Some("backup"))
-        .collect();
-    let auto = plain
-        .iter()
-        .copied()
-        .find(|t| t.get("owner").and_then(Value::as_str) == Some(schedule::OWNER_BACKUPS))
-        .or_else(|| {
-            plain.iter().copied().find(|t| {
-                !js::truthy(t.get("owner"))
-                    && t.get("name").and_then(Value::as_str) == Some("Automatic backup")
-            })
-        });
-    let backs_up = |t: &Value| {
-        kind(t).as_deref() == Some("backup")
-            || (kind(t).as_deref() == Some("steps")
-                && t.get("action")
-                    .and_then(|a| a.get("steps"))
-                    .and_then(Value::as_array)
-                    .is_some_and(|steps| {
-                        steps
-                            .iter()
-                            .any(|s| s.get("do").and_then(Value::as_str) == Some("backup"))
-                    }))
-    };
-    let others = mine
-        .into_iter()
-        .filter(|t| {
-            !auto.is_some_and(|a| std::ptr::eq(a, *t))
-                && t.get("enabled") != Some(&json!(false))
-                && backs_up(t)
-        })
-        .collect();
-    (auto, others)
-}
-
 /// `GET /api/overview`. The schedule comes from SpawnLoft's task file, not the system's
 /// scheduler, which would be a process per question; this covers every server at once.
 pub fn overview(panel: &Panel, layout: &Layout) -> Result<Routed, Failure> {
     let sched = Sched::new(&layout.data_root, &layout.run_dir, Panel::actor());
     let _ = panel;
     let data = sched.load()?;
-    let tasks: Vec<&Value> = Sched::tasks(&data).values().collect();
+    let tasks: Vec<Value> = Sched::tasks(&data).values().cloned().collect();
     let mut servers = Map::new();
     let mut bare: Vec<String> = Vec::new();
     for inst in registry::list_instances(registry_file(layout))? {
         let name = inst.name.as_str();
-        let (auto, others) = backup_tasks_of(&tasks, name);
+        let (auto, others) = super::backups::backup_tasks_of(&tasks, name)?;
         // the switch on the Backups page if it is on, else whatever task in Schedule backs it up
         let on = |t: &Value| t.get("enabled") != Some(&json!(false));
         let by = match auto {

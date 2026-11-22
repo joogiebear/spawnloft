@@ -1836,47 +1836,6 @@ pub fn clean_copies(
     Ok((gone, size))
 }
 
-/// What the overview says of a server's backups (`snapshotSummary`): when the newest archive
-/// and the newest one holding the worlds were made (milliseconds), and how many there are. From
-/// the file names and times alone, so it is cheap for every server at once.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct SnapshotSummary {
-    pub newest_at: Option<f64>,
-    pub newest_backup_at: Option<f64>,
-    pub count: usize,
-}
-
-/// `snapshotSummary(name)`.
-pub fn snapshot_summary(layout: &Layout, name: &str) -> SnapshotSummary {
-    let dir = join(&layout.backups_dir, &[name]);
-    let Ok(names) = fsx::readdir_names(Path::new(&dir)) else {
-        return SnapshotSummary::default();
-    };
-    let mut out = SnapshotSummary::default();
-    let (mut newest, mut newest_backup) = (0f64, 0f64);
-    for file in names.iter().filter(|f| f.ends_with(".tar.gz")) {
-        // a file that went away between the listing and the stat counts for nothing
-        // `stat.mtimeMs`: with its fraction, as Node computes it from seconds and nanoseconds
-        let at = std::fs::metadata(Path::new(&join(&dir, &[file.as_str()])))
-            .ok()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map_or(0.0, |d| {
-                d.as_secs() as f64 * 1000.0 + f64::from(d.subsec_nanos()) / 1e6
-            });
-        if at != 0.0 {
-            out.count += 1;
-        }
-        newest = newest.max(at);
-        if !is_partial_snapshot_name(file) {
-            newest_backup = newest_backup.max(at);
-        }
-    }
-    out.newest_at = (newest != 0.0).then_some(newest);
-    out.newest_backup_at = (newest_backup != 0.0).then_some(newest_backup);
-    out
-}
-
 /// `snapshotNames(name)`: the archives a server has, by name.
 pub fn snapshot_names(layout: &Layout, name: &str) -> Vec<String> {
     fsx::readdir_names(Path::new(&join(&layout.backups_dir, &[name])))
