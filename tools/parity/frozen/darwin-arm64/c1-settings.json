@@ -1,0 +1,547 @@
+{
+ "about": "What the Node core did in scenario c1-settings on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c1-settings",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/home/.local/share/spawnloft.\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (ls --json)",
+   "args": [
+    "ls",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nold   stopped  25570  -     2G   -       <run>/old\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (status old)",
+   "args": [
+    "status",
+    "old"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     old\nlabel:        (none)\nstatus:       stopped\ndirectory:    <run>/old\njar:\nmemory:       2G\njava:         java\nport:         25570\nrcon port:    -\nlevel-name:   (unset)\nmotd:         (unset)\nonline-mode:  (unset)\nconsole log:  <run>/home/.local/share/mcctl/run/old/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/chosen.\n  NOTE: 1 server(s) (old) are registered in <run>/home/.local/share/mcctl, which is not the data root in use. If they are yours: spawnloft config set-root \"<run>/home/.local/share/mcctl\"\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (status old)",
+   "args": [
+    "status",
+    "old"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"old\". Create one with: spawnloft new <name>\n"
+  },
+  {
+   "label": "step 15 (help)",
+   "args": [
+    "help"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.\n\nAUTOMATION\n  spawnloft status <name> --json     Versioned status record (no configured credentials)\n  spawnloft plugins <name> --json    Full plugin inventory\n  spawnloft backups <name> --json    Backup history (snapshots is an alias)\n  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries\n  spawnloft doctor --json            Read-only environment checks\n  spawnloft backup <name> --json     Create a backup; return its result and warnings\n  spawnloft metrics <name> --json    Recorded CPU and memory measurements\n      --follow                       Stream new readings; --json uses JSON Lines\n      --seconds <n>                  Limit the initial history window\n      --csv [--output <file>]        CSV export; refuses to overwrite an existing file\n  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.\n  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.\n  spawnloft mcp                      MCP server on stdio, for an AI client to launch\n      --allow-destructive            Also offer restore, kill and upgrade_minecraft\n      --show-ips                     Stop hiding player IP addresses in console lines\n\nLIFECYCLE\n  spawnloft list                         Show every instance and its state\n  spawnloft status <name>                Detailed state for one instance\n  spawnloft start <name>                 Start and wait until the server reports ready\n      --detach                       Return as soon as the process launches\n      --timeout <sec>                Ready timeout (default 180)\n      --no-sync                      Do not push registry ports into server.properties\n  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console \"stop\" command\n  spawnloft restart <name>               Stop then start\n  spawnloft kill <name>                  Force-kill the process tree\n\nCONSOLE\n  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows\n      --grep <regex>                 Filter lines\n  spawnloft cmd <name> \"<command>\"       Run a command over RCON and print the reply\n  spawnloft send <name> \"<line>\"         Write a raw line to the server's stdin\n  spawnloft console <name>               Interactive attach (server survives detach)\n  spawnloft players <name>               Who is online\n\nINSTANCES\n  spawnloft adopt <name> <dir>           Register an existing server directory in place\n      --jar <file> --memory <4G>\n  spawnloft new <name> [options]         Create a fresh instance\n      --jar <file>                   Server jar from the jars/ store\n      --paper <version>              Download that Paper version and use it\n      --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper\n      --vanilla <version>            Mojang's own server jar (no plugins, no mods)\n      --spigot | --craftbukkit <v>   Compiled here by BuildTools (needs a JDK, ~10 min)\n      --build <n>                    A specific build, for the sources that number them\n      --fabric <version>             Download Fabric for that version (mods, not plugins)\n      --neoforge <version>           Install NeoForge for that version (mods, not plugins)\n      --modpack <slug>               Build the whole server from a Modrinth modpack\n      --template <name>              Start from a saved template\n      --memory <4G> --port <n>\n      --accept-eula                  Write eula=true (you accept Mojang's EULA)\n      --offline                      Let anyone join as any name, no account needed.\n                                     Puts an OFFLINE/INSECURE banner in every log.\n  spawnloft clone <src> <new>            Copy plugins+config into a new instance\n      --with-worlds                  Also copy world data (default: fresh worlds)\n  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,\n                                     auto-restart=on|off, webhook=<url>|off\n  spawnloft props <name> [key=value...]  Read or edit server.properties\n  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>\n  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,\n                                     export [w], delete <w> --yes\n  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)\n\nSNAPSHOTS\n  spawnloft backup <name>                Snapshot to backups/<name>/\n      --scope <plugins|worlds|config|standard|full>\n      --label <text> --keep <n>\n  spawnloft snapshots <name>             List snapshots\n  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped\n  spawnloft prune <name> --keep <n>      Delete all but the newest n\n  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage\n\nOTHER\n  spawnloft templates                    List templates\n  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template\n  spawnloft ui [--port n] [--no-open] [--launcher]\n                                    Serve the local control panel and sign a browser in to it\n                                    (--no-open only prints the one-use link);\n                                    --launcher opens the game launcher instead\n  spawnloft ui --link [--port n] [--launcher]\n                                    Print a new sign-in link for the panel already running\n  spawnloft paper versions               Paper versions available to download\n  spawnloft paper fetch <version>        Download a Paper build into the jar store\n  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,\n                                     Purpur, Folia or Advanced Slime Paper);\n                                     --version <v> --yes crosses Minecraft versions\n  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update\n                                     (snapshot first; worlds and hand-added files untouched)\n  spawnloft config                       Show where servers, jars and backups live\n  spawnloft config set-root <path>       Move the data root (new servers only)\n  spawnloft config set-instances <path>  Put servers on a different drive\n  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,\n                                     so nothing stored needs changing (default: show the plan)\n  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move\n                                     that was interrupted\n  spawnloft config set-backup-mirror <path>|off\n                                     Copy every new snapshot to a second drive too\n  spawnloft rename <old> <new>           Rename an instance (and its folder)\n  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins\n  spawnloft reveal <name>                Open the instance folder in Explorer\n  spawnloft launchers [name]             Write start/console/stop .bat files\n  spawnloft jars                         List stored server jars\n  spawnloft jars import <path> [--as x]  Add a server jar to the store\n  spawnloft why <name>                   Say what is wrong with a server, from its own console\n  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings\n                                     for a bug report (--lines N, --json)\n\nBOTS (plugin testing with scripted players)\n  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)\n  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address\n  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report\n      --instance <server>            Use this server instead of the scenario's\n      --json                         The report as one JSON line; exit 1 when a step fails\n\nCLIENT (a game client for your own servers)\n  spawnloft client list                  Profiles, with running state\n  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)\n  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)\n  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList\n  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)\n  spawnloft client install <name>        Download what the profile needs, with progress on stderr\n  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)\n  spawnloft client status <name>         Say whether the client is running\n  spawnloft client stop <name>           Stop a running client\n  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log\n  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)\n  spawnloft client logout <name>         Forget a signed-in (or offline) account\n  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default\n\nDATABASES\n  spawnloft db                           List databases\n  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS\n  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]\n  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run\n  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address\n  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached\n  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials\n  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]\n  spawnloft db creds <db> <server>       Show a server's credentials again\n  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]\n  start, stop, restart, logs and status take a database's name like a server's.\n\n  spawnloft task list                    Scheduled tasks, when each last ran and runs next\n  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line \"<cmd>\"]\n      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon\n  spawnloft task run|rm|enable|disable <id>\n  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on\n\n  spawnloft doctor                       Check environment, ports, EULA, disk, stale state\n  spawnloft repair                       Rewrite task shims and server launchers for this install\n  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made\n\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nold   stopped  25570  -     2G   -       <run>/old\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nold   stopped  25570  -     2G   -       <run>/old\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>); using the defaults until you fix it or delete it\n"
+  },
+  {
+   "label": "step 22 (status old --json)",
+   "args": [
+    "status",
+    "old",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"old\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/old\",\"jar\":null,\"memory\":\"2G\",\"port\":25570,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/home/.local/share/mcctl/run/old/console.log\"}}\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>); using the defaults until you fix it or delete it\n"
+  },
+  {
+   "label": "step 23 (--help)",
+   "args": [
+    "--help"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.\n\nAUTOMATION\n  spawnloft status <name> --json     Versioned status record (no configured credentials)\n  spawnloft plugins <name> --json    Full plugin inventory\n  spawnloft backups <name> --json    Backup history (snapshots is an alias)\n  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries\n  spawnloft doctor --json            Read-only environment checks\n  spawnloft backup <name> --json     Create a backup; return its result and warnings\n  spawnloft metrics <name> --json    Recorded CPU and memory measurements\n      --follow                       Stream new readings; --json uses JSON Lines\n      --seconds <n>                  Limit the initial history window\n      --csv [--output <file>]        CSV export; refuses to overwrite an existing file\n  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.\n  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.\n  spawnloft mcp                      MCP server on stdio, for an AI client to launch\n      --allow-destructive            Also offer restore, kill and upgrade_minecraft\n      --show-ips                     Stop hiding player IP addresses in console lines\n\nLIFECYCLE\n  spawnloft list                         Show every instance and its state\n  spawnloft status <name>                Detailed state for one instance\n  spawnloft start <name>                 Start and wait until the server reports ready\n      --detach                       Return as soon as the process launches\n      --timeout <sec>                Ready timeout (default 180)\n      --no-sync                      Do not push registry ports into server.properties\n  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console \"stop\" command\n  spawnloft restart <name>               Stop then start\n  spawnloft kill <name>                  Force-kill the process tree\n\nCONSOLE\n  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows\n      --grep <regex>                 Filter lines\n  spawnloft cmd <name> \"<command>\"       Run a command over RCON and print the reply\n  spawnloft send <name> \"<line>\"         Write a raw line to the server's stdin\n  spawnloft console <name>               Interactive attach (server survives detach)\n  spawnloft players <name>               Who is online\n\nINSTANCES\n  spawnloft adopt <name> <dir>           Register an existing server directory in place\n      --jar <file> --memory <4G>\n  spawnloft new <name> [options]         Create a fresh instance\n      --jar <file>                   Server jar from the jars/ store\n      --paper <version>              Download that Paper version and use it\n      --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper\n      --vanilla <version>            Mojang's own server jar (no plugins, no mods)\n      --spigot | --craftbukkit <v>   Compiled here by BuildTools (needs a JDK, ~10 min)\n      --build <n>                    A specific build, for the sources that number them\n      --fabric <version>             Download Fabric for that version (mods, not plugins)\n      --neoforge <version>           Install NeoForge for that version (mods, not plugins)\n      --modpack <slug>               Build the whole server from a Modrinth modpack\n      --template <name>              Start from a saved template\n      --memory <4G> --port <n>\n      --accept-eula                  Write eula=true (you accept Mojang's EULA)\n      --offline                      Let anyone join as any name, no account needed.\n                                     Puts an OFFLINE/INSECURE banner in every log.\n  spawnloft clone <src> <new>            Copy plugins+config into a new instance\n      --with-worlds                  Also copy world data (default: fresh worlds)\n  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,\n                                     auto-restart=on|off, webhook=<url>|off\n  spawnloft props <name> [key=value...]  Read or edit server.properties\n  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>\n  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,\n                                     export [w], delete <w> --yes\n  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)\n\nSNAPSHOTS\n  spawnloft backup <name>                Snapshot to backups/<name>/\n      --scope <plugins|worlds|config|standard|full>\n      --label <text> --keep <n>\n  spawnloft snapshots <name>             List snapshots\n  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped\n  spawnloft prune <name> --keep <n>      Delete all but the newest n\n  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage\n\nOTHER\n  spawnloft templates                    List templates\n  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template\n  spawnloft ui [--port n] [--no-open] [--launcher]\n                                    Serve the local control panel and sign a browser in to it\n                                    (--no-open only prints the one-use link);\n                                    --launcher opens the game launcher instead\n  spawnloft ui --link [--port n] [--launcher]\n                                    Print a new sign-in link for the panel already running\n  spawnloft paper versions               Paper versions available to download\n  spawnloft paper fetch <version>        Download a Paper build into the jar store\n  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,\n                                     Purpur, Folia or Advanced Slime Paper);\n                                     --version <v> --yes crosses Minecraft versions\n  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update\n                                     (snapshot first; worlds and hand-added files untouched)\n  spawnloft config                       Show where servers, jars and backups live\n  spawnloft config set-root <path>       Move the data root (new servers only)\n  spawnloft config set-instances <path>  Put servers on a different drive\n  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,\n                                     so nothing stored needs changing (default: show the plan)\n  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move\n                                     that was interrupted\n  spawnloft config set-backup-mirror <path>|off\n                                     Copy every new snapshot to a second drive too\n  spawnloft rename <old> <new>           Rename an instance (and its folder)\n  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins\n  spawnloft reveal <name>                Open the instance folder in Explorer\n  spawnloft launchers [name]             Write start/console/stop .bat files\n  spawnloft jars                         List stored server jars\n  spawnloft jars import <path> [--as x]  Add a server jar to the store\n  spawnloft why <name>                   Say what is wrong with a server, from its own console\n  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings\n                                     for a bug report (--lines N, --json)\n\nBOTS (plugin testing with scripted players)\n  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)\n  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address\n  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report\n      --instance <server>            Use this server instead of the scenario's\n      --json                         The report as one JSON line; exit 1 when a step fails\n\nCLIENT (a game client for your own servers)\n  spawnloft client list                  Profiles, with running state\n  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)\n  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)\n  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList\n  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)\n  spawnloft client install <name>        Download what the profile needs, with progress on stderr\n  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)\n  spawnloft client status <name>         Say whether the client is running\n  spawnloft client stop <name>           Stop a running client\n  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log\n  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)\n  spawnloft client logout <name>         Forget a signed-in (or offline) account\n  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default\n\nDATABASES\n  spawnloft db                           List databases\n  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS\n  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]\n  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run\n  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address\n  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached\n  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials\n  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]\n  spawnloft db creds <db> <server>       Show a server's credentials again\n  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]\n  start, stop, restart, logs and status take a database's name like a server's.\n\n  spawnloft task list                    Scheduled tasks, when each last ran and runs next\n  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line \"<cmd>\"]\n      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon\n  spawnloft task run|rm|enable|disable <id>\n  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on\n\n  spawnloft doctor                       Check environment, ports, EULA, disk, stale state\n  spawnloft repair                       Rewrite task shims and server launchers for this install\n  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made\n\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>); using the defaults until you fix it or delete it\n"
+  },
+  {
+   "label": "step 26 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nold   stopped  25570  -     2G   -       <run>/old\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (it is not a JSON object); using the defaults until you fix it or delete it\n"
+  },
+  {
+   "label": "step 29 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/bom.\n  NOTE: 1 server(s) (old) are registered in <run>/home/.local/share/mcctl, which is not the data root in use. If they are yours: spawnloft config set-root \"<run>/home/.local/share/mcctl\"\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nold   stopped  25570  -     2G   -       <run>/old\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (EISDIR: illegal operation on a directory, read); using the defaults until you fix it or delete it\n"
+  },
+  {
+   "label": "step 39 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/legacy-settings.\n  NOTE: 1 server(s) (old) are registered in <run>/home/.local/share/mcctl, which is not the data root in use. If they are yours: spawnloft config set-root \"<run>/home/.local/share/mcctl\"\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (metrics old)",
+   "args": [
+    "metrics",
+    "old"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"old\". Create one with: spawnloft new <name>\n"
+  },
+  {
+   "label": "step 41 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/mcctl-env.\n  NOTE: 1 server(s) (old) are registered in <run>/home/.local/share/mcctl, which is not the data root in use. If they are yours: spawnloft config set-root \"<run>/home/.local/share/mcctl\"\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[0]\" argument must be of type string. Received type number (5)\n"
+  },
+  {
+   "label": "step 45 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[0]\" argument must be of type string. Received type number (5)\n"
+  },
+  {
+   "label": "step 48 (status)",
+   "args": [
+    "status"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[0]\" argument must be of type string. Received type boolean (true)\n"
+  },
+  {
+   "label": "step 51 (help)",
+   "args": [
+    "help"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[0]\" argument must be of type string. Received an instance of Array\n"
+  },
+  {
+   "label": "step 55 (metrics x --json)",
+   "args": [
+    "metrics",
+    "x",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"ENOTDIR\",\"message\":\"ENOTDIR: not a directory, mkdir '<run>/a-file/below/instances'\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 56 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Error: ENOTDIR: not a directory, mkdir '<run>/a-file/below/instances'\n"
+  },
+  {
+   "label": "step 59 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nold   stopped  25570  -     2G   -       <run>/old\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>); using the defaults until you fix it or delete it\n"
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "a-file": {
+   "kind": "file",
+   "mode": "644",
+   "text": "not a folder\n"
+  },
+  "bom": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bom/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "chosen/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "env-root/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/mcctl": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/mcctl/settings.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"dataRoot\": \"<run>/legacy-settings\"\n}\n"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft/settings.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"dataRoot\": "
+  },
+  "home/.local": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"old\": {\n      \"dir\": \"<run>/old\",\n      \"port\": 25570,\n      \"memory\": \"2G\"\n    }\n  }\n}\n"
+  },
+  "home/.local/share/mcctl/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.local/share/mcctl/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Local": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Local/mcctl": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Local/mcctl/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"old\": {\n      \"dir\": \"<run>/old\",\n      \"port\": 25570,\n      \"memory\": \"2G\"\n    }\n  }\n}\n"
+  },
+  "home/AppData/Roaming": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Roaming/mcctl": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Roaming/mcctl/settings.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"dataRoot\": \"<run>/legacy-settings\"\n}\n"
+  },
+  "home/AppData/Roaming/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Roaming/spawnloft/settings.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"dataRoot\": "
+  },
+  "legacy-settings": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "legacy-settings/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mcctl-env/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "servers": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "snaps": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

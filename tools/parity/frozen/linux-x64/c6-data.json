@@ -145,7 +145,7 @@
    ],
    "code": 0,
    "signal": null,
-   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"move\",\"executed\":false,\"from\":\"<run>/data\",\"to\":\"<run>/moved\",\"mode\":\"rename\",\"files\":7,\"bytes\":1167,\"problems\":[],\"warnings\":[\"1 scheduled task will be paused for the move and switched back on after\",\"close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\"],\"result\":null}}\n",
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"move\",\"executed\":false,\"from\":\"<run>/data\",\"to\":\"<run>/moved\",\"mode\":\"rename\",\"files\":7,\"bytes\":1273,\"problems\":[],\"warnings\":[\"1 scheduled task will be paused for the move and switched back on after\",\"close the SpawnLoft app first; it keeps log files in the data folder, and a folder with a file open cannot be moved\"],\"result\":null}}\n",
    "stderr": ""
   },
   {
@@ -497,12 +497,12 @@
    "kind": "dir",
    "mode": "755"
   },
-  "home/.config/systemd/user/spawnloft-23187ff88681d15d-a-backup.service": {
+  "home/.config/systemd/user/spawnloft-5b27cdde9324cd2f-a-backup.service": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft task a-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<run>/data/tasks/a-backup.sh\"\nWorkingDirectory=<run>/data\nKillMode=process\nStandardOutput=append:<run>/data/tasks/a-backup.stdout.log\nStandardError=append:<run>/data/tasks/a-backup.stderr.log\n"
   },
-  "home/.config/systemd/user/spawnloft-23187ff88681d15d-a-backup.timer": {
+  "home/.config/systemd/user/spawnloft-5b27cdde9324cd2f-a-backup.timer": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft schedule a-backup\n\n[Timer]\nOnCalendar=*-*-* 04:00:00\nPersistent=true\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
@@ -514,12 +514,12 @@
   "scheduler/calls.log": {
    "kind": "file",
    "mode": "644",
-   "text": "systemctl --user disable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable spawnloft-23187ff88681d15d-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable spawnloft-23187ff88681d15d-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-23187ff88681d15d-a-backup.timer\nsystemctl --user disable spawnloft-23187ff88681d15d-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-23187ff88681d15d-a-backup.timer\n"
+   "text": "systemctl --user disable --now spawnloft-5b27cdde9324cd2f-a-backup.timer\nsystemctl --user disable spawnloft-5b27cdde9324cd2f-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-5b27cdde9324cd2f-a-backup.timer\nsystemctl --user disable --now spawnloft-5b27cdde9324cd2f-a-backup.timer\nsystemctl --user disable spawnloft-5b27cdde9324cd2f-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-5b27cdde9324cd2f-a-backup.timer\nsystemctl --user disable spawnloft-5b27cdde9324cd2f-a-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-5b27cdde9324cd2f-a-backup.timer\n"
   },
   "scheduler/state.json": {
    "kind": "file",
    "mode": "644",
-   "text": "{\n  \"systemd\": {\n    \"spawnloft-23187ff88681d15d-a-backup.timer\": true\n  }\n}\n"
+   "text": "{\n  \"systemd\": {\n    \"spawnloft-5b27cdde9324cd2f-a-backup.timer\": true\n  }\n}\n"
   }
  }
 }

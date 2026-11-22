@@ -1,0 +1,128 @@
+{
+ "about": "What the Node core did in scenario c9-mcp-tools on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c9-mcp-tools",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 7 (mcp)",
+   "args": [
+    "mcp"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"tools\":{\"listChanged\":false}},\"serverInfo\":{\"name\":\"spawnloft\",\"title\":\"SpawnLoft\",\"version\":\"<version>\"},\"instructions\":\"SpawnLoft runs Minecraft servers on this computer. Start with list_servers to learn the server names.\\nChanges to plugins and the server software take effect when the server next restarts. install_plugin and update_plugin take a plugins snapshot first; take a backup yourself before anything else risky.\\nTo change a plugin's settings, find the file with list_config_files, read it with read_config_file, and change it with write_config_file using old_text and new_text; each change is snapshotted first. Then reload the plugin with run_command, or restart.\\nWhen a server will not start, read diagnostics before get_logs. For get_logs, prefer level \\\"warn\\\" over reading everything.\\nWhen a person reports a bug, diagnostics with bundle: true writes a zip they can attach.\\nDestructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.\\nTest players: bot_run_scenario joins up to five scripted players for plugin tests. client_launch starts the real game for one player when what matters is what a player sees; use client_profiles to find a profile, client_join to connect it to a server, client_chat and client_messages to talk, client_screenshot for evidence, client_quit when done.\"}}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"run1: stopped, port 47861\"}],\"structuredContent\":{\"instances\":[{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47861,\"rconPort\":47871,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/run1/console.log\"}],\"databases\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"run1: stopped; port 47861, RCON 47871; 1G memory\"}],\"structuredContent\":{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47861,\"rconPort\":47871,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/run1/console.log\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no instance named \\\"nope\\\". Known instances: run1\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"(no lines)\"}],\"structuredContent\":{\"name\":\"run1\",\"lines\":[],\"scanned\":100}}}\n{\"jsonrpc\":\"2.0\",\"id\":6,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"run1 is stopped.\\nNo known failure causes in the recent console. get_logs with level \\\"warn\\\" shows anything else.\"}],\"structuredContent\":{\"instance\":\"run1\",\"status\":{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47861,\"rconPort\":47871,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/run1/console.log\"},\"findings\":[],\"crashes\":{\"dir\":\"<run>/data/instances/run1/crash-reports\",\"reports\":[]},\"scope\":\"recent-console-and-crash-reports\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"Online (0): nobody\\nKnown players: 0\"}],\"structuredContent\":{\"name\":\"run1\",\"running\":false,\"online\":[],\"known\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":8,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"run1: not running; 0 samples in the last <secs> \\nNo samples recorded in this window.\"}],\"structuredContent\":{\"name\":\"run1\",\"running\":false,\"windowSeconds\":600,\"cores\":3,\"cpuScale\":\"whole-machine\",\"samplingAvailable\":true,\"summary\":{\"samples\":0,\"cpuAvg\":null,\"cpuMax\":null,\"cpuLast\":null,\"memoryMiBLast\":null,\"memoryMiBMax\":null},\"tick\":{},\"recent\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":9,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"No backups of run1 yet. The backup tool takes one.\"}],\"structuredContent\":{\"name\":\"run1\",\"snapshots\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":10,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"Nothing recorded.\"}],\"structuredContent\":{\"entries\":[],\"more\":false}}}\n{\"jsonrpc\":\"2.0\",\"id\":11,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no snapshots exist for \\\"run1\\\"\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":12,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no snapshots exist for \\\"run1\\\"\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":13,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"No plugins installed.\"}],\"structuredContent\":{\"name\":\"run1\",\"plugins\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":14,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"server.properties (<size>)\\nplugins/Greeter/config.yml (<size>)\\nplugins/Greeter/messages.properties (<size>)\"}],\"structuredContent\":{\"name\":\"run1\",\"folder\":null,\"files\":[{\"path\":\"server.properties\",\"sizeBytes\":<n>},{\"path\":\"plugins/Greeter/config.yml\",\"sizeBytes\":<n>},{\"path\":\"plugins/Greeter/messages.properties\",\"sizeBytes\":<n>}],\"truncated\":false}}}\n{\"jsonrpc\":\"2.0\",\"id\":15,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"plugins/Greeter/config.yml (<size>)\\nplugins/Greeter/messages.properties (<size>)\"}],\"structuredContent\":{\"name\":\"run1\",\"folder\":\"plugins/Greeter\",\"files\":[{\"path\":\"plugins/Greeter/config.yml\",\"sizeBytes\":<n>},{\"path\":\"plugins/Greeter/messages.properties\",\"sizeBytes\":<n>}],\"truncated\":false}}}\n{\"jsonrpc\":\"2.0\",\"id\":16,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"\\\"../..\\\" must be a folder inside the server folder\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":17,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"greeting: hello\\nlimit: 3\\n\"}],\"structuredContent\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"text\":\"greeting: hello\\nlimit: 3\\n\",\"sizeBytes\":<n>,\"redacted\":false}}}\n{\"jsonrpc\":\"2.0\",\"id\":18,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"#Minecraft server properties\\nmotd=A Minecraft Server\\nonline-mode=false\\nserver-ip=127.0.0.1\\nmax-players=20\\n\"}],\"structuredContent\":{\"name\":\"run1\",\"path\":\"server.properties\",\"text\":\"#Minecraft server properties\\nmotd=A Minecraft Server\\nonline-mode=false\\nserver-ip=127.0.0.1\\nmax-players=20\\n\",\"sizeBytes\":<n>,\"redacted\":false}}}\n{\"jsonrpc\":\"2.0\",\"id\":19,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"\\\"../instances.json\\\" must stay inside the server folder\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":20,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"plugins/Greeter/none.yml does not exist. list_config_files shows what does.\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":21,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"\\\"run1\\\" is not running. Start it first: spawnloft start run1\\nmineflayer is not installed: run \\\"spawnloft bot setup\\\" in a terminal (about 500 MB)\"}],\"structuredContent\":{\"name\":\"run1\",\"ok\":false,\"problems\":[\"\\\"run1\\\" is not running. Start it first: spawnloft start run1\",\"mineflayer is not installed: run \\\"spawnloft bot setup\\\" in a terminal (about 500 MB)\"],\"warnings\":[],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":null,\"maxBots\":5}}}\n{\"jsonrpc\":\"2.0\",\"id\":22,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no instance named \\\"nope\\\". Known instances: run1\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":23,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"\\\"run1\\\" is not running\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":24,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"run1 was not running.\"}],\"structuredContent\":{\"name\":\"run1\",\"alreadyStopped\":true}}}\n{\"jsonrpc\":\"2.0\",\"id\":25,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"(no profiles; make one with \\\"spawnloft client new\\\")\"}],\"structuredContent\":{\"profiles\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":26,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no profile named \\\"nobody\\\". Create one with: spawnloft client new <name> --mc <version>\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":27,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no profile named \\\"nobody\\\". Create one with: spawnloft client new <name> --mc <version>\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":28,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no profile named \\\"nobody\\\". Create one with: spawnloft client new <name> --mc <version>\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":29,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"no profile named \\\"nobody\\\". Create one with: spawnloft client new <name> --mc <version>\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":30,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"Changed plugins/Greeter/config.yml on run1.\\n@@ line 2 @@\\n  greeting: hello\\n- limit: 3\\n+ limit: 5\\n  \\nSnapshot taken first: before-edit_config_<stamp>.tar.gz (restore puts back this one file).\\nTakes effect at the next start.\"}],\"structuredContent\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"created\":false,\"snapshot\":\"before-edit_config_<stamp>.tar.gz\",\"running\":false,\"diff\":\"@@ line 2 @@\\n  greeting: hello\\n- limit: 3\\n+ limit: 5\\n  \"}}}\n{\"jsonrpc\":\"2.0\",\"id\":31,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"old_text was not found in plugins/Greeter/config.yml. Read the file again with read_config_file and copy the text exactly, including indentation.\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":32,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"give either content (the whole new file) or old_text and new_text (one exact replacement), not both\"}],\"isError\":true}}\n{\"jsonrpc\":\"2.0\",\"id\":33,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"Changed plugins/Greeter/messages.properties on run1.\\n@@ line 1 @@\\n- welcome=Welcome!\\n+ welcome=Hi!\\n  \\nSnapshot taken first: before-edit_config_<stamp>.tar.gz (restore puts back this one file).\\nTakes effect at the next start.\"}],\"structuredContent\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/messages.properties\",\"created\":false,\"snapshot\":\"before-edit_config_<stamp>.tar.gz\",\"running\":false,\"diff\":\"@@ line 1 @@\\n- welcome=Welcome!\\n+ welcome=Hi!\\n  \"}}}\n{\"jsonrpc\":\"2.0\",\"id\":34,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"greeting: hello\\nlimit: 5\\n\"}],\"structuredContent\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"text\":\"greeting: hello\\nlimit: 5\\n\",\"sizeBytes\":<n>,\"redacted\":false}}}\n{\"jsonrpc\":\"2.0\",\"id\":35,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"<time>  run1  config-edit: plugins/Greeter/messages.properties  - by AI assistant (parity-rig)\\n<time>  run1  config-edit: plugins/Greeter/config.yml  - by AI assistant (parity-rig)\"}],\"structuredContent\":{\"entries\":[{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"config-edit\",\"by\":{\"kind\":\"assistant\",\"name\":\"parity-rig\"},\"detail\":\"plugins/Greeter/messages.properties\",\"snapshot\":\"before-edit_config_<stamp>.tar.gz\"},{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"config-edit\",\"by\":{\"kind\":\"assistant\",\"name\":\"parity-rig\"},\"detail\":\"plugins/Greeter/config.yml\",\"snapshot\":\"before-edit_config_<stamp>.tar.gz\"}],\"more\":false}}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"config-edit\",\"by\":{\"kind\":\"assistant\",\"name\":\"parity-rig\"},\"detail\":\"plugins/Greeter/config.yml\",\"snapshot\":\"before-edit_config_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"config-edit\",\"by\":{\"kind\":\"assistant\",\"name\":\"parity-rig\"},\"detail\":\"plugins/Greeter/messages.properties\",\"snapshot\":\"before-edit_config_<stamp>.tar.gz\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1/before-edit_config_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"config\",\n  \"label\": \"before-edit\",\n  \"changeCopy\": true,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins/Greeter/config.yml\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/before-edit_config_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/Greeter/config.yml type=0 mode=644 size=25 sha256=6dc5d438ccb8e4e6cc09a2536dfa6db5ceb8f3aec6712b9cbfe71196f1de4f9e"
+  },
+  "data/backups/run1/before-edit_config_<stamp>.json#2": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"config\",\n  \"label\": \"before-edit\",\n  \"changeCopy\": true,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins/Greeter/messages.properties\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/before-edit_config_<stamp>.tar.gz#2": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/Greeter/messages.properties type=0 mode=644 size=17 sha256=e55b974d19251219ee90000312c3fb35325ae0c9fe967851954352d69402d6ef"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/plugins/Greeter": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/plugins/Greeter/config.yml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "greeting: hello\nlimit: 5\n"
+  },
+  "data/instances/run1/plugins/Greeter/messages.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "welcome=Hi!\n"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\nserver-ip=127.0.0.1\nmax-players=20\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47861,\n      \"rcon\": {\n        \"port\": 47871,\n        \"password\": \"hunter22secret\"\n      },\n      \"type\": \"paper\",\n      \"mcVersion\": \"1.21.4\"\n    }\n  },\n  \"databases\": {}\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

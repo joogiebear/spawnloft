@@ -1,0 +1,326 @@
+{
+ "about": "What the Node core did in scenario c7-client-versions-offline on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-versions-offline",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type  Fabric  Quilt  Forge  NeoForge  Downloaded\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": "Note: the Minecraft version list could not be read (could not reach the Minecraft version list: SPAWNLOFT_TEST_ORIGINS has no fake for https://piston-meta.mojang.com; the request was not sent), so only downloaded versions are listed.\n"
+  },
+  {
+   "label": "step 2 (client versions --json)",
+   "args": [
+    "client",
+    "versions",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":\"the Minecraft version list could not be read (could not reach the Minecraft version list: SPAWNLOFT_TEST_ORIGINS has no fake for https://piston-meta.mojang.com; the request was not sent), so only downloaded versions are listed\",\"versions\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (client versions --all)",
+   "args": [
+    "client",
+    "versions",
+    "--all"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type     Fabric  Quilt  Forge  NeoForge  Downloaded\n1.21.11  release  ?       ?      ?      ?\nb1.7.3   beta     ?       ?      ?      ?         yes\nOdd      release  ?       ?      ?      ?\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": "Note: the Minecraft version list could not be read (could not reach the Minecraft version list: SPAWNLOFT_TEST_ORIGINS has no fake for https://piston-meta.mojang.com; the request was not sent), so only downloaded versions are listed.\n"
+  },
+  {
+   "label": "step 8 (client versions --all --json)",
+   "args": [
+    "client",
+    "versions",
+    "--all",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":\"the Minecraft version list could not be read (could not reach the Minecraft version list: SPAWNLOFT_TEST_ORIGINS has no fake for https://piston-meta.mojang.com; the request was not sent), so only downloaded versions are listed\",\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}},{\"id\":\"b1.7.3\",\"type\":\"old_beta\",\"downloaded\":true,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}},{\"id\":\"Odd\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (client new a --mc 1.21.11 --loader fabric)",
+   "args": [
+    "client",
+    "new",
+    "a",
+    "--mc",
+    "1.21.11",
+    "--loader",
+    "fabric"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"a\" (Minecraft 1.21.11, fabric). Launch it: spawnloft client launch a\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (client new b --mc b1.7.3)",
+   "args": [
+    "client",
+    "new",
+    "b",
+    "--mc",
+    "b1.7.3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"b\" (Minecraft b1.7.3, vanilla). Launch it: spawnloft client launch b\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (client new c --mc 1.20.1)",
+   "args": [
+    "client",
+    "new",
+    "c",
+    "--mc",
+    "1.20.1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Minecraft version list is not available offline and \"1.20.1\" is not downloaded\n"
+  },
+  {
+   "label": "step 12 (client new c --mc Odd)",
+   "args": [
+    "client",
+    "new",
+    "c",
+    "--mc",
+    "Odd"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Minecraft version list is not available offline and \"Odd\" is not downloaded\n"
+  },
+  {
+   "label": "step 13 (client new c --mc 1.21.11 --loader forge)",
+   "args": [
+    "client",
+    "new",
+    "c",
+    "--mc",
+    "1.21.11",
+    "--loader",
+    "forge"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"c\" (Minecraft 1.21.11, forge). Launch it: spawnloft client launch c\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (client set a mc=1.20.1)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "mc=1.20.1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Minecraft version list is not available offline and \"1.20.1\" is not downloaded\n"
+  },
+  {
+   "label": "step 15 (client set a mc=1.21.11)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "mc=1.21.11"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": mc=1.21.11\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type     Fabric  Quilt  Forge  NeoForge  Downloaded\n1.19.4   release  ?       ?      ?      ?\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (client new d --mc 1.19.4 --json)",
+   "args": [
+    "client",
+    "new",
+    "d",
+    "--mc",
+    "1.19.4",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profile\":{\"name\":\"d\",\"mc\":\"1.19.4\",\"loader\":\"vanilla\",\"loaderVersion\":null,\"java\":null,\"memory\":\"2G\",\"harness\":false,\"server\":null,\"account\":null,\"assistantAccount\":false,\"createdAt\":\"<time>\"}}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (client versions --json)",
+   "args": [
+    "client",
+    "versions",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":\"the Minecraft version list could not be read (could not reach the Minecraft version list: SPAWNLOFT_TEST_ORIGINS has no fake for https://piston-meta.mojang.com; the request was not sent), so only downloaded versions are listed\",\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}},{\"id\":\"Odd\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: manifest.versions.filter is not a function\n"
+  },
+  {
+   "label": "step 25 (client new e --mc 1.18)",
+   "args": [
+    "client",
+    "new",
+    "e",
+    "--mc",
+    "1.18"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: Cannot read properties of null (reading 'id')\n"
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/client": {
+   "kind": "dir"
+  },
+  "data/client/cache": {
+   "kind": "dir"
+  },
+  "data/client/cache/version_manifest_v2.json": {
+   "kind": "file",
+   "text": "{\n  \"versions\": [\n    null\n  ]\n}\n"
+  },
+  "data/client/cache/version_manifest_v2.json.fetched-at": {
+   "kind": "file",
+   "text": "1000"
+  },
+  "data/client/profiles": {
+   "kind": "dir"
+  },
+  "data/client/profiles/a": {
+   "kind": "dir"
+  },
+  "data/client/profiles/a/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/b": {
+   "kind": "dir"
+  },
+  "data/client/profiles/b/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/c": {
+   "kind": "dir"
+  },
+  "data/client/profiles/c/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/d": {
+   "kind": "dir"
+  },
+  "data/client/profiles/d/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"a\": {\n      \"mc\": \"1.21.11\",\n      \"loader\": \"fabric\",\n      \"loaderVersion\": null,\n      \"java\": null,\n      \"memory\": \"2G\",\n      \"harness\": false,\n      \"server\": null,\n      \"account\": null,\n      \"assistantAccount\": false,\n      \"createdAt\": \"<time>\"\n    },\n    \"b\": {\n      \"mc\": \"b1.7.3\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"java\": null,\n      \"memory\": \"2G\",\n      \"harness\": false,\n      \"server\": null,\n      \"account\": null,\n      \"assistantAccount\": false,\n      \"createdAt\": \"<time>\"\n    },\n    \"c\": {\n      \"mc\": \"1.21.11\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": null,\n      \"java\": null,\n      \"memory\": \"2G\",\n      \"harness\": false,\n      \"server\": null,\n      \"account\": null,\n      \"assistantAccount\": false,\n      \"createdAt\": \"<time>\"\n    },\n    \"d\": {\n      \"mc\": \"1.19.4\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"java\": null,\n      \"memory\": \"2G\",\n      \"harness\": false,\n      \"server\": null,\n      \"account\": null,\n      \"assistantAccount\": false,\n      \"createdAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/client/versions": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.21.11": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.21.11/1.21.11.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"1.21.11\",\n  \"type\": \"release\",\n  \"releaseTime\": \"<time>\"\n}\n"
+  },
+  "data/client/versions/Odd": {
+   "kind": "dir"
+  },
+  "data/client/versions/Odd/Odd.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"odd\"\n}\n"
+  },
+  "data/client/versions/b1.7.3": {
+   "kind": "dir"
+  },
+  "data/client/versions/b1.7.3/b1.7.3.jar": {
+   "kind": "file",
+   "text": "abc"
+  },
+  "data/client/versions/b1.7.3/b1.7.3.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"b1.7.3\",\n  \"type\": \"old_beta\",\n  \"releaseTime\": \"<time>\",\n  \"downloads\": {\n    \"client\": {\n      \"size\": 3\n    }\n  }\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

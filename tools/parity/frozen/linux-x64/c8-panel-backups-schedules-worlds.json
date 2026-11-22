@@ -170,7 +170,7 @@
   "data/backups/srv1/a-label-that-is-longer-than-forty-charac_standard_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nold/ type=5 mode=755 size=0\nold/level.dat type=0 mode=644 size=3 sha256=cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\nold_the_end/ type=5 mode=755 size=0\nold_the_end/level.dat type=0 mode=644 size=7 sha256=abc28d2c5994c41291825991a0d10d8bab91d8ae48deb87b2a89a22578cf0fb9\nserver.properties type=0 mode=644 size=54 sha256=23007bdf88059634ad0e0e576764f6c57655fbbcebb10c9d43bb08cf339c2800\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nold/ type=5 mode=755 size=0\nold/level.dat type=0 mode=644 size=3 sha256=cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\nold_the_end/ type=5 mode=755 size=0\nold_the_end/level.dat type=0 mode=644 size=7 sha256=abc28d2c5994c41291825991a0d10d8bab91d8ae48deb87b2a89a22578cf0fb9\nserver.properties type=0 mode=644 size=54 sha256=23007bdf88059634ad0e0e576764f6c57655fbbcebb10c9d43bb08cf339c2800\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
   },
   "data/backups/srv1/bare_standard_2025-03-03_00-00-00.json": {
    "kind": "file",
@@ -214,7 +214,7 @@
   "data/backups/srv1/first-one_plugins_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f"
   },
   "data/backups/srv1/keepme_standard_2025-02-01_00-00-00.json": {
    "kind": "file",
@@ -244,7 +244,7 @@
   "data/backups/srv1/manual_standard_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nold/ type=5 mode=755 size=0\nold/level.dat type=0 mode=644 size=3 sha256=cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\nold_the_end/ type=5 mode=755 size=0\nold_the_end/level.dat type=0 mode=644 size=7 sha256=abc28d2c5994c41291825991a0d10d8bab91d8ae48deb87b2a89a22578cf0fb9\nserver.properties type=0 mode=644 size=54 sha256=23007bdf88059634ad0e0e576764f6c57655fbbcebb10c9d43bb08cf339c2800\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nold/ type=5 mode=755 size=0\nold/level.dat type=0 mode=644 size=3 sha256=cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\nold_the_end/ type=5 mode=755 size=0\nold_the_end/level.dat type=0 mode=644 size=7 sha256=abc28d2c5994c41291825991a0d10d8bab91d8ae48deb87b2a89a22578cf0fb9\nserver.properties type=0 mode=644 size=54 sha256=23007bdf88059634ad0e0e576764f6c57655fbbcebb10c9d43bb08cf339c2800\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
   },
   "data/backups/srv1/manual_standard_<stamp>.json#2": {
    "kind": "file",
@@ -254,7 +254,7 @@
   "data/backups/srv1/manual_standard_<stamp>.tar.gz#2": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nold/ type=5 mode=755 size=0\nold/level.dat type=0 mode=644 size=3 sha256=cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\nold_the_end/ type=5 mode=755 size=0\nold_the_end/level.dat type=0 mode=644 size=7 sha256=abc28d2c5994c41291825991a0d10d8bab91d8ae48deb87b2a89a22578cf0fb9\nserver.properties type=0 mode=644 size=54 sha256=23007bdf88059634ad0e0e576764f6c57655fbbcebb10c9d43bb08cf339c2800\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nold/ type=5 mode=755 size=0\nold/level.dat type=0 mode=644 size=3 sha256=cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\nold_the_end/ type=5 mode=755 size=0\nold_the_end/level.dat type=0 mode=644 size=7 sha256=abc28d2c5994c41291825991a0d10d8bab91d8ae48deb87b2a89a22578cf0fb9\nserver.properties type=0 mode=644 size=54 sha256=23007bdf88059634ad0e0e576764f6c57655fbbcebb10c9d43bb08cf339c2800\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
   },
   "data/backups/srv1/mojibake-Ã©_standard_2025-03-04_00-00-00.json": {
    "kind": "file",
@@ -284,7 +284,7 @@
   "data/backups/srv1/pre-restore_files_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f"
   },
   "data/backups/srv1/pre-restore_files_<stamp>.json#2": {
    "kind": "file",
@@ -294,7 +294,7 @@
   "data/backups/srv1/pre-restore_files_<stamp>.tar.gz#2": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f"
   },
   "data/backups/srv1/pre-restore_files_<stamp>.json#3": {
    "kind": "file",
@@ -304,7 +304,7 @@
   "data/backups/srv1/pre-restore_files_<stamp>.tar.gz#3": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nplugins/old.txt type=0 mode=644 size=4 sha256=4ebabbd77cf9141d3ec6a774c99442b93c8d6b4850c6f28cb0fdc02e8b239e5f"
   },
   "data/backups/srv1/stroke-ł_standard_2025-03-05_00-00-00.json": {
    "kind": "file",
@@ -523,7 +523,7 @@
   "data/run/runtime.json": {
    "kind": "file",
    "mode": "644",
-   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<repo>\"\n}\n"
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<code folder>\"\n}\n"
   },
   "data/run/srv1": {
    "kind": "dir",
@@ -586,27 +586,27 @@
    "kind": "dir",
    "mode": "755"
   },
-  "home/.config/systemd/user/spawnloft-18fe8e84801e33aa-srv1-backup.service": {
+  "home/.config/systemd/user/spawnloft-8aec30349fc3d480-srv1-backup.service": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft task srv1-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<run>/data/tasks/srv1-backup.sh\"\nWorkingDirectory=<run>/data\nKillMode=process\nStandardOutput=append:<run>/data/tasks/srv1-backup.stdout.log\nStandardError=append:<run>/data/tasks/srv1-backup.stderr.log\n"
   },
-  "home/.config/systemd/user/spawnloft-18fe8e84801e33aa-srv1-backup.timer": {
+  "home/.config/systemd/user/spawnloft-8aec30349fc3d480-srv1-backup.timer": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft schedule srv1-backup\n\n[Timer]\nOnCalendar=Fri *-*-* 22:15:00\nPersistent=true\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
   },
-  "home/.config/systemd/user/spawnloft-18fe8e84801e33aa-srv1-steps.service": {
+  "home/.config/systemd/user/spawnloft-8aec30349fc3d480-srv1-steps.service": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft task srv1-steps\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<run>/data/tasks/srv1-steps.sh\"\nWorkingDirectory=<run>/data\nKillMode=process\nStandardOutput=append:<run>/data/tasks/srv1-steps.stdout.log\nStandardError=append:<run>/data/tasks/srv1-steps.stderr.log\n\n[Install]\nWantedBy=default.target\n"
   },
-  "home/.config/systemd/user/spawnloft-18fe8e84801e33aa-srv2-start.service": {
+  "home/.config/systemd/user/spawnloft-8aec30349fc3d480-srv2-start.service": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft task srv2-start\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<run>/data/tasks/srv2-start.sh\"\nWorkingDirectory=<run>/data\nKillMode=process\nStandardOutput=append:<run>/data/tasks/srv2-start.stdout.log\nStandardError=append:<run>/data/tasks/srv2-start.stderr.log\n"
   },
-  "home/.config/systemd/user/spawnloft-18fe8e84801e33aa-srv2-start.timer": {
+  "home/.config/systemd/user/spawnloft-8aec30349fc3d480-srv2-start.timer": {
    "kind": "file",
    "mode": "600",
    "text": "[Unit]\nDescription=SpawnLoft schedule srv2-start\n\n[Timer]\nOnCalendar=*-*-* 06:00:00\nPersistent=true\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
@@ -640,12 +640,12 @@
   "scheduler/calls.log": {
    "kind": "file",
    "mode": "644",
-   "text": "systemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-18fe8e84801e33aa-srv1-backup.service spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-command.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-command.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-steps.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-steps.service\nsystemctl --user daemon-reload\nsystemctl --user enable spawnloft-18fe8e84801e33aa-srv1-steps.service\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv2-start.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv2-start.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv2-start.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-18fe8e84801e33aa-srv1-backup.timer\nsystemctl --user start --no-block spawnloft-18fe8e84801e33aa-srv1-backup.service\nsystemctl --user disable --now spawnloft-18fe8e84801e33aa-srv1-command.timer\nsystemctl --user disable spawnloft-18fe8e84801e33aa-srv1-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-18fe8e84801e33aa-srv1-command.service spawnloft-18fe8e84801e33aa-srv1-command.timer\n"
+   "text": "systemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-8aec30349fc3d480-srv1-backup.service spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-command.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-command.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-steps.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-steps.service\nsystemctl --user daemon-reload\nsystemctl --user enable spawnloft-8aec30349fc3d480-srv1-steps.service\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv2-start.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv2-start.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv2-start.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-8aec30349fc3d480-srv1-backup.timer\nsystemctl --user start --no-block spawnloft-8aec30349fc3d480-srv1-backup.service\nsystemctl --user disable --now spawnloft-8aec30349fc3d480-srv1-command.timer\nsystemctl --user disable spawnloft-8aec30349fc3d480-srv1-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-8aec30349fc3d480-srv1-command.service spawnloft-8aec30349fc3d480-srv1-command.timer\n"
   },
   "scheduler/state.json": {
    "kind": "file",
    "mode": "644",
-   "text": "{\n  \"systemd\": {\n    \"spawnloft-18fe8e84801e33aa-srv2-start.timer\": true,\n    \"spawnloft-18fe8e84801e33aa-srv1-steps.service\": true,\n    \"spawnloft-18fe8e84801e33aa-srv1-backup.timer\": true\n  }\n}\n"
+   "text": "{\n  \"systemd\": {\n    \"spawnloft-8aec30349fc3d480-srv2-start.timer\": true,\n    \"spawnloft-8aec30349fc3d480-srv1-steps.service\": true,\n    \"spawnloft-8aec30349fc3d480-srv1-backup.timer\": true\n  }\n}\n"
   }
  }
 }

@@ -1,0 +1,1131 @@
+{
+ "about": "What the Node core did in scenario c7-client-install on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-install",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 2 (client install m)",
+   "args": [
+    "client",
+    "install",
+    "m"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed 1.20.1: 8 files (7485 bytes)\n",
+   "stderr": "Reading the Minecraft version list\nDownloading the version file for Minecraft 1.20.1\nclient 1/1 (185 B)\nlog config 1/1 (44 B)\n<progress>\n"
+  },
+  {
+   "label": "step 3 (client install m --json)",
+   "args": [
+    "client",
+    "install",
+    "m",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"m\",\"id\":\"1.20.1\",\"jar\":\"<run>/data/client/versions/1.20.1/1.20.1.jar\",\"logConfig\":\"client-1.12.xml\",\"assetsLayout\":\"objects\",\"assetIndex\":{\"id\":\"5\",\"sha1\":\"eed48e219ce481ffdb24798f17684d7c93f496e0\",\"file\":\"<run>/data/client/assets/indexes/5.json\"},\"libraries\":4,\"natives\":1,\"assets\":3,\"downloaded\":0,\"bytes\":0}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (client install m)",
+   "args": [
+    "client",
+    "install",
+    "m"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed 1.20.1: 1 files (900 bytes)\n",
+   "stderr": "<progress>\n"
+  },
+  {
+   "label": "step 7 (client install m --json)",
+   "args": [
+    "client",
+    "install",
+    "m",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"m\",\"id\":\"1.20.1\",\"jar\":\"<run>/data/client/versions/1.20.1/1.20.1.jar\",\"logConfig\":\"client-1.12.xml\",\"assetsLayout\":\"objects\",\"assetIndex\":{\"id\":\"5\",\"sha1\":\"eed48e219ce481ffdb24798f17684d7c93f496e0\",\"file\":\"<run>/data/client/assets/indexes/5.json\"},\"libraries\":4,\"natives\":1,\"assets\":3,\"downloaded\":0,\"bytes\":0}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (client install m --verify --json)",
+   "args": [
+    "client",
+    "install",
+    "m",
+    "--verify",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"m\",\"id\":\"1.20.1\",\"jar\":\"<run>/data/client/versions/1.20.1/1.20.1.jar\",\"logConfig\":\"client-1.12.xml\",\"assetsLayout\":\"objects\",\"assetIndex\":{\"id\":\"5\",\"sha1\":\"eed48e219ce481ffdb24798f17684d7c93f496e0\",\"file\":\"<run>/data/client/assets/indexes/5.json\"},\"libraries\":4,\"natives\":1,\"assets\":3,\"downloaded\":0,\"bytes\":0}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (client install old --json)",
+   "args": [
+    "client",
+    "install",
+    "old",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"old\",\"id\":\"1.6.4\",\"jar\":\"<run>/data/client/versions/1.6.4/1.6.4.jar\",\"logConfig\":null,\"assetsLayout\":\"virtual\",\"assetIndex\":{\"id\":\"legacy\",\"sha1\":\"3c7e9bb51294bfd04dd85bcd5d5fa1fd635f8754\",\"file\":\"<run>/data/client/assets/indexes/legacy.json\"},\"libraries\":1,\"natives\":0,\"assets\":2,\"downloaded\":4,\"bytes\":1081}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (client install res)",
+   "args": [
+    "client",
+    "install",
+    "res"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed 1.5.2: 3 files (509 bytes)\n",
+   "stderr": "Reading the Minecraft version list\nDownloading the version file for Minecraft 1.5.2\nclient 1/1 (184 B)\n<progress>\n"
+  },
+  {
+   "label": "step 11 (client install lwjgl2 --json)",
+   "args": [
+    "client",
+    "install",
+    "lwjgl2",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"1.12.2 ships no macOS arm64 natives; use a newer Minecraft version on this machine\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (client install odd)",
+   "args": [
+    "client",
+    "install",
+    "odd"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Reading the Minecraft version list\nDownloading the version file for Minecraft odd-layout\nerror: Minecraft odd-layout's asset index (odd) is laid out in a way SpawnLoft does not know. Update SpawnLoft.\n"
+  },
+  {
+   "label": "step 13 (client install esc --json)",
+   "args": [
+    "client",
+    "install",
+    "esc",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"the asset index names the file \\\"../outside.ogg\\\", which would land outside its folder\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (client install gone)",
+   "args": [
+    "client",
+    "install",
+    "gone"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Reading the Minecraft version list\nDownloading the version file for Minecraft lib-missing\nerror: could not download library com.example:gone:1.0 from https://libraries.minecraft.net/com/example/gone/1.0/gone-1.0.jar: download of library com.example:gone:1.0 failed (404) from https://libraries.minecraft.net/com/example/gone/1.0/gone-1.0.jar\n"
+  },
+  {
+   "label": "step 15 (client install bent --json)",
+   "args": [
+    "client",
+    "install",
+    "bent",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"checksum-mismatch\",\"message\":\"could not download library com.example:bent:1.0 from https://libraries.minecraft.net/com/example/bent/1.0/bent-1.0.jar: checksum mismatch for library com.example:bent:1.0\\n  expected 0000000000000000000000000000000000000000\\n  got      36159e1a7453cd340f6b1d5decb25e87a3acb06d\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (client install made)",
+   "args": [
+    "client",
+    "install",
+    "made"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Reading the Minecraft version list\nDownloading the version file for Minecraft loader-made\nerror: library com.example:made:1.0 is made when the mod loader is set up, and it is missing or damaged; set the loader up again\n"
+  },
+  {
+   "label": "step 17 (client install many --json)",
+   "args": [
+    "client",
+    "install",
+    "many",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"loader-install-needed\",\"message\":\"library com.many:l0:1.0 is made when the mod loader is set up, and it is missing or damaged; set the loader up again\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (client install hostile --json)",
+   "args": [
+    "client",
+    "install",
+    "hostile",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"the archive tried to write outside its folder (\\\"../../escaped.so\\\"); nothing more was extracted\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (client install unlisted)",
+   "args": [
+    "client",
+    "install",
+    "unlisted"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Reading the Minecraft version list\nerror: Mojang's version list has no \"9.9.9\"; check the id (releases look like 26.3, snapshots like 26.4-snapshot-6, old versions like b1.7.3)\n"
+  },
+  {
+   "label": "step 20 (client install nosuch)",
+   "args": [
+    "client",
+    "install",
+    "nosuch"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nosuch\". Known profiles: m, old, res, lwjgl2, odd, esc, gone, bent, made, many, hostile, unlisted, fab\n"
+  },
+  {
+   "label": "step 21 (client install fab)",
+   "args": [
+    "client",
+    "install",
+    "fab"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Finding a Fabric loader for Minecraft 1.20.1\nerror: could not reach Fabric loaders for 1.20.1: SPAWNLOFT_TEST_ORIGINS has no fake for https://meta.fabricmc.net; the request was not sent\n"
+  },
+  {
+   "label": "step 22 (client install)",
+   "args": [
+    "client",
+    "install"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 23 (client install m extra)",
+   "args": [
+    "client",
+    "install",
+    "m",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 24 (client install m --bogus)",
+   "args": [
+    "client",
+    "install",
+    "m",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/example/alpha/1.0/alpha-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/example/bent/1.0/bent-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/example/beta/2.0/beta-2.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/example/beta/2.0/beta-2.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/example/gone/1.0/gone-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l1/1.0/l1-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l2/1.0/l2-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l3/1.0/l3-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l4/1.0/l4-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l5/1.0/l5-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l6/1.0/l6-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/many/l7/1.0/l7-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/org/evil/natives/1.0/natives-1.0-natives-macos-arm64.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-macos-arm64.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/33a9d690efb6c608cf32c5ff788a2915d77f531c/client.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/3d33585be75d20d5914eddd7af1c474f0ea55625/client-1.12.xml",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/aa01e32b0112258a58773288d946818e621cdff5/client.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/fbd331c211c635838a8df6c069a6f5fc66882b16/client.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/3c7e9bb51294bfd04dd85bcd5d5fa1fd635f8754/legacy.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/44c8c633ffe5ff0c189bb8292594f9d35d750762/odd.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/5b0942c38d6021f562461ec4acbfda97c54f9a68/pre-1.6.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/6c113c292406ad29ed3867bf0a6b57091d1f41ec/hostile-natives.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/7a7ca7bd1157fb63fe804068a115d998081b1cd4/1.20.1.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/8b9764f481cd382cd9300d83c52bfbd8601f80e2/escape.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/9efbc417ecb142e28ceebc6ca47c4e26f4c19277/lib-bad-sum.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/a042bc083ae6c5a2f8e6b45403687dfe5a8c1063/odd-layout.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/a6bafcfef96cd47a72df82dc5ed9ca02dd3c0b58/1.6.4.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/b0d2bebf53af17ce9aeade14ced244d4275ef2bc/1.5.2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/b49da072096af1d24e9f00bf3a1ddb69abdab519/lib-missing.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/d0ad59767826dfa76f722a0751929a81a0b88905/many-made.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/e1a55a31f76c4bd0ac2553cc944839e0104a6b5a/1.12.2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/e61cb556ccfb2e714839240c9ae94727ab859923/escape.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/eed48e219ce481ffdb24798f17684d7c93f496e0/5.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/fd027a4f738bf3b87ca3b7a8c5bd9f8926f86ede/loader-made.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://resources.download.minecraft.net",
+   "method": "GET",
+   "url": "/2f/2f3c7d7250bbd3c88bc94ac63dea6145a83fa28d",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://resources.download.minecraft.net",
+   "method": "GET",
+   "url": "/30/3077f5518b033bed9594299ed4928cdf09d4adba",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://resources.download.minecraft.net",
+   "method": "GET",
+   "url": "/68/681aa26fad9139e4fa6d2fd4303eda669aecb979",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://resources.download.minecraft.net",
+   "method": "GET",
+   "url": "/70/7027cdf1859e75cf9dc5613c11371960657c0edd",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/indexes": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/indexes/5.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"objects\":{\"minecraft/sounds/a.ogg\":{\"hash\":\"681aa26fad9139e4fa6d2fd4303eda669aecb979\",\"size\":3000},\"icons/icon.png\":{\"hash\":\"3077f5518b033bed9594299ed4928cdf09d4adba\",\"size\":700},\"minecraft/sounds/same.ogg\":{\"hash\":\"681aa26fad9139e4fa6d2fd4303eda669aecb979\",\"size\":3000}}}"
+  },
+  "data/client/assets/indexes/empty.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"objects\":{}}"
+  },
+  "data/client/assets/indexes/escape.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"virtual\":true,\"objects\":{\"../outside.ogg\":{\"hash\":\"f45fef318b6e9a98f337df6d164b12ddbac58456\",\"size\":60}}}"
+  },
+  "data/client/assets/indexes/legacy.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"virtual\":true,\"objects\":{\"sound/step/grass1.ogg\":{\"hash\":\"2f3c7d7250bbd3c88bc94ac63dea6145a83fa28d\",\"size\":400},\"music/calm1.ogg\":{\"hash\":\"681aa26fad9139e4fa6d2fd4303eda669aecb979\",\"size\":3000}}}"
+  },
+  "data/client/assets/indexes/odd.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"spread\":true,\"objects\":{\"x.ogg\":{\"hash\":\"aa292977540d9c9448486b47c1dbfc735f2233aa\",\"size\":50}}}"
+  },
+  "data/client/assets/indexes/pre-1.6.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"map_to_resources\":true,\"objects\":{\"sound/random/click.ogg\":{\"hash\":\"7027cdf1859e75cf9dc5613c11371960657c0edd\",\"size\":200}}}"
+  },
+  "data/client/assets/log_configs": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/log_configs/client-1.12.xml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<Configuration><Appenders/></Configuration>\n"
+  },
+  "data/client/assets/objects": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/objects/2f": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/objects/2f/2f3c7d7250bbd3c88bc94ac63dea6145a83fa28d": {
+   "kind": "file",
+   "mode": "644",
+   "size": 400,
+   "sha256": "ebb971a87e2d5ef60d0d0b3e6444646e48080f6b719a4e50cbbac7de05c39deb"
+  },
+  "data/client/assets/objects/30": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/objects/30/3077f5518b033bed9594299ed4928cdf09d4adba": {
+   "kind": "file",
+   "mode": "644",
+   "size": 700,
+   "sha256": "a2bb0cf24273ef59b0d6d7fb80c0cbac5c5d32880d3fb6166e36bcc750569920"
+  },
+  "data/client/assets/objects/68": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/objects/68/681aa26fad9139e4fa6d2fd4303eda669aecb979": {
+   "kind": "file",
+   "mode": "644",
+   "size": 3000,
+   "sha256": "eee49dc15d422aba9c0bbaf9a2bcd2ec52a6018923aa38e6bf255f0cbc906a54"
+  },
+  "data/client/assets/objects/70": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/objects/70/7027cdf1859e75cf9dc5613c11371960657c0edd": {
+   "kind": "file",
+   "mode": "644",
+   "size": 200,
+   "sha256": "370d812e2362a225a71c7fb03f0b3878cb587cd5bb6f72b22a3ebe16b7583889"
+  },
+  "data/client/cache": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/cache/version_manifest_v2.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"latest\":{\"release\":\"1.20.1\",\"snapshot\":\"escape\"},\"versions\":[{\"id\":\"1.20.1\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/v1/packages/7a7ca7bd1157fb63fe804068a115d998081b1cd4/1.20.1.json\",\"sha1\":\"7a7ca7bd1157fb63fe804068a115d998081b1cd4\"},{\"id\":\"1.6.4\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/v1/packages/a6bafcfef96cd47a72df82dc5ed9ca02dd3c0b58/1.6.4.json\",\"sha1\":\"a6bafcfef96cd47a72df82dc5ed9ca02dd3c0b58\"},{\"id\":\"1.5.2\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/v1/packages/b0d2bebf53af17ce9aeade14ced244d4275ef2bc/1.5.2.json\"},{\"id\":\"1.12.2\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/v1/packages/e1a55a31f76c4bd0ac2553cc944839e0104a6b5a/1.12.2.json\",\"sha1\":\"e1a55a31f76c4bd0ac2553cc944839e0104a6b5a\"},{\"id\":\"odd-layout\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/a042bc083ae6c5a2f8e6b45403687dfe5a8c1063/odd-layout.json\",\"sha1\":\"a042bc083ae6c5a2f8e6b45403687dfe5a8c1063\"},{\"id\":\"escape\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/e61cb556ccfb2e714839240c9ae94727ab859923/escape.json\",\"sha1\":\"e61cb556ccfb2e714839240c9ae94727ab859923\"},{\"id\":\"lib-missing\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/b49da072096af1d24e9f00bf3a1ddb69abdab519/lib-missing.json\",\"sha1\":\"b49da072096af1d24e9f00bf3a1ddb69abdab519\"},{\"id\":\"lib-bad-sum\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/9efbc417ecb142e28ceebc6ca47c4e26f4c19277/lib-bad-sum.json\",\"sha1\":\"9efbc417ecb142e28ceebc6ca47c4e26f4c19277\"},{\"id\":\"many-made\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/d0ad59767826dfa76f722a0751929a81a0b88905/many-made.json\",\"sha1\":\"d0ad59767826dfa76f722a0751929a81a0b88905\"},{\"id\":\"hostile-natives\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/6c113c292406ad29ed3867bf0a6b57091d1f41ec/hostile-natives.json\",\"sha1\":\"6c113c292406ad29ed3867bf0a6b57091d1f41ec\"},{\"id\":\"loader-made\",\"type\":\"snapshot\",\"url\":\"https://piston-meta.mojang.com/v1/packages/fd027a4f738bf3b87ca3b7a8c5bd9f8926f86ede/loader-made.json\",\"sha1\":\"fd027a4f738bf3b87ca3b7a8c5bd9f8926f86ede\"}]}"
+  },
+  "data/client/cache/version_manifest_v2.json.fetched-at": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<epoch-ms>"
+  },
+  "data/client/libraries": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/alpha/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/alpha/1.0/alpha-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1500,
+   "sha256": "8d273ad681291c9afee8f32f9a27376f507e82cb9a66c4f98876588235a1f722"
+  },
+  "data/client/libraries/com/example/bent": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/bent/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/beta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/beta/2.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/beta/2.0/beta-2.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 900,
+   "sha256": "8304bcae1c75062fce2a5ee6fb063472f5ebd33f475775c371e37201a1436d81"
+  },
+  "data/client/libraries/com/example/gone": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/gone/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l1/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l1/1.0/l1-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 100,
+   "sha256": "e75acadd54baceff802041c63ec04c1ffe9670fae2a616e87015d8264d9a75c6"
+  },
+  "data/client/libraries/com/many/l2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l2/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l2/1.0/l2-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 101,
+   "sha256": "16afd5d67b6c46895c156f825e2d18826ab324419bfc056e0355a39d00da7d62"
+  },
+  "data/client/libraries/com/many/l3": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l3/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l3/1.0/l3-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 102,
+   "sha256": "6288c74fc089ec772e0a6ae28e65274e7635578387c4936b7a724fb99d33f7e7"
+  },
+  "data/client/libraries/com/many/l4": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l4/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l4/1.0/l4-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 103,
+   "sha256": "2cdfa3a29e0eaa997ac2e608253723dd5676da3a0ad45b2e5993dc6c2fcf5ef4"
+  },
+  "data/client/libraries/com/many/l5": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l5/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l5/1.0/l5-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 104,
+   "sha256": "0f4f75618a841fdc9cf18b01a2276cb911678a3c11e7a541ef60da92d87877ca"
+  },
+  "data/client/libraries/com/many/l6": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l6/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l6/1.0/l6-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 105,
+   "sha256": "1862279a2022989f9631b5462c5ba53468381f2cb3ec89465e2d162933a32b89"
+  },
+  "data/client/libraries/com/many/l7": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l7/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/many/l7/1.0/l7-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 106,
+   "sha256": "c58a73e38b5e05944b2bcbcdeb7046328a731c7722f033b1cd55e1595a225d52"
+  },
+  "data/client/libraries/net": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/sf": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/sf/jopt-simple": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/sf/jopt-simple/jopt-simple": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/sf/jopt-simple/jopt-simple/4.5": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 300,
+   "sha256": "a4d0aa44152179b020b4454eada5787d1852d56b5dac0cc89c6ca9be5954c905"
+  },
+  "data/client/libraries/org": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/evil": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/evil/natives": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/evil/natives/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/evil/natives/1.0/natives-1.0-natives-macos-arm64.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "ok.so method=0 flags=0x0 size=4 csize=4 crc=bea95492 attr=0x0\n../../escaped.so method=0 flags=0x0 size=3 csize=3 crc=822b39fb attr=0x0"
+  },
+  "data/client/libraries/org/lwjgl": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/lwjgl/lwjgl": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/lwjgl/lwjgl/3.3.1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-macos-arm64.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "META-INF/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x0\nMETA-INF/MANIFEST.MF method=0 flags=0x0 size=22 csize=22 crc=205adf7a attr=0x0\nlibnatives-macos-arm64.so method=8 flags=0x0 size=2000 csize=284 crc=1a0683aa attr=0x0\nsub/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x0\nsub/notes.txt method=0 flags=0x0 size=32 csize=32 crc=76cbbf6f attr=0x0"
+  },
+  "data/client/natives": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/natives/1.20.1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/natives/1.20.1/.complete": {
+   "kind": "file",
+   "mode": "644",
+   "text": "1.20.1 osx arm64 3b9d0f555b5841687eeeb8b98ca89657d4efb506"
+  },
+  "data/client/natives/1.20.1/libnatives-macos-arm64.so": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2000,
+   "sha256": "33f765ace3523db91d65fed1daa9f2e2ace5e0e58a16c0eda69290ff7ae7b5bb"
+  },
+  "data/client/natives/1.20.1/sub": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/natives/1.20.1/sub/notes.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "natives for natives-macos-arm64\n"
+  },
+  "data/client/natives/hostile-natives": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/natives/hostile-natives/ok.so": {
+   "kind": "file",
+   "mode": "644",
+   "text": "fine"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"m\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"old\": {\n      \"mc\": \"1.6.4\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"res\": {\n      \"mc\": \"1.5.2\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"lwjgl2\": {\n      \"mc\": \"1.12.2\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"odd\": {\n      \"mc\": \"odd-layout\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"esc\": {\n      \"mc\": \"escape\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"gone\": {\n      \"mc\": \"lib-missing\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"bent\": {\n      \"mc\": \"lib-bad-sum\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"made\": {\n      \"mc\": \"loader-made\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"many\": {\n      \"mc\": \"many-made\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"hostile\": {\n      \"mc\": \"hostile-natives\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"unlisted\": {\n      \"mc\": \"9.9.9\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"fab\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"fabric\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": null,\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    }\n  },\n  \"defaultAccount\": null\n}\n"
+  },
+  "data/client/versions": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.12.2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.12.2/1.12.2.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"1.12.2\",\"type\":\"release\",\"mainClass\":\"net.minecraft.client.main.Main\",\"minecraftArguments\":\"--username ${auth_player_name}\",\"assetIndex\":{\"id\":\"1.12\",\"sha1\":\"e97551b7ce83f875cfbe308e43f9d690ed07479a\",\"size\":104,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/e97551b7ce83f875cfbe308e43f9d690ed07479a/1.12.json\"},\"downloads\":{\"client\":{\"sha1\":\"a8fa4198cd32206ae555da5daa166ecbf1a35bca\",\"size\":185,\"url\":\"https://piston-data.mojang.com/v1/objects/a8fa4198cd32206ae555da5daa166ecbf1a35bca/client.jar\"}},\"libraries\":[{\"name\":\"org.lwjgl.lwjgl:lwjgl-platform:2.9.4\",\"downloads\":{\"classifiers\":{\"natives-linux\":{\"path\":\"org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-linux.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-linux.jar\",\"sha1\":\"6195d137fffa4ccce68e29da12651e99afd92c92\",\"size\":864},\"natives-osx\":{\"path\":\"org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-osx.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-osx.jar\",\"sha1\":\"e22e32dc0fdb9613e03ddf7c0bc9035b0ad9fff3\",\"size\":858},\"natives-windows\":{\"path\":\"org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-windows.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/lwjgl-platform/2.9.4/lwjgl-platform-2.9.4-natives-windows.jar\",\"sha1\":\"a0109dd09a1eeb165098808c97efd3ef7f561f0e\",\"size\":870}}},\"natives\":{\"linux\":\"natives-linux\",\"osx\":\"natives-osx\",\"windows\":\"natives-windows\"},\"extract\":{\"exclude\":[\"META-INF/\",\"sub/\"]}}]}"
+  },
+  "data/client/versions/1.20.1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.20.1/1.20.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=15 csize=15 crc=45301290 attr=0x0"
+  },
+  "data/client/versions/1.20.1/1.20.1.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"1.20.1\",\"type\":\"release\",\"mainClass\":\"net.minecraft.client.main.Main\",\"javaVersion\":{\"component\":\"java-runtime-gamma\",\"majorVersion\":17},\"arguments\":{\"game\":[\"--username\",\"${auth_player_name}\"],\"jvm\":[\"-Djava.library.path=${natives_directory}\",\"-cp\",\"${classpath}\"]},\"assetIndex\":{\"id\":\"5\",\"sha1\":\"eed48e219ce481ffdb24798f17684d7c93f496e0\",\"size\":274,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/eed48e219ce481ffdb24798f17684d7c93f496e0/5.json\"},\"assets\":\"5\",\"downloads\":{\"client\":{\"sha1\":\"fbd331c211c635838a8df6c069a6f5fc66882b16\",\"size\":185,\"url\":\"https://piston-data.mojang.com/v1/objects/fbd331c211c635838a8df6c069a6f5fc66882b16/client.jar\"}},\"logging\":{\"client\":{\"argument\":\"-Dlog4j.configurationFile=${path}\",\"file\":{\"id\":\"client-1.12.xml\",\"sha1\":\"3d33585be75d20d5914eddd7af1c474f0ea55625\",\"size\":44,\"url\":\"https://piston-data.mojang.com/v1/objects/3d33585be75d20d5914eddd7af1c474f0ea55625/client-1.12.xml\"},\"type\":\"log4j2-xml\"}},\"libraries\":[{\"name\":\"com.example:alpha:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/alpha/1.0/alpha-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/alpha/1.0/alpha-1.0.jar\",\"sha1\":\"73fcc0ae065673ba4f51ffb52043e1465c0edd47\",\"size\":1500}}},{\"name\":\"com.example:alpha:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/alpha/1.0/alpha-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/alpha/1.0/alpha-1.0.jar\",\"sha1\":\"73fcc0ae065673ba4f51ffb52043e1465c0edd47\",\"size\":1500}}},{\"name\":\"com.example:beta:2.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/beta/2.0/beta-2.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/beta/2.0/beta-2.0.jar\",\"sha1\":\"1fc7ea50a1b348d5a8e64f780f9306c97d35df1b\",\"size\":900}}},{\"name\":\"com.example:never:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/never/1.0/never-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/never/1.0/never-1.0.jar\",\"sha1\":\"d4eb471aab4b5525d1d778e82eec065faa80521d\",\"size\":10}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"nowhere\"}}]},{\"name\":\"org.lwjgl:lwjgl:3.3.1:natives-linux\",\"downloads\":{\"artifact\":{\"path\":\"org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-linux.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-linux.jar\",\"sha1\":\"6195d137fffa4ccce68e29da12651e99afd92c92\",\"size\":864}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"linux\"}}]},{\"name\":\"org.lwjgl:lwjgl:3.3.1:natives-macos\",\"downloads\":{\"artifact\":{\"path\":\"org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-macos.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-macos.jar\",\"sha1\":\"4cea607e2159102f4b0d404418e184da43a979af\",\"size\":864}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"osx\"}}]},{\"name\":\"org.lwjgl:lwjgl:3.3.1:natives-macos-arm64\",\"downloads\":{\"artifact\":{\"path\":\"org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-macos-arm64.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-macos-arm64.jar\",\"sha1\":\"92a6976895eba856fa883395fb07914f60364daa\",\"size\":882}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"osx\"}}]},{\"name\":\"org.lwjgl:lwjgl:3.3.1:natives-windows\",\"downloads\":{\"artifact\":{\"path\":\"org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows.jar\",\"sha1\":\"a0109dd09a1eeb165098808c97efd3ef7f561f0e\",\"size\":870}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"windows\"}}]},{\"name\":\"org.lwjgl:lwjgl:3.3.1:natives-windows-arm64\",\"downloads\":{\"artifact\":{\"path\":\"org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows-arm64.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows-arm64.jar\",\"sha1\":\"9755b5947d052630f1a1c4ac29d79def391ad206\",\"size\":888}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"windows\"}}]},{\"name\":\"org.lwjgl:lwjgl:3.3.1:natives-windows-x86\",\"downloads\":{\"artifact\":{\"path\":\"org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows-x86.jar\",\"url\":\"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.1/lwjgl-3.3.1-natives-windows-x86.jar\",\"sha1\":\"246b0ed0af0f225310a5f7d116121a18a21c1413\",\"size\":882}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"windows\"}}]}]}"
+  },
+  "data/client/versions/1.5.2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.5.2/1.5.2.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=14 csize=14 crc=252be02f attr=0x0"
+  },
+  "data/client/versions/1.5.2/1.5.2.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"1.5.2\",\"type\":\"release\",\"mainClass\":\"net.minecraft.client.Minecraft\",\"minecraftArguments\":\"${auth_player_name}\",\"assetIndex\":{\"id\":\"pre-1.6\",\"sha1\":\"5b0942c38d6021f562461ec4acbfda97c54f9a68\",\"size\":125,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/5b0942c38d6021f562461ec4acbfda97c54f9a68/pre-1.6.json\"},\"downloads\":{\"client\":{\"sha1\":\"aa01e32b0112258a58773288d946818e621cdff5\",\"size\":184,\"url\":\"https://piston-data.mojang.com/v1/objects/aa01e32b0112258a58773288d946818e621cdff5/client.jar\"}},\"libraries\":[]}"
+  },
+  "data/client/versions/1.6.4": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.6.4/1.6.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=14 csize=14 crc=ce0efb43 attr=0x0"
+  },
+  "data/client/versions/1.6.4/1.6.4.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"1.6.4\",\"type\":\"release\",\"mainClass\":\"net.minecraft.client.main.Main\",\"minecraftArguments\":\"--username ${auth_player_name}\",\"assetIndex\":{\"id\":\"legacy\",\"sha1\":\"3c7e9bb51294bfd04dd85bcd5d5fa1fd635f8754\",\"size\":197,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/3c7e9bb51294bfd04dd85bcd5d5fa1fd635f8754/legacy.json\"},\"downloads\":{\"client\":{\"sha1\":\"33a9d690efb6c608cf32c5ff788a2915d77f531c\",\"size\":184,\"url\":\"https://piston-data.mojang.com/v1/objects/33a9d690efb6c608cf32c5ff788a2915d77f531c/client.jar\"}},\"libraries\":[{\"name\":\"net.sf.jopt-simple:jopt-simple:4.5\",\"downloads\":{\"artifact\":{\"path\":\"net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar\",\"url\":\"https://libraries.minecraft.net/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar\",\"sha1\":\"141df76375a2ed1a341f0984aaaf08293e3fb9a8\",\"size\":300}}}]}"
+  },
+  "data/client/versions/escape": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/escape/escape.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"escape\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"escape\",\"sha1\":\"8b9764f481cd382cd9300d83c52bfbd8601f80e2\",\"size\":107,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/8b9764f481cd382cd9300d83c52bfbd8601f80e2/escape.json\"},\"downloads\":{\"client\":{\"sha1\":\"8a386c7f638dc3526d4eb03d8baa7271194bbb16\",\"size\":185,\"url\":\"https://piston-data.mojang.com/v1/objects/8a386c7f638dc3526d4eb03d8baa7271194bbb16/client.jar\"}},\"libraries\":[]}"
+  },
+  "data/client/versions/hostile-natives": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/hostile-natives/hostile-natives.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"hostile-natives\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"libraries\":[{\"name\":\"org.evil:natives:1.0:natives-linux\",\"downloads\":{\"artifact\":{\"path\":\"org/evil/natives/1.0/natives-1.0-natives-linux.jar\",\"url\":\"https://libraries.minecraft.net/org/evil/natives/1.0/natives-1.0-natives-linux.jar\",\"sha1\":\"5c32f98e70c6eef7b04dff3b8bd3131c017de39e\",\"size\":223}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"linux\"}}]},{\"name\":\"org.evil:natives:1.0:natives-macos-arm64\",\"downloads\":{\"artifact\":{\"path\":\"org/evil/natives/1.0/natives-1.0-natives-macos-arm64.jar\",\"url\":\"https://libraries.minecraft.net/org/evil/natives/1.0/natives-1.0-natives-macos-arm64.jar\",\"sha1\":\"5c32f98e70c6eef7b04dff3b8bd3131c017de39e\",\"size\":223}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"osx\"}}]},{\"name\":\"org.evil:natives:1.0:natives-windows\",\"downloads\":{\"artifact\":{\"path\":\"org/evil/natives/1.0/natives-1.0-natives-windows.jar\",\"url\":\"https://libraries.minecraft.net/org/evil/natives/1.0/natives-1.0-natives-windows.jar\",\"sha1\":\"5c32f98e70c6eef7b04dff3b8bd3131c017de39e\",\"size\":223}},\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"windows\"}}]}]}"
+  },
+  "data/client/versions/lib-bad-sum": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/lib-bad-sum/lib-bad-sum.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"lib-bad-sum\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"libraries\":[{\"name\":\"com.example:bent:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/bent/1.0/bent-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/bent/1.0/bent-1.0.jar\",\"sha1\":\"0000000000000000000000000000000000000000\",\"size\":80}}}]}"
+  },
+  "data/client/versions/lib-missing": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/lib-missing/lib-missing.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"lib-missing\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"libraries\":[{\"name\":\"com.example:gone:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/gone/1.0/gone-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/gone/1.0/gone-1.0.jar\",\"sha1\":\"a6dfdeaa3a44a4c52d44284847d7160892b4017e\",\"size\":4}}}]}"
+  },
+  "data/client/versions/loader-made": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/loader-made/loader-made.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"loader-made\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"libraries\":[{\"name\":\"com.example:made:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/made/1.0/made-1.0.jar\",\"url\":\"\",\"sha1\":\"e572f95f9d1fad1088e43936931f12bbbbdbbb06\",\"size\":4}}}]}"
+  },
+  "data/client/versions/many-made": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/many-made/many-made.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"many-made\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"libraries\":[{\"name\":\"com.many:l0:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l0/1.0/l0-1.0.jar\",\"url\":\"\",\"sha1\":\"b497913a9aa82a0cb578d8aabaffc64bcdcf0884\",\"size\":2}}},{\"name\":\"com.many:l1:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l1/1.0/l1-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l1/1.0/l1-1.0.jar\",\"sha1\":\"ce8ea8fdad0a029d8a52a2b7e049704a1b7a8fc3\",\"size\":100}}},{\"name\":\"com.many:l2:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l2/1.0/l2-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l2/1.0/l2-1.0.jar\",\"sha1\":\"d9d306df1ff6c18b8e4f80958d1eefdcd07da5be\",\"size\":101}}},{\"name\":\"com.many:l3:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l3/1.0/l3-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l3/1.0/l3-1.0.jar\",\"sha1\":\"ce15dbf1c04b680a4ab28be5a0e147a4e40832b5\",\"size\":102}}},{\"name\":\"com.many:l4:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l4/1.0/l4-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l4/1.0/l4-1.0.jar\",\"sha1\":\"fbecf6049f31584017aac190a18cdb32572667b5\",\"size\":103}}},{\"name\":\"com.many:l5:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l5/1.0/l5-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l5/1.0/l5-1.0.jar\",\"sha1\":\"fd8a42f7ef35395e564182fa076cded66a9989bb\",\"size\":104}}},{\"name\":\"com.many:l6:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l6/1.0/l6-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l6/1.0/l6-1.0.jar\",\"sha1\":\"e40e69d6d15296777a055f7a7f5210c91280a9bd\",\"size\":105}}},{\"name\":\"com.many:l7:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l7/1.0/l7-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l7/1.0/l7-1.0.jar\",\"sha1\":\"7d39439ac3e8a5c785b6bfb5b24e96f3c20df4c3\",\"size\":106}}},{\"name\":\"com.many:l8:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l8/1.0/l8-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l8/1.0/l8-1.0.jar\",\"sha1\":\"aa2b6e1d89bace9c055e0845c8eb79dc259c2a62\",\"size\":107}}},{\"name\":\"com.many:l9:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l9/1.0/l9-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l9/1.0/l9-1.0.jar\",\"sha1\":\"fa881776d041c45de7f2d7139d5f8a8ee5566b23\",\"size\":108}}},{\"name\":\"com.many:l10:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l10/1.0/l10-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l10/1.0/l10-1.0.jar\",\"sha1\":\"5673656b67ab001c9bf6656857568d12c3fc9c33\",\"size\":109}}},{\"name\":\"com.many:l11:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/many/l11/1.0/l11-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/many/l11/1.0/l11-1.0.jar\",\"sha1\":\"2e5a2c58eca154ec4029a6b0502bc5be60ab0aff\",\"size\":110}}}]}"
+  },
+  "data/client/versions/odd-layout": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/odd-layout/odd-layout.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"odd-layout\",\"type\":\"snapshot\",\"assetIndex\":{\"id\":\"odd\",\"sha1\":\"44c8c633ffe5ff0c189bb8292594f9d35d750762\",\"size\":97,\"totalSize\":1,\"url\":\"https://piston-meta.mojang.com/v1/packages/44c8c633ffe5ff0c189bb8292594f9d35d750762/odd.json\"},\"downloads\":{\"client\":{\"sha1\":\"6ce2f08548c883d2e81136c97b4f91c215df7cd9\",\"size\":189,\"url\":\"https://piston-data.mojang.com/v1/objects/6ce2f08548c883d2e81136c97b4f91c215df7cd9/client.jar\"}},\"libraries\":[]}"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

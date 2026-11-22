@@ -50,7 +50,7 @@
   "data/run/runtime.json": {
    "kind": "file",
    "mode": "644",
-   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<repo>\"\n}\n"
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<code folder>\"\n}\n"
   },
   "data/services": {
    "kind": "dir",

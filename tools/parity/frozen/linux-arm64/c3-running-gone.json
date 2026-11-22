@@ -1,0 +1,147 @@
+{
+ "about": "What the Node core did in scenario c3-running-gone on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c3-running-gone",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 7 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47830   rcon 47831\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (backup run1 --label gone --scope worlds)",
+   "args": [
+    "backup",
+    "run1",
+    "--label",
+    "gone",
+    "--scope",
+    "worlds"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Flushing world to disk (save-all), then snapshotting...\nWrote <run>/data/backups/run1/gone_worlds_<stamp>.tar.gz (<size>)\n  included: world\n  WARNING: could not flush the world before the snapshot (RCON refused on 127.0.0.1:47831 - is the server running with enable-rcon=true?); the copy may be torn\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"worlds (gone), <size>\",\"snapshot\":\"gone_worlds_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1/gone_worlds_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"worlds\",\n  \"label\": \"gone\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"world\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": true,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": [\n    \"could not flush the world before the snapshot (RCON refused on 127.0.0.1:47831 - is the server running with enable-rcon=true?); the copy may be torn\"\n  ]\n}\n"
+  },
+  "data/backups/run1/gone_worlds_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/plugins/a.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "jar"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "#Minecraft server properties\nenable-rcon=true\nrcon.port=47831\nrcon.password=test\nlevel-name=world\nserver-port=47830\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances/run1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "level"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47830,\n      \"rcon\": {\n        \"port\": 47831,\n        \"password\": \"test\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

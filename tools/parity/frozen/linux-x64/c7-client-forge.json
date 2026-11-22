@@ -745,7 +745,7 @@
   "data/client/cache/loader-steps/1.20.1.json": {
    "kind": "file",
    "mode": "644",
-   "text": "{\n  \"format\": 1,\n  \"steps\": {\n    \"0d29c6ba06372674cd9d306b618c4fffc5a71dbd\": {\n      \"libraries/net/neoforged/installertools/patched/1.0/patched-1.0.jar\": [\n        4,\n        \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n      ]\n    },\n    \"63660fd4ad80ff8bf61a81923be599320dca9a70\": {\n      \"libraries/net/minecraftforge/patched/1.0/patched-1.0.jar\": [\n        4,\n        \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n      ]\n    }\n  }\n}"
+   "text": "{\n  \"format\": 1,\n  \"steps\": {\n    \"b6809a97b7acb2fa01344eff3153ccf5b59e4f49\": {\n      \"libraries/net/neoforged/installertools/patched/1.0/patched-1.0.jar\": [\n        4,\n        \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n      ]\n    },\n    \"bd5a82661fc3c79b19269edea22a50b41a81fac2\": {\n      \"libraries/net/minecraftforge/patched/1.0/patched-1.0.jar\": [\n        4,\n        \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n      ]\n    }\n  }\n}"
   },
   "data/client/cache/neoforge-versions.json": {
    "kind": "file",

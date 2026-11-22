@@ -1,0 +1,2209 @@
+{
+ "about": "What the Node core did in scenario c9-bot on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c9-bot",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 9 (bot)",
+   "args": [
+    "bot"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 10 (bot --json)",
+   "args": [
+    "bot",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (bot dance)",
+   "args": [
+    "bot",
+    "dance"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 12 (bot check)",
+   "args": [
+    "bot",
+    "check"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 13 (bot check --json)",
+   "args": [
+    "bot",
+    "check",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (bot check a b)",
+   "args": [
+    "bot",
+    "check",
+    "a",
+    "b"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 15 (bot check online --bogus)",
+   "args": [
+    "bot",
+    "check",
+    "online",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 16 (bot check online --json=1)",
+   "args": [
+    "bot",
+    "check",
+    "online",
+    "--json=1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (bot setup extra)",
+   "args": [
+    "bot",
+    "setup",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 18 (bot setup --json)",
+   "args": [
+    "bot",
+    "setup",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Unknown option --json\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (bot setup --bogus)",
+   "args": [
+    "bot",
+    "setup",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 20 (bot run)",
+   "args": [
+    "bot",
+    "run"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 21 (bot run a.json b.json)",
+   "args": [
+    "bot",
+    "run",
+    "a.json",
+    "b.json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\n"
+  },
+  {
+   "label": "step 22 (bot run a.json --force)",
+   "args": [
+    "bot",
+    "run",
+    "a.json",
+    "--force"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --force\n"
+  },
+  {
+   "label": "step 23 (bot run --json)",
+   "args": [
+    "bot",
+    "run",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (bot check nope)",
+   "args": [
+    "bot",
+    "check",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: online, offline, lan, wide, nodir, run1, db1\n"
+  },
+  {
+   "label": "step 25 (bot check nope --json)",
+   "args": [
+    "bot",
+    "check",
+    "nope",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"nope\\\". Known instances: online, offline, lan, wide, nodir, run1, db1\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (bot check bad name!)",
+   "args": [
+    "bot",
+    "check",
+    "bad name!"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"bad name!\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 27 (bot check bad name! --json)",
+   "args": [
+    "bot",
+    "check",
+    "bad name!",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"invalid instance name \\\"bad name!\\\" - use letters, digits, dash, underscore (max 32 chars)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 28 (bot check db1)",
+   "args": [
+    "bot",
+    "check",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is a database, not a Minecraft server\n"
+  },
+  {
+   "label": "step 29 (bot check db1 --json)",
+   "args": [
+    "bot",
+    "check",
+    "db1",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"\\\"db1\\\" is a database, not a Minecraft server\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (bot check online)",
+   "args": [
+    "bot",
+    "check",
+    "online"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "warning: \"online\" listens on every interface in offline mode, so anyone who can reach port 47961 can join under any name. For a test server, set server-ip=127.0.0.1.\n\"online\" runs in online mode, and bots have no account to log in with. Set online-mode=false in <run>/data/instances/online/server.properties on a server kept for testing, then restart it.\n\"online\" is not running. Start it first: spawnloft start online\nmineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (bot check online --json)",
+   "args": [
+    "bot",
+    "check",
+    "online",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"online\",\"ok\":false,\"problems\":[\"\\\"online\\\" runs in online mode, and bots have no account to log in with. Set online-mode=false in <run>/data/instances/online/server.properties on a server kept for testing, then restart it.\",\"\\\"online\\\" is not running. Start it first: spawnloft start online\",\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[\"\\\"online\\\" listens on every interface in offline mode, so anyone who can reach port 47961 can join under any name. For a test server, set server-ip=127.0.0.1.\"],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"\\\"online\\\" runs in online mode, and bots have no account to log in with. Set online-mode=false in <run>/data/instances/online/server.properties on a server kept for testing, then restart it.\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (bot check offline)",
+   "args": [
+    "bot",
+    "check",
+    "offline"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "\"offline\" is not running. Start it first: spawnloft start offline\nmineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (bot check offline --json)",
+   "args": [
+    "bot",
+    "check",
+    "offline",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"offline\",\"ok\":false,\"problems\":[\"\\\"offline\\\" is not running. Start it first: spawnloft start offline\",\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"\\\"offline\\\" is not running. Start it first: spawnloft start offline\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (bot check lan)",
+   "args": [
+    "bot",
+    "check",
+    "lan"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "warning: \"lan\" listens on 192.168.1.5 in offline mode, so anyone who can reach port 47964 can join under any name. For a test server, set server-ip=127.0.0.1.\n\"lan\" is not running. Start it first: spawnloft start lan\nmineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (bot check lan --json)",
+   "args": [
+    "bot",
+    "check",
+    "lan",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"lan\",\"ok\":false,\"problems\":[\"\\\"lan\\\" is not running. Start it first: spawnloft start lan\",\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[\"\\\"lan\\\" listens on 192.168.1.5 in offline mode, so anyone who can reach port 47964 can join under any name. For a test server, set server-ip=127.0.0.1.\"],\"minecraftVersion\":\"1.20.6\",\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"\\\"lan\\\" is not running. Start it first: spawnloft start lan\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (bot check wide)",
+   "args": [
+    "bot",
+    "check",
+    "wide"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "warning: \"wide\" listens on every interface in offline mode, so anyone who can reach port 47965 can join under any name. For a test server, set server-ip=127.0.0.1.\n\"wide\" is not running. Start it first: spawnloft start wide\nmineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (bot check wide --json)",
+   "args": [
+    "bot",
+    "check",
+    "wide",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"wide\",\"ok\":false,\"problems\":[\"\\\"wide\\\" is not running. Start it first: spawnloft start wide\",\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[\"\\\"wide\\\" listens on every interface in offline mode, so anyone who can reach port 47965 can join under any name. For a test server, set server-ip=127.0.0.1.\"],\"minecraftVersion\":null,\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"\\\"wide\\\" is not running. Start it first: spawnloft start wide\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (bot check nodir)",
+   "args": [
+    "bot",
+    "check",
+    "nodir"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. Received undefined\n"
+  },
+  {
+   "label": "step 39 (bot check nodir --json)",
+   "args": [
+    "bot",
+    "check",
+    "nodir",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"ERR_INVALID_ARG_TYPE\",\"message\":\"The \\\"path\\\" argument must be of type string. Received undefined\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (bot check run1)",
+   "args": [
+    "bot",
+    "check",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "\"run1\" is not running. Start it first: spawnloft start run1\nmineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (bot check run1 --json)",
+   "args": [
+    "bot",
+    "check",
+    "run1",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"run1\",\"ok\":false,\"problems\":[\"\\\"run1\\\" is not running. Start it first: spawnloft start run1\",\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"\\\"run1\\\" is not running. Start it first: spawnloft start run1\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (bot run {run}/missing.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/missing.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: cannot read scenario <run>/missing.json: ENOENT: no such file or directory, open '<run>/missing.json'\n"
+  },
+  {
+   "label": "step 43 (bot run {run}/missing.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/missing.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"cannot read scenario <run>/missing.json: ENOENT: no such file or directory, open '<run>/missing.json'\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (bot run {data}/instances)",
+   "args": [
+    "bot",
+    "run",
+    "{data}/instances"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: cannot read scenario <run>/data/instances: EISDIR: illegal operation on a directory, read\n"
+  },
+  {
+   "label": "step 46 (bot run {run}/scenarios/broken.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/broken.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: <run>/scenarios/broken.json is not valid JSON: <invalid json>\n"
+  },
+  {
+   "label": "step 47 (bot run {run}/scenarios/broken.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/broken.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"<run>/scenarios/broken.json is not valid JSON: <invalid json>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (bot run {run}/scenarios/bom.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bom.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: <run>/scenarios/bom.json is not valid JSON: <invalid json>\n"
+  },
+  {
+   "label": "step 51 (bot run {run}/scenarios/bad-1.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-1.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: a scenario is a JSON object\n"
+  },
+  {
+   "label": "step 53 (bot run {run}/scenarios/bad-2.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-2.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: a scenario is a JSON object\n"
+  },
+  {
+   "label": "step 55 (bot run {run}/scenarios/bad-3.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-3.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: a scenario is a JSON object\n"
+  },
+  {
+   "label": "step 57 (bot run {run}/scenarios/bad-4.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-4.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: a scenario is a JSON object\n"
+  },
+  {
+   "label": "step 59 (bot run {run}/scenarios/bad-5.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-5.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"bots\" must list at least one bot name\n"
+  },
+  {
+   "label": "step 61 (bot run {run}/scenarios/bad-6.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-6.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"bots\" must list at least one bot name\n"
+  },
+  {
+   "label": "step 63 (bot run {run}/scenarios/bad-7.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-7.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"bots\" lists 6 bots; the limit is 5\n"
+  },
+  {
+   "label": "step 65 (bot run {run}/scenarios/bad-8.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-8.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: bot name \"al\" is not a Minecraft name (3 to 16 letters, digits or underscores)\n"
+  },
+  {
+   "label": "step 67 (bot run {run}/scenarios/bad-9.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-9.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: bot name 7 is not a Minecraft name (3 to 16 letters, digits or underscores)\n"
+  },
+  {
+   "label": "step 69 (bot run {run}/scenarios/bad-10.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-10.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: bot name {\"name\":\"alice\"} is not a Minecraft name (3 to 16 letters, digits or underscores)\n"
+  },
+  {
+   "label": "step 71 (bot run {run}/scenarios/bad-11.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-11.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: bot name \"this_name_is_too_long\" is not a Minecraft name (3 to 16 letters, digits or underscores)\n"
+  },
+  {
+   "label": "step 73 (bot run {run}/scenarios/bad-12.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-12.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: bot names must differ\n"
+  },
+  {
+   "label": "step 75 (bot run {run}/scenarios/bad-13.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-13.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"setup\" must be a list of console commands\n"
+  },
+  {
+   "label": "step 77 (bot run {run}/scenarios/bad-14.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-14.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"setup\" must be a list of console commands\n"
+  },
+  {
+   "label": "step 79 (bot run {run}/scenarios/bad-15.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-15.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: setup command \"stop\" would take the server down or half-reload it; a scenario cannot run it\n"
+  },
+  {
+   "label": "step 81 (bot run {run}/scenarios/bad-16.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-16.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: setup command \"reload\" would take the server down or half-reload it; a scenario cannot run it\n"
+  },
+  {
+   "label": "step 83 (bot run {run}/scenarios/bad-17.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-17.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: setup command \"rl\" would take the server down or half-reload it; a scenario cannot run it\n"
+  },
+  {
+   "label": "step 85 (bot run {run}/scenarios/bad-18.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-18.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"steps\" must list at least one step\n"
+  },
+  {
+   "label": "step 87 (bot run {run}/scenarios/bad-19.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-19.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"steps\" must list at least one step\n"
+  },
+  {
+   "label": "step 89 (bot run {run}/scenarios/bad-20.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-20.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 is not an object\n"
+  },
+  {
+   "label": "step 91 (bot run {run}/scenarios/bad-21.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-21.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 is not an object\n"
+  },
+  {
+   "label": "step 93 (bot run {run}/scenarios/bad-22.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-22.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 is not an object\n"
+  },
+  {
+   "label": "step 95 (bot run {run}/scenarios/bad-23.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-23.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 must have exactly one of chat, command, expectMessage, waitWindow, click, closeWindow, expectItem, expectState, expectLog, leave; it has none\n"
+  },
+  {
+   "label": "step 97 (bot run {run}/scenarios/bad-24.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-24.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 must have exactly one of chat, command, expectMessage, waitWindow, click, closeWindow, expectItem, expectState, expectLog, leave; it has chat, command\n"
+  },
+  {
+   "label": "step 99 (bot run {run}/scenarios/bad-25.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-25.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 has \"2\", \"timeuot\", which is not a step key; the keys are chat, command, expectMessage, waitWindow, click, closeWindow, expectItem, expectState, expectLog, leave, bot, timeout, button\n"
+  },
+  {
+   "label": "step 101 (bot run {run}/scenarios/bad-26.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-26.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 (chat) names bot \"carol\", which is not in \"bots\"\n"
+  },
+  {
+   "label": "step 103 (bot run {run}/scenarios/bad-27.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-27.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 (chat) names bot null, which is not in \"bots\"\n"
+  },
+  {
+   "label": "step 105 (bot run {run}/scenarios/bad-28.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-28.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1 (chat) names bot {\"name\":\"alice\"}, which is not in \"bots\"\n"
+  },
+  {
+   "label": "step 107 (bot run {run}/scenarios/bad-29.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-29.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"timeout\" is milliseconds, 1 to 300000\n"
+  },
+  {
+   "label": "step 109 (bot run {run}/scenarios/bad-30.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-30.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"timeout\" is milliseconds, 1 to 300000\n"
+  },
+  {
+   "label": "step 111 (bot run {run}/scenarios/bad-31.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-31.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"timeout\" is milliseconds, 1 to 300000\n"
+  },
+  {
+   "label": "step 113 (bot run {run}/scenarios/bad-32.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-32.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"timeout\" is milliseconds, 1 to 300000\n"
+  },
+  {
+   "label": "step 115 (bot run {run}/scenarios/bad-33.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-33.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"timeout\" is milliseconds, 1 to 300000\n"
+  },
+  {
+   "label": "step 117 (bot run {run}/scenarios/bad-34.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-34.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"chat\" must be text\n"
+  },
+  {
+   "label": "step 119 (bot run {run}/scenarios/bad-35.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-35.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"chat\" must be text\n"
+  },
+  {
+   "label": "step 121 (bot run {run}/scenarios/bad-36.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-36.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"chat\" must be text\n"
+  },
+  {
+   "label": "step 123 (bot run {run}/scenarios/bad-37.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-37.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"stop\" would take the server down or half-reload it; a bot cannot run it\n"
+  },
+  {
+   "label": "step 125 (bot run {run}/scenarios/bad-38.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-38.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"reload\" would take the server down or half-reload it; a bot cannot run it\n"
+  },
+  {
+   "label": "step 127 (bot run {run}/scenarios/bad-39.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-39.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"rl\" would take the server down or half-reload it; a bot cannot run it\n"
+  },
+  {
+   "label": "step 129 (bot run {run}/scenarios/bad-40.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-40.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 2: \"restart\" would take the server down or half-reload it; a bot cannot run it\n"
+  },
+  {
+   "label": "step 131 (bot run {run}/scenarios/bad-41.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-41.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 133 (bot run {run}/scenarios/bad-42.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-42.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" uses the g flag, which has no meaning for a match here; drop it\n"
+  },
+  {
+   "label": "step 135 (bot run {run}/scenarios/bad-43.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-43.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" uses the y flag, which has no meaning for a match here; drop it\n"
+  },
+  {
+   "label": "step 137 (bot run {run}/scenarios/bad-44.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-44.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: Invalid flags supplied to RegExp constructor 'q'\n"
+  },
+  {
+   "label": "step 139 (bot run {run}/scenarios/bad-45.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-45.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: Invalid flags supplied to RegExp constructor 'ii'\n"
+  },
+  {
+   "label": "step 141 (bot run {run}/scenarios/bad-46.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-46.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: Invalid flags supplied to RegExp constructor 'uv'\n"
+  },
+  {
+   "label": "step 143 (bot run {run}/scenarios/bad-47.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-47.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" must be text or /a regular expression/\n"
+  },
+  {
+   "label": "step 145 (bot run {run}/scenarios/bad-48.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-48.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" must be text or /a regular expression/\n"
+  },
+  {
+   "label": "step 147 (bot run {run}/scenarios/bad-49.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-49.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"present\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 149 (bot run {run}/scenarios/bad-50.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-50.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"absent\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 151 (bot run {run}/scenarios/v8-0.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-0.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 153 (bot run {run}/scenarios/v8-1.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-1.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 155 (bot run {run}/scenarios/v8-2.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-2.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 157 (bot run {run}/scenarios/v8-3.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-3.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 159 (bot run {run}/scenarios/v8-4.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-4.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 161 (bot run {run}/scenarios/v8-5.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-5.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 163 (bot run {run}/scenarios/v8-6.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-6.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"expectMessage\" is not a valid regular expression: <invalid pattern>\n"
+  },
+  {
+   "label": "step 165 (bot run {run}/scenarios/v8-7.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-7.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 167 (bot run {run}/scenarios/v8-8.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-8.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 169 (bot run {run}/scenarios/v8-9.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-9.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 171 (bot run {run}/scenarios/v8-10.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/v8-10.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 173 (bot run {run}/scenarios/bad-51.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-51.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"waitWindow\" must be text or /a regular expression/\n"
+  },
+  {
+   "label": "step 175 (bot run {run}/scenarios/bad-52.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-52.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectLog takes {\"present\": pattern} or {\"absent\": pattern}\n"
+  },
+  {
+   "label": "step 177 (bot run {run}/scenarios/bad-53.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-53.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectLog takes {\"present\": pattern} or {\"absent\": pattern}\n"
+  },
+  {
+   "label": "step 179 (bot run {run}/scenarios/bad-54.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-54.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectLog takes {\"present\": pattern} or {\"absent\": pattern}\n"
+  },
+  {
+   "label": "step 181 (bot run {run}/scenarios/bad-55.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-55.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"present\" must be text or /a regular expression/\n"
+  },
+  {
+   "label": "step 183 (bot run {run}/scenarios/bad-56.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-56.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"click\" is a slot number\n"
+  },
+  {
+   "label": "step 185 (bot run {run}/scenarios/bad-57.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-57.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: \"click\" is a slot number\n"
+  },
+  {
+   "label": "step 187 (bot run {run}/scenarios/bad-58.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-58.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectItem is an item name such as \"minecraft:diamond\", or {\"name\": ..., \"count\": n}\n"
+  },
+  {
+   "label": "step 189 (bot run {run}/scenarios/bad-59.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-59.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectItem is an item name such as \"minecraft:diamond\", or {\"name\": ..., \"count\": n}\n"
+  },
+  {
+   "label": "step 191 (bot run {run}/scenarios/bad-60.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-60.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectItem is an item name such as \"minecraft:diamond\", or {\"name\": ..., \"count\": n}\n"
+  },
+  {
+   "label": "step 193 (bot run {run}/scenarios/bad-61.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-61.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectState is an object of what to wait for (gameMode, minHealth, maxHealth, dimension, near, nearBot, seesPlayer)\n"
+  },
+  {
+   "label": "step 195 (bot run {run}/scenarios/bad-62.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-62.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectState is an object of what to wait for (gameMode, minHealth, maxHealth, dimension, near, nearBot, seesPlayer)\n"
+  },
+  {
+   "label": "step 197 (bot run {run}/scenarios/bad-63.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-63.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: step 1: expectState is an object of what to wait for (gameMode, minHealth, maxHealth, dimension, near, nearBot, seesPlayer)\n"
+  },
+  {
+   "label": "step 199 (bot run {run}/scenarios/bad-64.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-64.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"step 1: \\\"expectMessage\\\" is not a valid regular expression: <invalid pattern>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 201 (bot run {run}/scenarios/bad-65.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/bad-65.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"\\\"bots\\\" must list at least one bot name\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 203 (bot run {run}/scenarios/noinstance.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 204 (bot run {run}/scenarios/noinstance.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no server named: put \\\"instance\\\" in the scenario or pass --instance <name>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 205 (bot run {run}/scenarios/noinstance.json --instance=)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--instance="
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 206 (bot run {run}/scenarios/noinstance.json --no-instance)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--no-instance"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server named: put \"instance\" in the scenario or pass --instance <name>\n"
+  },
+  {
+   "label": "step 207 (bot run {run}/scenarios/noinstance.json --instance nope)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--instance",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: online, offline, lan, wide, nodir, run1, db1\n"
+  },
+  {
+   "label": "step 208 (bot run {run}/scenarios/noinstance.json --instance db1)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--instance",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is a database, not a Minecraft server\n"
+  },
+  {
+   "label": "step 209 (bot run {run}/scenarios/noinstance.json --instance online)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--instance",
+    "online"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"online\" runs in online mode, and bots have no account to log in with. Set online-mode=false in <run>/data/instances/online/server.properties on a server kept for testing, then restart it.\n\"online\" is not running. Start it first: spawnloft start online\n"
+  },
+  {
+   "label": "step 210 (bot run {run}/scenarios/noinstance.json --instance online --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--instance",
+    "online",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"\\\"online\\\" runs in online mode, and bots have no account to log in with. Set online-mode=false in <run>/data/instances/online/server.properties on a server kept for testing, then restart it.\\n\\\"online\\\" is not running. Start it first: spawnloft start online\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 211 (bot run {run}/scenarios/noinstance.json --instance offline)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/noinstance.json",
+    "--instance",
+    "offline"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"offline\" is not running. Start it first: spawnloft start offline\n"
+  },
+  {
+   "label": "step 213 (bot run {run}/scenarios/lan.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/lan.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"lan\" is not running. Start it first: spawnloft start lan\n"
+  },
+  {
+   "label": "step 214 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47962   rcon 47972\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 215 (bot check run1)",
+   "args": [
+    "bot",
+    "check",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "mineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 216 (bot check run1 --json)",
+   "args": [
+    "bot",
+    "check",
+    "run1",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"run1\",\"ok\":false,\"problems\":[\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 218 (bot run {run}/scenarios/run1.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: mineflayer is not installed. Run once: spawnloft bot setup (about 500 MB into <run>/data/bot-host)\n"
+  },
+  {
+   "label": "step 219 (bot run {run}/scenarios/run1.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"mineflayer is not installed. Run once: spawnloft bot setup (about 500 MB into <run>/data/bot-host)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 222 (bot check run1)",
+   "args": [
+    "bot",
+    "check",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" will take up to 5 bots (Minecraft 1.21.4). mineflayer 4.39.0 is installed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 223 (bot check run1 --json)",
+   "args": [
+    "bot",
+    "check",
+    "run1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":true,\"data\":{\"name\":\"run1\",\"ok\":true,\"problems\":[],\"warnings\":[],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":\"4.39.0\",\"maxBots\":5}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 224 (bot check wide)",
+   "args": [
+    "bot",
+    "check",
+    "wide"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "warning: \"wide\" listens on every interface in offline mode, so anyone who can reach port 47965 can join under any name. For a test server, set server-ip=127.0.0.1.\n\"wide\" is not running. Start it first: spawnloft start wide\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 225 (bot run {run}/scenarios/run1.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1.json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ok     1. alice {\"chat\":\"hi\"}  (<ms> ms)\nok     2. alice {\"expectMessage\":\"/^<alice> HI$/i\"}  (<ms> ms)\nok     3. alice {\"command\":\"say done\"}  (<ms> ms)\nok     4. alice {\"expectMessage\":\"say done\"}  (<ms> ms)\nok     5. {\"expectLog\":{\"absent\":\"Exception\"}}  (<ms> ms)\nok     6. alice {\"closeWindow\":true}  (<ms> ms)\nPASSED: 6 of 6 steps passed in <ms> ms\n",
+   "stderr": "1 bot(s) joining run1 on 127.0.0.1:47962 (Minecraft 1.21.4)\nalice joined\n"
+  },
+  {
+   "label": "step 227 (bot run {run}/scenarios/run1-setup.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-setup.json",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":true,\"data\":{\"name\":\"smoke\",\"ok\":true,\"steps\":[{\"index\":0,\"step\":{\"bot\":\"alice\",\"chat\":\"hi\"},\"status\":\"passed\",\"durationMs\":<ms>,\"sent\":\"hi\"},{\"index\":1,\"step\":{\"bot\":\"alice\",\"expectMessage\":\"/^<alice> HI$/i\",\"timeout\":2000},\"status\":\"passed\",\"durationMs\":<ms>,\"matched\":\"<alice> hi\"},{\"index\":2,\"step\":{\"bot\":\"alice\",\"command\":\"say done\"},\"status\":\"passed\",\"durationMs\":<ms>,\"sent\":\"/say done\"},{\"index\":3,\"step\":{\"bot\":\"alice\",\"expectMessage\":\"say done\"},\"status\":\"passed\",\"durationMs\":<ms>,\"matched\":\"<alice> /say done\"},{\"index\":4,\"step\":{\"expectLog\":{\"absent\":\"Exception\"}},\"status\":\"passed\",\"durationMs\":<ms>,\"absent\":\"Exception\"},{\"index\":5,\"step\":{\"bot\":\"alice\",\"closeWindow\":true,\"timeout\":100},\"status\":\"passed\",\"durationMs\":<ms>}],\"bots\":{\"alice\":{\"messages\":[{\"at\":<epoch-ms>,\"kind\":\"chat\",\"text\":\"<alice> hi\"},{\"at\":<epoch-ms>,\"kind\":\"chat\",\"text\":\"<alice> /say done\"}],\"state\":{\"gameMode\":null,\"health\":null,\"food\":null,\"position\":null,\"dimension\":null,\"heldItem\":null,\"window\":null,\"players\":[]},\"left\":null},\"bob_2\":{\"messages\":[],\"state\":{\"gameMode\":null,\"health\":null,\"food\":null,\"position\":null,\"dimension\":null,\"heldItem\":null,\"window\":null,\"players\":[]},\"left\":null}},\"startedAt\":\"<time>\",\"log\":[],\"durationMs\":<ms>,\"instance\":\"run1\",\"setup\":[{\"command\":\"op alice\",\"reply\":\"Made alice a server operator\",\"ok\":true},{\"command\":\"/gamemode creative bob_2\",\"reply\":\"Set bob_2's game mode to Creative\",\"ok\":true}],\"mineflayer\":\"4.39.0\",\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 228 (bot run {run}/scenarios/run1-setup.json --instance run1 --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-setup.json",
+    "--instance",
+    "run1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":true,\"data\":{\"name\":\"smoke\",\"ok\":true,\"steps\":[{\"index\":0,\"step\":{\"bot\":\"alice\",\"chat\":\"hi\"},\"status\":\"passed\",\"durationMs\":<ms>,\"sent\":\"hi\"},{\"index\":1,\"step\":{\"bot\":\"alice\",\"expectMessage\":\"/^<alice> HI$/i\",\"timeout\":2000},\"status\":\"passed\",\"durationMs\":<ms>,\"matched\":\"<alice> hi\"},{\"index\":2,\"step\":{\"bot\":\"alice\",\"command\":\"say done\"},\"status\":\"passed\",\"durationMs\":<ms>,\"sent\":\"/say done\"},{\"index\":3,\"step\":{\"bot\":\"alice\",\"expectMessage\":\"say done\"},\"status\":\"passed\",\"durationMs\":<ms>,\"matched\":\"<alice> /say done\"},{\"index\":4,\"step\":{\"expectLog\":{\"absent\":\"Exception\"}},\"status\":\"passed\",\"durationMs\":<ms>,\"absent\":\"Exception\"},{\"index\":5,\"step\":{\"bot\":\"alice\",\"closeWindow\":true,\"timeout\":100},\"status\":\"passed\",\"durationMs\":<ms>}],\"bots\":{\"alice\":{\"messages\":[{\"at\":<epoch-ms>,\"kind\":\"chat\",\"text\":\"<alice> hi\"},{\"at\":<epoch-ms>,\"kind\":\"chat\",\"text\":\"<alice> /say done\"}],\"state\":{\"gameMode\":null,\"health\":null,\"food\":null,\"position\":null,\"dimension\":null,\"heldItem\":null,\"window\":null,\"players\":[]},\"left\":null},\"bob_2\":{\"messages\":[],\"state\":{\"gameMode\":null,\"health\":null,\"food\":null,\"position\":null,\"dimension\":null,\"heldItem\":null,\"window\":null,\"players\":[]},\"left\":null}},\"startedAt\":\"<time>\",\"log\":[],\"durationMs\":<ms>,\"instance\":\"run1\",\"setup\":[{\"command\":\"op alice\",\"reply\":\"Made alice a server operator\",\"ok\":true},{\"command\":\"/gamemode creative bob_2\",\"reply\":\"Set bob_2's game mode to Creative\",\"ok\":true}],\"mineflayer\":\"4.39.0\",\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 230 (bot run {run}/scenarios/run1-badsetup.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-badsetup.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"smoke\",\"ok\":false,\"steps\":[],\"bots\":{\"alice\":{\"messages\":[],\"state\":{\"gameMode\":null,\"health\":null,\"food\":null,\"position\":null,\"dimension\":null,\"heldItem\":null,\"window\":null,\"players\":[]},\"left\":null}},\"startedAt\":\"<time>\",\"error\":\"setup command \\\"gamemode creative nobody\\\" failed: No player was found\",\"log\":[],\"durationMs\":<ms>,\"instance\":\"run1\",\"setup\":[{\"command\":\"op alice\",\"reply\":\"Made alice a server operator\",\"ok\":true},{\"command\":\"gamemode creative nobody\",\"reply\":\"No player was found\",\"ok\":false}],\"mineflayer\":\"4.39.0\",\"warnings\":[]},\"error\":{\"code\":\"SCENARIO_FAILED\",\"message\":\"setup command \\\"gamemode creative nobody\\\" failed: No player was found\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 232 (bot run {run}/scenarios/run1-fails.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-fails.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "ok     1. alice {\"chat\":\"hi\"}  (<ms> ms)\nFAIL   2. alice {\"expectMessage\":\"nothing like it\"}  (<ms> ms)\n       timed out after 300 ms waiting for a message matching \"nothing like it\"\n         seen since the last action:\n         [chat] <alice> hi\nskip   3. alice {\"chat\":\"never sent\"}\nFAILED: 1 of 3 steps passed in <ms> ms\n",
+   "stderr": "1 bot(s) joining run1 on 127.0.0.1:47962 (Minecraft 1.21.4)\nalice joined\nstep 2 failed: timed out after 300 ms waiting for a message matching \"nothing like it\"\nseen since the last action:\n[chat] <alice> hi\n"
+  },
+  {
+   "label": "step 233 (bot run {run}/scenarios/run1-fails.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-fails.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"fails\",\"ok\":false,\"steps\":[{\"index\":0,\"step\":{\"bot\":\"alice\",\"chat\":\"hi\"},\"status\":\"passed\",\"durationMs\":<ms>,\"sent\":\"hi\"},{\"index\":1,\"step\":{\"bot\":\"alice\",\"expectMessage\":\"nothing like it\",\"timeout\":300},\"status\":\"failed\",\"durationMs\":<ms>,\"error\":\"timed out after 300 ms waiting for a message matching \\\"nothing like it\\\"\\n  seen since the last action:\\n  [chat] <alice> hi\"},{\"index\":2,\"step\":{\"bot\":\"alice\",\"chat\":\"never sent\"},\"status\":\"skipped\"}],\"bots\":{\"alice\":{\"messages\":[{\"at\":<epoch-ms>,\"kind\":\"chat\",\"text\":\"<alice> hi\"}],\"state\":{\"gameMode\":null,\"health\":null,\"food\":null,\"position\":null,\"dimension\":null,\"heldItem\":null,\"window\":null,\"players\":[]},\"left\":null}},\"startedAt\":\"<time>\",\"log\":[],\"durationMs\":<ms>,\"instance\":\"run1\",\"setup\":[],\"mineflayer\":\"4.39.0\",\"warnings\":[]},\"error\":{\"code\":\"SCENARIO_FAILED\",\"message\":\"a step failed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 235 (bot run {run}/scenarios/run1-fails.json --json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-fails.json",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"ok\":false,\"error\":\"mineflayer could not be loaded from <run>/data/bot-host: Cannot find module '<run>/data/bot-host/node_modules/mineflayer/index.js'. Please verify that the package.json has a valid \\\"main\\\" entry\\n  Run \\\"spawnloft bot setup\\\" (or \\\"spawnloft bot setup --force\\\" to reinstall)\",\"steps\":[],\"bots\":{},\"instance\":\"run1\",\"setup\":[],\"mineflayer\":\"4.39.0\",\"warnings\":[]},\"error\":{\"code\":\"SCENARIO_FAILED\",\"message\":\"mineflayer could not be loaded from <run>/data/bot-host: Cannot find module '<run>/data/bot-host/node_modules/mineflayer/index.js'. Please verify that the package.json has a valid \\\"main\\\" entry\\n  Run \\\"spawnloft bot setup\\\" (or \\\"spawnloft bot setup --force\\\" to reinstall)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 236 (bot run {run}/scenarios/run1-fails.json)",
+   "args": [
+    "bot",
+    "run",
+    "{run}/scenarios/run1-fails.json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "error: mineflayer could not be loaded from <run>/data/bot-host: Cannot find module '<run>/data/bot-host/node_modules/mineflayer/index.js'. Please verify that the package.json has a valid \"main\" entry\n  Run \"spawnloft bot setup\" (or \"spawnloft bot setup --force\" to reinstall)\nFAILED: 0 of 0 steps passed in <ms> ms\n",
+   "stderr": "1 bot(s) joining run1 on 127.0.0.1:47962 (Minecraft 1.21.4)\n"
+  },
+  {
+   "label": "step 238 (bot check run1 --json)",
+   "args": [
+    "bot",
+    "check",
+    "run1",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"data\":{\"name\":\"run1\",\"ok\":false,\"problems\":[\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"],\"warnings\":[],\"minecraftVersion\":\"1.21.4\",\"mineflayer\":null,\"maxBots\":5},\"error\":{\"code\":\"BOTS_REFUSED\",\"message\":\"mineflayer is not installed yet: run \\\"spawnloft bot setup\\\" (about 500 MB)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 239 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 240 (bot check run1)",
+   "args": [
+    "bot",
+    "check",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "\"run1\" is not running. Start it first: spawnloft start run1\nmineflayer is not installed yet: run \"spawnloft bot setup\" (about 500 MB)\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/bot-host": {
+   "kind": "dir"
+  },
+  "data/bot-host/node_modules": {
+   "kind": "dir"
+  },
+  "data/bot-host/node_modules/mineflayer": {
+   "kind": "dir"
+  },
+  "data/bot-host/node_modules/mineflayer/package.json": {
+   "kind": "file",
+   "text": "{ half"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances/lan": {
+   "kind": "dir"
+  },
+  "data/instances/lan/server.properties": {
+   "kind": "file",
+   "text": "online-mode=false\nserver-ip=192.168.1.5\n"
+  },
+  "data/instances/offline": {
+   "kind": "dir"
+  },
+  "data/instances/offline/server.properties": {
+   "kind": "file",
+   "text": "online-mode=false\nserver-ip=127.0.0.1\n"
+  },
+  "data/instances/online": {
+   "kind": "dir"
+  },
+  "data/instances/online/server.properties": {
+   "kind": "file",
+   "text": "online-mode=true\nserver-ip=\n"
+  },
+  "data/instances/run1": {
+   "kind": "dir"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "text": "online-mode=false\nserver-ip=127.0.0.1\nenable-rcon=true\nrcon.port=47972\nrcon.password=test\nserver-port=47962\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances/wide": {
+   "kind": "dir"
+  },
+  "data/instances/wide/server.properties": {
+   "kind": "file",
+   "text": "online-mode=false\nserver-ip=0.0.0.0\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"online\": {\n      \"dir\": \"<run>/data/instances/online\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47961,\n      \"rcon\": {\n        \"port\": 47971,\n        \"password\": \"x\"\n      }\n    },\n    \"offline\": {\n      \"dir\": \"<run>/data/instances/offline\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47963\n    },\n    \"lan\": {\n      \"dir\": \"<run>/data/instances/lan\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47964,\n      \"mcVersion\": \"1.20.6\"\n    },\n    \"wide\": {\n      \"dir\": \"<run>/data/instances/wide\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47965\n    },\n    \"nodir\": {\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47966\n    },\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47962,\n      \"mcVersion\": \"1.21.4\",\n      \"rcon\": {\n        \"port\": 47972,\n        \"password\": \"test\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"11.4.5\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47981\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/run/run1": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  },
+  "scenarios": {
+   "kind": "dir"
+  },
+  "scenarios/bad-1.json": {
+   "kind": "file",
+   "text": "[]\n"
+  },
+  "scenarios/bad-10.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    {\n      \"name\": \"alice\"\n    }\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-11.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"this_name_is_too_long\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-12.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"Alice\",\n    \"alice\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-13.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": \"op alice\",\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-14.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\",\n    3\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-15.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"stop\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-16.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"/minecraft:reload confirm\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-17.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"  /RL\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-18.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": []\n}\n"
+  },
+  "scenarios/bad-19.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ]\n}\n"
+  },
+  "scenarios/bad-2.json": {
+   "kind": "file",
+   "text": "null"
+  },
+  "scenarios/bad-20.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    null\n  ]\n}\n"
+  },
+  "scenarios/bad-21.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    \"chat\"\n  ]\n}\n"
+  },
+  "scenarios/bad-22.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    []\n  ]\n}\n"
+  },
+  "scenarios/bad-23.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-24.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"command\": \"/x\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-25.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"2\": \"x\",\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"timeuot\": 100\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-26.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"carol\",\n      \"chat\": \"hi\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-27.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"chat\": \"hi\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-28.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": {\n        \"name\": \"alice\"\n      },\n      \"chat\": \"hi\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-29.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"timeout\": 0\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-3.json": {
+   "kind": "file",
+   "text": "\"text\""
+  },
+  "scenarios/bad-30.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"timeout\": 1.5\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-31.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"timeout\": 300001\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-32.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"timeout\": null\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-33.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\",\n      \"timeout\": \"100\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-34.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-35.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"   \"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-36.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": 5\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-37.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/stop\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-38.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"minecraft:reload confirm\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-39.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"  /rl\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-4.json": {
+   "kind": "file",
+   "text": "42\n"
+  },
+  "scenarios/bad-40.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"command\": \"restart now\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-41.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(unclosed/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-42.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/hello/g\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-43.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/hello/iy\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-44.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/hello/q\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-45.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/hello/ii\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-46.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/hello/uv\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-47.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": 42\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-48.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-49.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"expectLog\": {\n        \"present\": \"/[/\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-5.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-50.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"expectLog\": {\n        \"absent\": \"/a{2,1}/\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-51.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"waitWindow\": \"\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-52.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"expectLog\": {\n        \"present\": \"a\",\n        \"absent\": \"b\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-53.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"expectLog\": {}\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-54.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"expectLog\": \"Exception\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-55.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"expectLog\": {\n        \"present\": null\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-56.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"click\": \"eleven\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-57.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"click\": 1.5\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-58.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectItem\": {\n        \"count\": 2\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-59.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectItem\": {\n        \"name\": \"diamond\",\n        \"count\": \"two\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-6.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": \"alice\",\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-60.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectItem\": \"\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-61.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectState\": \"creative\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-62.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectState\": []\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-63.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectState\": null\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-64.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\",\n    \"bob\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-65.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-7.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"bota1\",\n    \"botb2\",\n    \"botc3\",\n    \"botd4\",\n    \"bote5\",\n    \"botf6\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-8.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"al\"\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bad-9.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    7\n  ],\n  \"setup\": [\n    \"op alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"command\": \"/tp bob\"\n    },\n    {\n      \"bot\": \"bob\",\n      \"expectMessage\": \"teleported\",\n      \"timeout\": 2000\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    }\n  ]\n}\n"
+  },
+  "scenarios/bom.json": {
+   "kind": "file",
+   "text": "﻿{}"
+  },
+  "scenarios/broken.json": {
+   "kind": "file",
+   "text": "{ not json"
+  },
+  "scenarios/lan.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"smoke\",\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/^<alice> HI$/i\",\n      \"timeout\": 2000\n    },\n    {\n      \"bot\": \"alice\",\n      \"command\": \"say done\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"say done\"\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    },\n    {\n      \"bot\": \"alice\",\n      \"closeWindow\": true,\n      \"timeout\": 100\n    }\n  ],\n  \"instance\": \"lan\"\n}\n"
+  },
+  "scenarios/noinstance.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"smoke\",\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/^<alice> HI$/i\",\n      \"timeout\": 2000\n    },\n    {\n      \"bot\": \"alice\",\n      \"command\": \"say done\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"say done\"\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    },\n    {\n      \"bot\": \"alice\",\n      \"closeWindow\": true,\n      \"timeout\": 100\n    }\n  ]\n}\n"
+  },
+  "scenarios/run1-badsetup.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"smoke\",\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/^<alice> HI$/i\",\n      \"timeout\": 2000\n    },\n    {\n      \"bot\": \"alice\",\n      \"command\": \"say done\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"say done\"\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    },\n    {\n      \"bot\": \"alice\",\n      \"closeWindow\": true,\n      \"timeout\": 100\n    }\n  ],\n  \"instance\": \"run1\",\n  \"setup\": [\n    \"op alice\",\n    \"gamemode creative nobody\"\n  ]\n}\n"
+  },
+  "scenarios/run1-fails.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"fails\",\n  \"instance\": \"run1\",\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"nothing like it\",\n      \"timeout\": 300\n    },\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"never sent\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/run1-setup.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"smoke\",\n  \"bots\": [\n    \"alice\",\n    \"bob_2\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/^<alice> HI$/i\",\n      \"timeout\": 2000\n    },\n    {\n      \"bot\": \"alice\",\n      \"command\": \"say done\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"say done\"\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    },\n    {\n      \"bot\": \"alice\",\n      \"closeWindow\": true,\n      \"timeout\": 100\n    }\n  ],\n  \"instance\": \"run1\",\n  \"setup\": [\n    \"op alice\",\n    \"/gamemode creative bob_2\"\n  ]\n}\n"
+  },
+  "scenarios/run1.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"smoke\",\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"chat\": \"hi\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/^<alice> HI$/i\",\n      \"timeout\": 2000\n    },\n    {\n      \"bot\": \"alice\",\n      \"command\": \"say done\"\n    },\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"say done\"\n    },\n    {\n      \"expectLog\": {\n        \"absent\": \"Exception\"\n      }\n    },\n    {\n      \"bot\": \"alice\",\n      \"closeWindow\": true,\n      \"timeout\": 100\n    }\n  ],\n  \"instance\": \"run1\"\n}\n"
+  },
+  "scenarios/v8-0.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(?=a)(/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-1.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(a)\\\\1**/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-10.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/[\\\\p{L}--\\\\p{N}]/v\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-2.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(?<=x)*/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-3.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(?<a>x)\\\\k<b>/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-4.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(?!x)x)/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-5.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/\\\\a/u\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-6.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/[😀-🙏]/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-7.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/a(?=b)/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-8.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/(a)\\\\1/\"\n    }\n  ]\n}\n"
+  },
+  "scenarios/v8-9.json": {
+   "kind": "file",
+   "text": "{\n  \"bots\": [\n    \"alice\"\n  ],\n  \"steps\": [\n    {\n      \"bot\": \"alice\",\n      \"expectMessage\": \"/[\\\\u{1F600}-\\\\u{1F64F}]/u\"\n    }\n  ]\n}\n"
+  }
+ }
+}

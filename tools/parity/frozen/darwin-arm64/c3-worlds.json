@@ -1,0 +1,935 @@
+{
+ "about": "What the Node core did in scenario c3-worlds on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c3-worlds",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 27 (worlds)",
+   "args": [
+    "worlds"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: worlds requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 28 (worlds nope)",
+   "args": [
+    "worlds",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, srv3\n"
+  },
+  {
+   "label": "step 29 (worlds bad name)",
+   "args": [
+    "worlds",
+    "bad name"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 30 (worlds srv1)",
+   "args": [
+    "worlds",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WORLD          ACTIVE  DIMENSIONS       SIZE\nworld          yes     nether, the_end  <size>\n.importing             -                <size>\nalpha                  the_end          <size>\nBeta                   -                <size>\nlonely_nether          -                <size>\nzeta                   -                <size>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (worlds srv1 list)",
+   "args": [
+    "worlds",
+    "srv1",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WORLD          ACTIVE  DIMENSIONS       SIZE\nworld          yes     nether, the_end  <size>\n.importing             -                <size>\nalpha                  the_end          <size>\nBeta                   -                <size>\nlonely_nether          -                <size>\nzeta                   -                <size>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (worlds srv2)",
+   "args": [
+    "worlds",
+    "srv2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No worlds in <run>/data/instances/srv2. The server generates one on first start, or: spawnloft worlds srv2 import <zip-or-folder> --as <name>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (worlds srv3)",
+   "args": [
+    "worlds",
+    "srv3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No worlds in <run>/data/instances/srv3. The server generates one on first start, or: spawnloft worlds srv3 import <zip-or-folder> --as <name>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (worlds srv1 --json)",
+   "args": [
+    "worlds",
+    "srv1",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"worlds\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for worlds; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (worlds srv1 frobnicate)",
+   "args": [
+    "worlds",
+    "srv1",
+    "frobnicate"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft worlds <name> [use <world> | import <src> --as <name> | export [world] | delete <world> --yes]\n"
+  },
+  {
+   "label": "step 36 (worlds srv1 use)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft worlds srv1 use <world>\n"
+  },
+  {
+   "label": "step 37 (worlds srv1 use a/b)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use",
+    "a/b"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"a/b\" is not a world name\n"
+  },
+  {
+   "label": "step 38 (worlds srv1 use ..)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use",
+    ".."
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"..\" is not a world name\n"
+  },
+  {
+   "label": "step 39 (worlds srv1 use notaworld)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use",
+    "notaworld"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"notaworld\" is not a world in <run>/data/instances/srv1 (no level.dat)\n"
+  },
+  {
+   "label": "step 40 (worlds srv1 use missing)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use",
+    "missing"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"missing\" is not a world in <run>/data/instances/srv1 (no level.dat)\n"
+  },
+  {
+   "label": "step 41 (worlds srv1 use zeta)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "zeta is now the active world. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (worlds srv1)",
+   "args": [
+    "worlds",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WORLD          ACTIVE  DIMENSIONS       SIZE\nzeta           yes     -                <size>\n.importing             -                <size>\nalpha                  the_end          <size>\nBeta                   -                <size>\nlonely_nether          -                <size>\nworld                  nether, the_end  <size>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (worlds srv1 use world)",
+   "args": [
+    "worlds",
+    "srv1",
+    "use",
+    "world"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "world is now the active world. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (worlds srv1 import)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft worlds srv1 import <zip-or-folder> --as <name>\n"
+  },
+  {
+   "label": "step 45 (worlds srv1 import {run}/maps/none-here)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/none-here"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: there is nothing at <run>/maps/none-here\n"
+  },
+  {
+   "label": "step 46 (worlds srv1 import {run}/maps/Empty --as empty)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Empty",
+    "--as",
+    "empty"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no level.dat found under <run>/maps/Empty - that folder does not hold a world\n"
+  },
+  {
+   "label": "step 47 (worlds srv1 import {run}/maps/Wrapped --as bad name)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as",
+    "bad name"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 48 (worlds srv1 import {run}/maps/Wrapped --as world)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as",
+    "world"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"world\" already exists in <run>/data/instances/srv1 - pick another name\n"
+  },
+  {
+   "label": "step 49 (worlds srv1 import {run}/maps/Wrapped --as)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. Received type boolean (true)\n"
+  },
+  {
+   "label": "step 50 (worlds srv1 import {run}/maps/Wrapped)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported \"Wrapped\" (<size>, with nether).\nMake it the active world with: spawnloft worlds srv1 use Wrapped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (worlds srv1 import {run}/maps/Wrapped --as Copied)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as",
+    "Copied"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported \"Copied\" (<size>, with nether).\nMake it the active world with: spawnloft worlds srv1 use Copied\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (worlds srv1 import {run}/maps/Island Pack.tar.gz)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Island Pack.tar.gz"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported \"Island-Pack\" (<size>, with nether).\nMake it the active world with: spawnloft worlds srv1 use Island-Pack\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (worlds srv1 import {run}/maps/noworld.tgz --as nw)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/noworld.tgz",
+    "--as",
+    "nw"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no level.dat found inside noworld.tgz - that archive does not hold a world\n"
+  },
+  {
+   "label": "step 54 (worlds srv1 import {run}/maps/Sky.ZIP)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Sky.ZIP"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported \"Sky\" (<size>, with the_end).\nMake it the active world with: spawnloft worlds srv1 use Sky\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (worlds srv1 import {run}/maps/evil.zip --as evil)",
+   "args": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/evil.zip",
+    "--as",
+    "evil"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no level.dat found inside evil.zip - that archive does not hold a world\n"
+  },
+  {
+   "label": "step 56 (worlds srv1)",
+   "args": [
+    "worlds",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WORLD          ACTIVE  DIMENSIONS       SIZE\nworld          yes     nether, the_end  <size>\n.importing             -                <size>\nalpha                  the_end          <size>\nBeta                   -                <size>\nCopied                 nether           <size>\nIsland-Pack            nether           <size>\nlonely_nether          -                <size>\nSky                    the_end          <size>\nWrapped                nether           <size>\nzeta                   -                <size>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (worlds srv1 export)",
+   "args": [
+    "worlds",
+    "srv1",
+    "export"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Exported world, world_nether, world_the_end to:\n  <run>/data/backups/srv1/exports/world_<stamp>.zip  (<size>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (worlds srv1 export alpha)",
+   "args": [
+    "worlds",
+    "srv1",
+    "export",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Exported alpha, alpha_the_end to:\n  <run>/data/backups/srv1/exports/alpha_<stamp>.zip  (<size>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (worlds srv1 export notaworld)",
+   "args": [
+    "worlds",
+    "srv1",
+    "export",
+    "notaworld"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"notaworld\" is not a world in <run>/data/instances/srv1\n"
+  },
+  {
+   "label": "step 60 (worlds srv1 export ../x)",
+   "args": [
+    "worlds",
+    "srv1",
+    "export",
+    "../x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"../x\" is not a world name\n"
+  },
+  {
+   "label": "step 61 (worlds srv2 export)",
+   "args": [
+    "worlds",
+    "srv2",
+    "export"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"world\" is not a world in <run>/data/instances/srv2\n"
+  },
+  {
+   "label": "step 62 (worlds srv1 delete)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft worlds srv1 delete <world> --yes\n"
+  },
+  {
+   "label": "step 63 (worlds srv1 delete alpha)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete",
+    "alpha"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: this deletes the world \"alpha\". A copy is kept in its backups first (not past 1 GB:\n  add --no-copy for that). Re-run with --yes.\n"
+  },
+  {
+   "label": "step 64 (worlds srv1 delete world --yes)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete",
+    "world",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"world\" is the active world - switch to another world first, or use rebuild to reset it\n"
+  },
+  {
+   "label": "step 65 (worlds srv1 delete notaworld --yes)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete",
+    "notaworld",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"notaworld\" is not a world in <run>/data/instances/srv1\n"
+  },
+  {
+   "label": "step 66 (worlds srv1 delete a\\b --yes)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete",
+    "a\\b",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"a\\b\" is not a world name\n"
+  },
+  {
+   "label": "step 67 (worlds srv1 delete alpha --yes)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete",
+    "alpha",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Deleted alpha, alpha_the_end. A copy is kept as world-delete_files_<stamp>.tar.gz.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (worlds srv1 delete Beta --yes --no-copy)",
+   "args": [
+    "worlds",
+    "srv1",
+    "delete",
+    "Beta",
+    "--yes",
+    "--no-copy"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Deleted Beta.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 69 (snapshots srv1)",
+   "args": [
+    "snapshots",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                         SCOPE  SIZE   CREATED\nworld-delete_files_<stamp>.tar.gz  files  <size>  <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 70 (worlds srv1)",
+   "args": [
+    "worlds",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WORLD          ACTIVE  DIMENSIONS       SIZE\nworld          yes     nether, the_end  <size>\n.importing             -                <size>\nCopied                 nether           <size>\nIsland-Pack            nether           <size>\nlonely_nether          -                <size>\nSky                    the_end          <size>\nWrapped                nether           <size>\nzeta                   -                <size>\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/srv1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/srv1/exports": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/srv1/exports/alpha_<stamp>.zip": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "alpha/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x41ed0000\nalpha/level.dat method=8 flags=0x8 size=1 csize=3 crc=e8b7be43 attr=0x81a40000\nalpha_the_end/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x41ed0000\nalpha_the_end/level.dat method=8 flags=0x8 size=2 csize=4 crc=00e7ddce attr=0x81a40000"
+  },
+  "data/backups/srv1/exports/world_<stamp>.zip": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "world/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x41ed0000\nworld/region/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x41ed0000\nworld/level.dat method=8 flags=0x8 size=5 csize=7 crc=9aeacc13 attr=0x81a40000\nworld/region/r.0.0.mca method=8 flags=0x8 size=6 csize=8 crc=0f62f176 attr=0x81a40000\nworld_nether/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x41ed0000\nworld_nether/level.dat method=8 flags=0x8 size=6 csize=8 crc=d6f61515 attr=0x81a40000\nworld_the_end/ method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x41ed0000\nworld_the_end/level.dat method=8 flags=0x8 size=3 csize=5 crc=00fc33b1 attr=0x81a40000"
+  },
+  "data/backups/srv1/world-delete_files_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv1\",\n  \"scope\": \"files\",\n  \"label\": \"world-delete\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"alpha\",\n    \"alpha_the_end\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/srv1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/srv1/world-delete_files_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "alpha/ type=5 mode=755 size=0\nalpha/level.dat type=0 mode=644 size=1 sha256=ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb\nalpha_the_end/ type=5 mode=755 size=0\nalpha_the_end/level.dat type=0 mode=644 size=2 sha256=f9a00f43e97e3966bb846e76b6795e11512c3bbfa787e6b70e0310c7b9346b98"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/.importing": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/.importing/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "hidden"
+  },
+  "data/instances/srv1/Copied": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Copied/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "map"
+  },
+  "data/instances/srv1/Copied/region": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Copied/region/r.0.0.mca": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mr"
+  },
+  "data/instances/srv1/Copied_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Copied_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mn"
+  },
+  "data/instances/srv1/Island-Pack": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Island-Pack/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "island"
+  },
+  "data/instances/srv1/Island-Pack/region": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Island-Pack/region/r.0.0.mca": {
+   "kind": "file",
+   "mode": "644",
+   "text": "r"
+  },
+  "data/instances/srv1/Island-Pack_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Island-Pack_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "n"
+  },
+  "data/instances/srv1/Sky": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Sky/data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Sky/data/x.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "x"
+  },
+  "data/instances/srv1/Sky/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "sky"
+  },
+  "data/instances/srv1/Sky_the_end": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Sky_the_end/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "end"
+  },
+  "data/instances/srv1/Wrapped": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Wrapped/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "map"
+  },
+  "data/instances/srv1/Wrapped/region": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Wrapped/region/r.0.0.mca": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mr"
+  },
+  "data/instances/srv1/Wrapped_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/Wrapped_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mn"
+  },
+  "data/instances/srv1/lonely_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/lonely_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "ln"
+  },
+  "data/instances/srv1/notaworld": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/notaworld/readme.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "no"
+  },
+  "data/instances/srv1/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/plugins/Essentials": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/plugins/Essentials/config.yml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "a: 1\n"
+  },
+  "data/instances/srv1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "#Minecraft server properties\nlevel-name=world\nmotd=Hi\n"
+  },
+  "data/instances/srv1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "level"
+  },
+  "data/instances/srv1/world/region": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world/region/r.0.0.mca": {
+   "kind": "file",
+   "mode": "644",
+   "text": "region"
+  },
+  "data/instances/srv1/world/session.lock": {
+   "kind": "file",
+   "mode": "644",
+   "text": "lock"
+  },
+  "data/instances/srv1/world_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "nether"
+  },
+  "data/instances/srv1/world_the_end": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world_the_end/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "end"
+  },
+  "data/instances/srv1/zeta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/zeta/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "z"
+  },
+  "data/instances/srv2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv1\": {\n      \"dir\": \"<run>/data/instances/srv1\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47971\n    },\n    \"srv2\": {\n      \"dir\": \"<run>/data/instances/srv2\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47972\n    },\n    \"srv3\": {\n      \"dir\": \"<run>/data/instances/srv3\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47973\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Empty": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Empty/readme.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "nothing"
+  },
+  "maps/Island Pack.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "Pack/ type=5 mode=755 size=0\nPack/README.txt type=0 mode=644 size=7 sha256=3f22095641508576e91dc7c6c7f7e08a093985d53ea998043c6619ad240dc92c\nPack/Island/ type=5 mode=755 size=0\nPack/Island/level.dat type=0 mode=644 size=6 sha256=28cd2c5c15d13978a6bc06d38092dbbafb31f5590aa3ac120f9f8d8c0e0708c4\nPack/Island/session.lock type=0 mode=644 size=4 sha256=0c030586945fe504b604ecc2e875c38ede400cd5cd73da9730302162e6b02c6f\nPack/Island/region/ type=5 mode=755 size=0\nPack/Island/region/r.0.0.mca type=0 mode=644 size=1 sha256=454349e422f05297191ead13e21d3db520e5abef52055e4964b82fb213f593a1\nPack/Island_nether/ type=5 mode=755 size=0\nPack/Island_nether/level.dat type=0 mode=644 size=1 sha256=1b16b1df538ba12dc3f97edbb85caa7050d46c148134290feba80f8236c83db9"
+  },
+  "maps/Sky.ZIP": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "Sky/level.dat method=0 flags=0x0 size=3 csize=3 crc=062674ef attr=0x1a40000\nSky/data/x.dat method=0 flags=0x0 size=1 csize=1 crc=8cdc1683 attr=0x1a40000\nSky_the_end/level.dat method=0 flags=0x0 size=3 csize=3 crc=00fc33b1 attr=0x1a40000"
+  },
+  "maps/Wrapped": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Wrapped/Inner": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Wrapped/Inner/Map": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Wrapped/Inner/Map/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "map"
+  },
+  "maps/Wrapped/Inner/Map/region": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Wrapped/Inner/Map/region/r.0.0.mca": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mr"
+  },
+  "maps/Wrapped/Inner/Map/session.lock": {
+   "kind": "file",
+   "mode": "644",
+   "text": "lock"
+  },
+  "maps/Wrapped/Inner/Map_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Wrapped/Inner/Map_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mn"
+  },
+  "maps/Wrapped/Inner/Map_the_end": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "maps/Wrapped/Inner/Map_the_end/notes.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "not a world"
+  },
+  "maps/evil.zip": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "../evil/level.dat method=0 flags=0x0 size=1 csize=1 crc=efda7a5a attr=0x1800000"
+  },
+  "maps/noworld.tgz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "stuff/ type=5 mode=755 size=0\nstuff/a.txt type=0 mode=644 size=1 sha256=ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+  }
+ }
+}

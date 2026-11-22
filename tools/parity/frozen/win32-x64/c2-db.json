@@ -1,0 +1,1326 @@
+{
+ "about": "What the Node core did in scenario c2-db on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c2-db",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 10 (db)",
+   "args": [
+    "db"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No databases.\n\n  Add one with: spawnloft db add <name> --version <mysql-version>\n  See versions: spawnloft db versions\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (db list)",
+   "args": [
+    "db",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No databases.\n\n  Add one with: spawnloft db add <name> --version <mysql-version>\n  See versions: spawnloft db versions\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (db nope)",
+   "args": [
+    "db",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db [list|versions|add|create|connect|attach|detach|creds|root|remove]\n"
+  },
+  {
+   "label": "step 13 (db list --json)",
+   "args": [
+    "db",
+    "list",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"db\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for db; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (db versions)",
+   "args": [
+    "db",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "VERSION  STATUS  SUPPORT            RELEASED\n8.4.11   Stable  Long Term Support  -\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (db versions --engine garnet)",
+   "args": [
+    "db",
+    "versions",
+    "--engine",
+    "garnet"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "VERSION  STATUS  SUPPORT                RELEASED\n2.1.7    Stable  Verified native build  -\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (db versions --engine mariadb)",
+   "args": [
+    "db",
+    "versions",
+    "--engine",
+    "mariadb"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Choose MySQL or Redis (Garnet). MariaDB is not offered for new databases.\n"
+  },
+  {
+   "label": "step 17 (db versions --engine)",
+   "args": [
+    "db",
+    "versions",
+    "--engine"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Choose MySQL or Redis (Garnet). MariaDB is not offered for new databases.\n"
+  },
+  {
+   "label": "step 22 (db add)",
+   "args": [
+    "db",
+    "add"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db add <name> --version <version> [--port <n>] [--label \"...\"]\n"
+  },
+  {
+   "label": "step 23 (db add k --engine mariadb)",
+   "args": [
+    "db",
+    "add",
+    "k",
+    "--engine",
+    "mariadb"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Choose MySQL or Redis (Garnet). MariaDB is not offered for new databases.\n"
+  },
+  {
+   "label": "step 24 (db add bad name --engine garnet --version 0.0.0-fake)",
+   "args": [
+    "db",
+    "add",
+    "bad name",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 25 (db add srv1 --engine garnet --version 0.0.0-fake)",
+   "args": [
+    "db",
+    "add",
+    "srv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv1\" already exists - servers and databases share one set of names\n"
+  },
+  {
+   "label": "step 26 (db add kv2 --engine garnet --version 0.0.0-fake --port abc)",
+   "args": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "abc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: NaN is not a port number - use 1 to 65535\n"
+  },
+  {
+   "label": "step 27 (db add kv2 --engine garnet --version 0.0.0-fake --port 47900)",
+   "args": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "47900"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: port 47900 is already used by \"srv1\"\n"
+  },
+  {
+   "label": "step 28 (db add kv2 --engine garnet --version 9.9.9 --port 47822)",
+   "args": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "9.9.9",
+    "--port",
+    "47822"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: No verified Garnet 9.9.9 bundle. See: spawnloft db versions --engine garnet\n"
+  },
+  {
+   "label": "step 29 (db add kv2 --engine garnet --version bad! --port 47822)",
+   "args": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "bad!",
+    "--port",
+    "47822"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Invalid Garnet version\n"
+  },
+  {
+   "label": "step 30 (db add kv1 --engine garnet --version 0.0.0-fake --port 47821 --label   Key   value  )",
+   "args": [
+    "db",
+    "add",
+    "kv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "47821",
+    "--label",
+    "  Key   value  "
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Garnet 0.0.0-fake is already here\n  Setting up Redis (Garnet) 0.0.0-fake on port 47821\n\nCreated database \"kv1\" (Redis (Garnet) 0.0.0-fake) on 127.0.0.1:47821\nStart it with: spawnloft start kv1\nThen attach a server: spawnloft db attach kv1 <server>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (db add kv1 --engine garnet --version 0.0.0-fake --port 47823)",
+   "args": [
+    "db",
+    "add",
+    "kv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "47823"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"kv1\" already exists - servers and databases share one set of names\n"
+  },
+  {
+   "label": "step 32 (db add m1 --version 8.4.11 --port 47830)",
+   "args": [
+    "db",
+    "add",
+    "m1",
+    "--version",
+    "8.4.11",
+    "--port",
+    "47830"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Downloading MySQL 8.4.11 100%\n",
+   "stderr": "error: MySQL download checksum mismatch. Nothing was installed; please retry.\n"
+  },
+  {
+   "label": "step 33 (db add m2 --port 47831)",
+   "args": [
+    "db",
+    "add",
+    "m2",
+    "--port",
+    "47831"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Using MySQL 8.4.11, the newest stable release.\n  Downloading MySQL 8.4.11 100%\n",
+   "stderr": "error: MySQL download checksum mismatch. Nothing was installed; please retry.\n"
+  },
+  {
+   "label": "step 34 (db list)",
+   "args": [
+    "db",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "DATABASE  STATUS   ENGINE                     PORT   ATTACHED  UPTIME  DIR\ndb1       stopped  MariaDB 0.0.0-fake         47811  -         -       <run>/data/services/db1\nkv1       stopped  Redis (Garnet) 0.0.0-fake  47821  -         -       <run>/data/services/kv1\nkvx       stopped  Redis (Garnet) 0.0.0-fake  47824  -         -       <run>/data/services/kvx\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (db attach)",
+   "args": [
+    "db",
+    "attach"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db attach <database> <server>\n"
+  },
+  {
+   "label": "step 36 (db attach db1)",
+   "args": [
+    "db",
+    "attach",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db attach <database> <server>\n"
+  },
+  {
+   "label": "step 37 (db attach db1 srv1)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is not running - start it first, then attach\n"
+  },
+  {
+   "label": "step 38 (db attach srv1 db1)",
+   "args": [
+    "db",
+    "attach",
+    "srv1",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv1\" is a server, not a database\n"
+  },
+  {
+   "label": "step 39 (db attach db1 db1)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is a database, not a server\n"
+  },
+  {
+   "label": "step 40 (db attach db1 nope)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, db1, kvx, kv1\n"
+  },
+  {
+   "label": "step 41 (start db1 --timeout 60)",
+   "args": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"db1\"...\nReady - ready for connections\n  database pid <pid>   port 47811\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (start kv1 --timeout 60)",
+   "args": [
+    "start",
+    "kv1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"kv1\"...\nReady - Ready to accept connections\n  database pid <pid>   port 47821\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (db attach db1 srv1)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is attached to \"db1\".\n\nhost:      127.0.0.1\nport:      47811\ndatabase:  srv1\nuser:      srv1\npassword:  <password>\njdbc:      jdbc:mysql://127.0.0.1:47811/srv1\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (db attach db1 srv1)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is attached to \"db1\".\n\nhost:      127.0.0.1\nport:      47811\ndatabase:  srv1\nuser:      srv1\npassword:  <password>\njdbc:      jdbc:mysql://127.0.0.1:47811/srv1\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (db creds db1 srv1)",
+   "args": [
+    "db",
+    "creds",
+    "db1",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "host:      127.0.0.1\nport:      47811\ndatabase:  srv1\nuser:      srv1\npassword:  <password>\njdbc:      jdbc:mysql://127.0.0.1:47811/srv1\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (db credentials db1 srv2)",
+   "args": [
+    "db",
+    "credentials",
+    "db1",
+    "srv2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv2\" is not attached to \"db1\" - attach it first\n"
+  },
+  {
+   "label": "step 47 (db creds db1)",
+   "args": [
+    "db",
+    "creds",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db creds <database> <server>\n"
+  },
+  {
+   "label": "step 48 (db attach kv1 srv1)",
+   "args": [
+    "db",
+    "attach",
+    "kv1",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is attached to \"kv1\".\n\nhost:        127.0.0.1\nport:        47821\npassword:    <password>\nurl:         redis://:<password>@127.0.0.1:47821\nkey prefix:  srv1:\n  Redis has no per-server databases or users: every server attached here shares this password and key space. Plugins prefix their keys; LuckPerms and most others do it for you.\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (db attach kv1 srv2)",
+   "args": [
+    "db",
+    "attach",
+    "kv1",
+    "srv2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv2\" is attached to \"kv1\".\n\nhost:        127.0.0.1\nport:        47821\npassword:    <password>\nurl:         redis://:<password>@127.0.0.1:47821\nkey prefix:  srv2:\n  Redis has no per-server databases or users: every server attached here shares this password and key space. Plugins prefix their keys; LuckPerms and most others do it for you.\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (db creds kv1 srv2)",
+   "args": [
+    "db",
+    "creds",
+    "kv1",
+    "srv2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "host:        127.0.0.1\nport:        47821\npassword:    <password>\nurl:         redis://:<password>@127.0.0.1:47821\nkey prefix:  srv2:\n  Redis has no per-server databases or users: every server attached here shares this password and key space. Plugins prefix their keys; LuckPerms and most others do it for you.\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (db detach db1 srv2)",
+   "args": [
+    "db",
+    "detach",
+    "db1",
+    "srv2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv2\" is not attached to \"db1\"\n"
+  },
+  {
+   "label": "step 52 (db detach db1 srv1)",
+   "args": [
+    "db",
+    "detach",
+    "db1",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is detached from \"db1\"; database srv1 kept.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (db attach db1 srv1)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is attached to \"db1\".\n\nhost:      127.0.0.1\nport:      47811\ndatabase:  srv1\nuser:      srv1\npassword:  <password>\njdbc:      jdbc:mysql://127.0.0.1:47811/srv1\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (db detach db1 srv1 --drop)",
+   "args": [
+    "db",
+    "detach",
+    "db1",
+    "srv1",
+    "--drop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is detached from \"db1\"; database srv1 dropped.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (db detach kv1 srv1 --drop)",
+   "args": [
+    "db",
+    "detach",
+    "kv1",
+    "srv1",
+    "--drop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv1\" is detached from \"kv1\"; database null dropped.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 56 (db connect)",
+   "args": [
+    "db",
+    "connect"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db connect <name> --engine mysql|garnet --host <host> --port <n> --user <u> --password <p> [--tools <folder>]\n"
+  },
+  {
+   "label": "step 57 (db connect e1 --engine garnet --port 1)",
+   "args": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "garnet",
+    "--port",
+    "1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: could not reach 127.0.0.1:1: connect ECONNREFUSED 127.0.0.1:1\n"
+  },
+  {
+   "label": "step 58 (db connect e1 --engine garnet --port 47821 --password wrong)",
+   "args": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "garnet",
+    "--port",
+    "47821",
+    "--password",
+    "wrong"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: 127.0.0.1:47821 refused: WRONGPASS invalid username-password pair\n"
+  },
+  {
+   "label": "step 59 (db connect e1 --engine mariadb --port 47811)",
+   "args": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "mariadb",
+    "--port",
+    "47811"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Choose MySQL or Redis (Garnet). MariaDB is not offered for new databases.\n"
+  },
+  {
+   "label": "step 60 (db connect e1 --engine mysql --port abc)",
+   "args": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "mysql",
+    "--port",
+    "abc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: NaN is not a port number\n"
+  },
+  {
+   "label": "step 61 (db connect e1 --engine mysql --port 47811 --tools {run}/nowhere)",
+   "args": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811",
+    "--tools",
+    "{run}/nowhere"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: <run>/nowhere holds no client tool this engine knows\n"
+  },
+  {
+   "label": "step 62 (db connect srv1 --engine mysql --port 47811)",
+   "args": [
+    "db",
+    "connect",
+    "srv1",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv1\" already exists - servers and databases share one set of names\n"
+  },
+  {
+   "label": "step 63 (start kvx --timeout 60)",
+   "args": [
+    "start",
+    "kvx",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"kvx\"...\nReady - Ready to accept connections\n  database pid <pid>   port 47824\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (db connect e4 --engine garnet --port 47824 --password pw-kv)",
+   "args": [
+    "db",
+    "connect",
+    "e4",
+    "--engine",
+    "garnet",
+    "--port",
+    "47824",
+    "--password",
+    "pw-kv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Registered \"e4\": Redis (Garnet) at 127.0.0.1:47824, answering.\nAttach a server: spawnloft db attach e4 <server>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 65 (db connect e5 --engine garnet --host no-such-host.invalid --port 47824)",
+   "args": [
+    "db",
+    "connect",
+    "e5",
+    "--engine",
+    "garnet",
+    "--host",
+    "no-such-host.invalid",
+    "--port",
+    "47824"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: could not reach no-such-host.invalid:47824: getaddrinfo ENOTFOUND no-such-host.invalid\n"
+  },
+  {
+   "label": "step 66 (db address e4 --host no-such-host.invalid)",
+   "args": [
+    "db",
+    "address",
+    "e4",
+    "--host",
+    "no-such-host.invalid"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"e4\" now points at no-such-host.invalid:47824 - nothing answers there yet.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (stop kvx)",
+   "args": [
+    "stop",
+    "kvx"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"kvx\"...\n\"kvx\" stopped (exit code 1).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (db connect e2 --engine mysql --port 47811 --password pw-test --label Ext DB)",
+   "args": [
+    "db",
+    "connect",
+    "e2",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811",
+    "--password",
+    "pw-test",
+    "--label",
+    "Ext DB"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Registered \"e2\": MySQL at 127.0.0.1:47811, answering.\nAttach a server: spawnloft db attach e2 <server>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 69 (db connect e3 --engine mysql --port 47811)",
+   "args": [
+    "db",
+    "connect",
+    "e3",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: MariaDB refused: fake client: ERROR 1045 (28000): Access denied for user 'root'@'localhost'\n"
+  },
+  {
+   "label": "step 70 (db attach e2 srv2)",
+   "args": [
+    "db",
+    "attach",
+    "e2",
+    "srv2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv2\" is attached to \"e2\".\n\nhost:      127.0.0.1\nport:      47811\ndatabase:  srv2\nuser:      srv2\npassword:  <password>\njdbc:      jdbc:mysql://127.0.0.1:47811/srv2\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 71 (db address e2)",
+   "args": [
+    "db",
+    "address",
+    "e2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db address <database> [--host h] [--port n] [--user u] [--password p]\n"
+  },
+  {
+   "label": "step 72 (db address db1 --host x)",
+   "args": [
+    "db",
+    "address",
+    "db1",
+    "--host",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is run by SpawnLoft; its address is not edited by hand\n"
+  },
+  {
+   "label": "step 73 (db address e2 --host a b)",
+   "args": [
+    "db",
+    "address",
+    "e2",
+    "--host",
+    "a b"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"a b\" is not a host name or address\n"
+  },
+  {
+   "label": "step 74 (db address e2 --port 0)",
+   "args": [
+    "db",
+    "address",
+    "e2",
+    "--port",
+    "0"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: 0 is not a port number\n"
+  },
+  {
+   "label": "step 75 (db address e2 --port 1)",
+   "args": [
+    "db",
+    "address",
+    "e2",
+    "--port",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"e2\" now points at 127.0.0.1:1 - nothing answers there yet.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 76 (db address e2 --port 47811 --user admin)",
+   "args": [
+    "db",
+    "address",
+    "e2",
+    "--port",
+    "47811",
+    "--user",
+    "admin"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"e2\" now points at 127.0.0.1:47811, answering.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 77 (db root db1)",
+   "args": [
+    "db",
+    "root",
+    "db1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "host:      127.0.0.1\nport:      47811\nuser:      root\npassword:  pw-test\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 78 (db root e2)",
+   "args": [
+    "db",
+    "root",
+    "e2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "host:      127.0.0.1\nport:      47811\nuser:      admin\npassword:  pw-test\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 79 (db root srv1)",
+   "args": [
+    "db",
+    "root",
+    "srv1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv1\" is a server, not a database\n"
+  },
+  {
+   "label": "step 80 (db root)",
+   "args": [
+    "db",
+    "root"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db root <database>\n"
+  },
+  {
+   "label": "step 81 (db create)",
+   "args": [
+    "db",
+    "create"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db create <server> [--version <version>] [--engine mysql|garnet]\n"
+  },
+  {
+   "label": "step 82 (db create db1)",
+   "args": [
+    "db",
+    "create",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is a database, not a server\n"
+  },
+  {
+   "label": "step 83 (db create srv2 --engine mariadb)",
+   "args": [
+    "db",
+    "create",
+    "srv2",
+    "--engine",
+    "mariadb"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Choose MySQL or Redis (Garnet). MariaDB is not offered for new databases.\n"
+  },
+  {
+   "label": "step 84 (db create srv2 --engine garnet --version 0.0.0-fake)",
+   "args": [
+    "db",
+    "create",
+    "srv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Garnet 0.0.0-fake is already here\n  Setting up Redis (Garnet) 0.0.0-fake on port 47906\n  Starting srv2-db on port 47906\n  Attaching srv2\n  Created srv2-db\n\nCreated database \"srv2-db\" (Redis (Garnet) 0.0.0-fake) on 127.0.0.1:47906, running, attached to \"srv2\".\n\nhost:        127.0.0.1\nport:        47906\npassword:    <password>\nurl:         redis://:<password>@127.0.0.1:47906\nkey prefix:  srv2:\n  Redis has no per-server databases or users: every server attached here shares this password and key space. Plugins prefix their keys; LuckPerms and most others do it for you.\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 85 (db create srv2 --engine garnet --version 9.9.9)",
+   "args": [
+    "db",
+    "create",
+    "srv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "9.9.9"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: No verified Garnet 9.9.9 bundle. See: spawnloft db versions --engine garnet\n"
+  },
+  {
+   "label": "step 86 (db create srv1 --engine garnet --version 0.0.0-fake)",
+   "args": [
+    "db",
+    "create",
+    "srv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Garnet 0.0.0-fake is already here\n  Setting up Redis (Garnet) 0.0.0-fake on port 47901\n  Starting srv1-db on port 47901\n",
+   "stderr": "error: the database started but stopped again: Unhandled exception\n"
+  },
+  {
+   "label": "step 87 (db list)",
+   "args": [
+    "db",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "DATABASE  STATUS    ENGINE                     PORT                        ATTACHED  UPTIME  DIR\ndb1       running   MariaDB 0.0.0-fake         47811                       -         <secs> <run>/data/services/db1\ne2        external  MySQL                      127.0.0.1:47811             srv2      -       -\ne4        external  Redis (Garnet)             no-such-host.invalid:47824  -         -       -\nkv1       running   Redis (Garnet) 0.0.0-fake  47821                       srv2      <secs> <run>/data/services/kv1\nkvx       stopped   Redis (Garnet) 0.0.0-fake  47824                       -         -       <run>/data/services/kvx\nsrv2-db   running   Redis (Garnet) 0.0.0-fake  47906                       srv2      <secs> <run>/data/services/srv2-db\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 88 (db remove)",
+   "args": [
+    "db",
+    "remove"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft db remove <database> [--purge]\n"
+  },
+  {
+   "label": "step 89 (db remove kv1)",
+   "args": [
+    "db",
+    "remove",
+    "kv1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"kv1\" is running - stop it before deleting it.\n"
+  },
+  {
+   "label": "step 90 (db remove srv1)",
+   "args": [
+    "db",
+    "remove",
+    "srv1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"srv1\" is a server, not a database\n"
+  },
+  {
+   "label": "step 91 (stop kv1)",
+   "args": [
+    "stop",
+    "kv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"kv1\"...\n\"kv1\" stopped (exit code 1).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 92 (db remove kv1 --purge)",
+   "args": [
+    "db",
+    "remove",
+    "kv1",
+    "--purge"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed database \"kv1\" and its files.\nServers that were attached: srv2 - update any plugin configs you configured manually.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 93 (db rm e2 --purge)",
+   "args": [
+    "db",
+    "rm",
+    "e2",
+    "--purge"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed database \"e2\" (files kept).\nServers that were attached: srv2 - update any plugin configs you configured manually.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 94 (stop srv2-db)",
+   "args": [
+    "stop",
+    "srv2-db"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"srv2-db\"...\n\"srv2-db\" stopped (exit code 1).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 95 (db attach db1 srv2)",
+   "args": [
+    "db",
+    "attach",
+    "db1",
+    "srv2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv2\" is attached to \"db1\".\n\nhost:      127.0.0.1\nport:      47811\ndatabase:  srv2\nuser:      srv2\npassword:  <password>\njdbc:      jdbc:mysql://127.0.0.1:47811/srv2\nConfigure your plugins manually with these values. SpawnLoft does not edit plugin configs.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 96 (stop db1)",
+   "args": [
+    "stop",
+    "db1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"db1\"...\n\"db1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 97 (db detach db1 srv2 --drop)",
+   "args": [
+    "db",
+    "detach",
+    "db1",
+    "srv2",
+    "--drop"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"db1\" is not running, so its data cannot be dropped - start it first, or detach without --drop\n"
+  },
+  {
+   "label": "step 98 (db detach db1 srv2)",
+   "args": [
+    "db",
+    "detach",
+    "db1",
+    "srv2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"srv2\" is detached from \"db1\"; database srv2 kept.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 99 (db remove srv2-db)",
+   "args": [
+    "db",
+    "remove",
+    "srv2-db"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed database \"srv2-db\" (files kept).\nServers that were attached: srv2 - update any plugin configs you configured manually.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 100 (db)",
+   "args": [
+    "db"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "DATABASE  STATUS    ENGINE                     PORT                        ATTACHED  UPTIME  DIR\ndb1       stopped   MariaDB 0.0.0-fake         47811                       -         -       <run>/data/services/db1\ne4        external  Redis (Garnet)             no-such-host.invalid:47824  -         -       -\nkvx       stopped   Redis (Garnet) 0.0.0-fake  47824                       -         -       <run>/data/services/kvx\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 101 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON  MEM  UPTIME  DIR\nsrv1  stopped  47900  -     1G   -       <run>/data/instances/srv1\nsrv2  stopped  47905  -     1G   -       <run>/data/instances/srv2\n\nDATABASE  STATUS    ENGINE                     PORT                        ATTACHED  UPTIME  DIR\ndb1       stopped   MariaDB 0.0.0-fake         47811                       -         -       <run>/data/services/db1\ne4        external  Redis (Garnet)             no-such-host.invalid:47824  -         -       -\nkvx       stopped   Redis (Garnet) 0.0.0-fake  47824                       -         -       <run>/data/services/kvx\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://cdn.mysql.com",
+   "method": "GET",
+   "url": "/Downloads/MySQL-8.4/mysql-8.4.11-winx64.zip",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.mysql.com",
+   "method": "GET",
+   "url": "/Downloads/MySQL-8.4/mysql-8.4.11-winx64.zip",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/engines/garnet-0.0.0-fake": {
+   "kind": "dir"
+  },
+  "data/engines/garnet-0.0.0-fake/GarnetServer.mjs": {
+   "kind": "file",
+   "text": "/**\r\n * Stands in for GarnetServer: takes the flags the real one takes, listens on loopback, speaks\r\n * enough of the Redis protocol for AUTH, PING, SAVE, SET/GET and SHUTDOWN, and says it is ready\r\n * the way Redis does. FAKE_GARNET_FAIL=start makes it die on the port the way a taken one does.\r\n */\r\nimport fs from 'node:fs'\r\nimport net from 'node:net'\r\nimport path from 'node:path'\r\n\r\nconst argv = process.argv\r\nconst flag = (k) => { const i = argv.indexOf(k); return i === -1 ? null : argv[i + 1] }\r\nconst port = Number(flag('--port'))\r\nconst bind = flag('--bind') ?? '127.0.0.1'\r\nconst password = flag('--password')\r\nconst checkpoints = flag('--checkpointdir')\r\nconst say = (l) => process.stdout.write(`[${new Date().toISOString()}] ${l}\\n`)\r\n\r\nsay(`fake Garnet starting: ${argv.slice(2).join(' ')}`)\r\nif (process.env.FAKE_GARNET_FAIL === 'start') {\r\n  process.stdout.write('Unhandled exception. System.Net.Sockets.SocketException: Address already in use\\n')\r\n  process.exit(1)\r\n}\r\n\r\nconst store = new Map()\r\nfunction parse(buf) {\r\n  if (!buf.startsWith('*')) return null\r\n  const nl = buf.indexOf('\\r\\n')\r\n  if (nl === -1) return null\r\n  const n = Number(buf.slice(1, nl))\r\n  let rest = buf.slice(nl + 2)\r\n  const items = []\r\n  for (let i = 0; i < n; i++) {\r\n    if (!rest.startsWith('$')) return null\r\n    const e = rest.indexOf('\\r\\n')\r\n    if (e === -1) return null\r\n    const len = Number(rest.slice(1, e))\r\n    if (rest.length < e + 2 + len + 2) return null\r\n    items.push(rest.slice(e + 2, e + 2 + len))\r\n    rest = rest.slice(e + 2 + len + 2)\r\n  }\r\n  return { items, rest }\r\n}\r\n\r\nconst server = net.createServer((socket) => {\r\n  let buf = ''\r\n  let authed = !password\r\n  socket.on('data', (c) => {\r\n    buf += c.toString()\r\n    for (;;) {\r\n      const r = parse(buf)\r\n      if (!r) break\r\n      buf = r.rest\r\n      const [cmd, ...args] = r.items\r\n      const op = String(cmd).toUpperCase()\r\n      if (op === 'AUTH') {\r\n        authed = args[args.length - 1] === password\r\n        socket.write(authed ? '+OK\\r\\n' : '-WRONGPASS invalid username-password pair\\r\\n')\r\n      } else if (!authed) {\r\n        socket.write('-NOAUTH Authentication required.\\r\\n')\r\n      } else if (op === 'PING') socket.write('+PONG\\r\\n')\r\n      else if (op === 'SET') { store.set(args[0], args[1]); socket.write('+OK\\r\\n') }\r\n      else if (op === 'GET') { const v = store.get(args[0]); socket.write(v == null ? '$-1\\r\\n' : `$${Buffer.byteLength(v)}\\r\\n${v}\\r\\n`) }\r\n      else if (op === 'SAVE' && checkpoints && fs.existsSync(path.join(checkpoints, 'fail-save'))) socket.write('-ERR checkpoint failed\\r\\n')\r\n      else if (op === 'SAVE') { if (checkpoints) { fs.mkdirSync(checkpoints, { recursive: true }); fs.writeFileSync(path.join(checkpoints, 'checkpoint.txt'), String(Date.now())) } socket.write('+OK\\r\\n') }\r\n      else if (op === 'SHUTDOWN') { say('User requested shutdown...'); socket.end(); setTimeout(() => process.exit(0), 50) }\r\n      else socket.write(`-ERR unknown command '${cmd}'\\r\\n`)\r\n    }\r\n  })\r\n  socket.on('error', () => {})\r\n})\r\nserver.listen(port, bind, () => setTimeout(() => say('Ready to accept connections'), 150))\r\nserver.on('error', (err) => { process.stdout.write(`Unhandled exception: ${err.message}\\n`); process.exit(1) })\r\nsetInterval(() => {}, 1 << 30)\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake": {
+   "kind": "dir"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin": {
+   "kind": "dir"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs": {
+   "kind": "file",
+   "text": "/** Stands in for mariadb-admin: `shutdown` over TCP. Refuses without a password in MYSQL_PWD. */\r\nimport net from 'node:net'\r\n\r\nconst port = Number(process.argv.find((a) => a.startsWith('--port='))?.slice(7))\r\nif (!process.env.MYSQL_PWD) {\r\n  process.stderr.write('fake admin: Access denied (no password)\\n')\r\n  process.exit(1)\r\n}\r\nif (process.argv.at(-1) !== 'shutdown') process.exit(2)\r\nconst s = net.createConnection(port, '127.0.0.1', () => s.write('shutdown\\n'))\r\ns.on('data', () => { s.end(); process.exit(0) })\r\ns.on('error', (e) => { process.stderr.write(`fake admin: ${e.message}\\n`); process.exit(1) })\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs": {
+   "kind": "file",
+   "text": "/** Stands in for mariadb-dump --databases <db>: asks the fake server for a dump and prints it. */\r\nimport net from 'node:net'\r\n\r\nconst argv = process.argv\r\nconst port = Number(argv.find((a) => a.startsWith('--port='))?.slice(7))\r\nconst db = argv[argv.indexOf('--databases') + 1]\r\nif (!process.env.MYSQL_PWD) {\r\n  process.stderr.write(\"fake dump: Access denied for user 'root'@'localhost'\\n\")\r\n  process.exit(1)\r\n}\r\nif (!db) process.exit(2)\r\nconst s = net.createConnection(port, '127.0.0.1', () => s.write(`dump ${Buffer.from(db).toString('base64')}\\n`))\r\nlet buf = ''\r\ns.on('data', (d) => { buf += d })\r\ns.on('end', () => {\r\n  const line = buf.trim()\r\n  if (!line.startsWith('ok ')) { process.stderr.write('fake dump: server refused\\n'); process.exit(1) }\r\n  process.stdout.write(Buffer.from(line.slice(3), 'base64').toString('utf8'))\r\n  process.exit(0)\r\n})\r\ns.on('error', (e) => { process.stderr.write(`fake dump: ${e.message}\\n`); process.exit(1) })\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs": {
+   "kind": "file",
+   "text": "/**\r\n * Stands in for mariadb-install-db: makes the data folder and records the root password in it,\r\n * which is where the other fakes look to check what the real tools check over the wire.\r\n */\r\nimport fs from 'node:fs'\r\nimport path from 'node:path'\r\n\r\nconst arg = (k) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3)\r\nconst datadir = arg('datadir')\r\nif (!datadir) {\r\n  process.stderr.write('fake install-db: --datadir is required\\n')\r\n  process.exit(2)\r\n}\r\nfs.mkdirSync(path.join(datadir, 'mysql'), { recursive: true })\r\nfs.writeFileSync(path.join(datadir, 'root.txt'), arg('password') ?? '')\r\nfs.writeFileSync(path.join(datadir, 'port.txt'), arg('port') ?? '')\r\nprocess.stdout.write('fake install-db: done\\n')\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs": {
+   "kind": "file",
+   "text": "/** Stands in for the mariadb client with --execute: ships the statements to the fake server. */\r\nimport net from 'node:net'\r\n\r\nconst argv = process.argv\r\nconst port = Number(argv.find((a) => a.startsWith('--port='))?.slice(7))\r\nconst at = argv.indexOf('--execute')\r\nif (!process.env.MYSQL_PWD) {\r\n  process.stderr.write(\"fake client: ERROR 1045 (28000): Access denied for user 'root'@'localhost'\\n\")\r\n  process.exit(1)\r\n}\r\n// --execute carries the statements; without it they arrive on stdin, the way an import does.\r\nconst text = at === -1 ? await new Promise((resolve) => { let b = ''; process.stdin.on('data', (c) => { b += c }); process.stdin.on('end', () => resolve(b)) }) : argv[at + 1]\r\nconst s = net.createConnection(port, '127.0.0.1', () => s.write(`sql ${Buffer.from(text).toString('base64')}\\n`))\r\ns.on('data', (d) => { s.end(); process.exit(String(d).startsWith('ok') ? 0 : 1) })\r\ns.on('error', (e) => { process.stderr.write(`fake client: ERROR 2002: Can't connect (${e.message})\\n`); process.exit(1) })\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs": {
+   "kind": "file",
+   "text": "/**\r\n * Stands in for mariadbd --console: reads the port and data folder from the ini, listens on\r\n * loopback, says \"ready for connections\" on stderr the way the real one does, takes no stdin,\r\n * and speaks a one-line protocol the fake admin and client use:\r\n *\r\n *   shutdown          exit 0 after saying so (and a line in <datadir>/fake-shutdowns.log, which\r\n *                     outlives the console log a restart starts again)\r\n *   sql <base64>      append the statements to <datadir>/sql.log, answer \"ok\"\r\n *   dump <base64 db>  answer \"ok <base64 dump text>\" and close, the way a dump streams\r\n *\r\n * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does.\r\n * FAKE_MARIADB_STABLE_DUMP=1 leaves the time out of a dump, so two runs dump the same bytes.\r\n */\r\nimport fs from 'node:fs'\r\nimport net from 'node:net'\r\nimport path from 'node:path'\r\n\r\nconst ini = process.argv.find((a) => a.startsWith('--defaults-file='))?.slice('--defaults-file='.length)\r\nconst text = ini ? fs.readFileSync(ini, 'utf8') : ''\r\nconst port = Number(/^port=(\\d+)/m.exec(text)?.[1])\r\nconst datadir = /^datadir=(.+)$/m.exec(text)?.[1]?.trim()\r\nconst note = (line) => process.stderr.write(`<time> 0 [Note] mariadbd: ${line}\\n`)\r\n\r\nnote(`Starting fake MariaDB ${process.argv.slice(2).join(' ')}`)\r\nif (process.env.FAKE_MARIADB_FAIL === 'start') {\r\n  process.stderr.write(\"<time> 0 [ERROR] Can't start server: Bind on TCP/IP port. Got error: 10048\\n\")\r\n  process.stderr.write('<time> 0 [ERROR] Aborting\\n')\r\n  process.exit(1)\r\n}\r\n\r\nconst server = net.createServer((socket) => {\r\n  let buf = ''\r\n  socket.on('data', (c) => {\r\n    buf += c.toString()\r\n    let nl\r\n    while ((nl = buf.indexOf('\\n')) !== -1) {\r\n      const line = buf.slice(0, nl).trim()\r\n      buf = buf.slice(nl + 1)\r\n      if (line === 'shutdown') {\r\n        note('Normal shutdown')\r\n        try {\r\n          fs.appendFileSync(path.join(datadir, 'fake-shutdowns.log'), JSON.stringify({ pid: process.pid, at: Date.now() }) + '\\n')\r\n        } catch {\r\n          /* the console line is the evidence then */\r\n        }\r\n        socket.end('ok\\n')\r\n        setTimeout(() => process.exit(0), 50)\r\n      } else if (line.startsWith('sql ')) {\r\n        const sql = Buffer.from(line.slice(4), 'base64').toString('utf8')\r\n        fs.appendFileSync(path.join(datadir, 'sql.log'), sql + '\\n')\r\n        socket.write('ok\\n')\r\n      } else if (line.startsWith('dump ')) {\r\n        const db = Buffer.from(line.slice(5), 'base64').toString('utf8')\r\n        const text = `-- MariaDB dump (fake) of ${db}\\nCREATE DATABASE IF NOT EXISTS \\`${db}\\`;\\nUSE \\`${db}\\`;\\n${process.env.FAKE_MARIADB_STABLE_DUMP === '1' ? '' : `-- dumped at ${Date.now()}\\n`}`\r\n        socket.end(`ok ${Buffer.from(text).toString('base64')}\\n`)\r\n      } else {\r\n        socket.write('error unknown\\n')\r\n      }\r\n    }\r\n  })\r\n  socket.on('error', () => {})\r\n})\r\nserver.listen(port, '127.0.0.1', () => setTimeout(() => note('ready for connections.'), 150))\r\nserver.on('error', (err) => {\r\n  process.stderr.write(`<time> 0 [ERROR] Can't start server: ${err.message}\\n`)\r\n  process.exit(1)\r\n})\r\nsetInterval(() => {}, 1 << 30)\r\n"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances/srv1": {
+   "kind": "dir"
+  },
+  "data/instances/srv2": {
+   "kind": "dir"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv1\": {\n      \"dir\": \"<run>/data/instances/srv1\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47900,\n      \"label\": \"Survival\"\n    },\n    \"srv2\": {\n      \"dir\": \"<run>/data/instances/srv2\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47905\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47811,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw-test\"\n      },\n      \"attachments\": {}\n    },\n    \"kvx\": {\n      \"kind\": \"database\",\n      \"engine\": \"garnet\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/kvx\",\n      \"port\": 47824,\n      \"root\": {\n        \"password\": \"pw-kv\"\n      },\n      \"attachments\": {}\n    },\n    \"e4\": {\n      \"kind\": \"database\",\n      \"engine\": \"garnet\",\n      \"external\": true,\n      \"host\": \"no-such-host.invalid\",\n      \"port\": 47824,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw-kv\"\n      },\n      \"attachments\": {},\n      \"createdAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/services/db1": {
+   "kind": "dir"
+  },
+  "data/services/db1/data": {
+   "kind": "dir"
+  },
+  "data/services/db1/data/mysql": {
+   "kind": "dir"
+  },
+  "data/services/db1/data/sql.log": {
+   "kind": "file",
+   "text": "CREATE DATABASE IF NOT EXISTS `srv1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\nCREATE USER IF NOT EXISTS 'srv1'@'localhost' IDENTIFIED BY '<password>';\nCREATE USER IF NOT EXISTS 'srv1'@'127.0.0.1' IDENTIFIED BY '<password>';\nALTER USER 'srv1'@'localhost' IDENTIFIED BY '<password>';\nALTER USER 'srv1'@'127.0.0.1' IDENTIFIED BY '<password>';\nGRANT ALL PRIVILEGES ON `srv1`.* TO 'srv1'@'localhost', 'srv1'@'127.0.0.1';\nFLUSH PRIVILEGES;\nCREATE DATABASE IF NOT EXISTS `srv1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\nCREATE USER IF NOT EXISTS 'srv1'@'localhost' IDENTIFIED BY '<password>';\nCREATE USER IF NOT EXISTS 'srv1'@'127.0.0.1' IDENTIFIED BY '<password>';\nALTER USER 'srv1'@'localhost' IDENTIFIED BY '<password>';\nALTER USER 'srv1'@'127.0.0.1' IDENTIFIED BY '<password>';\nGRANT ALL PRIVILEGES ON `srv1`.* TO 'srv1'@'localhost', 'srv1'@'127.0.0.1';\nFLUSH PRIVILEGES;\nDROP USER IF EXISTS 'srv1'@'localhost', 'srv1'@'127.0.0.1';\nFLUSH PRIVILEGES;\nCREATE DATABASE IF NOT EXISTS `srv1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\nCREATE USER IF NOT EXISTS 'srv1'@'localhost' IDENTIFIED BY '<password>';\nCREATE USER IF NOT EXISTS 'srv1'@'127.0.0.1' IDENTIFIED BY '<password>';\nALTER USER 'srv1'@'localhost' IDENTIFIED BY '<password>';\nALTER USER 'srv1'@'127.0.0.1' IDENTIFIED BY '<password>';\nGRANT ALL PRIVILEGES ON `srv1`.* TO 'srv1'@'localhost', 'srv1'@'127.0.0.1';\nFLUSH PRIVILEGES;\nDROP USER IF EXISTS 'srv1'@'localhost', 'srv1'@'127.0.0.1';\nDROP DATABASE IF EXISTS `srv1`;\nFLUSH PRIVILEGES;\nSELECT 1;\nCREATE DATABASE IF NOT EXISTS `srv2` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\nCREATE USER IF NOT EXISTS 'srv2'@'localhost' IDENTIFIED BY '<password>';\nCREATE USER IF NOT EXISTS 'srv2'@'127.0.0.1' IDENTIFIED BY '<password>';\nALTER USER 'srv2'@'localhost' IDENTIFIED BY '<password>';\nALTER USER 'srv2'@'127.0.0.1' IDENTIFIED BY '<password>';\nGRANT ALL PRIVILEGES ON `srv2`.* TO 'srv2'@'localhost', 'srv2'@'127.0.0.1';\nFLUSH PRIVILEGES;\nSELECT 1;\nCREATE DATABASE IF NOT EXISTS `srv2` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\nCREATE USER IF NOT EXISTS 'srv2'@'localhost' IDENTIFIED BY '<password>';\nCREATE USER IF NOT EXISTS 'srv2'@'127.0.0.1' IDENTIFIED BY '<password>';\nALTER USER 'srv2'@'localhost' IDENTIFIED BY '<password>';\nALTER USER 'srv2'@'127.0.0.1' IDENTIFIED BY '<password>';\nGRANT ALL PRIVILEGES ON `srv2`.* TO 'srv2'@'localhost', 'srv2'@'127.0.0.1';\nFLUSH PRIVILEGES;\n"
+  },
+  "data/services/db1/my.ini": {
+   "kind": "file",
+   "text": "[mysqld]\ndatadir=<run>/data/services/db1/data\nport=47811\nbind-address=127.0.0.1\n"
+  },
+  "data/services/kvx": {
+   "kind": "dir"
+  },
+  "data/services/kvx/data": {
+   "kind": "dir"
+  },
+  "data/services/srv2-db": {
+   "kind": "dir"
+  },
+  "data/services/srv2-db/data": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

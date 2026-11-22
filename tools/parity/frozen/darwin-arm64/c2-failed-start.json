@@ -1,0 +1,160 @@
+{
+ "about": "What the Node core did in scenario c2-failed-start on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c2-failed-start",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 13 (start bad2 --timeout 30)",
+   "args": [
+    "start",
+    "bad2",
+    "--timeout",
+    "30"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"bad2\"...\nServer did not reach ready state: Failed to start the minecraft server\n\nLast 25 console lines:\n  [00:00:00 INFO]: Starting minecraft server (fake) with -Xms1G -Xmx1G -Dterminal.jline=false -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true -jar server.jar --nogui\n  [00:00:00 INFO]: Failed to start the minecraft server\n  \n  [spawnloft] server process exited (code=1)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (start db2 --timeout 30)",
+   "args": [
+    "start",
+    "db2",
+    "--timeout",
+    "30"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"db2\"...\nServer did not reach ready state: [ERROR] Can't start server\n\nLast 25 console lines:\n  <time> 0 [Note] mariadbd: Starting fake MariaDB --defaults-file=<run>/data/services/db2/my.ini --console\n  <time> 0 [ERROR] Can't start server: Bind on TCP/IP port. Got error: 10048\n  <time> 0 [ERROR] Aborting\n  \n  [spawnloft] server process exited (code=1)\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines/mariadb-0.0.0-fake": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/** Stands in for mariadb-admin: `shutdown` over TCP. Refuses without a password in MYSQL_PWD. */\nimport net from 'node:net'\n\nconst port = Number(process.argv.find((a) => a.startsWith('--port='))?.slice(7))\nif (!process.env.MYSQL_PWD) {\n  process.stderr.write('fake admin: Access denied (no password)\\n')\n  process.exit(1)\n}\nif (process.argv.at(-1) !== 'shutdown') process.exit(2)\nconst s = net.createConnection(port, '127.0.0.1', () => s.write('shutdown\\n'))\ns.on('data', () => { s.end(); process.exit(0) })\ns.on('error', (e) => { process.stderr.write(`fake admin: ${e.message}\\n`); process.exit(1) })\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/**\n * Stands in for mariadbd --console: reads the port and data folder from the ini, listens on\n * loopback, says \"ready for connections\" on stderr the way the real one does, takes no stdin,\n * and speaks a one-line protocol the fake admin and client use:\n *\n *   shutdown          exit 0 after saying so (and a line in <datadir>/fake-shutdowns.log, which\n *                     outlives the console log a restart starts again)\n *   sql <base64>      append the statements to <datadir>/sql.log, answer \"ok\"\n *   dump <base64 db>  answer \"ok <base64 dump text>\" and close, the way a dump streams\n *\n * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does.\n * FAKE_MARIADB_STABLE_DUMP=1 leaves the time out of a dump, so two runs dump the same bytes.\n */\nimport fs from 'node:fs'\nimport net from 'node:net'\nimport path from 'node:path'\n\nconst ini = process.argv.find((a) => a.startsWith('--defaults-file='))?.slice('--defaults-file='.length)\nconst text = ini ? fs.readFileSync(ini, 'utf8') : ''\nconst port = Number(/^port=(\\d+)/m.exec(text)?.[1])\nconst datadir = /^datadir=(.+)$/m.exec(text)?.[1]?.trim()\nconst note = (line) => process.stderr.write(`<time> 0 [Note] mariadbd: ${line}\\n`)\n\nnote(`Starting fake MariaDB ${process.argv.slice(2).join(' ')}`)\nif (process.env.FAKE_MARIADB_FAIL === 'start') {\n  process.stderr.write(\"<time> 0 [ERROR] Can't start server: Bind on TCP/IP port. Got error: 10048\\n\")\n  process.stderr.write('<time> 0 [ERROR] Aborting\\n')\n  process.exit(1)\n}\n\nconst server = net.createServer((socket) => {\n  let buf = ''\n  socket.on('data', (c) => {\n    buf += c.toString()\n    let nl\n    while ((nl = buf.indexOf('\\n')) !== -1) {\n      const line = buf.slice(0, nl).trim()\n      buf = buf.slice(nl + 1)\n      if (line === 'shutdown') {\n        note('Normal shutdown')\n        try {\n          fs.appendFileSync(path.join(datadir, 'fake-shutdowns.log'), JSON.stringify({ pid: process.pid, at: Date.now() }) + '\\n')\n        } catch {\n          /* the console line is the evidence then */\n        }\n        socket.end('ok\\n')\n        setTimeout(() => process.exit(0), 50)\n      } else if (line.startsWith('sql ')) {\n        const sql = Buffer.from(line.slice(4), 'base64').toString('utf8')\n        fs.appendFileSync(path.join(datadir, 'sql.log'), sql + '\\n')\n        socket.write('ok\\n')\n      } else if (line.startsWith('dump ')) {\n        const db = Buffer.from(line.slice(5), 'base64').toString('utf8')\n        const text = `-- MariaDB dump (fake) of ${db}\\nCREATE DATABASE IF NOT EXISTS \\`${db}\\`;\\nUSE \\`${db}\\`;\\n${process.env.FAKE_MARIADB_STABLE_DUMP === '1' ? '' : `-- dumped at ${Date.now()}\\n`}`\n        socket.end(`ok ${Buffer.from(text).toString('base64')}\\n`)\n      } else {\n        socket.write('error unknown\\n')\n      }\n    }\n  })\n  socket.on('error', () => {})\n})\nserver.listen(port, '127.0.0.1', () => setTimeout(() => note('ready for connections.'), 150))\nserver.on('error', (err) => {\n  process.stderr.write(`<time> 0 [ERROR] Can't start server: ${err.message}\\n`)\n  process.exit(1)\n})\nsetInterval(() => {}, 1 << 30)\n"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/bad1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/bad1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/bad1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/bad1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=47823\nenable-rcon=true\nrcon.port=47824\nrcon.password=t\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances/bad2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/bad2/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/bad2/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/bad2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=47825\nenable-rcon=true\nrcon.port=47826\nrcon.password=t\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"bad1\": {\n      \"dir\": \"<run>/data/instances/bad1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47823,\n      \"rcon\": {\n        \"port\": 47824,\n        \"password\": \"t\"\n      }\n    },\n    \"bad2\": {\n      \"dir\": \"<run>/data/instances/bad2\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47825,\n      \"rcon\": {\n        \"port\": 47826,\n        \"password\": \"t\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47821,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw\"\n      }\n    },\n    \"db2\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/db2\",\n      \"port\": 47822,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db1/data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db1/my.ini": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[mysqld]\ndatadir=<run>/data/services/db1/data\nport=47821\nbind-address=127.0.0.1\n"
+  },
+  "data/services/db2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db2/data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db2/my.ini": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[mysqld]\ndatadir=<run>/data/services/db2/data\nport=47822\nbind-address=127.0.0.1\n"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

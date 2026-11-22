@@ -158,7 +158,7 @@
   "data/instances.json": {
    "kind": "file",
    "mode": "600",
-   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47781,\n      \"rcon\": {\n        \"port\": 47791,\n        \"password\": \"test\"\n      }\n    },\n    \"cl1\": {\n      \"dir\": \"<run>/data/instances/cl1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"java\",\n      \"memory\": \"1G\",\n      \"loader\": \"paper\",\n      \"port\": 47782,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"run1\",\n        \"withWorlds\": false\n      }\n    }\n  }\n}\n"
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47781,\n      \"rcon\": {\n        \"port\": 47791,\n        \"password\": \"test\"\n      }\n    },\n    \"cl1\": {\n      \"dir\": \"<run>/data/instances/cl1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"/usr/lib/jvm/temurin-25-jdk-amd64/bin/java\",\n      \"memory\": \"1G\",\n      \"loader\": \"paper\",\n      \"port\": 47782,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"run1\",\n        \"withWorlds\": false\n      }\n    }\n  }\n}\n"
   },
   "data/jars": {
    "kind": "dir",

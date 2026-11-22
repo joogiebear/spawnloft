@@ -1,0 +1,302 @@
+{
+ "about": "What the Node core did in scenario c6-maintenance on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c6-maintenance",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 37 (task add alpha --daily 04:00)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "04:00"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"alpha-backup\" - Take a backup, daily 04:00.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (repair)",
+   "args": [
+    "repair"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Rewrote 1 task shim(s) and the launchers of 3 server(s) for <exe>.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (repair --json)",
+   "args": [
+    "repair",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":1,\"launchers\":3,\"runtime\":\"<runtime>\",\"root\":\"<code folder>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (repair extra)",
+   "args": [
+    "repair",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft repair [--json]\n"
+  },
+  {
+   "label": "step 41 (repair --bogus)",
+   "args": [
+    "repair",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 42 (uninstall)",
+   "args": [
+    "uninstall"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: uninstall stops every server and removes every scheduled task; with --data it also deletes\n  the servers this program created, jars, backups, templates and settings.\n  Add --yes to go ahead. The desktop app's uninstaller runs this for you.\n"
+  },
+  {
+   "label": "step 43 (uninstall --data)",
+   "args": [
+    "uninstall",
+    "--data"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: uninstall stops every server and removes every scheduled task; with --data it also deletes\n  the servers this program created, jars, backups, templates and settings.\n  Add --yes to go ahead. The desktop app's uninstaller runs this for you.\n"
+  },
+  {
+   "label": "step 44 (start live)",
+   "args": [
+    "start",
+    "live"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"live\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47882   rcon 47892\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (uninstall --yes)",
+   "args": [
+    "uninstall",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "stopping live\nremoving scheduled tasks\nStopped: live\nScheduled tasks removed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (status live)",
+   "args": [
+    "status",
+    "live"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:        live\nlabel:           (none)\nstatus:          stopped\ndirectory:       <run>/data/instances/live\njar:             server.jar\nmemory:          1G\njava:            <repo>/test/fixtures/fake-java.mjs\nport:            47882\nrcon port:       47892\nlevel-name:      (unset)\nmotd:            live\nonline-mode:     (unset)\nlast exit code:  0\nconsole log:     <run>/data/run/live/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (task add alpha --daily 05:00)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "05:00"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"alpha-backup\" - Take a backup, daily 05:00.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (uninstall --yes --data)",
+   "args": [
+    "uninstall",
+    "--yes",
+    "--data"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "removing scheduled tasks\ndeleting <run>/data/instances/alpha\ndeleting <run>/data/instances/live\ndeleting <run>/data/jars\ndeleting <run>/data/templates\ndeleting <run>/data/run\ndeleting <run>/data/engines\ndeleting <run>/data/tasks\ndeleting <run>/data/instances.json\ndeleting <run>/home/AppData/Roaming/spawnloft/settings.json\ndeleting <run>/home/AppData/Roaming/mcctl/settings.json\ndeleting <run>/home/AppData/Roaming/mcctl-desktop\ndeleting <run>/mybackups/alpha/.snapshot.lock\ndeleting <run>/mybackups/alpha/standard_<stamp>.tar.gz\ndeleting <run>/mybackups/alpha/standard_<stamp>.json\ndeleting <run>/mybackups/alpha/standard_<stamp>.tar.gz.pending\ndeleting <run>/mybackups/alpha/exports/alpha_<stamp>.zip\ndeleting <run>/mybackups/alpha/exports/alpha_<stamp>_2.LOG\ndeleting <run>/mybackups/client/client_<stamp>.tar.gz\ndeleting <run>/mybackups/mydb/mydb_<stamp>.sql\ndeleting <run>/mybackups/mydb/mydb_<stamp>.json\ndeleting <run>/mybackups/stranger/old.tar.gz\ndeleting <run>/mybackups/stranger/old.json\nScheduled tasks removed.\nDeleted 22 item(s).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/data.\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "text": "{\"at\":\"<time>\",\"server\":\"alpha\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"live\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"live\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"alpha\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"alpha\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"alpha\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/schedules.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"tasks\": {}\n}\n"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "elsewhere": {
+   "kind": "dir"
+  },
+  "elsewhere/kept": {
+   "kind": "dir"
+  },
+  "elsewhere/kept/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle kept console - SpawnLoft\n\"<core>\" console kept\npause\n"
+  },
+  "elsewhere/kept/server.jar": {
+   "kind": "file",
+   "text": ""
+  },
+  "elsewhere/kept/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle kept - SpawnLoft\n\"<core>\" start kept\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console kept\n"
+  },
+  "elsewhere/kept/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle kept - SpawnLoft\n\"<core>\" stop kept\npause\n"
+  },
+  "elsewhere/kept/world": {
+   "kind": "dir"
+  },
+  "elsewhere/kept/world/level.dat": {
+   "kind": "file",
+   "text": "w"
+  },
+  "home": {
+   "kind": "dir"
+  },
+  "home/.config": {
+   "kind": "dir"
+  },
+  "home/.config/OtherApp": {
+   "kind": "dir"
+  },
+  "home/.config/OtherApp/window-state.json": {
+   "kind": "file",
+   "text": "{\n  \"x\": 1\n}\n"
+  },
+  "home/.config/mcctl": {
+   "kind": "dir"
+  },
+  "home/.config/mcctl/settings.json": {
+   "kind": "file",
+   "text": "{}\n"
+  },
+  "home/.config/mcctl-desktop": {
+   "kind": "dir"
+  },
+  "home/.config/mcctl-desktop/window-state.json": {
+   "kind": "file",
+   "text": "{\n  \"x\": 1\n}\n"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir"
+  },
+  "home/.config/spawnloft/settings.json": {
+   "kind": "file",
+   "text": "{\n  \"backupsDir\": \"<run>/mybackups\"\n}\n"
+  },
+  "home/AppData": {
+   "kind": "dir"
+  },
+  "home/AppData/Roaming": {
+   "kind": "dir"
+  },
+  "mybackups": {
+   "kind": "dir"
+  },
+  "mybackups/alpha": {
+   "kind": "dir"
+  },
+  "mybackups/alpha/exports": {
+   "kind": "dir"
+  },
+  "mybackups/alpha/exports/keep.zip": {
+   "kind": "file",
+   "text": "z"
+  },
+  "mybackups/alpha/notes.txt": {
+   "kind": "file",
+   "text": "mine"
+  },
+  "mybackups/loose.tar.gz": {
+   "kind": "file",
+   "tar": ""
+  },
+  "mybackups/stranger": {
+   "kind": "dir"
+  },
+  "mybackups/stranger/.snapshot.lock": {
+   "kind": "file",
+   "text": ""
+  },
+  "mybackups/stranger/standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "tar": ""
+  },
+  "scheduler": {
+   "kind": "dir"
+  },
+  "scheduler/calls.log": {
+   "kind": "file",
+   "text": "schtasks /Create /TN mcctl\\alpha-backup /TR \"<run>/data/tasks/alpha-backup.cmd\" /SC DAILY /ST 04:00 /F\nschtasks /Delete /TN mcctl\\alpha-backup /F\npowershell -NoProfile -NonInteractive -Command \"$s = New-Object -ComObject Schedule.Service; $s.Connect(); $s.GetFolder('\\\\').DeleteFolder('mcctl', 0)\"\nschtasks /Create /TN mcctl\\alpha-backup /TR \"<run>/data/tasks/alpha-backup.cmd\" /SC DAILY /ST 05:00 /F\nschtasks /Delete /TN mcctl\\alpha-backup /F\npowershell -NoProfile -NonInteractive -Command \"$s = New-Object -ComObject Schedule.Service; $s.Connect(); $s.GetFolder('\\\\').DeleteFolder('mcctl', 0)\"\n"
+  },
+  "scheduler/state.json": {
+   "kind": "file",
+   "text": "{\n  \"windows\": {}\n}\n"
+  }
+ }
+}

@@ -1,0 +1,877 @@
+{
+ "about": "What the Node core did in scenario c2-lifecycle on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c2-lifecycle",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 10 (start)",
+   "args": [
+    "start"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: start requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 11 (start nope)",
+   "args": [
+    "start",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"nope\"...\n",
+   "stderr": "error: no instance named \"nope\". Known instances: run1, noeula, nojar, bad1, db1\n"
+  },
+  {
+   "label": "step 12 (start noeula)",
+   "args": [
+    "start",
+    "noeula"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"noeula\"...\n",
+   "stderr": "error: EULA not accepted for \"noeula\".\n  Read https://aka.ms/MinecraftEULA then set eula=true in <run>/data/instances/noeula/eula.txt\n  or re-create the instance with --accept-eula.\n"
+  },
+  {
+   "label": "step 13 (start nojar)",
+   "args": [
+    "start",
+    "nojar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"nojar\"...\n",
+   "stderr": "error: server jar not found for \"nojar\": <run>/data/instances/nojar/server.jar\n"
+  },
+  {
+   "label": "step 14 (start run1 --json)",
+   "args": [
+    "start",
+    "run1",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"start\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for start; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" was not running.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (stop)",
+   "args": [
+    "stop"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: stop requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 17 (kill run1)",
+   "args": [
+    "kill",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" was not running.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (kill)",
+   "args": [
+    "kill"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: kill requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 19 (restart)",
+   "args": [
+    "restart"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: restart requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 20 (cmd run1)",
+   "args": [
+    "cmd",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: cmd requires a command, e.g. spawnloft cmd survival \"tps\"\n"
+  },
+  {
+   "label": "step 21 (cmd run1   )",
+   "args": [
+    "cmd",
+    "run1",
+    "  "
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: cmd requires a command, e.g. spawnloft cmd survival \"tps\"\n"
+  },
+  {
+   "label": "step 22 (cmd run1 tps)",
+   "args": [
+    "cmd",
+    "run1",
+    "tps"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"run1\" is not running\n"
+  },
+  {
+   "label": "step 23 (cmd nope tps)",
+   "args": [
+    "cmd",
+    "nope",
+    "tps"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: run1, noeula, nojar, bad1, db1\n"
+  },
+  {
+   "label": "step 24 (rcon)",
+   "args": [
+    "rcon"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: cmd requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 25 (send run1)",
+   "args": [
+    "send",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: send requires a line to write to the server console\n"
+  },
+  {
+   "label": "step 26 (send run1 hello)",
+   "args": [
+    "send",
+    "run1",
+    "hello"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"run1\" is not running\n"
+  },
+  {
+   "label": "step 27 (players run1)",
+   "args": [
+    "players",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"run1\" is not running\n"
+  },
+  {
+   "label": "step 28 (players nope)",
+   "args": [
+    "players",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: run1, noeula, nojar, bad1, db1\n"
+  },
+  {
+   "label": "step 29 (console run1)",
+   "args": [
+    "console",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"run1\" is not running\n"
+  },
+  {
+   "label": "step 30 (attach nope)",
+   "args": [
+    "attach",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: run1, noeula, nojar, bad1, db1\n"
+  },
+  {
+   "label": "step 31 (props run1)",
+   "args": [
+    "props",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "max-players:  20\nmotd:         A Minecraft Server\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (props run1 motd=Hello = there 9=nine new-key= max-players=5 max-players=6)",
+   "args": [
+    "props",
+    "run1",
+    "motd=Hello = there",
+    "9=nine",
+    "new-key=",
+    "max-players=5",
+    "max-players=6"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated <run>/data/instances/run1/server.properties:\n  9=nine\n  motd=Hello = there\n  new-key=\n  max-players=6\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (props run1 broken)",
+   "args": [
+    "props",
+    "run1",
+    "broken"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: malformed assignment \"broken\" - expected key=value\n"
+  },
+  {
+   "label": "step 34 (props run1)",
+   "args": [
+    "props",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "9:            nine\nmax-players:  6\nmotd:         Hello = there\nnew-key:\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (props nope)",
+   "args": [
+    "props",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: run1, noeula, nojar, bad1, db1\n"
+  },
+  {
+   "label": "step 36 (set run1)",
+   "args": [
+    "set",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: set requires key=value pairs, e.g. spawnloft set survival memory=8G\n"
+  },
+  {
+   "label": "step 37 (set run1 memory)",
+   "args": [
+    "set",
+    "run1",
+    "memory"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: malformed assignment \"memory\" - expected key=value\n"
+  },
+  {
+   "label": "step 38 (set run1 memory=)",
+   "args": [
+    "set",
+    "run1",
+    "memory="
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: malformed assignment \"memory=\" - expected key=value\n"
+  },
+  {
+   "label": "step 39 (set run1 colour=red)",
+   "args": [
+    "set",
+    "run1",
+    "colour=red"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: unknown setting \"colour\" - one of: label, memory, java, jar, port, rcon.port, rcon.password, auto-restart, webhook\n"
+  },
+  {
+   "label": "step 40 (set run1 port=abc)",
+   "args": [
+    "set",
+    "run1",
+    "port=abc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: NaN is not a port number - use 1 to 65535\n"
+  },
+  {
+   "label": "step 41 (set run1 port=0)",
+   "args": [
+    "set",
+    "run1",
+    "port=0"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: 0 is not a port number - use 1 to 65535\n"
+  },
+  {
+   "label": "step 42 (set run1 port=1.5)",
+   "args": [
+    "set",
+    "run1",
+    "port=1.5"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: 1.5 is not a port number - use 1 to 65535\n"
+  },
+  {
+   "label": "step 43 (set run1 port=47781)",
+   "args": [
+    "set",
+    "run1",
+    "port=47781"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: port 47781 is already used by \"db1\"\n"
+  },
+  {
+   "label": "step 44 (set run1 rcon.port=47762)",
+   "args": [
+    "set",
+    "run1",
+    "rcon.port=47762"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: port 47762 is already used by \"noeula\"\n"
+  },
+  {
+   "label": "step 45 (set run1 auto-restart=maybe)",
+   "args": [
+    "set",
+    "run1",
+    "auto-restart=maybe"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: auto-restart takes on or off\n"
+  },
+  {
+   "label": "step 46 (set run1 webhook=ftp://example.com/x)",
+   "args": [
+    "set",
+    "run1",
+    "webhook=ftp://example.com/x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"ftp://example.com/x\" is not an http(s) URL - paste the one Discord gives you\n"
+  },
+  {
+   "label": "step 47 (set run1 webhook=not a url)",
+   "args": [
+    "set",
+    "run1",
+    "webhook=not a url"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"not a url\" is not an http(s) URL - paste the one Discord gives you\n"
+  },
+  {
+   "label": "step 48 (set run1 jar=missing.jar)",
+   "args": [
+    "set",
+    "run1",
+    "jar=missing.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: server jar \"missing.jar\" is not in <run>/data/jars.\n  Stored jars: paper-1.21.4-100.jar\n  Download one with \"spawnloft paper fetch <version>\" or add one with \"spawnloft jars import <path>\".\n"
+  },
+  {
+   "label": "step 49 (set nope memory=2G)",
+   "args": [
+    "set",
+    "nope",
+    "memory=2G"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: run1, noeula, nojar, bad1, db1\n"
+  },
+  {
+   "label": "step 50 (set run1 label=  My \t Server   memory=2G rcon.password=secret rcon.password=test auto-restart=ON webhook=https://discord.com/api/webhooks/1/abc java={repo}/test/fixtures/fake-java.mjs)",
+   "args": [
+    "set",
+    "run1",
+    "label=  My \t Server  ",
+    "memory=2G",
+    "rcon.password=secret",
+    "rcon.password=test",
+    "auto-restart=ON",
+    "webhook=https://discord.com/api/webhooks/1/abc",
+    "java={repo}/test/fixtures/fake-java.mjs"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"run1\":\n  label = My Server\n  memory = 2G\n  rcon = {\"port\":47771,\"password\":\"test\"}\n  autoRestart = true\n  webhook = https://discord.com/api/webhooks/1/abc\n  java = <repo>/test/fixtures/fake-java.mjs\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (set run1 label=off webhook=off auto-restart=false port=47761 rcon.port=47771)",
+   "args": [
+    "set",
+    "run1",
+    "label=off",
+    "webhook=off",
+    "auto-restart=false",
+    "port=47761",
+    "rcon.port=47771"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"run1\":\n  label = null\n  webhook = null\n  autoRestart = false\n  port = 47761\n  rcon = {\"port\":47771,\"password\":\"test\"}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (set run1 jar=paper-1.21.4-100.jar)",
+   "args": [
+    "set",
+    "run1",
+    "jar=paper-1.21.4-100.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"run1\":\n  jar = paper-1.21.4-100.jar\n\n2 older jar(s) left in <run>/data/instances/run1:\n  old-server.jar  3 B\n  server.jar  0 B\nKept on purpose - they are how you go back. Delete them when you are sure.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (set run1 jar=server.jar)",
+   "args": [
+    "set",
+    "run1",
+    "jar=server.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"run1\":\n  jar = server.jar\n\n2 older jar(s) left in <run>/data/instances/run1:\n  old-server.jar  3 B\n  paper-1.21.4-100.jar  7 B\nKept on purpose - they are how you go back. Delete them when you are sure.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47761   rcon 47771\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 56 (start run1)",
+   "args": [
+    "start",
+    "run1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\n",
+   "stderr": "error: instance \"run1\" is already running (java pid <pid>)\n"
+  },
+  {
+   "label": "step 57 (cmd run1 tps)",
+   "args": [
+    "cmd",
+    "run1",
+    "tps"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "TPS from last 1m, 5m, 15m: *20.0, *20.0, *20.0\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (cmd run1 tps --raw)",
+   "args": [
+    "cmd",
+    "run1",
+    "tps",
+    "--raw"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "§6TPS from last 1m, 5m, 15m: §a*20.0§r, §a*20.0§r, §a*20.0\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (rcon run1 say nothing)",
+   "args": [
+    "rcon",
+    "run1",
+    "say",
+    "nothing"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "(no output)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (players run1)",
+   "args": [
+    "players",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "There are 0 of a max of 20 players online:\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (send run1 hello there)",
+   "args": [
+    "send",
+    "run1",
+    "hello",
+    "there"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "> hello there\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (send run1  )",
+   "args": [
+    "send",
+    "run1",
+    " "
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: send requires a line to write to the server console\n"
+  },
+  {
+   "label": "step 63 (console run1)",
+   "args": [
+    "console",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "--- attached to \"run1\" (ctrl-c or \"/detach\" to leave; the server keeps running) ---\n[00:00:00 INFO]: Starting minecraft server (fake) with -Xms2G -Xmx2G -Dterminal.jline=false -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true -jar server.jar --nogui\n[00:00:00 INFO]: Done (0.042s)! For help, type \"help\"\n[00:00:00 INFO]: fake got: hello there\n--- detached from \"run1\" (still running) ---\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (set run1 memory=1G)",
+   "args": [
+    "set",
+    "run1",
+    "memory=1G"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"run1\":\n  memory = 1G\nRestart the instance for changes to take effect.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 65 (props run1 motd=Up)",
+   "args": [
+    "props",
+    "run1",
+    "motd=Up"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated <run>/data/instances/run1/server.properties:\n  motd=Up\nRestart the instance for changes to take effect.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 66 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (restart run1 --timeout 60)",
+   "args": [
+    "restart",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47761   rcon 47771\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (restart run1 --timeout 60)",
+   "args": [
+    "restart",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\nStarting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47761   rcon 47771\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 69 (kill run1)",
+   "args": [
+    "kill",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" force-killed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 70 (kill run1)",
+   "args": [
+    "kill",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" was not running.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 71 (start run1 --no-wait)",
+   "args": [
+    "start",
+    "run1",
+    "--no-wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nLaunched (java pid <pid>). Not waiting for ready.\nFollow with: spawnloft logs run1 -f\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 72 (stop run1 --timeout 30)",
+   "args": [
+    "stop",
+    "run1",
+    "--timeout",
+    "30"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 73 (status)",
+   "args": [
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME    STATUS   PORT   RCON   MEM  UPTIME  DIR\nbad1    stopped  47764  47774  1G   -       <run>/data/instances/bad1\nnoeula  stopped  47762  47772  1G   -       <run>/data/instances/noeula\nnojar   stopped  47763  47773  1G   -       <run>/data/instances/nojar\nrun1    stopped  47761  47771  1G   -       <run>/data/instances/run1\n\nDATABASE  STATUS   ENGINE          PORT   ATTACHED  UPTIME  DIR\ndb1       stopped  MariaDB 11.4.5  47781  -         -       <run>/data/services/db1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 74 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"bad1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/bad1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47764,\"rconPort\":47774,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/bad1/console.log\"},{\"name\":\"noeula\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/noeula\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47762,\"rconPort\":47772,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/noeula/console.log\"},{\"name\":\"nojar\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/nojar\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47763,\"rconPort\":47773,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/nojar/console.log\"},{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47761,\"rconPort\":47771,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":0,\"consoleLog\":\"<run>/data/run/run1/console.log\"}],\"databases\":[{\"name\":\"db1\",\"label\":null,\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/db1\",\"jar\":null,\"memory\":null,\"port\":47781,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/db1/console.log\"}]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"tps\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"tps\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"say nothing\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"hello there\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"kill\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/bad1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/bad1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/bad1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/noeula": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/noeula/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/nojar": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/old-server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "old"
+  },
+  "data/instances/run1/paper-1.21.4-100.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "new jar"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "#Minecraft server properties\nmotd=Up\nmax-players=6\n9=nine\nnew-key=\nserver-port=47761\nenable-rcon=true\nrcon.port=47771\nrcon.password=test\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47761,\n      \"rcon\": {\n        \"port\": 47771,\n        \"password\": \"test\"\n      },\n      \"label\": null,\n      \"autoRestart\": false,\n      \"webhook\": null\n    },\n    \"noeula\": {\n      \"dir\": \"<run>/data/instances/noeula\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47762,\n      \"rcon\": {\n        \"port\": 47772,\n        \"password\": \"test\"\n      }\n    },\n    \"nojar\": {\n      \"dir\": \"<run>/data/instances/nojar\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47763,\n      \"rcon\": {\n        \"port\": 47773,\n        \"password\": \"test\"\n      }\n    },\n    \"bad1\": {\n      \"dir\": \"<run>/data/instances/bad1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47764,\n      \"rcon\": {\n        \"port\": 47774,\n        \"password\": \"test\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"11.4.5\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47781\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/paper-1.21.4-100.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "new jar"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

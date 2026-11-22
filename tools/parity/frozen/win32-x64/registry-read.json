@@ -1,0 +1,385 @@
+{
+ "about": "What the Node core did in scenario registry-read on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "registry-read",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 7 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME    STATUS   PORT   RCON   MEM  UPTIME  DIR\nalpha   stopped  25565  25575  2G   -       <run>/data/instances/alpha\nBeta_2  stopped  25566  25576  4G   -       <run>/data/instances/Beta_2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"},{\"name\":\"Beta_2\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/Beta_2\",\"jar\":\"fabric-server-launch.jar\",\"memory\":\"4G\",\"port\":25566,\"rconPort\":25576,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/Beta_2/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (status)",
+   "args": [
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME    STATUS   PORT   RCON   MEM  UPTIME  DIR\nalpha   stopped  25565  25575  2G   -       <run>/data/instances/alpha\nBeta_2  stopped  25566  25576  4G   -       <run>/data/instances/Beta_2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (status alpha)",
+   "args": [
+    "status",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     alpha\nlabel:        (none)\nstatus:       stopped\ndirectory:    <run>/data/instances/alpha\njar:          paper-1.21.4-15.jar\nmemory:       2G\njava:         java\nport:         25565\nrcon port:    25575\nlevel-name:   (unset)\nmotd:         Alpha \\u00a7aworld\nonline-mode:  true\nconsole log:  <run>/data/run/alpha/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (status alpha --json)",
+   "args": [
+    "status",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (status Beta_2 --json)",
+   "args": [
+    "status",
+    "Beta_2",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"Beta_2\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/Beta_2\",\"jar\":\"fabric-server-launch.jar\",\"memory\":\"4G\",\"port\":25566,\"rconPort\":25576,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/Beta_2/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (status alpha Beta_2 --json)",
+   "args": [
+    "status",
+    "alpha",
+    "Beta_2",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft status <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (logs alpha)",
+   "args": [
+    "logs",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[10:00:01] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\n[10:00:01] [Server thread/WARN]: The exception was: java.net.BindException: Address already in use\n[10:00:02] [Server thread/INFO]: Stopping server\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (logs alpha -n 2)",
+   "args": [
+    "logs",
+    "alpha",
+    "-n",
+    "2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:01] [Server thread/WARN]: The exception was: java.net.BindException: Address already in use\n[10:00:02] [Server thread/INFO]: Stopping server\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (logs alpha --grep WARN)",
+   "args": [
+    "logs",
+    "alpha",
+    "--grep",
+    "WARN"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:01] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\n[10:00:01] [Server thread/WARN]: The exception was: java.net.BindException: Address already in use\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (logs Beta_2)",
+   "args": [
+    "logs",
+    "Beta_2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (why alpha)",
+   "args": [
+    "why",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\n>> The port is already taken\n   Something else is listening on port 25565 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (why alpha --json)",
+   "args": [
+    "why",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"status\":{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"},\"findings\":[{\"id\":\"port-in-use\",\"title\":\"The port is already taken\",\"advice\":\"Something else is listening on port 25565 - usually another server, or another copy of this one. \\\"spawnloft list\\\" shows who; change the port under Manage if both should run at once.\",\"line\":\"[10:00:01] [Server thread/WARN]: The exception was: java.net.BindException: Address already in use\",\"at\":2}],\"crashes\":{\"dir\":\"<run>/data/instances/alpha/crash-reports\",\"reports\":[]},\"scope\":\"recent-console-and-crash-reports\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (diagnostics Beta_2 --json)",
+   "args": [
+    "diagnostics",
+    "Beta_2",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":true,\"data\":{\"instance\":\"Beta_2\",\"status\":{\"name\":\"Beta_2\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/Beta_2\",\"jar\":\"fabric-server-launch.jar\",\"memory\":\"4G\",\"port\":25566,\"rconPort\":25576,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/Beta_2/console.log\"},\"findings\":[],\"crashes\":{\"dir\":\"<run>/data/instances/Beta_2/crash-reports\",\"reports\":[]},\"scope\":\"recent-console-and-crash-reports\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (metrics alpha)",
+   "args": [
+    "metrics",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Performance: alpha (4 cores; CPU is a share of the whole machine)\nNo measurements in this range.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (metrics alpha --json)",
+   "args": [
+    "metrics",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"runId\":null,\"startedAt\":null,\"running\":false,\"samplingAvailable\":true,\"sampleSeconds\":10,\"cores\":4,\"cpuScale\":\"whole-machine\",\"samples\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (metrics alpha --csv)",
+   "args": [
+    "metrics",
+    "alpha",
+    "--csv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance,run_id,timestamp,cpu_percent,rss_mib,cores\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (props alpha)",
+   "args": [
+    "props",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "enable-rcon:    true\nmax-players:    20\nmotd:           Alpha \\u00a7aworld\nonline-mode:    true\nrcon.password:  rcon-secret-alpha\nrcon.port:      25575\nserver-port:    25565\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (props alpha motd)",
+   "args": [
+    "props",
+    "alpha",
+    "motd"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: malformed assignment \"motd\" - expected key=value\n"
+  },
+  {
+   "label": "step 26 (plugins alpha --json)",
+   "args": [
+    "plugins",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"plugins\":[{\"file\":\"Essentials.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Essentials\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":22,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (plugins Beta_2 --json)",
+   "args": [
+    "plugins",
+    "Beta_2",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"Beta_2\",\"plugins\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 28 (snapshots alpha --json)",
+   "args": [
+    "snapshots",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"backups\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (backups alpha)",
+   "args": [
+    "backups",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No snapshots for \"alpha\". Create one with: spawnloft backup alpha\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (status gamma --json)",
+   "args": [
+    "status",
+    "gamma",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"gamma\\\". Known instances: alpha, Beta_2\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (logs)",
+   "args": [
+    "logs"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: logs requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 32 (why --json)",
+   "args": [
+    "why",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft diagnostics <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (list extra --json)",
+   "args": [
+    "list",
+    "extra",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft list --json\"}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances/Beta_2": {
+   "kind": "dir"
+  },
+  "data/instances/Beta_2/mods": {
+   "kind": "dir"
+  },
+  "data/instances/alpha": {
+   "kind": "dir"
+  },
+  "data/instances/alpha/eula.txt": {
+   "kind": "file",
+   "text": "eula=true\n"
+  },
+  "data/instances/alpha/plugins": {
+   "kind": "dir"
+  },
+  "data/instances/alpha/plugins/Essentials.jar": {
+   "kind": "file",
+   "zip": ""
+  },
+  "data/instances/alpha/server.properties": {
+   "kind": "file",
+   "text": "#Minecraft server properties\nserver-port=25565\nmotd=Alpha \\u00a7aworld\nmax-players=20\nenable-rcon=true\nrcon.port=25575\nrcon.password=rcon-secret-alpha\nonline-mode=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"alpha\": {\n      \"dir\": \"<run>/data/instances/alpha\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"2G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"rcon-secret-alpha\"\n      },\n      \"createdAt\": \"<time>\"\n    },\n    \"Beta_2\": {\n      \"dir\": \"<run>/data/instances/Beta_2\",\n      \"jar\": \"fabric-server-launch.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.20.6\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"rcon-secret-beta\"\n      },\n      \"createdAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/run/alpha": {
+   "kind": "dir"
+  },
+  "data/run/alpha/console.log": {
+   "kind": "file",
+   "text": "[10:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[10:00:01] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\n[10:00:01] [Server thread/WARN]: The exception was: java.net.BindException: Address already in use\n[10:00:02] [Server thread/INFO]: Stopping server\n"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

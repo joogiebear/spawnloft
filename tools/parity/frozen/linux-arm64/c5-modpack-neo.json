@@ -1,0 +1,223 @@
+{
+ "about": "What the Node core did in scenario c5-modpack-neo on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c5-modpack-neo",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 2 (new n1 --modpack neo)",
+   "args": [
+    "new",
+    "n1",
+    "--modpack",
+    "neo"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading neo-1.0.0.mrpack\n  Downloading the NeoForge 26.1.0.6 installer\n  Downloading neo-mod.jar (1 of 1)\n  Creating the server\n  Installing NeoForge (this downloads its libraries and takes a few minutes)\n  Applying the pack’s configuration\n\nCreated \"n1\" from Neo Pack 1.0.0\nminecraft:   26.1\nloader:      neoforge 26.1.0.6\npack files:  1\nport:        25565\n\nStart it with: spawnloft start n1\nPlayers need the matching client pack to join - the same pack, installed in their launcher.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 3 (pack n1)",
+   "args": [
+    "pack",
+    "n1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "n1 runs Neo Pack 1.0.0 (minecraft 26.1, neoforge 26.1.0.6)\nThat is the newest release.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 4 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"n1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/n1\",\"jar\":\"server.jar\",\"memory\":\"4G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/n1/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/neo/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/neo/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_neo-mod.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/neo/1.0.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar.sha256",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bin/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"99.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  },
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"n1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"server.jar\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/.mcctl-pack.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"project\": \"neo\",\n  \"versionId\": \"idx1\",\n  \"versionNumber\": \"1.0.0\",\n  \"name\": \"Neo Pack\",\n  \"mc\": \"26.1\",\n  \"loader\": {\n    \"kind\": \"neoforge\",\n    \"version\": \"26.1.0.6\"\n  },\n  \"installedAt\": \"<time>\",\n  \"files\": [\n    \"mods/neo-mod.jar\"\n  ],\n  \"skippedClientOnly\": 0\n}\n"
+  },
+  "data/instances/n1/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'n1'\n"
+  },
+  "data/instances/n1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/n1/libraries": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/libraries/net": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/libraries/net/neoforged": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/mods/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"neo-mod.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"neo\",\n      \"version\": \"1.0.0\",\n      \"installedAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/instances/n1/mods/neo-mod.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1200,
+   "sha256": "efda89d816d524613ef7e3374a202e4646df60e2398b058cfa518b7d1eb708a0"
+  },
+  "data/instances/n1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad"
+  },
+  "data/instances/n1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25565\nenable-rcon=true\nrcon.port=25575\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=Neo Pack\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/n1/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'n1' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'n1'\n"
+  },
+  "data/instances/n1/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'n1'\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"n1\": {\n      \"dir\": \"<run>/data/instances/n1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"neoforge\",\n      \"mcVersion\": \"26.1\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/neoforge-26.1.0.6-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 5000,
+   "sha256": "6fed287ccffa43763bbcb945f6f8612838f0eec9a9557e0655cf1731699827f9"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

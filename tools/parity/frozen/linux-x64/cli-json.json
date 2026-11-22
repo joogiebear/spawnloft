@@ -583,7 +583,7 @@
    ],
    "code": 1,
    "signal": null,
-   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"21.0.13.0.3\\\" <date>\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 64 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"25.0.5\\\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-amd64/bin/java (not on PATH)\",\"java (also): openjdk version \\\"21.0.13\\\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"17.0.21\\\" <date> at java\",\"java (also): openjdk version \\\"11.0.33\\\" <date> at /usr/lib/jvm/temurin-11-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"1.8.0_512\\\" at /usr/lib/jvm/temurin-8-jdk-amd64/bin/java\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 64 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
    "stderr": ""
   },
   {
@@ -594,7 +594,7 @@
    ],
    "code": 0,
    "signal": null,
-   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<repo>\"}}\n",
+   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<code folder>\"}}\n",
    "stderr": ""
   },
   {
@@ -801,7 +801,7 @@
    ],
    "code": 1,
    "signal": null,
-   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"21.0.13.0.3\\\" <date>\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 370 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"25.0.5\\\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-amd64/bin/java (not on PATH)\",\"java (also): openjdk version \\\"21.0.13\\\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"17.0.21\\\" <date> at java\",\"java (also): openjdk version \\\"11.0.33\\\" <date> at /usr/lib/jvm/temurin-11-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"1.8.0_512\\\" at /usr/lib/jvm/temurin-8-jdk-amd64/bin/java\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 506 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
    "stderr": ""
   },
   {
@@ -812,7 +812,7 @@
    ],
    "code": 0,
    "signal": null,
-   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<repo>\"}}\n",
+   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<code folder>\"}}\n",
    "stderr": ""
   },
   {
@@ -824,7 +824,7 @@
    ],
    "code": 0,
    "signal": null,
-   "stdout": "{\"schemaVersion\":1,\"command\":\"diag\",\"ok\":true,\"data\":{\"facts\":{\"spawnloft\":\"<version>\",\"os\":\"linux\",\"arch\":\"x64\",\"server\":{\"name\":\"alpha\",\"software\":\"paper\",\"version\":\"1.21.4\",\"status\":\"never started\",\"startedAt\":null,\"memory\":\"2G\",\"java\":{\"major\":21,\"version\":\"openjdk version \\\"21.0.13.0.3\\\" <date>\",\"path\":\"java\"},\"plugins\":[]},\"client\":null},\"findings\":{\"server\":[],\"client\":[]},\"files\":[{\"name\":\"server-console.log\",\"bytes\":0},{\"name\":\"server-daemon.log\",\"bytes\":0},{\"name\":\"server.properties\",\"bytes\":29}],\"file\":\"<run>/data/backups/alpha/exports/alpha_diag_<stamp>.zip\"}}\n",
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diag\",\"ok\":true,\"data\":{\"facts\":{\"spawnloft\":\"<version>\",\"os\":\"linux\",\"arch\":\"x64\",\"server\":{\"name\":\"alpha\",\"software\":\"paper\",\"version\":\"1.21.4\",\"status\":\"never started\",\"startedAt\":null,\"memory\":\"2G\",\"java\":{\"major\":25,\"version\":\"openjdk version \\\"25.0.5\\\" <date> LTS\",\"path\":\"/usr/lib/jvm/temurin-25-jdk-amd64/bin/java\"},\"plugins\":[]},\"client\":null},\"findings\":{\"server\":[],\"client\":[]},\"files\":[{\"name\":\"server-console.log\",\"bytes\":0},{\"name\":\"server-daemon.log\",\"bytes\":0},{\"name\":\"server.properties\",\"bytes\":29}],\"file\":\"<run>/data/backups/alpha/exports/alpha_diag_<stamp>.zip\"}}\n",
    "stderr": ""
   },
   {
@@ -953,7 +953,7 @@
   "data/run/runtime.json": {
    "kind": "file",
    "mode": "644",
-   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<repo>\"\n}\n"
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<code folder>\"\n}\n"
   },
   "data/services": {
    "kind": "dir",

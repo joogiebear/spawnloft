@@ -1,0 +1,1686 @@
+{
+ "about": "What the Node core did in scenario c5-modpack on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c5-modpack",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 2 (new a1 --modpack alpha)",
+   "args": [
+    "new",
+    "a1",
+    "--modpack",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading alpha-2.0.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading lithium.jar (1 of 3)\n  Downloading lithium.properties (2 of 3)\n  Downloading deep.jar (3 of 3)\n  Creating the server\n  Fetching Fabric 0.16.10 for 1.21.4\n  Applying the pack’s configuration\n\nCreated \"a1\" from Alpha Pack 2.0\nminecraft:   1.21.4\nloader:      fabric 0.16.10\npack files:  3 (1 client-only skipped)\nport:        25565\n\nStart it with: spawnloft start a1\nPlayers need the matching client pack to join - the same pack, installed in their launcher.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 3 (new a1 --modpack alpha)",
+   "args": [
+    "new",
+    "a1",
+    "--modpack",
+    "alpha"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading alpha-2.0.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading lithium.jar (1 of 3)\n  Downloading lithium.properties (2 of 3)\n  Downloading deep.jar (3 of 3)\n  Creating the server\n",
+   "stderr": "error: instance \"a1\" already exists\n"
+  },
+  {
+   "label": "step 4 (new a2 --modpack alpha --port 26300 --memory 6G --offline)",
+   "args": [
+    "new",
+    "a2",
+    "--modpack",
+    "alpha",
+    "--port",
+    "26300",
+    "--memory",
+    "6G",
+    "--offline"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading alpha-2.0.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading lithium.jar (1 of 3)\n  Downloading lithium.properties (2 of 3)\n  Downloading deep.jar (3 of 3)\n  Creating the server\n  Fetching Fabric 0.16.10 for 1.21.4\n  Applying the pack’s configuration\n\nCreated \"a2\" from Alpha Pack 2.0\nminecraft:   1.21.4\nloader:      fabric 0.16.10\npack files:  3 (1 client-only skipped)\nport:        26300\n\nStart it with: spawnloft start a2\nPlayers need the matching client pack to join - the same pack, installed in their launcher.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"a1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/a1\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"4G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/a1/console.log\"},{\"name\":\"a2\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/a2\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"6G\",\"port\":26300,\"rconPort\":25576,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/a2/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 6 (plugins a1 --json)",
+   "args": [
+    "plugins",
+    "a1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"a1\",\"plugins\":[{\"file\":\"lithium.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modpack\",\"project\":\"alpha\",\"installedVersion\":\"2.0\",\"gameVersions\":null,\"modId\":null,\"name\":\"lithium\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":2000,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (pack a1)",
+   "args": [
+    "pack",
+    "a1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "a1 runs Alpha Pack 2.0 (minecraft 1.21.4, fabric 0.16.10)\nThat is the newest release.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (pack a1 check)",
+   "args": [
+    "pack",
+    "a1",
+    "check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "a1 runs Alpha Pack 2.0 (minecraft 1.21.4, fabric 0.16.10)\nThat is the newest release.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (pack a1 update)",
+   "args": [
+    "pack",
+    "a1",
+    "update"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: updating replaces the pack's own files. A standard snapshot is taken first, the worlds\n  and anything you added by hand are never touched, and players will need the matching new\n  client pack. The server must be stopped. Re-run with --yes.\n"
+  },
+  {
+   "label": "step 10 (pack a1 update --yes)",
+   "args": [
+    "pack",
+    "a1",
+    "update",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\nAlready on the newest release (2.0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (pack a1 bogus)",
+   "args": [
+    "pack",
+    "a1",
+    "bogus"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft pack <name> [update --yes]\n"
+  },
+  {
+   "label": "step 12 (pack)",
+   "args": [
+    "pack"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: pack requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 13 (pack nope)",
+   "args": [
+    "pack",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a1, a2\n"
+  },
+  {
+   "label": "step 14 (new x-empty --modpack empty)",
+   "args": [
+    "new",
+    "x-empty",
+    "--modpack",
+    "empty"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: that pack has no Fabric or NeoForge release SpawnLoft can install\n"
+  },
+  {
+   "label": "step 15 (new x-quiltonly --modpack quiltonly)",
+   "args": [
+    "new",
+    "x-quiltonly",
+    "--modpack",
+    "quiltonly"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: that pack has no Fabric or NeoForge release SpawnLoft can install\n"
+  },
+  {
+   "label": "step 16 (new x-nofile --modpack nofile)",
+   "args": [
+    "new",
+    "x-nofile",
+    "--modpack",
+    "nofile"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: that pack version has no downloadable file\n"
+  },
+  {
+   "label": "step 17 (new x-badsum --modpack badsum)",
+   "args": [
+    "new",
+    "x-badsum",
+    "--modpack",
+    "badsum"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading badsum-1.mrpack\n",
+   "stderr": "error: the pack download did not match its checksum; nothing was installed\n"
+  },
+  {
+   "label": "step 18 (new x-notpack --modpack notpack)",
+   "args": [
+    "new",
+    "x-notpack",
+    "--modpack",
+    "notpack"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading notpack-1.mrpack\n",
+   "stderr": "error: the pack has no modrinth.index.json - it is not an mrpack\n"
+  },
+  {
+   "label": "step 19 (new x-notjson --modpack notjson)",
+   "args": [
+    "new",
+    "x-notjson",
+    "--modpack",
+    "notjson"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading notjson-1.mrpack\n",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 20 (new x-forge --modpack forge)",
+   "args": [
+    "new",
+    "x-forge",
+    "--modpack",
+    "forge"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading forge-1.mrpack\n",
+   "stderr": "error: this pack is built for forge, which SpawnLoft cannot run - Fabric and NeoForge packs only\n"
+  },
+  {
+   "label": "step 21 (new x-quilt --modpack quilt)",
+   "args": [
+    "new",
+    "x-quilt",
+    "--modpack",
+    "quilt"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading quilt-1.mrpack\n",
+   "stderr": "error: this pack is built for quilt, which SpawnLoft cannot run - Fabric and NeoForge packs only\n"
+  },
+  {
+   "label": "step 22 (new x-nomc --modpack nomc)",
+   "args": [
+    "new",
+    "x-nomc",
+    "--modpack",
+    "nomc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading nomc-1.mrpack\n",
+   "stderr": "error: the pack names no Minecraft version\n"
+  },
+  {
+   "label": "step 23 (new x-noloader --modpack noloader)",
+   "args": [
+    "new",
+    "x-noloader",
+    "--modpack",
+    "noloader"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading noloader-1.mrpack\n",
+   "stderr": "error: the pack names no loader SpawnLoft can run (Fabric or NeoForge)\n"
+  },
+  {
+   "label": "step 24 (new x-badmc --modpack badmc)",
+   "args": [
+    "new",
+    "x-badmc",
+    "--modpack",
+    "badmc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading badmc-1.mrpack\n",
+   "stderr": "error: the pack's Minecraft version \"../1.21\" is not a valid version\n"
+  },
+  {
+   "label": "step 25 (new x-notmc --modpack notmc)",
+   "args": [
+    "new",
+    "x-notmc",
+    "--modpack",
+    "notmc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading notmc-1.mrpack\n",
+   "stderr": "error: that file does not look like a Modrinth modpack index\n"
+  },
+  {
+   "label": "step 26 (new x-escape --modpack escape)",
+   "args": [
+    "new",
+    "x-escape",
+    "--modpack",
+    "escape"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading escape-1.mrpack\n",
+   "stderr": "error: the pack lists a file outside its own folder (\"../evil.jar\"); refusing the whole pack\n"
+  },
+  {
+   "label": "step 27 (new x-nodl --modpack nodl)",
+   "args": [
+    "new",
+    "x-nodl",
+    "--modpack",
+    "nodl"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading nodl-1.mrpack\n",
+   "stderr": "error: the pack gives no download for \"mods/x.jar\"\n"
+  },
+  {
+   "label": "step 28 (new x-evilhost --modpack evilhost)",
+   "args": [
+    "new",
+    "x-evilhost",
+    "--modpack",
+    "evilhost"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading evilhost-1.mrpack\n",
+   "stderr": "error: \"mods/x.jar\" is only offered from a host a pack may not use (https from cdn.modrinth.com, github.com, raw.githubusercontent.com, gitlab.com only); refusing the whole pack\n"
+  },
+  {
+   "label": "step 29 (new x-httphost --modpack httphost)",
+   "args": [
+    "new",
+    "x-httphost",
+    "--modpack",
+    "httphost"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading httphost-1.mrpack\n",
+   "stderr": "error: \"mods/x.jar\" is only offered from a host a pack may not use (https from cdn.modrinth.com, github.com, raw.githubusercontent.com, gitlab.com only); refusing the whole pack\n"
+  },
+  {
+   "label": "step 30 (new x-nohash --modpack nohash)",
+   "args": [
+    "new",
+    "x-nohash",
+    "--modpack",
+    "nohash"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading nohash-1.mrpack\n",
+   "stderr": "error: the pack publishes no checksum for \"mods/x.jar\", so it could not be verified; refusing the whole pack\n"
+  },
+  {
+   "label": "step 31 (new x-oddhash --modpack oddhash)",
+   "args": [
+    "new",
+    "x-oddhash",
+    "--modpack",
+    "oddhash"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading oddhash-1.mrpack\n",
+   "stderr": "error: the pack's sha1 checksum for \"mods/x.jar\" is not a checksum; refusing the whole pack\n"
+  },
+  {
+   "label": "step 32 (new x-oddsize --modpack oddsize)",
+   "args": [
+    "new",
+    "x-oddsize",
+    "--modpack",
+    "oddsize"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading oddsize-1.mrpack\n",
+   "stderr": "error: the pack lists an impossible size for \"mods/x.jar\"; refusing the whole pack\n"
+  },
+  {
+   "label": "step 33 (new x-filesum --modpack filesum)",
+   "args": [
+    "new",
+    "x-filesum",
+    "--modpack",
+    "filesum"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading filesum-1.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading x.jar (1 of 1)\n",
+   "stderr": "error: \"mods/x.jar\" did not match the checksum the pack published; nothing was installed\n"
+  },
+  {
+   "label": "step 34 (new x-short --modpack short)",
+   "args": [
+    "new",
+    "x-short",
+    "--modpack",
+    "short"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading short-1.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading y.jar (1 of 1)\n",
+   "stderr": "error: \"mods/y.jar\" is not the size the pack published; nothing was installed\n"
+  },
+  {
+   "label": "step 35 (new x-gone --modpack gone)",
+   "args": [
+    "new",
+    "x-gone",
+    "--modpack",
+    "gone"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading gone-1.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading z.jar (1 of 1)\n",
+   "stderr": "error: download failed: 404 for https://cdn.modrinth.com/data/missing.jar\n"
+  },
+  {
+   "label": "step 36 (new x-nofabric --modpack nofabric)",
+   "args": [
+    "new",
+    "x-nofabric",
+    "--modpack",
+    "nofabric"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading nofabric-1.mrpack\n  Fetching Fabric 0.16.10 for 1.99\n",
+   "stderr": "error: Fabric has no server launcher for 1.99 - it may not support that version.\n"
+  },
+  {
+   "label": "step 37 (new x-broken --modpack broken)",
+   "args": [
+    "new",
+    "x-broken",
+    "--modpack",
+    "broken"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: Modrinth answered 500 for /project/broken/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D\n"
+  },
+  {
+   "label": "step 38 (new x-missing --modpack missing)",
+   "args": [
+    "new",
+    "x-missing",
+    "--modpack",
+    "missing"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: Modrinth answered 404 for /project/missing/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D\n"
+  },
+  {
+   "label": "step 39 (new x-e --modpack a b/c)",
+   "args": [
+    "new",
+    "x-e",
+    "--modpack",
+    "a b/c"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: Modrinth answered 404 for /project/a%20b%2Fc/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D\n"
+  },
+  {
+   "label": "step 40 (new x-t --modpack )",
+   "args": [
+    "new",
+    "x-t",
+    "--modpack",
+    ""
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n",
+   "stderr": "error: Modrinth answered 404 for /project/true/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D\n"
+  },
+  {
+   "label": "step 41 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\na1    stopped  25565  25575  4G   -       <run>/data/instances/a1\na2    stopped  26300  25576  6G   -       <run>/data/instances/a2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (new b1 --modpack beta1)",
+   "args": [
+    "new",
+    "b1",
+    "--modpack",
+    "beta1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading beta1-1.0.mrpack\n  Fetching Fabric 0.16.10 for 1.21.4\n  Downloading old.jar (1 of 3)\n  Downloading keep.jar (2 of 3)\n  Downloading gone.cfg (3 of 3)\n  Creating the server\n  Fetching Fabric 0.16.10 for 1.21.4\n  Applying the pack’s configuration\n\nCreated \"b1\" from Beta Pack 1.0\nminecraft:   1.21.4\nloader:      fabric 0.16.10\npack files:  3\nport:        25566\n\nStart it with: spawnloft start b1\nPlayers need the matching client pack to join - the same pack, installed in their launcher.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (pack b1)",
+   "args": [
+    "pack",
+    "b1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "b1 runs Beta Pack 1.0 (minecraft 1.21.4, fabric 0.16.10)\nRelease 2.0 is out. Apply with: spawnloft pack b1 update --yes\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (pack b1 update --yes)",
+   "args": [
+    "pack",
+    "b1",
+    "update",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Finding the pack on Modrinth\n  Downloading beta-2.0.mrpack\n  Fetching Fabric 0.16.10 for 1.21.5\n  Downloading keep.jar (1 of 3)\n  Downloading new.jar (2 of 3)\n  Downloading new.cfg (3 of 3)\n  Snapshotting before anything changes\n  Applying the new pack\n\nUpdated to 2.0 (from 1.0).\n  Snapshot: <run>/data/backups/b1/pre-pack-update_standard_<stamp>.tar.gz\n  3 pack files laid in, 3 old pack file(s) retired.\n  Minecraft moved to 1.21.5 - the worlds migrate on the next start.\nPlayers need the matching new client pack to join.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (pack b1)",
+   "args": [
+    "pack",
+    "b1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "b1 runs Beta Pack 2.0 (minecraft 1.21.5, fabric 0.16.10)\nThat is the newest release.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (plugins b1 --json)",
+   "args": [
+    "plugins",
+    "b1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"b1\",\"plugins\":[{\"file\":\"keep.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modpack\",\"project\":\"beta\",\"installedVersion\":\"2.0\",\"gameVersions\":null,\"modId\":null,\"name\":\"keep\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":800,\"mtime\":\"<time>\"},{\"file\":\"new.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modpack\",\"project\":\"beta\",\"installedVersion\":\"2.0\",\"gameVersions\":null,\"modId\":null,\"name\":\"new\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":1100,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"a1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/a1\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"4G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/a1/console.log\"},{\"name\":\"a2\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/a2\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"6G\",\"port\":26300,\"rconPort\":25576,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/a2/console.log\"},{\"name\":\"b1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/b1\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"4G\",\"port\":25566,\"rconPort\":25577,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/b1/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (snapshots b1)",
+   "args": [
+    "snapshots",
+    "b1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                               SCOPE     SIZE    CREATED\npre-pack-update_standard_<stamp>.tar.gz  standard  <size>  <time>\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/a%20b%2Fc/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alpha/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/badmc/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/badsum/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta1/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/broken/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/empty/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/escape/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/evilhost/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/filesum/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/forge/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/gone/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/httphost/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/missing/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/nodl/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/nofabric/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/nofile/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/nohash/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/noloader/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/nomc/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/notjson/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/notmc/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/notpack/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/oddhash/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/oddsize/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/quilt/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/quiltonly/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/short/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/true/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/alpha/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/alpha/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/alpha/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/badmc/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/badsum/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/beta/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/beta1/1.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/escape/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/evilhost/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_gone.cfg",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_lithium.properties",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_lithium.properties",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_lithium.properties",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_new.cfg",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_keep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_keep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_lithium.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_lithium.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_lithium.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_nested_deep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_nested_deep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_nested_deep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_new.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_old.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_x.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_y.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/filesum/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/forge/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/gone/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/httphost/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/missing.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/nodl/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/nofabric/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/nohash/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/noloader/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/nomc/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/notjson/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/notmc/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/notpack/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/oddhash/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/oddsize/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/quilt/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/short/1.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.21.4/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.21.5/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.99/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bin/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"99.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  },
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"a1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\"}\n{\"at\":\"<time>\",\"server\":\"a2\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\"}\n{\"at\":\"<time>\",\"server\":\"b1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\"}\n{\"at\":\"<time>\",\"server\":\"b1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (pre-pack-update), <size>\",\"snapshot\":\"pre-pack-update_standard_<stamp>.tar.gz\"}\n"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1/.mcctl-pack.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"project\": \"alpha\",\n  \"versionId\": \"alpha-2\",\n  \"versionNumber\": \"2.0\",\n  \"name\": \"Alpha Pack\",\n  \"mc\": \"1.21.4\",\n  \"loader\": {\n    \"kind\": \"fabric\",\n    \"version\": \"0.16.10\"\n  },\n  \"installedAt\": \"<time>\",\n  \"files\": [\n    \"mods/lithium.jar\",\n    \"config/lithium.properties\",\n    \"mods/nested/deep.jar\",\n    \"config/shared.toml\",\n    \"server.properties\",\n    \"config/shared.toml\",\n    \"config/server-only.txt\"\n  ],\n  \"skippedClientOnly\": 1\n}\n"
+  },
+  "data/instances/a1/config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1/config/lithium.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# lithium config\nmixin.ai=false\n"
+  },
+  "data/instances/a1/config/server-only.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "yes\n"
+  },
+  "data/instances/a1/config/shared.toml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "shared = 2\n"
+  },
+  "data/instances/a1/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'a1'\n"
+  },
+  "data/instances/a1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/a1/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/instances/a1/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1/mods/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"lithium.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"alpha\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/instances/a1/mods/lithium.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2000,
+   "sha256": "83c2b88910d7841e10ecdb5c108fab5bb3bb96eb7ad07a99c1123b586201857c"
+  },
+  "data/instances/a1/mods/nested": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1/mods/nested/deep.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 700,
+   "sha256": "a458eeed7dd9ca57d2e2a68af3c8ade0742ce55f3e73af51d451a7ae759aad18"
+  },
+  "data/instances/a1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=from the pack\n"
+  },
+  "data/instances/a1/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'a1' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'a1'\n"
+  },
+  "data/instances/a1/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'a1'\n"
+  },
+  "data/instances/a2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a2/.mcctl-pack.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"project\": \"alpha\",\n  \"versionId\": \"alpha-2\",\n  \"versionNumber\": \"2.0\",\n  \"name\": \"Alpha Pack\",\n  \"mc\": \"1.21.4\",\n  \"loader\": {\n    \"kind\": \"fabric\",\n    \"version\": \"0.16.10\"\n  },\n  \"installedAt\": \"<time>\",\n  \"files\": [\n    \"mods/lithium.jar\",\n    \"config/lithium.properties\",\n    \"mods/nested/deep.jar\",\n    \"config/shared.toml\",\n    \"server.properties\",\n    \"config/shared.toml\",\n    \"config/server-only.txt\"\n  ],\n  \"skippedClientOnly\": 1\n}\n"
+  },
+  "data/instances/a2/config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a2/config/lithium.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# lithium config\nmixin.ai=false\n"
+  },
+  "data/instances/a2/config/server-only.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "yes\n"
+  },
+  "data/instances/a2/config/shared.toml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "shared = 2\n"
+  },
+  "data/instances/a2/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'a2'\n"
+  },
+  "data/instances/a2/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/a2/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/instances/a2/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a2/mods/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"lithium.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"alpha\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/instances/a2/mods/lithium.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2000,
+   "sha256": "83c2b88910d7841e10ecdb5c108fab5bb3bb96eb7ad07a99c1123b586201857c"
+  },
+  "data/instances/a2/mods/nested": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a2/mods/nested/deep.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 700,
+   "sha256": "a458eeed7dd9ca57d2e2a68af3c8ade0742ce55f3e73af51d451a7ae759aad18"
+  },
+  "data/instances/a2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=from the pack\n"
+  },
+  "data/instances/a2/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'a2' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'a2'\n"
+  },
+  "data/instances/a2/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'a2'\n"
+  },
+  "data/instances/b1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/.mcctl-pack.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"project\": \"beta\",\n  \"versionId\": \"beta-2\",\n  \"versionNumber\": \"2.0\",\n  \"name\": \"Beta Pack\",\n  \"mc\": \"1.21.5\",\n  \"loader\": {\n    \"kind\": \"fabric\",\n    \"version\": \"0.16.10\"\n  },\n  \"installedAt\": \"<time>\",\n  \"files\": [\n    \"mods/keep.jar\",\n    \"mods/new.jar\",\n    \"config/new.cfg\",\n    \"config/over.txt\"\n  ],\n  \"skippedClientOnly\": 0\n}\n"
+  },
+  "data/instances/b1/config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/config/mine.cfg": {
+   "kind": "file",
+   "mode": "644",
+   "text": "added by hand\n"
+  },
+  "data/instances/b1/config/new.cfg": {
+   "kind": "file",
+   "mode": "644",
+   "text": "new\n"
+  },
+  "data/instances/b1/config/over.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "two\n"
+  },
+  "data/instances/b1/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'b1'\n"
+  },
+  "data/instances/b1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/b1/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/instances/b1/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/mods/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"keep.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"beta\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    },\n    \"new.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"beta\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/instances/b1/mods/keep.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 800,
+   "sha256": "bdb684913ec73d92985f7900af4ae87ae05dcab84c8d323233f1970c990ace60"
+  },
+  "data/instances/b1/mods/new.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1100,
+   "sha256": "f20bcf88318df05f60f507ad61e76bd1e3770b81176e9e3c743f6012243fc937"
+  },
+  "data/instances/b1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25566\nenable-rcon=true\nrcon.port=25577\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=Beta Pack\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/b1/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'b1' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'b1'\n"
+  },
+  "data/instances/b1/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'b1'\n"
+  },
+  "data/instances/b1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "world\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"a1\": {\n      \"dir\": \"<run>/data/instances/a1\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"java\": \"/usr/lib/jvm/temurin-25-jdk-arm64/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"a2\": {\n      \"dir\": \"<run>/data/instances/a2\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"java\": \"/usr/lib/jvm/temurin-25-jdk-arm64/bin/java\",\n      \"memory\": \"6G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 26300,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"b1\": {\n      \"dir\": \"<run>/data/instances/b1\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"java\": \"/usr/lib/jvm/temurin-25-jdk-arm64/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.21.5\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25577,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/jars/fabric-server-mc.1.21.5-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "8305e54608f400b3091e4018f8a3aadf99e8094fa01afead13b6b317e2d09225"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

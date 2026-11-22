@@ -1,0 +1,1087 @@
+{
+ "about": "What the Node core did in scenario c1-edges on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c1-edges",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 13 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME   STATUS   PORT   RCON   MEM  UPTIME  DIR\n10     stopped  25602  -      2G   -       <run>/data/instances/10\n2      stopped  25603  -      3    -       <run>/data/instances/2\nAlpha  stopped  25604  25614  4G   -       <run>/data/instances/Älpha-ünï\nbeta   stopped  25605  -      2G   -       <run>/data/instances/beta\ngone   stopped         -           -\nzeta   stale    25601  25611  1G   -       <run>/data/instances/zeta/../zeta/\n\nDATABASE  STATUS    ENGINE          PORT         ATTACHED    UPTIME  DIR\next       external  MySQL 8.4       db.lan:3306  -           -       -\nmaria     stopped   MariaDB 11.4.5  33060        zeta, beta  -       <run>/data/services/maria\nodd       stopped   other           1            -           -       -\nredis     stopped   Redis (Garnet)  6380         -           -       <run>/data/services/redis\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (ls --json)",
+   "args": [
+    "ls",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"gone\\\". Known instances: 2, 10, zeta, Alpha, beta, gone, maria, redis, ext, odd\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (status --json)",
+   "args": [
+    "status",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"gone\\\". Known instances: 2, 10, zeta, Alpha, beta, gone, maria, redis, ext, odd\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (status zeta)",
+   "args": [
+    "status",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     zeta\nlabel:        Zeta world\nstatus:       stale\ndirectory:    <run>/data/instances/zeta/../zeta/\njar:          server.jar\nmemory:       1G\njava:         java\nport:         25601\nrcon port:    25611\nlevel-name:   zworld\nmotd:         Hello=there\nonline-mode:  false\nconsole log:  <run>/data/run/zeta/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (status zeta --json)",
+   "args": [
+    "status",
+    "zeta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"zeta\",\"label\":\"Zeta world\",\"kind\":\"server\",\"status\":\"stale\",\"directory\":\"<run>/data/instances/zeta/../zeta/\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":25601,\"rconPort\":25611,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/zeta/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (status 10)",
+   "args": [
+    "status",
+    "10"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     10\nlabel:        (none)\nstatus:       stopped\ndirectory:    <run>/data/instances/10\njar:          a.jar\nmemory:       2G\njava:         java\nport:         25602\nrcon port:    -\nlevel-name:   (unset)\nmotd:         (unset)\nonline-mode:  (unset)\nconsole log:  <run>/data/run/10/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (status 2)",
+   "args": [
+    "status",
+    "2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     2\nlabel:        (none)\nstatus:       stopped\ndirectory:    <run>/data/instances/2\njar:\nmemory:       3\njava:         java\nport:         25603\nrcon port:    -\nlevel-name:   (unset)\nmotd:         (unset)\nonline-mode:  (unset)\nconsole log:  <run>/data/run/2/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (status Alpha)",
+   "args": [
+    "status",
+    "Alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     Alpha\nlabel:        (none)\nstatus:       stopped\ndirectory:    <run>/data/instances/Älpha-ünï\njar:          server.jar\nmemory:       4G\njava:         java\nport:         25604\nrcon port:    25614\nlevel-name:   (unset)\nmotd:         §aUnicode ✓\nonline-mode:  (unset)\nconsole log:  <run>/data/run/Alpha/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (status beta)",
+   "args": [
+    "status",
+    "beta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:        beta\nlabel:           (none)\nstatus:          stopped\ndirectory:       <run>/data/instances/beta\njar:             server.jar\nmemory:          2G\njava:            java\nport:            25605\nrcon port:       -\nlevel-name:      (unset)\nmotd:            (unset)\nonline-mode:     (unset)\nlast exit code:  1\nconsole log:     <run>/data/run/beta/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (status maria)",
+   "args": [
+    "status",
+    "maria"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "database:     maria\nlabel:        Main DB\nstatus:       stopped\nengine:       MariaDB 11.4.5\ndirectory:    <run>/data/services/maria\nhost:         127.0.0.1\nport:         33060\nattached:     zeta, beta\nconsole log:  <run>/data/run/maria/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (status maria --json)",
+   "args": [
+    "status",
+    "maria",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"maria\",\"label\":\"Main DB\",\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/maria\",\"jar\":null,\"memory\":null,\"port\":33060,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/maria/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (status redis)",
+   "args": [
+    "status",
+    "redis"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "database:     redis\nlabel:        (none)\nstatus:       stopped\nengine:       Redis (Garnet) undefined\ndirectory:    <run>/data/services/redis\nhost:         127.0.0.1\nport:         6380\nattached:     (none)\nconsole log:  <run>/data/run/redis/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (status ext)",
+   "args": [
+    "status",
+    "ext"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "database:     ext\nlabel:        (none)\nstatus:       stopped\nengine:       MySQL 8.4\ndirectory:\nhost:         127.0.0.1\nport:         3306\nattached:     (none)\nconsole log:  <run>/data/run/ext/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (status odd)",
+   "args": [
+    "status",
+    "odd"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "database:     odd\nlabel:        (none)\nstatus:       stopped\nengine:       other undefined\ndirectory:\nhost:         127.0.0.1\nport:         1\nattached:     (none)\nconsole log:  <run>/data/run/odd/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (status gone)",
+   "args": [
+    "status",
+    "gone"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"gone\". Known instances: 2, 10, zeta, Alpha, beta, gone, maria, redis, ext, odd\n"
+  },
+  {
+   "label": "step 28 (status gone --json)",
+   "args": [
+    "status",
+    "gone",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"gone\\\". Known instances: 2, 10, zeta, Alpha, beta, gone, maria, redis, ext, odd\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (status bad name)",
+   "args": [
+    "status",
+    "bad name"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 30 (status bad name --json)",
+   "args": [
+    "status",
+    "bad name",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"invalid instance name \\\"bad name\\\" - use letters, digits, dash, underscore (max 32 chars)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (status zeta --json --extra)",
+   "args": [
+    "status",
+    "zeta",
+    "--json",
+    "--extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Unknown option --extra\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (status zeta --json=yes)",
+   "args": [
+    "status",
+    "zeta",
+    "--json=yes"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (status zeta --no-json)",
+   "args": [
+    "status",
+    "zeta",
+    "--no-json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     zeta\nlabel:        Zeta world\nstatus:       stale\ndirectory:    <run>/data/instances/zeta/../zeta/\njar:          server.jar\nmemory:       1G\njava:         java\nport:         25601\nrcon port:    25611\nlevel-name:   zworld\nmotd:         Hello=there\nonline-mode:  false\nconsole log:  <run>/data/run/zeta/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (list --csv)",
+   "args": [
+    "list",
+    "--csv"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --csv is supported only for metrics\n"
+  },
+  {
+   "label": "step 35 (list --csv --json)",
+   "args": [
+    "list",
+    "--csv",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--csv is supported only for metrics\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (logs zeta)",
+   "args": [
+    "logs",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [Server thread/INFO]: Starting\n[10:00:01] [Server thread/ERROR]: Exception ticking world\n[10:00:02] [Server thread/WARN]: Can't keep up!\njava.lang.OutOfMemoryError: Java heap space\n[10:00:03] [Server thread/INFO]: Stopping server\nno newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (log zeta -n 0)",
+   "args": [
+    "log",
+    "zeta",
+    "-n",
+    "0"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [Server thread/INFO]: Starting\n[10:00:01] [Server thread/ERROR]: Exception ticking world\n[10:00:02] [Server thread/WARN]: Can't keep up!\njava.lang.OutOfMemoryError: Java heap space\n[10:00:03] [Server thread/INFO]: Stopping server\nno newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (logs zeta -n -1)",
+   "args": [
+    "logs",
+    "zeta",
+    "-n",
+    "-1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "no newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (logs zeta -n 1.5)",
+   "args": [
+    "logs",
+    "zeta",
+    "-n",
+    "1.5"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "no newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (logs zeta -n 0x2)",
+   "args": [
+    "logs",
+    "zeta",
+    "-n",
+    "0x2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:03] [Server thread/INFO]: Stopping server\nno newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (logs zeta -n Infinity)",
+   "args": [
+    "logs",
+    "zeta",
+    "-n",
+    "Infinity"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [Server thread/INFO]: Starting\n[10:00:01] [Server thread/ERROR]: Exception ticking world\n[10:00:02] [Server thread/WARN]: Can't keep up!\njava.lang.OutOfMemoryError: Java heap space\n[10:00:03] [Server thread/INFO]: Stopping server\nno newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (logs zeta --lines 2)",
+   "args": [
+    "logs",
+    "zeta",
+    "--lines",
+    "2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:03] [Server thread/INFO]: Stopping server\nno newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (logs zeta -n)",
+   "args": [
+    "logs",
+    "zeta",
+    "-n"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "no newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (logs zeta --no-n)",
+   "args": [
+    "logs",
+    "zeta",
+    "--no-n"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [Server thread/INFO]: Starting\n[10:00:01] [Server thread/ERROR]: Exception ticking world\n[10:00:02] [Server thread/WARN]: Can't keep up!\njava.lang.OutOfMemoryError: Java heap space\n[10:00:03] [Server thread/INFO]: Stopping server\nno newline at the end\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (logs zeta -n abc)",
+   "args": [
+    "logs",
+    "zeta",
+    "-n",
+    "abc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "RangeError [ERR_OUT_OF_RANGE]: The value of \"size\" is out of range. It must be >= 0 && <= 9007199254740991. Received NaN\n"
+  },
+  {
+   "label": "step 46 (logs zeta --grep info)",
+   "args": [
+    "logs",
+    "zeta",
+    "--grep",
+    "info"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [Server thread/INFO]: Starting\n[10:00:03] [Server thread/INFO]: Stopping server\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (logs zeta --grep ^\\[10:00:0[12]\\] -n 1)",
+   "args": [
+    "logs",
+    "zeta",
+    "--grep",
+    "^\\[10:00:0[12]\\]",
+    "-n",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:02] [Server thread/WARN]: Can't keep up!\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (logs zeta --grep ( -n 1)",
+   "args": [
+    "logs",
+    "zeta",
+    "--grep",
+    "(",
+    "-n",
+    "1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid pattern>\n"
+  },
+  {
+   "label": "step 49 (logs zeta --grep)",
+   "args": [
+    "logs",
+    "zeta",
+    "--grep"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (logs zeta --grep TRUE|ticking)",
+   "args": [
+    "logs",
+    "zeta",
+    "--grep",
+    "TRUE|ticking"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:01] [Server thread/ERROR]: Exception ticking world\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (logs zeta --grep \\d{2}:\\d{2}:0[3-9]|\\bjava\\.)",
+   "args": [
+    "logs",
+    "zeta",
+    "--grep",
+    "\\d{2}:\\d{2}:0[3-9]|\\bjava\\."
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "java.lang.OutOfMemoryError: Java heap space\n[10:00:03] [Server thread/INFO]: Stopping server\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (logs beta --grep [\\w-]+:|\\[[^\\]]+\\])",
+   "args": [
+    "logs",
+    "beta",
+    "--grep",
+    "[\\w-]+:|\\[[^\\]]+\\]"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (logs 10)",
+   "args": [
+    "logs",
+    "10"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (logs zeta --json)",
+   "args": [
+    "logs",
+    "zeta",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"logs\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for logs; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (logs )",
+   "args": [
+    "logs",
+    ""
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: logs requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 56 (why zeta)",
+   "args": [
+    "why",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\n>> Something in the world crashed the server\n   An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see <run>/data/instances/zeta/crash-reports. If it repeats, that report is what the responsible plugin or mod’s author needs.\n\n>> The server ran out of memory\n   It has 1G and wants more. Raise it under Manage (modded servers usually want 4G or more), and make sure the machine has that to give.\n\nCrash reports (2 newest, in <run>/data/instances/zeta/crash-reports):\n  crash-empty.txt  \n  crash-2026-11-01_10.00.00-server.txt  - Ticking entity\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (why beta)",
+   "args": [
+    "why",
+    "beta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\n>> A plugin is missing a dependency\n   A plugin needs \"ProtocolLib\" and \"Vault\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.\n\n>> The port is already taken\n   Something else is listening on port 25605 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.\n\n>> The EULA is not accepted\n   Set eula=true in <run>/data/instances/beta/eula.txt (see https://aka.ms/MinecraftEULA) and start again.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (why Alpha)",
+   "args": [
+    "why",
+    "Alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Nothing SpawnLoft recognises in the recent console. The last lines of the log are the\nnext place to look: spawnloft logs Alpha -n 60 --grep \" ERROR]| WARN]|Exception\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (why zeta --json)",
+   "args": [
+    "why",
+    "zeta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":true,\"data\":{\"instance\":\"zeta\",\"status\":{\"name\":\"zeta\",\"label\":\"Zeta world\",\"kind\":\"server\",\"status\":\"stale\",\"directory\":\"<run>/data/instances/zeta/../zeta/\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":25601,\"rconPort\":25611,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/zeta/console.log\"},\"findings\":[{\"id\":\"ticking-crash\",\"title\":\"Something in the world crashed the server\",\"advice\":\"An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see <run>/data/instances/zeta/crash-reports. If it repeats, that report is what the responsible plugin or mod’s author needs.\",\"line\":\"[10:00:01] [Server thread/ERROR]: Exception ticking world\",\"at\":1},{\"id\":\"out-of-memory\",\"title\":\"The server ran out of memory\",\"advice\":\"It has 1G and wants more. Raise it under Manage (modded servers usually want 4G or more), and make sure the machine has that to give.\",\"line\":\"java.lang.OutOfMemoryError: Java heap space\",\"at\":3}],\"crashes\":{\"dir\":\"<run>/data/instances/zeta/crash-reports\",\"reports\":[{\"file\":\"crash-empty.txt\",\"mtime\":\"<time>\",\"size\":16,\"sizeHuman\":\"16 B\",\"description\":\"\"},{\"file\":\"crash-2026-11-01_10.00.00-server.txt\",\"mtime\":\"<time>\",\"size\":120,\"sizeHuman\":\"120 B\",\"description\":\"Ticking entity\"}]},\"scope\":\"recent-console-and-crash-reports\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (diagnostics beta --json)",
+   "args": [
+    "diagnostics",
+    "beta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":true,\"data\":{\"instance\":\"beta\",\"status\":{\"name\":\"beta\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/beta\",\"jar\":\"server.jar\",\"memory\":\"2G\",\"port\":25605,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":1,\"consoleLog\":\"<run>/data/run/beta/console.log\"},\"findings\":[{\"id\":\"missing-plugin-dependency\",\"title\":\"A plugin is missing a dependency\",\"advice\":\"A plugin needs \\\"ProtocolLib\\\" and \\\"Vault\\\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.\",\"line\":\"UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download\",\"at\":0},{\"id\":\"port-in-use\",\"title\":\"The port is already taken\",\"advice\":\"Something else is listening on port 25605 - usually another server, or another copy of this one. \\\"spawnloft list\\\" shows who; change the port under Manage if both should run at once.\",\"line\":\"FAILED TO BIND TO PORT!\",\"at\":1},{\"id\":\"eula\",\"title\":\"The EULA is not accepted\",\"advice\":\"Set eula=true in <run>/data/instances/beta/eula.txt (see https://aka.ms/MinecraftEULA) and start again.\",\"line\":\"You need to agree to the EULA in order to run the server\",\"at\":2}],\"crashes\":{\"dir\":\"<run>/data/instances/beta/crash-reports\",\"reports\":[]},\"scope\":\"recent-console-and-crash-reports\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (why zeta beta --json)",
+   "args": [
+    "why",
+    "zeta",
+    "beta",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft diagnostics <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (why)",
+   "args": [
+    "why"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: why requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 63 (metrics zeta)",
+   "args": [
+    "metrics",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Performance: zeta (4 cores; CPU is a share of the whole machine)\n<time>  CPU 12.3%  Memory 512 MiB\n<time>  CPU 1.4%  Memory 600 MiB\n<time>  CPU 0.0%  Memory 640 MiB\n<time>  CPU 100.0%  Memory 2048.5 MiB\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (metrics zeta --json)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":true,\"data\":{\"instance\":\"zeta\",\"runId\":\"zeta:1763600000000\",\"startedAt\":<epoch-ms>,\"running\":false,\"samplingAvailable\":true,\"sampleSeconds\":10,\"cores\":4,\"cpuScale\":\"whole-machine\",\"samples\":[{\"timestamp\":\"<time>\",\"at\":1763600000,\"cpuPercent\":12.25,\"rssMiB\":512},{\"timestamp\":\"<time>\",\"at\":1763600010,\"cpuPercent\":1.35,\"rssMiB\":600},{\"timestamp\":\"<time>\",\"at\":1763600040,\"cpuPercent\":0,\"rssMiB\":640},{\"timestamp\":\"<time>\",\"at\":1763600050,\"cpuPercent\":99.95,\"rssMiB\":2048.5}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 65 (metrics zeta --csv)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--csv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance,run_id,timestamp,cpu_percent,rss_mib,cores\n\"zeta\",\"zeta:1763600000000\",<time>,12.25,512,4\n\"zeta\",\"zeta:1763600000000\",<time>,1.35,600,4\n\"zeta\",\"zeta:1763600000000\",<time>,0,640,4\n\"zeta\",\"zeta:1763600000000\",<time>,99.95,2048.5,4\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 66 (metrics zeta --seconds 1)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--seconds",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Performance: zeta (4 cores; CPU is a share of the whole machine)\nNo measurements in this range.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (metrics zeta --seconds 0)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--seconds",
+    "0"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --seconds must be a positive number\n"
+  },
+  {
+   "label": "step 68 (metrics zeta --seconds)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--seconds"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --seconds must be a positive number\n"
+  },
+  {
+   "label": "step 69 (metrics zeta --json --csv)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--json",
+    "--csv"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Choose --json or --csv, not both\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 70 (metrics zeta --csv=1)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--csv=1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --csv does not take a value\n"
+  },
+  {
+   "label": "step 71 (metrics zeta --output x.csv)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--output",
+    "x.csv"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --output <file> requires --csv without --follow\n"
+  },
+  {
+   "label": "step 72 (metrics zeta --csv --output {run}/export.csv)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--csv",
+    "--output",
+    "{run}/export.csv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Exported 4 measurements to <run>/export.csv\n"
+  },
+  {
+   "label": "step 73 (metrics zeta --csv --output {run}/export.csv)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--csv",
+    "--output",
+    "{run}/export.csv"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Error: EEXIST: file already exists, open '<run>/export.csv'\n"
+  },
+  {
+   "label": "step 74 (metrics zeta --wat)",
+   "args": [
+    "metrics",
+    "zeta",
+    "--wat"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --wat\n"
+  },
+  {
+   "label": "step 75 (metrics)",
+   "args": [
+    "metrics"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft metrics <instance>\n"
+  },
+  {
+   "label": "step 76 (metrics beta --json)",
+   "args": [
+    "metrics",
+    "beta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":true,\"data\":{\"instance\":\"beta\",\"runId\":null,\"startedAt\":null,\"running\":false,\"samplingAvailable\":true,\"sampleSeconds\":10,\"cores\":4,\"cpuScale\":\"whole-machine\",\"samples\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 77 (metrics gone --json)",
+   "args": [
+    "metrics",
+    "gone",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"gone\\\". Known instances: 2, 10, zeta, Alpha, beta, gone, maria, redis, ext, odd\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 78 (help)",
+   "args": [
+    "help"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.\n\nAUTOMATION\n  spawnloft status <name> --json     Versioned status record (no configured credentials)\n  spawnloft plugins <name> --json    Full plugin inventory\n  spawnloft backups <name> --json    Backup history (snapshots is an alias)\n  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries\n  spawnloft doctor --json            Read-only environment checks\n  spawnloft backup <name> --json     Create a backup; return its result and warnings\n  spawnloft metrics <name> --json    Recorded CPU and memory measurements\n      --follow                       Stream new readings; --json uses JSON Lines\n      --seconds <n>                  Limit the initial history window\n      --csv [--output <file>]        CSV export; refuses to overwrite an existing file\n  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.\n  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.\n  spawnloft mcp                      MCP server on stdio, for an AI client to launch\n      --allow-destructive            Also offer restore, kill and upgrade_minecraft\n      --show-ips                     Stop hiding player IP addresses in console lines\n\nLIFECYCLE\n  spawnloft list                         Show every instance and its state\n  spawnloft status <name>                Detailed state for one instance\n  spawnloft start <name>                 Start and wait until the server reports ready\n      --detach                       Return as soon as the process launches\n      --timeout <sec>                Ready timeout (default 180)\n      --no-sync                      Do not push registry ports into server.properties\n  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console \"stop\" command\n  spawnloft restart <name>               Stop then start\n  spawnloft kill <name>                  Force-kill the process tree\n\nCONSOLE\n  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows\n      --grep <regex>                 Filter lines\n  spawnloft cmd <name> \"<command>\"       Run a command over RCON and print the reply\n  spawnloft send <name> \"<line>\"         Write a raw line to the server's stdin\n  spawnloft console <name>               Interactive attach (server survives detach)\n  spawnloft players <name>               Who is online\n\nINSTANCES\n  spawnloft adopt <name> <dir>           Register an existing server directory in place\n      --jar <file> --memory <4G>\n  spawnloft new <name> [options]         Create a fresh instance\n      --jar <file>                   Server jar from the jars/ store\n      --paper <version>              Download that Paper version and use it\n      --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper\n      --vanilla <version>            Mojang's own server jar (no plugins, no mods)\n      --spigot | --craftbukkit <v>   Compiled here by BuildTools (needs a JDK, ~10 min)\n      --build <n>                    A specific build, for the sources that number them\n      --fabric <version>             Download Fabric for that version (mods, not plugins)\n      --neoforge <version>           Install NeoForge for that version (mods, not plugins)\n      --modpack <slug>               Build the whole server from a Modrinth modpack\n      --template <name>              Start from a saved template\n      --memory <4G> --port <n>\n      --accept-eula                  Write eula=true (you accept Mojang's EULA)\n      --offline                      Let anyone join as any name, no account needed.\n                                     Puts an OFFLINE/INSECURE banner in every log.\n  spawnloft clone <src> <new>            Copy plugins+config into a new instance\n      --with-worlds                  Also copy world data (default: fresh worlds)\n  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,\n                                     auto-restart=on|off, webhook=<url>|off\n  spawnloft props <name> [key=value...]  Read or edit server.properties\n  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>\n  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,\n                                     export [w], delete <w> --yes\n  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)\n\nSNAPSHOTS\n  spawnloft backup <name>                Snapshot to backups/<name>/\n      --scope <plugins|worlds|config|standard|full>\n      --label <text> --keep <n>\n  spawnloft snapshots <name>             List snapshots\n  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped\n  spawnloft prune <name> --keep <n>      Delete all but the newest n\n  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage\n\nOTHER\n  spawnloft templates                    List templates\n  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template\n  spawnloft ui [--port n] [--no-open] [--launcher]\n                                    Serve the local control panel and sign a browser in to it\n                                    (--no-open only prints the one-use link);\n                                    --launcher opens the game launcher instead\n  spawnloft ui --link [--port n] [--launcher]\n                                    Print a new sign-in link for the panel already running\n  spawnloft paper versions               Paper versions available to download\n  spawnloft paper fetch <version>        Download a Paper build into the jar store\n  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,\n                                     Purpur, Folia or Advanced Slime Paper);\n                                     --version <v> --yes crosses Minecraft versions\n  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update\n                                     (snapshot first; worlds and hand-added files untouched)\n  spawnloft config                       Show where servers, jars and backups live\n  spawnloft config set-root <path>       Move the data root (new servers only)\n  spawnloft config set-instances <path>  Put servers on a different drive\n  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,\n                                     so nothing stored needs changing (default: show the plan)\n  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move\n                                     that was interrupted\n  spawnloft config set-backup-mirror <path>|off\n                                     Copy every new snapshot to a second drive too\n  spawnloft rename <old> <new>           Rename an instance (and its folder)\n  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins\n  spawnloft reveal <name>                Open the instance folder in Explorer\n  spawnloft launchers [name]             Write start/console/stop .bat files\n  spawnloft jars                         List stored server jars\n  spawnloft jars import <path> [--as x]  Add a server jar to the store\n  spawnloft why <name>                   Say what is wrong with a server, from its own console\n  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings\n                                     for a bug report (--lines N, --json)\n\nBOTS (plugin testing with scripted players)\n  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)\n  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address\n  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report\n      --instance <server>            Use this server instead of the scenario's\n      --json                         The report as one JSON line; exit 1 when a step fails\n\nCLIENT (a game client for your own servers)\n  spawnloft client list                  Profiles, with running state\n  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)\n  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)\n  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList\n  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)\n  spawnloft client install <name>        Download what the profile needs, with progress on stderr\n  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)\n  spawnloft client status <name>         Say whether the client is running\n  spawnloft client stop <name>           Stop a running client\n  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log\n  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)\n  spawnloft client logout <name>         Forget a signed-in (or offline) account\n  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default\n\nDATABASES\n  spawnloft db                           List databases\n  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS\n  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]\n  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run\n  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address\n  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached\n  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials\n  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]\n  spawnloft db creds <db> <server>       Show a server's credentials again\n  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]\n  start, stop, restart, logs and status take a database's name like a server's.\n\n  spawnloft task list                    Scheduled tasks, when each last ran and runs next\n  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line \"<cmd>\"]\n      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon\n  spawnloft task run|rm|enable|disable <id>\n  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on\n\n  spawnloft doctor                       Check environment, ports, EULA, disk, stale state\n  spawnloft repair                       Rewrite task shims and server launchers for this install\n  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made\n\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 79 (help --json)",
+   "args": [
+    "help",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"help\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for help; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 80 (--help --json)",
+   "args": [
+    "--help",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"--help\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Use help without --json\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 81 (-h)",
+   "args": [
+    "-h"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.\n\nAUTOMATION\n  spawnloft status <name> --json     Versioned status record (no configured credentials)\n  spawnloft plugins <name> --json    Full plugin inventory\n  spawnloft backups <name> --json    Backup history (snapshots is an alias)\n  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries\n  spawnloft doctor --json            Read-only environment checks\n  spawnloft backup <name> --json     Create a backup; return its result and warnings\n  spawnloft metrics <name> --json    Recorded CPU and memory measurements\n      --follow                       Stream new readings; --json uses JSON Lines\n      --seconds <n>                  Limit the initial history window\n      --csv [--output <file>]        CSV export; refuses to overwrite an existing file\n  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.\n  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.\n  spawnloft mcp                      MCP server on stdio, for an AI client to launch\n      --allow-destructive            Also offer restore, kill and upgrade_minecraft\n      --show-ips                     Stop hiding player IP addresses in console lines\n\nLIFECYCLE\n  spawnloft list                         Show every instance and its state\n  spawnloft status <name>                Detailed state for one instance\n  spawnloft start <name>                 Start and wait until the server reports ready\n      --detach                       Return as soon as the process launches\n      --timeout <sec>                Ready timeout (default 180)\n      --no-sync                      Do not push registry ports into server.properties\n  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console \"stop\" command\n  spawnloft restart <name>               Stop then start\n  spawnloft kill <name>                  Force-kill the process tree\n\nCONSOLE\n  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows\n      --grep <regex>                 Filter lines\n  spawnloft cmd <name> \"<command>\"       Run a command over RCON and print the reply\n  spawnloft send <name> \"<line>\"         Write a raw line to the server's stdin\n  spawnloft console <name>               Interactive attach (server survives detach)\n  spawnloft players <name>               Who is online\n\nINSTANCES\n  spawnloft adopt <name> <dir>           Register an existing server directory in place\n      --jar <file> --memory <4G>\n  spawnloft new <name> [options]         Create a fresh instance\n      --jar <file>                   Server jar from the jars/ store\n      --paper <version>              Download that Paper version and use it\n      --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper\n      --vanilla <version>            Mojang's own server jar (no plugins, no mods)\n      --spigot | --craftbukkit <v>   Compiled here by BuildTools (needs a JDK, ~10 min)\n      --build <n>                    A specific build, for the sources that number them\n      --fabric <version>             Download Fabric for that version (mods, not plugins)\n      --neoforge <version>           Install NeoForge for that version (mods, not plugins)\n      --modpack <slug>               Build the whole server from a Modrinth modpack\n      --template <name>              Start from a saved template\n      --memory <4G> --port <n>\n      --accept-eula                  Write eula=true (you accept Mojang's EULA)\n      --offline                      Let anyone join as any name, no account needed.\n                                     Puts an OFFLINE/INSECURE banner in every log.\n  spawnloft clone <src> <new>            Copy plugins+config into a new instance\n      --with-worlds                  Also copy world data (default: fresh worlds)\n  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,\n                                     auto-restart=on|off, webhook=<url>|off\n  spawnloft props <name> [key=value...]  Read or edit server.properties\n  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>\n  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,\n                                     export [w], delete <w> --yes\n  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)\n\nSNAPSHOTS\n  spawnloft backup <name>                Snapshot to backups/<name>/\n      --scope <plugins|worlds|config|standard|full>\n      --label <text> --keep <n>\n  spawnloft snapshots <name>             List snapshots\n  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped\n  spawnloft prune <name> --keep <n>      Delete all but the newest n\n  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage\n\nOTHER\n  spawnloft templates                    List templates\n  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template\n  spawnloft ui [--port n] [--no-open] [--launcher]\n                                    Serve the local control panel and sign a browser in to it\n                                    (--no-open only prints the one-use link);\n                                    --launcher opens the game launcher instead\n  spawnloft ui --link [--port n] [--launcher]\n                                    Print a new sign-in link for the panel already running\n  spawnloft paper versions               Paper versions available to download\n  spawnloft paper fetch <version>        Download a Paper build into the jar store\n  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,\n                                     Purpur, Folia or Advanced Slime Paper);\n                                     --version <v> --yes crosses Minecraft versions\n  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update\n                                     (snapshot first; worlds and hand-added files untouched)\n  spawnloft config                       Show where servers, jars and backups live\n  spawnloft config set-root <path>       Move the data root (new servers only)\n  spawnloft config set-instances <path>  Put servers on a different drive\n  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,\n                                     so nothing stored needs changing (default: show the plan)\n  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move\n                                     that was interrupted\n  spawnloft config set-backup-mirror <path>|off\n                                     Copy every new snapshot to a second drive too\n  spawnloft rename <old> <new>           Rename an instance (and its folder)\n  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins\n  spawnloft reveal <name>                Open the instance folder in Explorer\n  spawnloft launchers [name]             Write start/console/stop .bat files\n  spawnloft jars                         List stored server jars\n  spawnloft jars import <path> [--as x]  Add a server jar to the store\n  spawnloft why <name>                   Say what is wrong with a server, from its own console\n  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings\n                                     for a bug report (--lines N, --json)\n\nBOTS (plugin testing with scripted players)\n  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)\n  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address\n  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report\n      --instance <server>            Use this server instead of the scenario's\n      --json                         The report as one JSON line; exit 1 when a step fails\n\nCLIENT (a game client for your own servers)\n  spawnloft client list                  Profiles, with running state\n  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)\n  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)\n  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList\n  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)\n  spawnloft client install <name>        Download what the profile needs, with progress on stderr\n  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)\n  spawnloft client status <name>         Say whether the client is running\n  spawnloft client stop <name>           Stop a running client\n  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log\n  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)\n  spawnloft client logout <name>         Forget a signed-in (or offline) account\n  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default\n\nDATABASES\n  spawnloft db                           List databases\n  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS\n  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]\n  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run\n  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address\n  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached\n  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials\n  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]\n  spawnloft db creds <db> <server>       Show a server's credentials again\n  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]\n  start, stop, restart, logs and status take a database's name like a server's.\n\n  spawnloft task list                    Scheduled tasks, when each last ran and runs next\n  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line \"<cmd>\"]\n      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon\n  spawnloft task run|rm|enable|disable <id>\n  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on\n\n  spawnloft doctor                       Check environment, ports, EULA, disk, stale state\n  spawnloft repair                       Rewrite task shims and server launchers for this install\n  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made\n\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 82 ()",
+   "args": [],
+   "code": 0,
+   "signal": null,
+   "stdout": "spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.\n\nAUTOMATION\n  spawnloft status <name> --json     Versioned status record (no configured credentials)\n  spawnloft plugins <name> --json    Full plugin inventory\n  spawnloft backups <name> --json    Backup history (snapshots is an alias)\n  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries\n  spawnloft doctor --json            Read-only environment checks\n  spawnloft backup <name> --json     Create a backup; return its result and warnings\n  spawnloft metrics <name> --json    Recorded CPU and memory measurements\n      --follow                       Stream new readings; --json uses JSON Lines\n      --seconds <n>                  Limit the initial history window\n      --csv [--output <file>]        CSV export; refuses to overwrite an existing file\n  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.\n  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.\n  spawnloft mcp                      MCP server on stdio, for an AI client to launch\n      --allow-destructive            Also offer restore, kill and upgrade_minecraft\n      --show-ips                     Stop hiding player IP addresses in console lines\n\nLIFECYCLE\n  spawnloft list                         Show every instance and its state\n  spawnloft status <name>                Detailed state for one instance\n  spawnloft start <name>                 Start and wait until the server reports ready\n      --detach                       Return as soon as the process launches\n      --timeout <sec>                Ready timeout (default 180)\n      --no-sync                      Do not push registry ports into server.properties\n  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console \"stop\" command\n  spawnloft restart <name>               Stop then start\n  spawnloft kill <name>                  Force-kill the process tree\n\nCONSOLE\n  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows\n      --grep <regex>                 Filter lines\n  spawnloft cmd <name> \"<command>\"       Run a command over RCON and print the reply\n  spawnloft send <name> \"<line>\"         Write a raw line to the server's stdin\n  spawnloft console <name>               Interactive attach (server survives detach)\n  spawnloft players <name>               Who is online\n\nINSTANCES\n  spawnloft adopt <name> <dir>           Register an existing server directory in place\n      --jar <file> --memory <4G>\n  spawnloft new <name> [options]         Create a fresh instance\n      --jar <file>                   Server jar from the jars/ store\n      --paper <version>              Download that Paper version and use it\n      --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper\n      --vanilla <version>            Mojang's own server jar (no plugins, no mods)\n      --spigot | --craftbukkit <v>   Compiled here by BuildTools (needs a JDK, ~10 min)\n      --build <n>                    A specific build, for the sources that number them\n      --fabric <version>             Download Fabric for that version (mods, not plugins)\n      --neoforge <version>           Install NeoForge for that version (mods, not plugins)\n      --modpack <slug>               Build the whole server from a Modrinth modpack\n      --template <name>              Start from a saved template\n      --memory <4G> --port <n>\n      --accept-eula                  Write eula=true (you accept Mojang's EULA)\n      --offline                      Let anyone join as any name, no account needed.\n                                     Puts an OFFLINE/INSECURE banner in every log.\n  spawnloft clone <src> <new>            Copy plugins+config into a new instance\n      --with-worlds                  Also copy world data (default: fresh worlds)\n  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,\n                                     auto-restart=on|off, webhook=<url>|off\n  spawnloft props <name> [key=value...]  Read or edit server.properties\n  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>\n  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,\n                                     export [w], delete <w> --yes\n  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)\n\nSNAPSHOTS\n  spawnloft backup <name>                Snapshot to backups/<name>/\n      --scope <plugins|worlds|config|standard|full>\n      --label <text> --keep <n>\n  spawnloft snapshots <name>             List snapshots\n  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped\n  spawnloft prune <name> --keep <n>      Delete all but the newest n\n  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage\n\nOTHER\n  spawnloft templates                    List templates\n  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template\n  spawnloft ui [--port n] [--no-open] [--launcher]\n                                    Serve the local control panel and sign a browser in to it\n                                    (--no-open only prints the one-use link);\n                                    --launcher opens the game launcher instead\n  spawnloft ui --link [--port n] [--launcher]\n                                    Print a new sign-in link for the panel already running\n  spawnloft paper versions               Paper versions available to download\n  spawnloft paper fetch <version>        Download a Paper build into the jar store\n  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,\n                                     Purpur, Folia or Advanced Slime Paper);\n                                     --version <v> --yes crosses Minecraft versions\n  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update\n                                     (snapshot first; worlds and hand-added files untouched)\n  spawnloft config                       Show where servers, jars and backups live\n  spawnloft config set-root <path>       Move the data root (new servers only)\n  spawnloft config set-instances <path>  Put servers on a different drive\n  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,\n                                     so nothing stored needs changing (default: show the plan)\n  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move\n                                     that was interrupted\n  spawnloft config set-backup-mirror <path>|off\n                                     Copy every new snapshot to a second drive too\n  spawnloft rename <old> <new>           Rename an instance (and its folder)\n  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins\n  spawnloft reveal <name>                Open the instance folder in Explorer\n  spawnloft launchers [name]             Write start/console/stop .bat files\n  spawnloft jars                         List stored server jars\n  spawnloft jars import <path> [--as x]  Add a server jar to the store\n  spawnloft why <name>                   Say what is wrong with a server, from its own console\n  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings\n                                     for a bug report (--lines N, --json)\n\nBOTS (plugin testing with scripted players)\n  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)\n  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address\n  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report\n      --instance <server>            Use this server instead of the scenario's\n      --json                         The report as one JSON line; exit 1 when a step fails\n\nCLIENT (a game client for your own servers)\n  spawnloft client list                  Profiles, with running state\n  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)\n  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)\n  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList\n  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)\n  spawnloft client install <name>        Download what the profile needs, with progress on stderr\n  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)\n  spawnloft client status <name>         Say whether the client is running\n  spawnloft client stop <name>           Stop a running client\n  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log\n  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)\n  spawnloft client logout <name>         Forget a signed-in (or offline) account\n  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default\n\nDATABASES\n  spawnloft db                           List databases\n  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS\n  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]\n  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run\n  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address\n  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached\n  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials\n  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]\n  spawnloft db creds <db> <server>       Show a server's credentials again\n  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]\n  start, stop, restart, logs and status take a database's name like a server's.\n\n  spawnloft task list                    Scheduled tasks, when each last ran and runs next\n  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line \"<cmd>\"]\n      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon\n  spawnloft task run|rm|enable|disable <id>\n  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on\n\n  spawnloft doctor                       Check environment, ports, EULA, disk, stale state\n  spawnloft repair                       Rewrite task shims and server launchers for this install\n  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made\n\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 84 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 85 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"<invalid json>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 86 (status a)",
+   "args": [
+    "status",
+    "a"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 88 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 90 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: Cannot read properties of null (reading 'instances')\n"
+  },
+  {
+   "label": "step 92 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/data.\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 94 (status s)",
+   "args": [
+    "status",
+    "s"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. Received type number (5)\n"
+  },
+  {
+   "label": "step 95 (why s --json)",
+   "args": [
+    "why",
+    "s",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"ERR_INVALID_ARG_TYPE\",\"message\":\"The \\\"path\\\" argument must be of type string. Received type number (5)\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 98 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 99 (status s --json)",
+   "args": [
+    "status",
+    "s",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"<invalid json>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 102 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/data.\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/zeta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/zeta/crash-reports": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/zeta/crash-reports/crash-2026-11-01_10.00.00-server.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "---- Minecraft Crash Report ----\n// Oops.\n\nTime: <date>\nDescription: Ticking entity\n\njava.lang.NullPointerException\n"
+  },
+  "data/instances/zeta/crash-reports/crash-empty.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "Description:   \n"
+  },
+  "data/instances/zeta/crash-reports/notes.md": {
+   "kind": "file",
+   "mode": "644",
+   "text": "not a report\n"
+  },
+  "data/instances/zeta/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "level-name=zworld\nmotd=Hello=there\r\nonline-mode=false\n"
+  },
+  "data/instances/Älpha-ünï": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/Älpha-ünï/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "motd=§aUnicode ✓\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {}\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/2/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "0"
+  },
+  "data/run/beta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/beta/console.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download\nFAILED TO BIND TO PORT!\nYou need to agree to the EULA in order to run the server\n"
+  },
+  "data/run/beta/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"running\": false,\n  \"exitCode\": 1,\n  \"stoppedAt\": <epoch-ms>\n}\n"
+  },
+  "data/run/s": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/zeta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/zeta/console.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[10:00:00] [Server thread/INFO]: Starting\r\n[10:00:01] [Server thread/ERROR]: Exception ticking world\r\n[10:00:02] [Server thread/WARN]: Can't keep up!\r\njava.lang.OutOfMemoryError: Java heap space\r\n[10:00:03] [Server thread/INFO]: Stopping server\r\nno newline at the end"
+  },
+  "data/run/zeta/metrics.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "1763600000 12.25 512 20 3 20\n1763600010 1.35 600 - - -\nbad line\n1763600020 101 1\n1763600030 -1 1\n0 5 5\n1763600040  640\n1763600050 99.95 2048.5\n"
+  },
+  "data/run/zeta/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"running\": true,\n  \"daemonPid\": <pid>,\n  \"javaPid\": <pid>,\n  \"daemonExe\": \"spawnloft-core\",\n  \"javaExe\": \"java\",\n  \"startedAt\": <epoch-ms>,\n  \"exitCode\": null,\n  \"restarts\": 2,\n  \"crashed\": true,\n  \"error\": \"boom\"\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "export.csv": {
+   "kind": "file",
+   "mode": "644",
+   "text": "instance,run_id,timestamp,cpu_percent,rss_mib,cores\n\"zeta\",\"zeta:1763600000000\",<time>,12.25,512,4\n\"zeta\",\"zeta:1763600000000\",<time>,1.35,600,4\n\"zeta\",\"zeta:1763600000000\",<time>,0,640,4\n\"zeta\",\"zeta:1763600000000\",<time>,99.95,2048.5,4\n"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

@@ -122,7 +122,7 @@
   "data/backups/run1/pre-install_plugins_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Greeter/ type=5 mode=755 size=0\nplugins/Greeter/messages.properties type=0 mode=644 size=12 sha256=d08b7bacebc820ecc3f1061afef661ff3f33e401b5ef9748c07989c869f71c4f\nplugins/Greeter/config.yml type=0 mode=644 size=25 sha256=d1dfa414e48f5cb51ba3644f9fc0d428442eaf83ae183b74f1911b1445180302"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Greeter/ type=5 mode=755 size=0\nplugins/Greeter/config.yml type=0 mode=644 size=25 sha256=d1dfa414e48f5cb51ba3644f9fc0d428442eaf83ae183b74f1911b1445180302\nplugins/Greeter/messages.properties type=0 mode=644 size=12 sha256=d08b7bacebc820ecc3f1061afef661ff3f33e401b5ef9748c07989c869f71c4f"
   },
   "data/backups/run1/pre-install_plugins_<stamp>.json#2": {
    "kind": "file",
@@ -132,7 +132,7 @@
   "data/backups/run1/pre-install_plugins_<stamp>.tar.gz#2": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Greeter/ type=5 mode=755 size=0\nplugins/Greeter/messages.properties type=0 mode=644 size=12 sha256=d08b7bacebc820ecc3f1061afef661ff3f33e401b5ef9748c07989c869f71c4f\nplugins/Greeter/config.yml type=0 mode=644 size=25 sha256=d1dfa414e48f5cb51ba3644f9fc0d428442eaf83ae183b74f1911b1445180302"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Greeter/ type=5 mode=755 size=0\nplugins/Greeter/config.yml type=0 mode=644 size=25 sha256=d1dfa414e48f5cb51ba3644f9fc0d428442eaf83ae183b74f1911b1445180302\nplugins/Greeter/messages.properties type=0 mode=644 size=12 sha256=d08b7bacebc820ecc3f1061afef661ff3f33e401b5ef9748c07989c869f71c4f"
   },
   "data/backups/run1/pre-update_plugins_<stamp>.json": {
    "kind": "file",
@@ -142,7 +142,7 @@
   "data/backups/run1/pre-update_plugins_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Greeter/ type=5 mode=755 size=0\nplugins/Greeter/messages.properties type=0 mode=644 size=12 sha256=d08b7bacebc820ecc3f1061afef661ff3f33e401b5ef9748c07989c869f71c4f\nplugins/Greeter/config.yml type=0 mode=644 size=25 sha256=d1dfa414e48f5cb51ba3644f9fc0d428442eaf83ae183b74f1911b1445180302"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Greeter/ type=5 mode=755 size=0\nplugins/Greeter/config.yml type=0 mode=644 size=25 sha256=d1dfa414e48f5cb51ba3644f9fc0d428442eaf83ae183b74f1911b1445180302\nplugins/Greeter/messages.properties type=0 mode=644 size=12 sha256=d08b7bacebc820ecc3f1061afef661ff3f33e401b5ef9748c07989c869f71c4f"
   },
   "data/engines": {
    "kind": "dir",

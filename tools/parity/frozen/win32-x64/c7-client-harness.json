@@ -1,0 +1,213 @@
+{
+ "about": "What the Node core did in scenario c7-client-harness on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-harness",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 4 (client launch h2)",
+   "args": [
+    "client",
+    "launch",
+    "h2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: The harness mod is not published for Minecraft 1.20.1 yet (published: 1.21.11). Turn the harness off on this profile to play (harness=false), or use 1.21.11 for harness work.\n"
+  },
+  {
+   "label": "step 5 (client launch h2 --json)",
+   "args": [
+    "client",
+    "launch",
+    "h2",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"harness-not-published\",\"message\":\"The harness mod is not published for Minecraft 1.20.1 yet (published: 1.21.11). Turn the harness off on this profile to play (harness=false), or use 1.21.11 for harness work.\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (client launch h2)",
+   "args": [
+    "client",
+    "launch",
+    "h2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: The harness mod is not published for Minecraft 1.20.1 yet (published: 1.21.11) (the published list could not be read: github.com did not answer). Turn the harness off on this profile to play (harness=false), or use 1.21.11 for harness work.\n"
+  },
+  {
+   "label": "step 9 (client launch h2 --json)",
+   "args": [
+    "client",
+    "launch",
+    "h2",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"harness-not-published\",\"message\":\"The harness mod is not published for Minecraft 1.20.1 yet (published: 1.21.11). Turn the harness off on this profile to play (harness=false), or use 1.21.11 for harness work.\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (client launch h1 --as Hana --wait --json)",
+   "args": [
+    "client",
+    "launch",
+    "h1",
+    "--as",
+    "Hana",
+    "--wait",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"fabric-loader-0.16.0-1.21.11\",\"account\":{\"type\":\"offline\",\"name\":\"Hana\"},\"profile\":{\"name\":\"h1\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"fabric\",\"loaderVersion\":\"0.16.0\",\"memory\":\"1G\",\"harness\":true},\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (client status h1 --json)",
+   "args": [
+    "client",
+    "status",
+    "h1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"h1\",\"running\":true,\"pid\":<pid>,\"startedAt\":\"<time>\",\"uptimeMs\":<ms>,\"account\":{\"type\":\"offline\",\"name\":\"Hana\"},\"launchedBy\":\"cli\",\"server\":null,\"address\":null,\"harness\":{\"port\":<port>}}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (client stop h1)",
+   "args": [
+    "client",
+    "stop",
+    "h1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"h1\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (client launch h1 --wait)",
+   "args": [
+    "client",
+    "launch",
+    "h1",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Launched \"h1\" as h1_ (pid <pid>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (client stop h1 --json)",
+   "args": [
+    "client",
+    "stop",
+    "h1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"stopped\":true,\"wasRunning\":true}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/client": {
+   "kind": "dir"
+  },
+  "data/client/cache": {
+   "kind": "dir"
+  },
+  "data/client/cache/harness-index.status.json": {
+   "kind": "file",
+   "text": "{\n  \"lastCheck\": 1763700000000,\n  \"outcome\": \"unchanged\",\n  \"reason\": null\n}\n"
+  },
+  "data/client/profiles": {
+   "kind": "dir"
+  },
+  "data/client/profiles/h1": {
+   "kind": "dir"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"h1\": {\n      \"mc\": \"1.21.11\",\n      \"loader\": \"fabric\",\n      \"loaderVersion\": \"0.16.0\",\n      \"memory\": \"1G\",\n      \"harness\": true\n    },\n    \"h2\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"fabric\",\n      \"loaderVersion\": \"0.16.0\",\n      \"memory\": \"1G\",\n      \"harness\": true\n    }\n  }\n}\n"
+  },
+  "data/client/run": {
+   "kind": "dir"
+  },
+  "data/client/run/h1": {
+   "kind": "dir"
+  },
+  "data/client/run/h1/client.log": {
+   "kind": "file",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: h1_\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/h1/played.json": {
+   "kind": "file",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 2\n}\n"
+  },
+  "data/client/run/h1/stop-asked.json": {
+   "kind": "file",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/run/h2": {
+   "kind": "dir"
+  },
+  "data/client/versions": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.21.11": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.21.11/1.21.11.json": {
+   "kind": "file",
+   "text": "{\r\n  \"arguments\": {\r\n    \"game\": [\r\n      \"--username\",\r\n      \"${auth_player_name}\",\r\n      \"--version\",\r\n      \"${version_name}\",\r\n      \"--gameDir\",\r\n      \"${game_directory}\",\r\n      \"--assetsDir\",\r\n      \"${assets_root}\",\r\n      \"--assetIndex\",\r\n      \"${assets_index_name}\",\r\n      \"--uuid\",\r\n      \"${auth_uuid}\",\r\n      \"--accessToken\",\r\n      \"${auth_access_token}\",\r\n      \"--clientId\",\r\n      \"${clientid}\",\r\n      \"--xuid\",\r\n      \"${auth_xuid}\",\r\n      \"--versionType\",\r\n      \"${version_type}\",\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"features\": {\r\n              \"is_demo_user\": true\r\n            }\r\n          }\r\n        ],\r\n        \"value\": \"--demo\"\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"features\": {\r\n              \"has_custom_resolution\": true\r\n            }\r\n          }\r\n        ],\r\n        \"value\": [\r\n          \"--width\",\r\n          \"${resolution_width}\",\r\n          \"--height\",\r\n          \"${resolution_height}\"\r\n        ]\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"features\": {\r\n              \"has_quick_plays_support\": true\r\n            }\r\n          }\r\n        ],\r\n        \"value\": [\r\n          \"--quickPlayPath\",\r\n          \"${quickPlayPath}\"\r\n        ]\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"features\": {\r\n              \"is_quick_play_singleplayer\": true\r\n            }\r\n          }\r\n        ],\r\n        \"value\": [\r\n          \"--quickPlaySingleplayer\",\r\n          \"${quickPlaySingleplayer}\"\r\n        ]\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"features\": {\r\n              \"is_quick_play_multiplayer\": true\r\n            }\r\n          }\r\n        ],\r\n        \"value\": [\r\n          \"--quickPlayMultiplayer\",\r\n          \"${quickPlayMultiplayer}\"\r\n        ]\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"features\": {\r\n              \"is_quick_play_realms\": true\r\n            }\r\n          }\r\n        ],\r\n        \"value\": [\r\n          \"--quickPlayRealms\",\r\n          \"${quickPlayRealms}\"\r\n        ]\r\n      }\r\n    ],\r\n    \"jvm\": [\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"os\": {\r\n              \"name\": \"osx\"\r\n            }\r\n          }\r\n        ],\r\n        \"value\": [\r\n          \"-XstartOnFirstThread\"\r\n        ]\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"os\": {\r\n              \"name\": \"windows\"\r\n            }\r\n          }\r\n        ],\r\n        \"value\": \"-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\"\r\n      },\r\n      {\r\n        \"rules\": [\r\n          {\r\n            \"action\": \"allow\",\r\n            \"os\": {\r\n              \"arch\": \"x86\"\r\n            }\r\n          }\r\n        ],\r\n        \"value\": \"-Xss1M\"\r\n      },\r\n      \"-Djava.library.path=${natives_directory}\",\r\n      \"-Djna.tmpdir=${natives_directory}\",\r\n      \"-Dorg.lwjgl.system.SharedLibraryExtractPath=${natives_directory}\",\r\n      \"-Dio.netty.native.workdir=${natives_directory}\",\r\n      \"-Dminecraft.launcher.brand=${launcher_name}\",\r\n      \"-Dminecraft.launcher.version=${launcher_version}\",\r\n      \"-cp\",\r\n      \"${classpath}\"\r\n    ]\r\n  },\r\n  \"assetIndex\": {\r\n    \"id\": \"29\",\r\n    \"sha1\": \"a2f0558bd140ae4f8f6a48d0ea6f1dbc16a84baa\",\r\n    \"size\": 529966,\r\n    \"totalSize\": 452742718,\r\n    \"url\": \"https://piston-meta.mojang.com/v1/packages/a2f0558bd140ae4f8f6a48d0ea6f1dbc16a84baa/29.json\"\r\n  },\r\n  \"assets\": \"29\",\r\n  \"complianceLevel\": 1,\r\n  \"downloads\": {\r\n    \"client\": {\r\n      \"sha1\": \"ba2df812c2d12e0219c489c4cd9a5e1f0760f5bd\",\r\n      \"size\": 31152600,\r\n      \"url\": \"https://piston-data.mojang.com/v1/objects/ba2df812c2d12e0219c489c4cd9a5e1f0760f5bd/client.jar\"\r\n    },\r\n    \"client_mappings\": {\r\n      \"sha1\": \"031a68bebf55d824f66d6573d8c752f0e1bf232a\",\r\n      \"size\": 11779287,\r\n      \"url\": \"https://piston-data.mojang.com/v1/objects/031a68bebf55d824f66d6573d8c752f0e1bf232a/client.txt\"\r\n    },\r\n    \"server\": {\r\n      \"sha1\": \"64bb6d763bed0a9f1d632ec347938594144943ed\",\r\n      \"size\": 56327581,\r\n      \"url\": \"https://piston-data.mojang.com/v1/objects/64bb6d763bed0a9f1d632ec347938594144943ed/server.jar\"\r\n    },\r\n    \"server_mappings\": {\r\n      \"sha1\": \"5621e9253f05fd57872bbe7f8ddf5f9a7d525955\",\r\n      \"size\": 8678606,\r\n      \"url\": \"https://piston-data.mojang.com/v1/objects/5621e9253f05fd57872bbe7f8ddf5f9a7d525955/server.txt\"\r\n    }\r\n  },\r\n  \"id\": \"1.21.11\",\r\n  \"javaVersion\": {\r\n    \"component\": \"java-runtime-delta\",\r\n    \"majorVersion\": 21\r\n  },\r\n  \"libraries\": [\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar\",\r\n          \"sha1\": \"1227f9e0666314f9de41477e3ec277e542ed7f7b\",\r\n          \"size\": 1330045,\r\n          \"url\": \"https://libraries.minecraft.net/ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar\"\r\n        }\r\n      },\r\n      \"name\": \"ca.weblite:java-objc-bridge:1.1\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"osx\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\",\r\n          \"sha1\": \"6ff6d710fd4ffd470f2799653fab57e27fed0c9d\",\r\n          \"size\": 46763,\r\n          \"url\": \"https://libraries.minecraft.net/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\"\r\n        }\r\n      },\r\n      \"name\": \"com.mojang:jtracy:1.0.37:natives-windows\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"windows\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar\",\r\n          \"sha1\": \"908ce8e5e196e52061dc11290723d19e2c574bfd\",\r\n          \"size\": 100000,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar\"\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-linux\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"linux\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar\",\r\n          \"sha1\": \"9c2086997079f664149bd1a6ff5aedd313e0c772\",\r\n          \"size\": 100001,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar\"\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-macos\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"osx\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar\",\r\n          \"sha1\": \"8be5e9f608e7d6b78c56d047982b5ea0d6cc7033\",\r\n          \"size\": 100002,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar\"\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-macos-arm64\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"osx\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-arm64.jar\",\r\n          \"sha1\": \"b8eae2308625740adfb9c4d62e20ad7c28984005\",\r\n          \"size\": 100003,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-arm64.jar\"\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-windows-arm64\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"windows\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-x86.jar\",\r\n          \"sha1\": \"e553dd7836f2decb46d66c8e34e410032c6e8a8d\",\r\n          \"size\": 100004,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-x86.jar\"\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-windows-x86\",\r\n      \"rules\": [\r\n        {\r\n          \"action\": \"allow\",\r\n          \"os\": {\r\n            \"name\": \"windows\"\r\n          }\r\n        }\r\n      ]\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\",\r\n          \"sha1\": \"29589b5f87ed335a6c7e7ee6a5775f81f97ecb84\",\r\n          \"size\": 785029,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\"\r\n        },\r\n        \"classifiers\": {\r\n          \"natives-windows\": {\r\n            \"path\": \"com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\",\r\n            \"sha1\": \"6ff6d710fd4ffd470f2799653fab57e27fed0c9d\",\r\n            \"size\": 46763,\r\n            \"url\": \"https://libraries.minecraft.net/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\"\r\n          }\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3\",\r\n      \"natives\": {\r\n        \"windows\": \"natives-windows\"\r\n      },\r\n      \"extract\": {\r\n        \"exclude\": [\r\n          \"META-INF/\"\r\n        ]\r\n      }\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\",\r\n          \"sha1\": \"29589b5f87ed335a6c7e7ee6a5775f81f97ecb84\",\r\n          \"size\": 785029,\r\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\"\r\n        }\r\n      },\r\n      \"name\": \"org.lwjgl:lwjgl:3.3.3\"\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar\",\r\n          \"sha1\": \"1f30a180ee04ccd53339a716aec13cae60a013b5\",\r\n          \"size\": 683071,\r\n          \"url\": \"https://libraries.minecraft.net/at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar\"\r\n        }\r\n      },\r\n      \"name\": \"at.yawk.lz4:lz4-java:1.8.1\"\r\n    },\r\n    {\r\n      \"downloads\": {\r\n        \"artifact\": {\r\n          \"path\": \"com/azure/azure-json/1.4.0/azure-json-1.4.0.jar\",\r\n          \"sha1\": \"fcc1d354dbc3e0300e5276b1bf124d0247799cd8\",\r\n          \"size\": 325945,\r\n          \"url\": \"https://libraries.minecraft.net/com/azure/azure-json/1.4.0/azure-json-1.4.0.jar\"\r\n        }\r\n      },\r\n      \"name\": \"com.azure:azure-json:1.4.0\"\r\n    }\r\n  ],\r\n  \"logging\": {\r\n    \"client\": {\r\n      \"argument\": \"-Dlog4j.configurationFile=${path}\",\r\n      \"file\": {\r\n        \"id\": \"client-1.21.2.xml\",\r\n        \"sha1\": \"39384bd14c0606d812afec88d8aff595b2587dd9\",\r\n        \"size\": 1073,\r\n        \"url\": \"https://piston-data.mojang.com/v1/objects/39384bd14c0606d812afec88d8aff595b2587dd9/client-1.21.2.xml\"\r\n      },\r\n      \"type\": \"log4j2-xml\"\r\n    }\r\n  },\r\n  \"mainClass\": \"net.minecraft.client.main.Main\",\r\n  \"minimumLauncherVersion\": 21,\r\n  \"releaseTime\": \"<time>\",\r\n  \"time\": \"<time>\",\r\n  \"type\": \"release\"\r\n}"
+  },
+  "data/client/versions/fabric-loader-0.16.0-1.21.11": {
+   "kind": "dir"
+  },
+  "data/client/versions/fabric-loader-0.16.0-1.21.11/fabric-loader-0.16.0-1.21.11.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"fabric-loader-0.16.0-1.21.11\",\n  \"inheritsFrom\": \"1.21.11\",\n  \"type\": \"release\",\n  \"mainClass\": \"net.fabricmc.loader.impl.launch.knot.KnotClient\",\n  \"arguments\": {\n    \"game\": [],\n    \"jvm\": [\n      \"-DFabricMcEmu= net.minecraft.client.main.Main \"\n    ]\n  },\n  \"libraries\": []\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

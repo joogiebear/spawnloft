@@ -1,0 +1,993 @@
+{
+ "about": "What the Node core did in scenario c7-client-versions on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-versions",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type     Fabric  Quilt  Forge  NeoForge  Downloaded\n1.21.11  release  yes     yes           yes\n1.21.10  release  yes                   yes\n1.20.1   release  yes     yes    yes    yes\n1.12.2   release                 yes\n1.5.2    release\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (client versions --json)",
+   "args": [
+    "client",
+    "versions",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":null,\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":true,\"forge\":false,\"neoforge\":true}},{\"id\":\"1.21.10\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":false,\"forge\":false,\"neoforge\":true}},{\"id\":\"1.20.1\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":true,\"forge\":true,\"neoforge\":true}},{\"id\":\"1.12.2\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":true,\"neoforge\":false}},{\"id\":\"1.5.2\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":false,\"neoforge\":false}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 3 (client versions --snapshots -n 4)",
+   "args": [
+    "client",
+    "versions",
+    "--snapshots",
+    "-n",
+    "4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version          Type               Fabric  Quilt  Forge  NeoForge  Downloaded\n26.1-snapshot-1  snapshot           yes\n1.21.11          release            yes     yes           yes\n1.21.11-rc1      release-candidate\n1.21.11-pre2     pre-release\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 4 (client versions --all --json)",
+   "args": [
+    "client",
+    "versions",
+    "--all",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":null,\"versions\":[{\"id\":\"26.1-snapshot-1\",\"type\":\"snapshot\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":false,\"forge\":false,\"neoforge\":false}},{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":true,\"forge\":false,\"neoforge\":true}},{\"id\":\"1.21.11-rc1\",\"type\":\"snapshot\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":false,\"neoforge\":false}},{\"id\":\"1.21.11-pre2\",\"type\":\"snapshot\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":false,\"neoforge\":false}},{\"id\":\"1.21.10\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":false,\"forge\":false,\"neoforge\":true}},{\"id\":\"1.20.1\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":true,\"forge\":true,\"neoforge\":true}},{\"id\":\"1.12.2\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":true,\"neoforge\":false}},{\"id\":\"1.5.2\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":false,\"neoforge\":false}},{\"id\":\"b1.7.3\",\"type\":\"old_beta\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":false,\"neoforge\":false}},{\"id\":\"no-time\",\"type\":\"snapshot\",\"downloaded\":false,\"loaders\":{\"fabric\":false,\"quilt\":false,\"forge\":false,\"neoforge\":false}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (client versions -n 0)",
+   "args": [
+    "client",
+    "versions",
+    "-n",
+    "0"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: -n must be a positive whole number\n"
+  },
+  {
+   "label": "step 6 (client versions extra)",
+   "args": [
+    "client",
+    "versions",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 7 (client versions --bogus)",
+   "args": [
+    "client",
+    "versions",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 8 (client new a --mc 1.21.11)",
+   "args": [
+    "client",
+    "new",
+    "a",
+    "--mc",
+    "1.21.11"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"a\" (Minecraft 1.21.11, vanilla). Launch it: spawnloft client launch a\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (client new b --mc  1.20.1  --loader forge --memory 4G --json)",
+   "args": [
+    "client",
+    "new",
+    "b",
+    "--mc",
+    " 1.20.1 ",
+    "--loader",
+    "forge",
+    "--memory",
+    "4G",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profile\":{\"name\":\"b\",\"mc\":\"1.20.1\",\"loader\":\"forge\",\"loaderVersion\":null,\"java\":null,\"memory\":\"4G\",\"harness\":false,\"server\":null,\"account\":null,\"assistantAccount\":false,\"createdAt\":\"<time>\"}}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (client new c --mc 1.21.11 --loader fabric --harness --server s1 --java /opt/java/bin/java)",
+   "args": [
+    "client",
+    "new",
+    "c",
+    "--mc",
+    "1.21.11",
+    "--loader",
+    "fabric",
+    "--harness",
+    "--server",
+    "s1",
+    "--java",
+    "/opt/java/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"c\" (Minecraft 1.21.11, fabric). Launch it: spawnloft client launch c\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (client new d --mc 1.21.11 --loader neoforge)",
+   "args": [
+    "client",
+    "new",
+    "d",
+    "--mc",
+    "1.21.11",
+    "--loader",
+    "neoforge"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"d\" (Minecraft 1.21.11, neoforge). Launch it: spawnloft client launch d\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (client new e --mc 1.21.11 --loader quilt --account offline:Bob)",
+   "args": [
+    "client",
+    "new",
+    "e",
+    "--mc",
+    "1.21.11",
+    "--loader",
+    "quilt",
+    "--account",
+    "offline:Bob"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created profile \"e\" (Minecraft 1.21.11, quilt). Launch it: spawnloft client launch e\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (client new x --mc 1.12.2 --loader fabric)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.12.2",
+    "--loader",
+    "fabric"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Fabric has no build for Minecraft 1.12.2; use Vanilla for it, or a version Fabric supports\n"
+  },
+  {
+   "label": "step 14 (client new x --mc 26.1-snapshot-1 --loader quilt)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "26.1-snapshot-1",
+    "--loader",
+    "quilt"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Quilt has no loader for Minecraft 26.1-snapshot-1 yet. Use None for it, or wait for Quilt to catch up.\n"
+  },
+  {
+   "label": "step 15 (client new x --mc 1.5.2 --loader forge)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.5.2",
+    "--loader",
+    "forge"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Forge for Minecraft 1.5.2 is older than SpawnLoft offers (1.6.4 and newer). Use None for it.\n"
+  },
+  {
+   "label": "step 16 (client new x --mc 1.12.2 --loader neoforge --json)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.12.2",
+    "--loader",
+    "neoforge",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"loader-not-available\",\"message\":\"NeoForge has no build for Minecraft 1.12.2. Use None, or a version NeoForge supports.\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (client new x --mc 1.21.99)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.99"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Mojang's version list has no \"1.21.99\"; check the id (releases look like 26.3, snapshots like 26.4-snapshot-6, old versions like b1.7.3). Did you mean 1.21.11, 1.21.11-rc1, 1.21.11-pre2, 1.21.10?\n"
+  },
+  {
+   "label": "step 18 (client new x --mc 9.9)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "9.9"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Mojang's version list has no \"9.9\"; check the id (releases look like 26.3, snapshots like 26.4-snapshot-6, old versions like b1.7.3)\n"
+  },
+  {
+   "label": "step 19 (client new x --mc 1.21..1)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21..1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid Minecraft version \"1.21..1\" - versions look like 26.3, 26.4-snapshot-6 or b1.7.3\n"
+  },
+  {
+   "label": "step 20 (client new x --mc 1.21.11 --loader fabrik)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.11",
+    "--loader",
+    "fabrik"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Error: unknown loader \"fabrik\"\n"
+  },
+  {
+   "label": "step 21 (client new A --mc 1.21.11)",
+   "args": [
+    "client",
+    "new",
+    "A",
+    "--mc",
+    "1.21.11"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: a profile named \"a\" already exists (names must differ in more than case)\n"
+  },
+  {
+   "label": "step 22 (client new bad name --mc 1.21.11)",
+   "args": [
+    "client",
+    "new",
+    "bad name",
+    "--mc",
+    "1.21.11"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid profile name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 23 (client new x --mc 1.21.11 --harness)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.11",
+    "--harness"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the harness mod needs the fabric loader\n"
+  },
+  {
+   "label": "step 24 (client new x --mc 1.21.11 --memory 1.5G)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.11",
+    "--memory",
+    "1.5G"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: memory must be a whole number of M or G, like 2G or 1536M, not \"1.5G\"\n"
+  },
+  {
+   "label": "step 25 (client new x --mc 1.21.11 --memory lots)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.11",
+    "--memory",
+    "lots"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid memory value \"lots\" - use e.g. 4G or 6144M\n"
+  },
+  {
+   "label": "step 26 (client new x --mc 1.21.11 --java  )",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.11",
+    "--java",
+    " "
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: java must be text or null\n"
+  },
+  {
+   "label": "step 27 (client new x --mc)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Minecraft version must be text, like 26.3\n"
+  },
+  {
+   "label": "step 28 (client new x)",
+   "args": [
+    "client",
+    "new",
+    "x"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 29 (client new)",
+   "args": [
+    "client",
+    "new"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 30 (client new x y --mc 1.21.11)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "y",
+    "--mc",
+    "1.21.11"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 31 (client new x --mc 1.21.11 --purge)",
+   "args": [
+    "client",
+    "new",
+    "x",
+    "--mc",
+    "1.21.11",
+    "--purge"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --purge\n"
+  },
+  {
+   "label": "step 32 (client set a memory=3G java=/usr/bin/java)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "memory=3G",
+    "java=/usr/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": memory=3G java=/usr/bin/java\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (client set a java= serverList=false assistantAccount=true --json)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "java=",
+    "serverList=false",
+    "assistantAccount=true",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profile\":{\"name\":\"a\",\"assistantAccount\":true,\"serverList\":false,\"mc\":\"1.21.11\",\"loader\":\"vanilla\",\"loaderVersion\":null,\"java\":null,\"memory\":\"3G\",\"harness\":false,\"server\":null,\"account\":null,\"createdAt\":\"<time>\"}}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (client set a loader=quilt)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "loader=quilt"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": loader=quilt\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (client set a loaderVersion=0.29.1)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "loaderVersion=0.29.1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": loaderVersion=0.29.1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (client set a mc=1.20.1)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "mc=1.20.1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": mc=1.20.1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (client set a mc=1.12.2 loader=fabric)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "mc=1.12.2",
+    "loader=fabric"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Fabric has no build for Minecraft 1.12.2; use Vanilla for it, or a version Fabric supports\n"
+  },
+  {
+   "label": "step 38 (client set a mc=1.20.1  loader=quilt)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "mc=1.20.1 ",
+    "loader=quilt"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": mc=1.20.1  loader=quilt\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (client set a loader=vanilla harness=true)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "loader=vanilla",
+    "harness=true"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the harness mod needs the fabric loader\n"
+  },
+  {
+   "label": "step 40 (client set a harness=maybe)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "harness=maybe"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 41 (client set a bogus=1)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "bogus=1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: unknown profile field \"bogus\"; one of mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList\n"
+  },
+  {
+   "label": "step 42 (client set a memory)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "memory"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 43 (client set a memory=2G memory=5G)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "memory=2G",
+    "memory=5G"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": memory=5G\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (client set a loaderVersion=../x)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "loaderVersion=../x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: loaderVersion \"../x\" must be a version like 0.16.9 (letters, digits, dots, +, _ and -)\n"
+  },
+  {
+   "label": "step 45 (client set a account=Steve server=s2)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "account=Steve",
+    "server=s2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": account=Steve server=s2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (client set a account=)",
+   "args": [
+    "client",
+    "set",
+    "a",
+    "account="
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Updated \"a\": account cleared\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (client set a)",
+   "args": [
+    "client",
+    "set",
+    "a"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 48 (client set nope memory=1G)",
+   "args": [
+    "client",
+    "set",
+    "nope",
+    "memory=1G"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Known profiles: a, b, c, d, e\n"
+  },
+  {
+   "label": "step 49 (client set nope mc=1.21.11)",
+   "args": [
+    "client",
+    "set",
+    "nope",
+    "mc=1.21.11"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Known profiles: a, b, c, d, e\n"
+  },
+  {
+   "label": "step 50 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "a  1.20.1  quilt  5G  offline  stopped\nb  1.20.1  forge  4G  offline  stopped\nc  1.21.11  fabric  2G  offline  stopped\nd  1.21.11  neoforge  2G  offline  stopped\ne  1.21.11  quilt  2G  account Bob  stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (client list --json)",
+   "args": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profiles\":[{\"name\":\"a\",\"assistantAccount\":true,\"serverList\":false,\"mc\":\"1.20.1\",\"loader\":\"quilt\",\"loaderVersion\":null,\"java\":null,\"memory\":\"5G\",\"harness\":false,\"server\":\"s2\",\"account\":null,\"createdAt\":\"<time>\",\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"b\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"forge\",\"loaderVersion\":null,\"java\":null,\"memory\":\"4G\",\"harness\":false,\"server\":null,\"account\":null,\"createdAt\":\"<time>\",\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"c\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"fabric\",\"loaderVersion\":null,\"java\":\"/opt/java/bin/java\",\"memory\":\"2G\",\"harness\":true,\"server\":\"s1\",\"account\":null,\"createdAt\":\"<time>\",\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"d\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"neoforge\",\"loaderVersion\":null,\"java\":null,\"memory\":\"2G\",\"harness\":false,\"server\":null,\"account\":null,\"createdAt\":\"<time>\",\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"e\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"quilt\",\"loaderVersion\":null,\"java\":null,\"memory\":\"2G\",\"harness\":false,\"server\":null,\"account\":\"offline:Bob\",\"createdAt\":\"<time>\",\"accountName\":\"Bob\",\"accountType\":\"offline\",\"running\":false}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type     Fabric  Quilt  Forge  NeoForge  Downloaded\n1.21.11  release  yes     yes           yes\n1.21.10  release  yes                   yes       yes\n1.20.1   release  yes     yes    yes    yes\n1.12.2   release                 yes\n1.5.2    release\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (client versions --json -n 3)",
+   "args": [
+    "client",
+    "versions",
+    "--json",
+    "-n",
+    "3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":null,\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":true,\"forge\":false,\"neoforge\":true}},{\"id\":\"1.21.10\",\"type\":\"release\",\"downloaded\":true,\"loaders\":{\"fabric\":true,\"quilt\":false,\"forge\":false,\"neoforge\":true}},{\"id\":\"1.20.1\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":true,\"quilt\":true,\"forge\":true,\"neoforge\":true}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (client set hand loader=fabric)",
+   "args": [
+    "client",
+    "set",
+    "hand",
+    "loader=fabric"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: mc.trim is not a function\n"
+  },
+  {
+   "label": "step 62 (client set hand memory=3G)",
+   "args": [
+    "client",
+    "set",
+    "hand",
+    "memory=3G"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Minecraft version must be text, like 26.3\n"
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://files.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/maven-metadata.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://files.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/promotions_slim.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/game",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.quiltmc.org",
+   "method": "GET",
+   "url": "/v3/versions/game",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/client": {
+   "kind": "dir"
+  },
+  "data/client/cache": {
+   "kind": "dir"
+  },
+  "data/client/cache/fabric-game-versions.json": {
+   "kind": "file",
+   "text": "[{\"version\":\"26.1-snapshot-1\",\"stable\":false},{\"version\":\"1.21.11\",\"stable\":true},{\"version\":\"1.21.10\",\"stable\":true},{\"version\":\"1.20.1\",\"stable\":true}]"
+  },
+  "data/client/cache/fabric-game-versions.json.fetched-at": {
+   "kind": "file",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/forge-maven-metadata.json": {
+   "kind": "file",
+   "text": "{\"1.12.2\":[\"1.12.2-14.23.5.2860\"],\"1.20.1\":[\"1.20.1-47.4.28\",\"1.20.1-47.4.0\"],\"1.5.2\":[\"1.5.2-7.8.1.738\"]}"
+  },
+  "data/client/cache/forge-maven-metadata.json.fetched-at": {
+   "kind": "file",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/forge-promotions.json": {
+   "kind": "file",
+   "text": "{\"promos\":{\"1.20.1-recommended\":\"47.4.0\"}}"
+  },
+  "data/client/cache/forge-promotions.json.fetched-at": {
+   "kind": "file",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/neoforge-versions.json": {
+   "kind": "file",
+   "text": "{\"versions\":[\"20.1.5-beta\",\"21.10.3\",\"21.11.1-beta\",\"21.11.2\"]}"
+  },
+  "data/client/cache/neoforge-versions.json.fetched-at": {
+   "kind": "file",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/quilt-game-versions.json": {
+   "kind": "file",
+   "text": "[{\"version\":\"1.21.11\",\"stable\":true},{\"version\":\"1.20.1\",\"stable\":true}]"
+  },
+  "data/client/cache/quilt-game-versions.json.fetched-at": {
+   "kind": "file",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/version_manifest_v2.json": {
+   "kind": "file",
+   "text": "{\"latest\":{\"release\":\"1.21.11\",\"snapshot\":\"26.1-snapshot-1\"},\"versions\":[{\"id\":\"26.1-snapshot-1\",\"type\":\"snapshot\",\"releaseTime\":\"<time>\"},{\"id\":\"1.21.11\",\"type\":\"release\",\"releaseTime\":\"<time>\"},{\"id\":\"1.21.11-rc1\",\"type\":\"snapshot\",\"releaseTime\":\"<time>\"},{\"id\":\"1.21.11-pre2\",\"type\":\"snapshot\",\"releaseTime\":\"<time>\"},{\"id\":\"1.21.10\",\"type\":\"release\",\"releaseTime\":\"<time>\"},{\"id\":\"1.20.1\",\"type\":\"release\",\"releaseTime\":\"<time>\"},{\"id\":\"1.12.2\",\"type\":\"release\",\"releaseTime\":\"<time>\"},{\"id\":\"1.5.2\",\"type\":\"release\",\"releaseTime\":\"<time>\"},{\"id\":\"b1.7.3\",\"type\":\"old_beta\",\"releaseTime\":\"<time>\"},{\"id\":\"bad/id\",\"type\":\"release\",\"releaseTime\":\"<time>\"},{\"id\":\"no-time\",\"type\":\"snapshot\"}]}"
+  },
+  "data/client/cache/version_manifest_v2.json.fetched-at": {
+   "kind": "file",
+   "text": "<epoch-ms>"
+  },
+  "data/client/profiles": {
+   "kind": "dir"
+  },
+  "data/client/profiles/a": {
+   "kind": "dir"
+  },
+  "data/client/profiles/a/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/b": {
+   "kind": "dir"
+  },
+  "data/client/profiles/b/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/c": {
+   "kind": "dir"
+  },
+  "data/client/profiles/c/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/d": {
+   "kind": "dir"
+  },
+  "data/client/profiles/d/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/e": {
+   "kind": "dir"
+  },
+  "data/client/profiles/e/options.txt": {
+   "kind": "file",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"hand\": {\n      \"mc\": 26.1,\n      \"loader\": \"vanilla\",\n      \"memory\": \"2G\"\n    }\n  }\n}\n"
+  },
+  "data/client/versions": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.20.1": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.20.1/1.20.1.jar": {
+   "kind": "file",
+   "text": "short"
+  },
+  "data/client/versions/1.20.1/1.20.1.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"1.20.1\",\n  \"type\": \"release\",\n  \"downloads\": {\n    \"client\": {\n      \"size\": 99\n    }\n  }\n}\n"
+  },
+  "data/client/versions/1.21.10": {
+   "kind": "dir"
+  },
+  "data/client/versions/1.21.10/1.21.10.jar": {
+   "kind": "file",
+   "text": "12345"
+  },
+  "data/client/versions/1.21.10/1.21.10.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"1.21.10\",\n  \"type\": \"release\",\n  \"downloads\": {\n    \"client\": {\n      \"size\": 5\n    }\n  }\n}\n"
+  },
+  "data/client/versions/broken": {
+   "kind": "dir"
+  },
+  "data/client/versions/broken/broken.json": {
+   "kind": "file",
+   "text": "{ not json"
+  },
+  "data/client/versions/fabric-loader-0.16.9-1.21.11": {
+   "kind": "dir"
+  },
+  "data/client/versions/fabric-loader-0.16.9-1.21.11/fabric-loader-0.16.9-1.21.11.json": {
+   "kind": "file",
+   "text": "{\n  \"id\": \"fabric-loader-0.16.9-1.21.11\",\n  \"inheritsFrom\": \"1.21.11\"\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

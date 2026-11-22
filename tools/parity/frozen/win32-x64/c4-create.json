@@ -1,0 +1,2211 @@
+{
+ "about": "What the Node core did in scenario c4-create on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c4-create",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (jars)",
+   "args": [
+    "jars"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No jars stored. Import one with: spawnloft jars import <path-to-jar>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (jars import)",
+   "args": [
+    "jars",
+    "import"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft jars import <path-to-jar> [--as <name>]\n"
+  },
+  {
+   "label": "step 3 (jars import {run}/in/missing.jar)",
+   "args": [
+    "jars",
+    "import",
+    "{run}/in/missing.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: jar not found: <run>/in/missing.jar\n"
+  },
+  {
+   "label": "step 6 (jars import {run}/in/paper-1.21.4-15.jar)",
+   "args": [
+    "jars",
+    "import",
+    "{run}/in/paper-1.21.4-15.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported <run>/data/jars/paper-1.21.4-15.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (jars import {run}/in/Other.jar --as custom.jar)",
+   "args": [
+    "jars",
+    "import",
+    "{run}/in/Other.jar",
+    "--as",
+    "custom.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported <run>/data/jars/custom.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (jars import {run}/in/Other.jar --as)",
+   "args": [
+    "jars",
+    "import",
+    "{run}/in/Other.jar",
+    "--as"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. Received type boolean (true)\n"
+  },
+  {
+   "label": "step 9 (jars import {run}/in)",
+   "args": [
+    "jars",
+    "import",
+    "{run}/in"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Error: EPERM: operation not permitted, copyfile '<run>/in' -> '<run>/data/jars/in'\n"
+  },
+  {
+   "label": "step 10 (jars)",
+   "args": [
+    "jars"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                 SIZE  ADDED\ncustom.jar           <size>   <date>\npaper-1.21.4-15.jar  <size>   <date>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (jars import {data}/jars/custom.jar)",
+   "args": [
+    "jars",
+    "import",
+    "{data}/jars/custom.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported <run>/data/jars/custom.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (jars import {data}/jars/custom.jar --as custom.jar)",
+   "args": [
+    "jars",
+    "import",
+    "{data}/jars/custom.jar",
+    "--as",
+    "custom.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported <run>/data/jars/custom.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (jars import {run}/in/linked.jar --as custom.jar)",
+   "args": [
+    "jars",
+    "import",
+    "{run}/in/linked.jar",
+    "--as",
+    "custom.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Imported <run>/data/jars/custom.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (jars)",
+   "args": [
+    "jars"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                 SIZE  ADDED\ncustom.jar           <size>   <date>\nedge.jar             <size>   2106-02-07\nold.jar              <size>   <date>\npaper-1.21.4-15.jar  <size>   <date>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (jars list --json)",
+   "args": [
+    "jars",
+    "list",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"jars\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for jars; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (templates)",
+   "args": [
+    "templates"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No templates. Create one from an existing instance:\n  spawnloft templates save <instance> <template-name>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (new)",
+   "args": [
+    "new"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: new requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 22 (new a)",
+   "args": [
+    "new",
+    "a"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server jar specified.\n  Pick one with --jar <file>. Available: custom.jar, edge.jar, old.jar, paper-1.21.4-15.jar\n"
+  },
+  {
+   "label": "step 23 (new a --jar nothere.jar --java java)",
+   "args": [
+    "new",
+    "a",
+    "--jar",
+    "nothere.jar",
+    "--java",
+    "java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: server jar \"nothere.jar\" is not in <run>/data/jars.\n  Stored jars: custom.jar, edge.jar, old.jar, paper-1.21.4-15.jar\n  Download one with \"spawnloft paper fetch <version>\" or add one with \"spawnloft jars import <path>\".\n"
+  },
+  {
+   "label": "step 24 (new BAD! --jar custom.jar)",
+   "args": [
+    "new",
+    "BAD!",
+    "--jar",
+    "custom.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"BAD!\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 25 (new b --jar custom.jar --memory 5X)",
+   "args": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--memory",
+    "5X"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid memory value \"5X\" - use e.g. 4G or 6144M\n"
+  },
+  {
+   "label": "step 26 (new b --jar custom.jar --memory)",
+   "args": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--memory"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid memory value \"true\" - use e.g. 4G or 6144M\n"
+  },
+  {
+   "label": "step 27 (new b --jar custom.jar --no-memory)",
+   "args": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--no-memory"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid memory value \"false\" - use e.g. 4G or 6144M\n"
+  },
+  {
+   "label": "step 28 (new c --jar --java java)",
+   "args": [
+    "new",
+    "c",
+    "--jar",
+    "--java",
+    "java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. Received type boolean (true)\n"
+  },
+  {
+   "label": "step 29 (new c --no-jar --java java)",
+   "args": [
+    "new",
+    "c",
+    "--no-jar",
+    "--java",
+    "java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server jar specified.\n  Pick one with --jar <file>. Available: custom.jar, edge.jar, old.jar, paper-1.21.4-15.jar\n"
+  },
+  {
+   "label": "step 30 (new a --jar paper-1.21.4-15.jar --java java --accept-eula)",
+   "args": [
+    "new",
+    "a",
+    "--jar",
+    "paper-1.21.4-15.jar",
+    "--java",
+    "java",
+    "--accept-eula"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"a\"\ndirectory:  <run>/data/instances/a\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       25565\nrcon port:  25575\n\nStart it with: spawnloft start a\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (new a --jar paper-1.21.4-15.jar)",
+   "args": [
+    "new",
+    "a",
+    "--jar",
+    "paper-1.21.4-15.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"a\" already exists\n"
+  },
+  {
+   "label": "step 32 (new b --jar custom.jar --java /opt/java/bin/java --port 26000 --rcon-port 26001 --offline --motd Hello there --memory 6144M)",
+   "args": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "/opt/java/bin/java",
+    "--port",
+    "26000",
+    "--rcon-port",
+    "26001",
+    "--offline",
+    "--motd",
+    "Hello there",
+    "--memory",
+    "6144M"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"b\"\ndirectory:  <run>/data/instances/b\njar:        custom.jar\nmemory:     6144M\nport:       26000\nrcon port:  26001\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/b/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (new d --jar {run}/in/Other.jar --java java --port abc)",
+   "args": [
+    "new",
+    "d",
+    "--jar",
+    "{run}/in/Other.jar",
+    "--java",
+    "java",
+    "--port",
+    "abc"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"d\"\ndirectory:  <run>/data/instances/d\njar:        Other.jar\nmemory:     4G\nport:       NaN\nrcon port:  25576\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/d/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (new e2 --jar custom.jar --java --motd)",
+   "args": [
+    "new",
+    "e2",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "--motd"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"e2\"\ndirectory:  <run>/data/instances/e2\njar:        custom.jar\nmemory:     4G\nport:       25566\nrcon port:  25577\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/e2/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (new full --jar custom.jar --java java)",
+   "args": [
+    "new",
+    "full",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: directory already exists and is not empty: <run>/data/instances/full\n"
+  },
+  {
+   "label": "step 38 (new afile --jar custom.jar --java java)",
+   "args": [
+    "new",
+    "afile",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Error: ENOTDIR: not a directory, scandir '<run>/data/instances/afile'\n"
+  },
+  {
+   "label": "step 39 (new x1 --modpack= --jar custom.jar --java java)",
+   "args": [
+    "new",
+    "x1",
+    "--modpack=",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"x1\"\ndirectory:  <run>/data/instances/x1\njar:        custom.jar\nmemory:     4G\nport:       25567\nrcon port:  25578\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/x1/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (clone)",
+   "args": [
+    "clone"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: clone requires a source and a destination: spawnloft clone <src> <new-name>\n"
+  },
+  {
+   "label": "step 61 (clone a)",
+   "args": [
+    "clone",
+    "a"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: clone requires a source and a destination: spawnloft clone <src> <new-name>\n"
+  },
+  {
+   "label": "step 62 (clone nope e)",
+   "args": [
+    "clone",
+    "nope",
+    "e"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a, b, d, e2, x1\n"
+  },
+  {
+   "label": "step 63 (clone a BAD!)",
+   "args": [
+    "clone",
+    "a",
+    "BAD!"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"BAD!\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 64 (clone a e --java java)",
+   "args": [
+    "clone",
+    "a",
+    "e",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Cloned \"a\" -> \"e\" (fresh worlds)\ndirectory:  <run>/data/instances/e\nport:       25568\nrcon port:  25579\n\nStart it with: spawnloft start e\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 65 (clone a f --with-worlds --memory 6G --port 27000 --no-accept-eula)",
+   "args": [
+    "clone",
+    "a",
+    "f",
+    "--with-worlds",
+    "--memory",
+    "6G",
+    "--port",
+    "27000",
+    "--no-accept-eula"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Cloned \"a\" -> \"f\" (with worlds)\ndirectory:  <run>/data/instances/f\nport:       27000\nrcon port:  25580\n\nStart it with: spawnloft start f\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 66 (clone a e)",
+   "args": [
+    "clone",
+    "a",
+    "e"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"e\" already exists\n"
+  },
+  {
+   "label": "step 67 (templates save)",
+   "args": [
+    "templates",
+    "save"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft templates save <instance> <template-name>\n"
+  },
+  {
+   "label": "step 68 (templates save a)",
+   "args": [
+    "templates",
+    "save",
+    "a"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft templates save <instance> <template-name>\n"
+  },
+  {
+   "label": "step 69 (templates save nope t1)",
+   "args": [
+    "templates",
+    "save",
+    "nope",
+    "t1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a, b, d, e2, x1, e, f\n"
+  },
+  {
+   "label": "step 70 (templates save a t1)",
+   "args": [
+    "templates",
+    "save",
+    "a",
+    "t1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Saved template \"t1\" -> <run>/data/templates/t1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 71 (templates save a t1)",
+   "args": [
+    "templates",
+    "save",
+    "a",
+    "t1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: template \"t1\" already exists\n"
+  },
+  {
+   "label": "step 72 (templates save a t2 --with-worlds)",
+   "args": [
+    "templates",
+    "save",
+    "a",
+    "t2",
+    "--with-worlds"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Saved template \"t2\" -> <run>/data/templates/t2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 73 (templates save a bad name)",
+   "args": [
+    "templates",
+    "save",
+    "a",
+    "bad name"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 79 (templates)",
+   "args": [
+    "templates"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  JAR                  WORLDS  FROM\nt1    paper-1.21.4-15.jar  no      a\nt2    paper-1.21.4-15.jar  yes     a\nt3    -                    no      -\nt4    -                    no      -\nt5    custom.jar           yes     elsewhere\nt6    -                    no      -\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 80 (template list)",
+   "args": [
+    "template",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  JAR                  WORLDS  FROM\nt1    paper-1.21.4-15.jar  no      a\nt2    paper-1.21.4-15.jar  yes     a\nt3    -                    no      -\nt4    -                    no      -\nt5    custom.jar           yes     elsewhere\nt6    -                    no      -\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 81 (new g --template t1 --java java)",
+   "args": [
+    "new",
+    "g",
+    "--template",
+    "t1",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"g\"\ndirectory:  <run>/data/instances/g\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       25569\nrcon port:  25581\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/g/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 82 (new h --template nope)",
+   "args": [
+    "new",
+    "h",
+    "--template",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no template named \"nope\" - see: spawnloft templates\n"
+  },
+  {
+   "label": "step 83 (new i --template t3 --java java)",
+   "args": [
+    "new",
+    "i",
+    "--template",
+    "t3",
+    "--java",
+    "java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no server jar specified.\n  Pick one with --jar <file>. Available: custom.jar, edge.jar, old.jar, paper-1.21.4-15.jar\n"
+  },
+  {
+   "label": "step 84 (new j --template t5 --java java)",
+   "args": [
+    "new",
+    "j",
+    "--template",
+    "t5",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"j\"\ndirectory:  <run>/data/instances/j\njar:        custom.jar\nmemory:     4G\nport:       25570\nrcon port:  25582\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/j/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 85 (new k --template t1 --from a --java java)",
+   "args": [
+    "new",
+    "k",
+    "--template",
+    "t1",
+    "--from",
+    "a",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"k\"\ndirectory:  <run>/data/instances/k\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       25571\nrcon port:  25583\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/k/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 86 (new l --from a --with-worlds --java java)",
+   "args": [
+    "new",
+    "l",
+    "--from",
+    "a",
+    "--with-worlds",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"l\"\ndirectory:  <run>/data/instances/l\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       25572\nrcon port:  25584\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/l/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 87 (new m --template)",
+   "args": [
+    "new",
+    "m",
+    "--template"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no template named \"true\" - see: spawnloft templates\n"
+  },
+  {
+   "label": "step 89 (new m --template --java java)",
+   "args": [
+    "new",
+    "m",
+    "--template",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"m\"\ndirectory:  <run>/data/instances/m\njar:        custom.jar\nmemory:     4G\nport:       25573\nrcon port:  25585\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/m/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 90 (new mb --jar custom.jar --java java --memory 4G)",
+   "args": [
+    "new",
+    "mb",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java",
+    "--memory",
+    "4G"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid memory value \"4G\" - use e.g. 4G or 6144M\n"
+  },
+  {
+   "label": "step 91 (new mc --jar custom.jar --java java --memory ﻿4G)",
+   "args": [
+    "new",
+    "mc",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java",
+    "--memory",
+    "﻿4G"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created instance \"mc\"\ndirectory:  <run>/data/instances/mc\njar:        custom.jar\nmemory:     ﻿4G\nport:       25574\nrcon port:  25586\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/mc/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 92 (adopt)",
+   "args": [
+    "adopt"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: adopt requires a name and a directory: spawnloft adopt <name> <server-dir>\n"
+  },
+  {
+   "label": "step 93 (adopt x)",
+   "args": [
+    "adopt",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: adopt requires a name and a directory: spawnloft adopt <name> <server-dir>\n"
+  },
+  {
+   "label": "step 94 (adopt x {run}/nope)",
+   "args": [
+    "adopt",
+    "x",
+    "{run}/nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: directory not found: <run>/nope\n"
+  },
+  {
+   "label": "step 98 (adopt two {run}/srv/two)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: multiple jars in <run>/srv/two - pass --jar <one of: paper-1.21.4-1.jar, purpur-1.21.4-2.jar>\n"
+  },
+  {
+   "label": "step 99 (adopt two {run}/srv/two --jar ../x.jar)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "../x.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the jar must be a file inside <run>/srv/two: ../x.jar\n"
+  },
+  {
+   "label": "step 100 (adopt two {run}/srv/two --jar ..fun.jar)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "..fun.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the jar must be a file inside <run>/srv/two: ..fun.jar\n"
+  },
+  {
+   "label": "step 101 (adopt two {run}/srv/two --jar missing.jar)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "missing.jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: jar not found: <run>/srv/two/missing.jar\n"
+  },
+  {
+   "label": "step 102 (adopt two {run}/srv/two --jar)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of type string. Received type boolean (true)\n"
+  },
+  {
+   "label": "step 103 (adopt two {run}/srv/two --memory lots)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--memory",
+    "lots"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid memory value \"lots\" - use e.g. 4G or 6144M\n"
+  },
+  {
+   "label": "step 105 (adopt two {run}/srv/two --jar purpur-1.21.4-2.jar --java java --memory 3G)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "purpur-1.21.4-2.jar",
+    "--java",
+    "java",
+    "--memory",
+    "3G"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Adopted \"two\"\ndirectory:  <run>/srv/two\njar:        purpur-1.21.4-2.jar\nmemory:     3G\nport:       25999\nrcon port:  26999\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 108 (adopt one {run}/srv/one --java java)",
+   "args": [
+    "adopt",
+    "one",
+    "{run}/srv/one",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Adopted \"one\"\ndirectory:  <run>/srv/one\njar:        custom-build.jar\nmemory:     4G\nport:       25587\nrcon port:  25588\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 111 (adopt neo {run}/srv/neo --java java)",
+   "args": [
+    "adopt",
+    "neo",
+    "{run}/srv/neo",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Adopted \"neo\"\ndirectory:  <run>/srv/neo\njar:        server.jar\nmemory:     4G\nport:       25589\nrcon port:  25590\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 114 (adopt fab {run}/srv/fab --java java)",
+   "args": [
+    "adopt",
+    "fab",
+    "{run}/srv/fab",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Adopted \"fab\"\ndirectory:  <run>/srv/fab\njar:        fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\nmemory:     4G\nport:       25591\nrcon port:  25592\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 115 (adopt fab2 {run}/srv/fab --jar sub/inner.jar --java java)",
+   "args": [
+    "adopt",
+    "fab2",
+    "{run}/srv/fab",
+    "--jar",
+    "sub/inner.jar",
+    "--java",
+    "java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Adopted \"fab2\"\ndirectory:  <run>/srv/fab\njar:        sub/inner.jar\nmemory:     4G\nport:       25593\nrcon port:  25594\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 117 (adopt empty {run}/srv/empty)",
+   "args": [
+    "adopt",
+    "empty",
+    "{run}/srv/empty"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no .jar found in <run>/srv/empty - pass --jar <file>\n"
+  },
+  {
+   "label": "step 119 (adopt afile {run}/srv/afile)",
+   "args": [
+    "adopt",
+    "afile",
+    "{run}/srv/afile"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Error: ENOTDIR: not a directory, scandir '<run>/srv/afile'\n"
+  },
+  {
+   "label": "step 120 (adopt two {run}/srv/two)",
+   "args": [
+    "adopt",
+    "two",
+    "{run}/srv/two"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"two\" already exists\n"
+  },
+  {
+   "label": "step 121 (launchers nope)",
+   "args": [
+    "launchers",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a, b, d, e2, x1, e, f, g, j, k, l, m, mc, two, one, neo, fab, fab2\n"
+  },
+  {
+   "label": "step 122 (launchers a nope)",
+   "args": [
+    "launchers",
+    "a",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a, b, d, e2, x1, e, f, g, j, k, l, m, mc, two, one, neo, fab, fab2\n"
+  },
+  {
+   "label": "step 123 (launchers a)",
+   "args": [
+    "launchers",
+    "a"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "a: start.bat, console.bat, stop.bat\n\nDouble-click start.bat in an instance folder to run it with a console attached.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 124 (launchers)",
+   "args": [
+    "launchers"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "a: start.bat, console.bat, stop.bat\nb: start.bat, console.bat, stop.bat\nd: start.bat, console.bat, stop.bat\ne: start.bat, console.bat, stop.bat\ne2: start.bat, console.bat, stop.bat\nf: start.bat, console.bat, stop.bat\nfab: start.bat, console.bat, stop.bat\nfab2: start.bat, console.bat, stop.bat\ng: start.bat, console.bat, stop.bat\nj: start.bat, console.bat, stop.bat\nk: start.bat, console.bat, stop.bat\nl: start.bat, console.bat, stop.bat\nm: start.bat, console.bat, stop.bat\nmc: start.bat, console.bat, stop.bat\nneo: start.bat, console.bat, stop.bat\none: start.bat, console.bat, stop.bat\ntwo: start.bat, console.bat, stop.bat\nx1: start.bat, console.bat, stop.bat\n\nDouble-click start.bat in an instance folder to run it with a console attached.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 125 (rebuild)",
+   "args": [
+    "rebuild"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: rebuild requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 126 (rebuild a)",
+   "args": [
+    "rebuild",
+    "a"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: rebuild deletes the worlds in \"a\". Re-run with --yes to confirm.\n  Add --wipe-plugins to reset plugins too. A snapshot is taken first unless --no-snapshot.\n"
+  },
+  {
+   "label": "step 127 (rebuild nope --yes)",
+   "args": [
+    "rebuild",
+    "nope",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a, b, d, e2, x1, e, f, g, j, k, l, m, mc, two, one, neo, fab, fab2\n"
+  },
+  {
+   "label": "step 128 (rebuild a --yes --no-snapshot)",
+   "args": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--no-snapshot"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Rebuilt \"a\" — removed: world, world_nether, world_the_end, logs, cache, crash-reports, usercache.json, banned-ips.json, ops.json, session.lock\nPlugins kept.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 129 (rebuild a --yes --no-snapshot)",
+   "args": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--no-snapshot"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Rebuilt \"a\" — removed: (nothing to remove)\nPlugins kept.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 134 (rebuild a --yes)",
+   "args": [
+    "rebuild",
+    "a",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshot: <run>/data/backups/a/pre-rebuild_standard_<stamp>.tar.gz\nRebuilt \"a\" — removed: custom_nether\nPlugins kept.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 135 (rebuild a --yes --wipe-plugins --no-snapshot)",
+   "args": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--wipe-plugins",
+    "--no-snapshot"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Rebuilt \"a\" — removed: plugins\nPlugins wiped.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 136 (rebuild a --yes --json)",
+   "args": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"rebuild\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for rebuild; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 137 (reveal)",
+   "args": [
+    "reveal"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: reveal requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 138 (open nope)",
+   "args": [
+    "open",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: a, b, d, e2, x1, e, f, g, j, k, l, m, mc, two, one, neo, fab, fab2\n"
+  },
+  {
+   "label": "step 139 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM    UPTIME  DIR\na     stopped  25565  25575  4G     -       <run>/data/instances/a\nb     stopped  26000  26001  6144M  -       <run>/data/instances/b\nd     stopped         25576  4G     -       <run>/data/instances/d\ne     stopped  25568  25579  4G     -       <run>/data/instances/e\ne2    stopped  25566  25577  4G     -       <run>/data/instances/e2\nf     stopped  27000  25580  6G     -       <run>/data/instances/f\nfab   stopped  25591  25592  4G     -       <run>/srv/fab\nfab2  stopped  25593  25594  4G     -       <run>/srv/fab\ng     stopped  25569  25581  4G     -       <run>/data/instances/g\nj     stopped  25570  25582  4G     -       <run>/data/instances/j\nk     stopped  25571  25583  4G     -       <run>/data/instances/k\nl     stopped  25572  25584  4G     -       <run>/data/instances/l\nm     stopped  25573  25585  4G     -       <run>/data/instances/m\nmc    stopped  25574  25586  ﻿4G    -       <run>/data/instances/mc\nneo   stopped  25589  25590  4G     -       <run>/srv/neo\none   stopped  25587  25588  4G     -       <run>/srv/one\ntwo   stopped  25999  26999  3G     -       <run>/srv/two\nx1    stopped  25567  25578  4G     -       <run>/data/instances/x1\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "text": "{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"b\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"custom.jar\"}\n{\"at\":\"<time>\",\"server\":\"d\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Other.jar\"}\n{\"at\":\"<time>\",\"server\":\"e2\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"custom.jar\"}\n{\"at\":\"<time>\",\"server\":\"x1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"custom.jar\"}\n{\"at\":\"<time>\",\"server\":\"e\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"f\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"g\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"j\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"custom.jar\"}\n{\"at\":\"<time>\",\"server\":\"k\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"l\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"m\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"custom.jar\"}\n{\"at\":\"<time>\",\"server\":\"mc\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"custom.jar\"}\n{\"at\":\"<time>\",\"server\":\"two\",\"action\":\"adopt\",\"by\":{\"kind\":\"cli\"},\"detail\":\"<run>/srv/two\"}\n{\"at\":\"<time>\",\"server\":\"one\",\"action\":\"adopt\",\"by\":{\"kind\":\"cli\"},\"detail\":\"<run>/srv/one\"}\n{\"at\":\"<time>\",\"server\":\"neo\",\"action\":\"adopt\",\"by\":{\"kind\":\"cli\"},\"detail\":\"<run>/srv/neo\"}\n{\"at\":\"<time>\",\"server\":\"fab\",\"action\":\"adopt\",\"by\":{\"kind\":\"cli\"},\"detail\":\"<run>/srv/fab\"}\n{\"at\":\"<time>\",\"server\":\"fab2\",\"action\":\"adopt\",\"by\":{\"kind\":\"cli\"},\"detail\":\"<run>/srv/fab\"}\n{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"rebuild\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fresh worlds, plugins kept\"}\n{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"rebuild\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fresh worlds, plugins kept\"}\n{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"rebuild\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fresh worlds, plugins kept\",\"snapshot\":\"pre-rebuild_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"a\",\"action\":\"rebuild\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fresh worlds and plugins\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/backups/a": {
+   "kind": "dir"
+  },
+  "data/backups/a/pre-rebuild_standard_<stamp>.json": {
+   "kind": "file",
+   "text": "{\n  \"instance\": \"a\",\n  \"scope\": \"standard\",\n  \"label\": \"pre-rebuild\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"custom_nether\",\n    \"world\",\n    \"world_custom\",\n    \"worldly\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/a\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/a/pre-rebuild_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "tar": "plugins/ type=5 mode=777 size=0\nplugins/P/ type=5 mode=777 size=0\nplugins/P.jar type=0 mode=666 size=1 sha256=148de9c5a7a44d19e56cd9ae1a554bf67847afb0c58f6e12fa29ac7ddfca9940\nplugins/P/config.yml type=0 mode=666 size=5 sha256=37b128c59f1f5097f73f82691cb519f1f568667faab5ced1b4ab979d36837eae\nplugins/P/logs/ type=5 mode=777 size=0\nplugins/P/logs/old.log type=0 mode=666 size=10 sha256=1bf8dbd0ee5139933825576db483c2b3648f564c5f33380666c3573e27b70b77\ncustom_nether/ type=5 mode=777 size=0\ncustom_nether/level.dat type=0 mode=666 size=2 sha256=ff2082aa78aea80a27cb4fb91f0350153702c16dce790a77f0bb0bfbf6899977\nworld/ type=5 mode=777 size=0\nworld/level.dat type=0 mode=666 size=2 sha256=06f8faea3b5f697691b6d063a07ba4ffaf1ece9a1d473c588565231cdc8e59cc\nworld_custom/ type=5 mode=777 size=0\nworld_custom/level.dat type=0 mode=666 size=1 sha256=2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6\nworldly/ type=5 mode=777 size=0\nworldly/level.dat type=0 mode=666 size=15 sha256=be8cc8f5b98a50bac91adb78788dbd64a71dcb77b8897b5efd4348f354865b62\nserver.properties type=0 mode=666 size=36 sha256=de7e0c3e5cacac9706aca675298a9590c0243e7483082cb0ff50f39851dfedc1\neula.txt type=0 mode=666 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances/a": {
+   "kind": "dir"
+  },
+  "data/instances/a/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a console - SpawnLoft\n\"<core>\" console a\npause\n"
+  },
+  "data/instances/a/eula.txt": {
+   "kind": "file",
+   "text": "eula=true\n"
+  },
+  "data/instances/a/libraries": {
+   "kind": "dir"
+  },
+  "data/instances/a/libraries/lib.jar": {
+   "kind": "file",
+   "text": "lib"
+  },
+  "data/instances/a/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/instances/a/server.properties": {
+   "kind": "file",
+   "text": "level-name=custom\nserver-port=25565\n"
+  },
+  "data/instances/a/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a - SpawnLoft\n\"<core>\" start a\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console a\n"
+  },
+  "data/instances/a/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a - SpawnLoft\n\"<core>\" stop a\npause\n"
+  },
+  "data/instances/a/version_history.json": {
+   "kind": "file",
+   "text": "{}"
+  },
+  "data/instances/a/versions": {
+   "kind": "dir"
+  },
+  "data/instances/a/versions/v.jar": {
+   "kind": "file",
+   "text": "v"
+  },
+  "data/instances/a/world": {
+   "kind": "dir"
+  },
+  "data/instances/a/world/level.dat": {
+   "kind": "file",
+   "text": "w2"
+  },
+  "data/instances/a/world_custom": {
+   "kind": "dir"
+  },
+  "data/instances/a/world_custom/level.dat": {
+   "kind": "file",
+   "text": "c"
+  },
+  "data/instances/a/worldly": {
+   "kind": "dir"
+  },
+  "data/instances/a/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/instances/afile": {
+   "kind": "file",
+   "text": "x"
+  },
+  "data/instances/b": {
+   "kind": "dir"
+  },
+  "data/instances/b/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle b console - SpawnLoft\n\"<core>\" console b\npause\n"
+  },
+  "data/instances/b/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/b/server.properties": {
+   "kind": "file",
+   "text": "server-port=26000\nenable-rcon=true\nrcon.port=26001\nrcon.password=<password>\nserver-ip=\nonline-mode=false\nmotd=Hello there\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/b/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle b - SpawnLoft\n\"<core>\" start b\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console b\n"
+  },
+  "data/instances/b/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle b - SpawnLoft\n\"<core>\" stop b\npause\n"
+  },
+  "data/instances/c": {
+   "kind": "dir"
+  },
+  "data/instances/d": {
+   "kind": "dir"
+  },
+  "data/instances/d/Other.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/d/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle d console - SpawnLoft\n\"<core>\" console d\npause\n"
+  },
+  "data/instances/d/server.properties": {
+   "kind": "file",
+   "text": "server-port=NaN\nenable-rcon=true\nrcon.port=25576\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=d (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/d/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle d - SpawnLoft\n\"<core>\" start d\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console d\n"
+  },
+  "data/instances/d/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle d - SpawnLoft\n\"<core>\" stop d\npause\n"
+  },
+  "data/instances/e": {
+   "kind": "dir"
+  },
+  "data/instances/e/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/e/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle e console - SpawnLoft\n\"<core>\" console e\npause\n"
+  },
+  "data/instances/e/crash-reports": {
+   "kind": "dir"
+  },
+  "data/instances/e/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/instances/e/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/e/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/e/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/instances/e/plugins": {
+   "kind": "dir"
+  },
+  "data/instances/e/plugins/P": {
+   "kind": "dir"
+  },
+  "data/instances/e/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/instances/e/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/instances/e/server.properties": {
+   "kind": "file",
+   "text": "server-port=25568\nenable-rcon=true\nrcon.port=25579\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=e (clone of a)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/e/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle e - SpawnLoft\n\"<core>\" start e\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console e\n"
+  },
+  "data/instances/e/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle e - SpawnLoft\n\"<core>\" stop e\npause\n"
+  },
+  "data/instances/e/worldly": {
+   "kind": "dir"
+  },
+  "data/instances/e/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/instances/e2": {
+   "kind": "dir"
+  },
+  "data/instances/e2/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle e2 console - SpawnLoft\n\"<core>\" console e2\npause\n"
+  },
+  "data/instances/e2/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/e2/server.properties": {
+   "kind": "file",
+   "text": "server-port=25566\nenable-rcon=true\nrcon.port=25577\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=true\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/e2/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle e2 - SpawnLoft\n\"<core>\" start e2\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console e2\n"
+  },
+  "data/instances/e2/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle e2 - SpawnLoft\n\"<core>\" stop e2\npause\n"
+  },
+  "data/instances/f": {
+   "kind": "dir"
+  },
+  "data/instances/f/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/f/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle f console - SpawnLoft\n\"<core>\" console f\npause\n"
+  },
+  "data/instances/f/crash-reports": {
+   "kind": "dir"
+  },
+  "data/instances/f/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/instances/f/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/f/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/f/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/instances/f/plugins": {
+   "kind": "dir"
+  },
+  "data/instances/f/plugins/P": {
+   "kind": "dir"
+  },
+  "data/instances/f/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/instances/f/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/instances/f/server.properties": {
+   "kind": "file",
+   "text": "server-port=27000\nenable-rcon=true\nrcon.port=25580\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=f (clone of a)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/f/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle f - SpawnLoft\n\"<core>\" start f\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console f\n"
+  },
+  "data/instances/f/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle f - SpawnLoft\n\"<core>\" stop f\npause\n"
+  },
+  "data/instances/f/world": {
+   "kind": "dir"
+  },
+  "data/instances/f/world/level.dat": {
+   "kind": "file",
+   "text": "w"
+  },
+  "data/instances/f/world/region": {
+   "kind": "dir"
+  },
+  "data/instances/f/world/region/r.0.0.mca": {
+   "kind": "file",
+   "text": "r"
+  },
+  "data/instances/f/world_custom": {
+   "kind": "dir"
+  },
+  "data/instances/f/world_custom/level.dat": {
+   "kind": "file",
+   "text": "c"
+  },
+  "data/instances/f/world_nether": {
+   "kind": "dir"
+  },
+  "data/instances/f/world_nether/level.dat": {
+   "kind": "file",
+   "text": "n"
+  },
+  "data/instances/f/world_the_end": {
+   "kind": "dir"
+  },
+  "data/instances/f/world_the_end/level.dat": {
+   "kind": "file",
+   "text": "e"
+  },
+  "data/instances/f/worldly": {
+   "kind": "dir"
+  },
+  "data/instances/f/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/instances/full": {
+   "kind": "dir"
+  },
+  "data/instances/full/keep.txt": {
+   "kind": "file",
+   "text": "x"
+  },
+  "data/instances/g": {
+   "kind": "dir"
+  },
+  "data/instances/g/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/g/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle g console - SpawnLoft\n\"<core>\" console g\npause\n"
+  },
+  "data/instances/g/crash-reports": {
+   "kind": "dir"
+  },
+  "data/instances/g/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/instances/g/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/g/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/g/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/instances/g/plugins": {
+   "kind": "dir"
+  },
+  "data/instances/g/plugins/P": {
+   "kind": "dir"
+  },
+  "data/instances/g/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/instances/g/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/instances/g/server.properties": {
+   "kind": "file",
+   "text": "server-port=25569\nenable-rcon=true\nrcon.port=25581\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=g (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/g/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle g - SpawnLoft\n\"<core>\" start g\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console g\n"
+  },
+  "data/instances/g/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle g - SpawnLoft\n\"<core>\" stop g\npause\n"
+  },
+  "data/instances/g/worldly": {
+   "kind": "dir"
+  },
+  "data/instances/g/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/instances/h": {
+   "kind": "dir"
+  },
+  "data/instances/i": {
+   "kind": "dir"
+  },
+  "data/instances/i/server.properties": {
+   "kind": "file",
+   "text": "motd=bare\n"
+  },
+  "data/instances/j": {
+   "kind": "dir"
+  },
+  "data/instances/j/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle j console - SpawnLoft\n\"<core>\" console j\npause\n"
+  },
+  "data/instances/j/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/j/server.properties": {
+   "kind": "file",
+   "text": "server-port=25570\nenable-rcon=true\nrcon.port=25582\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=j (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/j/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle j - SpawnLoft\n\"<core>\" start j\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console j\n"
+  },
+  "data/instances/j/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle j - SpawnLoft\n\"<core>\" stop j\npause\n"
+  },
+  "data/instances/k": {
+   "kind": "dir"
+  },
+  "data/instances/k/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/k/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle k console - SpawnLoft\n\"<core>\" console k\npause\n"
+  },
+  "data/instances/k/crash-reports": {
+   "kind": "dir"
+  },
+  "data/instances/k/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/instances/k/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/k/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/k/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/instances/k/plugins": {
+   "kind": "dir"
+  },
+  "data/instances/k/plugins/P": {
+   "kind": "dir"
+  },
+  "data/instances/k/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/instances/k/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/instances/k/server.properties": {
+   "kind": "file",
+   "text": "server-port=25571\nenable-rcon=true\nrcon.port=25583\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=k (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/k/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle k - SpawnLoft\n\"<core>\" start k\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console k\n"
+  },
+  "data/instances/k/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle k - SpawnLoft\n\"<core>\" stop k\npause\n"
+  },
+  "data/instances/k/worldly": {
+   "kind": "dir"
+  },
+  "data/instances/k/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/instances/l": {
+   "kind": "dir"
+  },
+  "data/instances/l/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/l/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle l console - SpawnLoft\n\"<core>\" console l\npause\n"
+  },
+  "data/instances/l/crash-reports": {
+   "kind": "dir"
+  },
+  "data/instances/l/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/instances/l/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/l/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/instances/l/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/instances/l/plugins": {
+   "kind": "dir"
+  },
+  "data/instances/l/plugins/P": {
+   "kind": "dir"
+  },
+  "data/instances/l/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/instances/l/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/instances/l/server.properties": {
+   "kind": "file",
+   "text": "server-port=25572\nenable-rcon=true\nrcon.port=25584\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=l (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/l/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle l - SpawnLoft\n\"<core>\" start l\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console l\n"
+  },
+  "data/instances/l/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle l - SpawnLoft\n\"<core>\" stop l\npause\n"
+  },
+  "data/instances/l/world": {
+   "kind": "dir"
+  },
+  "data/instances/l/world/level.dat": {
+   "kind": "file",
+   "text": "w"
+  },
+  "data/instances/l/world/region": {
+   "kind": "dir"
+  },
+  "data/instances/l/world/region/r.0.0.mca": {
+   "kind": "file",
+   "text": "r"
+  },
+  "data/instances/l/world_custom": {
+   "kind": "dir"
+  },
+  "data/instances/l/world_custom/level.dat": {
+   "kind": "file",
+   "text": "c"
+  },
+  "data/instances/l/world_nether": {
+   "kind": "dir"
+  },
+  "data/instances/l/world_nether/level.dat": {
+   "kind": "file",
+   "text": "n"
+  },
+  "data/instances/l/world_the_end": {
+   "kind": "dir"
+  },
+  "data/instances/l/world_the_end/level.dat": {
+   "kind": "file",
+   "text": "e"
+  },
+  "data/instances/l/worldly": {
+   "kind": "dir"
+  },
+  "data/instances/l/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/instances/m": {
+   "kind": "dir"
+  },
+  "data/instances/m/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle m console - SpawnLoft\n\"<core>\" console m\npause\n"
+  },
+  "data/instances/m/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/m/server.properties": {
+   "kind": "file",
+   "text": "server-port=25573\nenable-rcon=true\nrcon.port=25585\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=m (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/m/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle m - SpawnLoft\n\"<core>\" start m\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console m\n"
+  },
+  "data/instances/m/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle m - SpawnLoft\n\"<core>\" stop m\npause\n"
+  },
+  "data/instances/mc": {
+   "kind": "dir"
+  },
+  "data/instances/mc/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle mc console - SpawnLoft\n\"<core>\" console mc\npause\n"
+  },
+  "data/instances/mc/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/mc/server.properties": {
+   "kind": "file",
+   "text": "server-port=25574\nenable-rcon=true\nrcon.port=25586\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=mc (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/mc/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle mc - SpawnLoft\n\"<core>\" start mc\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console mc\n"
+  },
+  "data/instances/mc/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle mc - SpawnLoft\n\"<core>\" stop mc\npause\n"
+  },
+  "data/instances/x1": {
+   "kind": "dir"
+  },
+  "data/instances/x1/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle x1 console - SpawnLoft\n\"<core>\" console x1\npause\n"
+  },
+  "data/instances/x1/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/instances/x1/server.properties": {
+   "kind": "file",
+   "text": "server-port=25567\nenable-rcon=true\nrcon.port=25578\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=x1 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/x1/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle x1 - SpawnLoft\n\"<core>\" start x1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console x1\n"
+  },
+  "data/instances/x1/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle x1 - SpawnLoft\n\"<core>\" stop x1\npause\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"a\": {\n      \"dir\": \"<run>/data/instances/a\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"b\": {\n      \"dir\": \"<run>/data/instances/b\",\n      \"jar\": \"custom.jar\",\n      \"java\": \"/opt/java/bin/java\",\n      \"memory\": \"6144M\",\n      \"loader\": \"paper\",\n      \"port\": 26000,\n      \"rcon\": {\n        \"port\": 26001,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"d\": {\n      \"dir\": \"<run>/data/instances/d\",\n      \"jar\": \"Other.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": null,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"e2\": {\n      \"dir\": \"<run>/data/instances/e2\",\n      \"jar\": \"custom.jar\",\n      \"java\": true,\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25577,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"x1\": {\n      \"dir\": \"<run>/data/instances/x1\",\n      \"jar\": \"custom.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25567,\n      \"rcon\": {\n        \"port\": 25578,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"e\": {\n      \"dir\": \"<run>/data/instances/e\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25568,\n      \"rcon\": {\n        \"port\": 25579,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"a\",\n        \"withWorlds\": false\n      }\n    },\n    \"f\": {\n      \"dir\": \"<run>/data/instances/f\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"6G\",\n      \"loader\": \"paper\",\n      \"port\": 27000,\n      \"rcon\": {\n        \"port\": 25580,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"a\",\n        \"withWorlds\": true\n      }\n    },\n    \"g\": {\n      \"dir\": \"<run>/data/instances/g\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25569,\n      \"rcon\": {\n        \"port\": 25581,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"template\": \"t1\"\n      }\n    },\n    \"j\": {\n      \"dir\": \"<run>/data/instances/j\",\n      \"jar\": \"custom.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25570,\n      \"rcon\": {\n        \"port\": 25582,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"template\": \"t5\"\n      }\n    },\n    \"k\": {\n      \"dir\": \"<run>/data/instances/k\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25571,\n      \"rcon\": {\n        \"port\": 25583,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"a\",\n        \"withWorlds\": false\n      }\n    },\n    \"l\": {\n      \"dir\": \"<run>/data/instances/l\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25572,\n      \"rcon\": {\n        \"port\": 25584,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"a\",\n        \"withWorlds\": true\n      }\n    },\n    \"m\": {\n      \"dir\": \"<run>/data/instances/m\",\n      \"jar\": \"custom.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25573,\n      \"rcon\": {\n        \"port\": 25585,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"template\": true\n      }\n    },\n    \"mc\": {\n      \"dir\": \"<run>/data/instances/mc\",\n      \"jar\": \"custom.jar\",\n      \"java\": \"java\",\n      \"memory\": \"﻿4G\",\n      \"loader\": \"paper\",\n      \"port\": 25574,\n      \"rcon\": {\n        \"port\": 25586,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"two\": {\n      \"dir\": \"<run>/srv/two\",\n      \"jar\": \"purpur-1.21.4-2.jar\",\n      \"java\": \"java\",\n      \"memory\": \"3G\",\n      \"loader\": \"purpur\",\n      \"port\": 25999,\n      \"rcon\": {\n        \"port\": 26999,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/srv/two\"\n      }\n    },\n    \"one\": {\n      \"dir\": \"<run>/srv/one\",\n      \"jar\": \"custom-build.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25587,\n      \"rcon\": {\n        \"port\": 25588,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/srv/one\"\n      }\n    },\n    \"neo\": {\n      \"dir\": \"<run>/srv/neo\",\n      \"jar\": \"server.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"neoforge\",\n      \"port\": 25589,\n      \"rcon\": {\n        \"port\": 25590,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/srv/neo\"\n      }\n    },\n    \"fab\": {\n      \"dir\": \"<run>/srv/fab\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"fabric\",\n      \"port\": 25591,\n      \"rcon\": {\n        \"port\": 25592,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/srv/fab\"\n      }\n    },\n    \"fab2\": {\n      \"dir\": \"<run>/srv/fab\",\n      \"jar\": \"sub/inner.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25593,\n      \"rcon\": {\n        \"port\": 25594,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"adopted\": \"<run>/srv/fab\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/jars/custom.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "data/jars/edge.jar": {
+   "kind": "file",
+   "text": "EDGE"
+  },
+  "data/jars/old.jar": {
+   "kind": "file",
+   "text": "OLD"
+  },
+  "data/jars/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/run/a": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "data/templates/aaa-file": {
+   "kind": "file",
+   "text": "not a template"
+  },
+  "data/templates/t1": {
+   "kind": "dir"
+  },
+  "data/templates/t1/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/templates/t1/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a console - SpawnLoft\n\"<core>\" console a\npause\n"
+  },
+  "data/templates/t1/crash-reports": {
+   "kind": "dir"
+  },
+  "data/templates/t1/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/templates/t1/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/templates/t1/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/templates/t1/plugins": {
+   "kind": "dir"
+  },
+  "data/templates/t1/plugins/P": {
+   "kind": "dir"
+  },
+  "data/templates/t1/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/templates/t1/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/templates/t1/server.properties": {
+   "kind": "file",
+   "text": "server-port=25565\nenable-rcon=true\nrcon.port=25575\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=a (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/templates/t1/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a - SpawnLoft\n\"<core>\" start a\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console a\n"
+  },
+  "data/templates/t1/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a - SpawnLoft\n\"<core>\" stop a\npause\n"
+  },
+  "data/templates/t1/template.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"t1\",\n  \"jar\": \"paper-1.21.4-15.jar\",\n  \"memory\": \"4G\",\n  \"includesWorlds\": false,\n  \"sourceInstance\": \"a\",\n  \"createdAt\": \"<time>\"\n}\n"
+  },
+  "data/templates/t1/worldly": {
+   "kind": "dir"
+  },
+  "data/templates/t1/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/templates/t2": {
+   "kind": "dir"
+  },
+  "data/templates/t2/banned-ips.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/templates/t2/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a console - SpawnLoft\n\"<core>\" console a\npause\n"
+  },
+  "data/templates/t2/crash-reports": {
+   "kind": "dir"
+  },
+  "data/templates/t2/crash-reports/c.txt": {
+   "kind": "file",
+   "text": "crash"
+  },
+  "data/templates/t2/eula.txt": {
+   "kind": "file",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/templates/t2/ops.json": {
+   "kind": "file",
+   "text": "[]"
+  },
+  "data/templates/t2/plugins": {
+   "kind": "dir"
+  },
+  "data/templates/t2/plugins/P": {
+   "kind": "dir"
+  },
+  "data/templates/t2/plugins/P/config.yml": {
+   "kind": "file",
+   "text": "a: 1\n"
+  },
+  "data/templates/t2/plugins/P.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "data/templates/t2/server.properties": {
+   "kind": "file",
+   "text": "server-port=25565\nenable-rcon=true\nrcon.port=25575\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=a (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/templates/t2/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a - SpawnLoft\n\"<core>\" start a\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console a\n"
+  },
+  "data/templates/t2/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle a - SpawnLoft\n\"<core>\" stop a\npause\n"
+  },
+  "data/templates/t2/template.json": {
+   "kind": "file",
+   "text": "{\n  \"name\": \"t2\",\n  \"jar\": \"paper-1.21.4-15.jar\",\n  \"memory\": \"4G\",\n  \"includesWorlds\": true,\n  \"sourceInstance\": \"a\",\n  \"createdAt\": \"<time>\"\n}\n"
+  },
+  "data/templates/t2/world": {
+   "kind": "dir"
+  },
+  "data/templates/t2/world/level.dat": {
+   "kind": "file",
+   "text": "w"
+  },
+  "data/templates/t2/world/region": {
+   "kind": "dir"
+  },
+  "data/templates/t2/world/region/r.0.0.mca": {
+   "kind": "file",
+   "text": "r"
+  },
+  "data/templates/t2/world_custom": {
+   "kind": "dir"
+  },
+  "data/templates/t2/world_custom/level.dat": {
+   "kind": "file",
+   "text": "c"
+  },
+  "data/templates/t2/world_nether": {
+   "kind": "dir"
+  },
+  "data/templates/t2/world_nether/level.dat": {
+   "kind": "file",
+   "text": "n"
+  },
+  "data/templates/t2/world_the_end": {
+   "kind": "dir"
+  },
+  "data/templates/t2/world_the_end/level.dat": {
+   "kind": "file",
+   "text": "e"
+  },
+  "data/templates/t2/worldly": {
+   "kind": "dir"
+  },
+  "data/templates/t2/worldly/level.dat": {
+   "kind": "file",
+   "text": "not a dimension"
+  },
+  "data/templates/t3": {
+   "kind": "dir"
+  },
+  "data/templates/t3/server.properties": {
+   "kind": "file",
+   "text": "motd=bare\n"
+  },
+  "data/templates/t4": {
+   "kind": "dir"
+  },
+  "data/templates/t4/template.json": {
+   "kind": "file",
+   "text": "{ not json"
+  },
+  "data/templates/t5": {
+   "kind": "dir"
+  },
+  "data/templates/t5/template.json": {
+   "kind": "file",
+   "text": "{\"jar\": \"custom.jar\", \"includesWorlds\": 1, \"sourceInstance\": \"elsewhere\", \"memory\": \"2G\"}"
+  },
+  "data/templates/t6": {
+   "kind": "dir"
+  },
+  "data/templates/t6/template.json": {
+   "kind": "file",
+   "text": "[1,2]"
+  },
+  "data/templates/t7": {
+   "kind": "dir"
+  },
+  "data/templates/t7/template.json": {
+   "kind": "file",
+   "text": "{\"name\": true, \"jar\": \"custom.jar\"}"
+  },
+  "home": {
+   "kind": "dir"
+  },
+  "in": {
+   "kind": "dir"
+  },
+  "in/Other.jar": {
+   "kind": "file",
+   "text": "OTHER"
+  },
+  "in/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "text": "PAPER JAR"
+  },
+  "srv": {
+   "kind": "dir"
+  },
+  "srv/afile": {
+   "kind": "file",
+   "text": "x"
+  },
+  "srv/empty": {
+   "kind": "dir"
+  },
+  "srv/fab": {
+   "kind": "dir"
+  },
+  "srv/fab/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle fab2 console - SpawnLoft\n\"<core>\" console fab2\npause\n"
+  },
+  "srv/fab/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "text": "f"
+  },
+  "srv/fab/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle fab2 - SpawnLoft\n\"<core>\" start fab2\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console fab2\n"
+  },
+  "srv/fab/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle fab2 - SpawnLoft\n\"<core>\" stop fab2\npause\n"
+  },
+  "srv/fab/sub": {
+   "kind": "dir"
+  },
+  "srv/fab/sub/inner.jar": {
+   "kind": "file",
+   "text": "i"
+  },
+  "srv/neo": {
+   "kind": "dir"
+  },
+  "srv/neo/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle neo console - SpawnLoft\n\"<core>\" console neo\npause\n"
+  },
+  "srv/neo/libraries": {
+   "kind": "dir"
+  },
+  "srv/neo/libraries/net": {
+   "kind": "dir"
+  },
+  "srv/neo/libraries/net/neoforged": {
+   "kind": "dir"
+  },
+  "srv/neo/libraries/net/neoforged/x.txt": {
+   "kind": "file",
+   "text": "n"
+  },
+  "srv/neo/server.jar": {
+   "kind": "file",
+   "text": "s"
+  },
+  "srv/neo/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle neo - SpawnLoft\n\"<core>\" start neo\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console neo\n"
+  },
+  "srv/neo/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle neo - SpawnLoft\n\"<core>\" stop neo\npause\n"
+  },
+  "srv/one": {
+   "kind": "dir"
+  },
+  "srv/one/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle one console - SpawnLoft\n\"<core>\" console one\npause\n"
+  },
+  "srv/one/custom-build.jar": {
+   "kind": "file",
+   "text": "c"
+  },
+  "srv/one/server.properties": {
+   "kind": "file",
+   "text": "server-port=abc\nrcon.port=0\n"
+  },
+  "srv/one/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle one - SpawnLoft\n\"<core>\" start one\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console one\n"
+  },
+  "srv/one/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle one - SpawnLoft\n\"<core>\" stop one\npause\n"
+  },
+  "srv/two": {
+   "kind": "dir"
+  },
+  "srv/two/console.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle two console - SpawnLoft\n\"<core>\" console two\npause\n"
+  },
+  "srv/two/paper-1.21.4-1.jar": {
+   "kind": "file",
+   "text": "p"
+  },
+  "srv/two/purpur-1.21.4-2.jar": {
+   "kind": "file",
+   "text": "q"
+  },
+  "srv/two/server.properties": {
+   "kind": "file",
+   "text": "server-port=25999\nrcon.port=26999\nrcon.password=<password>\nmotd=Mine\n"
+  },
+  "srv/two/start.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle two - SpawnLoft\n\"<core>\" start two\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console two\n"
+  },
+  "srv/two/stop.bat": {
+   "kind": "file",
+   "text": "@echo off\ntitle two - SpawnLoft\n\"<core>\" stop two\npause\n"
+  },
+  "srv/two/zlib.jar": {
+   "kind": "file",
+   "text": "z"
+  }
+ }
+}

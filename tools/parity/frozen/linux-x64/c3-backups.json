@@ -1002,7 +1002,7 @@
   "data/backups/srv1/pre-restore_files_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "world/ type=5 mode=755 size=0\nworld/new-file.txt type=0 mode=644 size=21 sha256=167961048c7acfb545c08fe990e7ecdeee8ef10d3a15f9a00c95f31cf154fc66\nworld/level.dat type=0 mode=644 size=13 sha256=a12b9561022a47f90cd30a81b6f35b56223bd13f861839b291f5c65c628329d4\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nextra/ type=5 mode=755 size=0\nextra/level.dat type=0 mode=644 size=5 sha256=c8dee78f8c7b466c881847accc196998bad00e2b96c5ef913dfbe454d3807c96"
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=13 sha256=a12b9561022a47f90cd30a81b6f35b56223bd13f861839b291f5c65c628329d4\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld/new-file.txt type=0 mode=644 size=21 sha256=167961048c7acfb545c08fe990e7ecdeee8ef10d3a15f9a00c95f31cf154fc66\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nextra/ type=5 mode=755 size=0\nextra/level.dat type=0 mode=644 size=5 sha256=c8dee78f8c7b466c881847accc196998bad00e2b96c5ef913dfbe454d3807c96"
   },
   "data/backups/srv1/pre-restore_files_<stamp>.json#2": {
    "kind": "file",
@@ -1026,7 +1026,7 @@
   "data/backups/srv3/m_plugins_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nplugins/dynmap/ type=5 mode=755 size=0\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46"
   },
   "data/backups/srv3/s3d_standard_<stamp>.json": {
    "kind": "file",
@@ -1036,7 +1036,7 @@
   "data/backups/srv3/s3d_standard_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nplugins/dynmap/ type=5 mode=755 size=0\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326"
   },
   "data/engines": {
    "kind": "dir",
@@ -1321,7 +1321,7 @@
   "mirror/srv3/m_plugins_<stamp>.tar.gz": {
    "kind": "file",
    "mode": "644",
-   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46"
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nplugins/dynmap/ type=5 mode=755 size=0\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46"
   },
   "mirror2": {
    "kind": "dir",

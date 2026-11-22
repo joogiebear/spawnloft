@@ -1,0 +1,137 @@
+{
+ "about": "What the Node core did in scenario c4-reveal on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c4-reveal",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 3 (reveal alpha)",
+   "args": [
+    "reveal",
+    "alpha"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: This computer has no desktop to open folders on. The folder is <run>/data/instances/alpha\n"
+  },
+  {
+   "label": "step 5 (reveal nodir)",
+   "args": [
+    "reveal",
+    "nodir"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: This computer has no desktop to open folders on. The folder is undefined\n"
+  },
+  {
+   "label": "step 6 (reveal nodir)",
+   "args": [
+    "reveal",
+    "nodir"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Opening undefined\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (reveal numdir)",
+   "args": [
+    "reveal",
+    "numdir"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Opening 5\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (reveal alpha)",
+   "args": [
+    "reveal",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Opening <run>/data/instances/alpha\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (open alpha)",
+   "args": [
+    "open",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Opening <run>/data/instances/alpha\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (reveal alpha)",
+   "args": [
+    "reveal",
+    "alpha"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: This computer has no file manager to open folders with. The folder is <run>/data/instances/alpha\n"
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"alpha\": {\n      \"dir\": \"<run>/data/instances/alpha\",\n      \"jar\": \"paper-1.21.4-1.jar\",\n      \"port\": 25565\n    },\n    \"nodir\": {\n      \"jar\": \"x.jar\"\n    },\n    \"numdir\": {\n      \"dir\": 5,\n      \"jar\": \"x.jar\"\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}
