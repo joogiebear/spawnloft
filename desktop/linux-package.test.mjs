@@ -39,14 +39,13 @@ test('the layout keeps both 1.x paths and differs between deb and rpm only in pa
   assert.ok(paths.includes('/usr/share/applications/spawnloft-desktop.desktop'))
   // /usr/bin/spawnloft-desktop is an alternatives link made after install, never a packaged file
   assert.ok(!paths.includes('/usr/bin/spawnloft-desktop'))
-  assert.ok(!paths.some(p => p.includes('/runtime')), 'no runtime without --runtime')
-  assert.ok(layout({ kind: 'deb', ...args, runtime: '/r' }).some(([p, s]) => p === `${INSTALL_DIR}/resources/runtime` && s.tree === '/r'))
+  // no Node and no Node core (rust/PLAN-CORE-PORT.md 5.1); the licence beside the binaries
+  assert.ok(!paths.some(p => p.includes('/resources/runtime') || p.includes('/resources/core') || p.endsWith('.mjs')), paths.join('\n'))
+  assert.equal(deb.find(([p]) => p === `${INSTALL_DIR}/resources/LICENSE`)[1].from, path.join(import.meta.dirname, '..', 'LICENSE'))
   const marker = files => files.find(([p]) => p.endsWith('/package-type'))[1].text
   assert.equal(marker(deb), 'deb')
   assert.equal(marker(rpm), 'rpm')
   assert.deepEqual(rpm.map(([p]) => p), paths)
-  const pkgJson = JSON.parse(deb.find(([p]) => p.endsWith('/resources/core/package.json'))[1].text)
-  assert.equal(pkgJson.version, V)
 })
 
 test('every command-line entry runs the core', () => {
@@ -62,11 +61,13 @@ test('package metadata: same name as 1.x, tilde prerelease, conflicts with the C
   assert.match(control, /^Version: 2\.0\.0~beta\.3$/m)
   assert.match(control, /^Architecture: arm64$/m)
   assert.match(control, /^Depends: libc6 \(>= 2\.35\), libwebkit2gtk-4\.1-0, libgtk-3-0, /m)
+  assert.doesNotMatch(control, /libstdc\+\+/, 'libstdc++ was for the bundled Node')
   assert.match(control, /^Conflicts: spawnloft-cli$/m)
   const spec = rpmSpec({ version: V, staging: '/s', glibc: '2.35' })
   assert.match(spec, /^Name: spawnloft$/m)
   assert.match(spec, /^Version: 2\.0\.0~beta\.3$/m)
   assert.match(spec, /^Requires: glibc >= 2\.35, webkit2gtk4\.1, gtk3, /m)
+  assert.doesNotMatch(spec, /libstdc\+\+/)
   assert.match(spec, /^Conflicts: spawnloft-cli$/m)
   // after the old package's %postun, which removes 1.x's alternatives link
   assert.match(spec, /^%posttrans\n.*--install \/usr\/bin\/spawnloft-desktop spawnloft-desktop \/opt\/SpawnLoft\/spawnloft-desktop 100/ms)
@@ -102,18 +103,17 @@ test('the 2.x command-line package runs the core', () => {
   assert.match(WRAPPER_2X, /^exec \/opt\/spawnloft-cli\/bin\/spawnloft-core "\$@"$/m)
 })
 
-test('a desktop package is not built without a staged runtime for its architecture', async () => {
+test('a desktop package is not built from binaries of another architecture', async () => {
   const { buildPackages } = await import('../rust/crates/spawnloft-shell/installer/linux-package.mjs')
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-'))
   try {
-    // a minimal x64 ELF header is enough for the architecture check
-    const elf = Buffer.alloc(64); elf.writeUInt32BE(0x7f454c46, 0); elf.writeUInt16LE(0x3e, 18)
-    for (const f of ['shell', 'core']) fs.writeFileSync(path.join(tmp, f), elf)
+    // a minimal ELF header is enough for the architecture check
+    const elf = machine => { const b = Buffer.alloc(64); b.writeUInt32BE(0x7f454c46, 0); b.writeUInt16LE(machine, 18); return b }
+    fs.writeFileSync(path.join(tmp, 'shell'), elf(0x3e))
+    fs.writeFileSync(path.join(tmp, 'core'), elf(0xb7))
     const opts = { version: V, arch: 'x64', shell: path.join(tmp, 'shell'), core: path.join(tmp, 'core'), out: path.join(tmp, 'out') }
-    assert.throws(() => buildPackages(opts), /--runtime is required/)
-    fs.mkdirSync(path.join(tmp, 'rt'))
-    fs.writeFileSync(path.join(tmp, 'rt', 'runtime.json'), '{"node":"0.0.1"}')
-    assert.throws(() => buildPackages({ ...opts, runtime: path.join(tmp, 'rt') }), /the pin/)
+    assert.throws(() => buildPackages(opts), /core is a arm64 binary, not x64/)
+    assert.throws(() => buildPackages({ ...opts, arch: 'riscv' }), /--arch must be x64 or arm64/)
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
   }
@@ -131,6 +131,14 @@ test('the release gate reads each Linux package against its release name', async
   // an x64 build under the arm64 name, a hyphenated version, a missing 1.x path: each is refused
   const bad = linuxPackageProblems('f', `SpawnLoft-${V}-linux-arm64.deb`, V, deb('Package: spawn-loft\nVersion: 2.0.0-beta.3\nArchitecture: amd64\n', good.split('\n').slice(0, 2).join('\n')))
   assert.equal(bad.length, 5)
-  const rpm = (cmd, args) => (args[0] === '-qp' ? 'spawnloft-cli\n2.0.0~beta.3\naarch64\n' : '/opt/spawnloft-cli/bin/spawnloft-core\n/usr/bin/spawnloft\n')
+  const rpm = (cmd, args) => (args[0] === '-qp' ? 'spawnloft-cli\n2.0.0~beta.3\naarch64\n' : '/opt/spawnloft-cli/bin/spawnloft-core\n/opt/spawnloft-cli/bin/node\n/usr/bin/spawnloft\n')
   assert.deepEqual(linuxPackageProblems('f', `spawnloft-cli-${V}-linux-aarch64.rpm`, V, rpm), [])
+  // a package that still carries Node or its core is refused (rust/PLAN-CORE-PORT.md 5.1)
+  const withNode = good + '\n-rwxr-xr-x root/root 9 2026-11-11 02:12 ./opt/SpawnLoft/resources/runtime/node-24.0.0/bin/node' +
+    '\n-rw-r--r-- root/root 9 2026-11-11 02:12 ./opt/SpawnLoft/resources/core/mcctl.mjs'
+  const found = linuxPackageProblems('f', `SpawnLoft-${V}-linux-arm64.deb`, V, deb('Package: spawnloft\nVersion: 2.0.0~beta.3\nArchitecture: arm64\n', withNode))
+  assert.deepEqual(found, ['ships a Node.js binary, /opt/SpawnLoft/resources/runtime/node-24.0.0/bin/node', 'ships a Node core file, /opt/SpawnLoft/resources/core/mcctl.mjs'])
+  // the command-line package's bin/node is the link to the core, and only there
+  const cliNode = (cmd, args) => (args[0] === '-qp' ? 'spawnloft-cli\n2.0.0~beta.3\naarch64\n' : '/opt/spawnloft-cli/bin/spawnloft-core\n/opt/spawnloft-cli/runtime/node-24.0.0/bin/node\n')
+  assert.match(linuxPackageProblems('f', `spawnloft-cli-${V}-linux-aarch64.rpm`, V, cliNode).join('\n'), /ships a Node\.js binary/)
 })

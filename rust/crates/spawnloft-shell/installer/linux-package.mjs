@@ -5,7 +5,7 @@
 //   node linux-package.mjs config <version> <pubkey file> <out dir>
 //       writes <out dir>/overlay.json for `tauri build --no-bundle --config` (version, updater key)
 //   node linux-package.mjs package --version <v> --arch x64|arm64 --shell <SpawnLoft binary>
-//       --core <spawnloft-core> --out <dir> --runtime <dir> [--commit <sha>] [--deb-only]
+//       --core <spawnloft-core> --out <dir> [--commit <sha>] [--deb-only]
 //       writes SpawnLoft-<v>-linux-<deb arch>.deb, SpawnLoft-<v>-linux-<rpm arch>.rpm and
 //       build-info.json into <dir>
 //
@@ -25,8 +25,7 @@
 //   /opt/SpawnLoft/resources/bin/spawnloft-core  the Rust core
 //   /opt/SpawnLoft/resources/bin/spawnloft       1.x's command-line launchers, now forwarders to
 //   /opt/SpawnLoft/resources/bin/mcctl           the core (design A4 / Q-W)
-//   /opt/SpawnLoft/resources/core/...            the Node core (until 2.1)
-//   /opt/SpawnLoft/resources/runtime/...         the bundled Node runtime (stage-runtime.mjs)
+//   /opt/SpawnLoft/resources/LICENSE             SpawnLoft's licence
 //   /opt/SpawnLoft/resources/package-type        deb | rpm: how 1.x's updater, and the core's,
 //                                                tell which kind of install this is
 //   /usr/bin/spawnloft                           runs the core
@@ -34,14 +33,16 @@
 // /usr/bin/spawnloft-desktop is an update-alternatives link, as 1.x made it; it is not a packaged
 // file because 1.x's own removal script deletes that path during the upgrade (deb: before our
 // postinst; rpm: after our %post, hence %posttrans), through update-alternatives --remove.
+// No Node and no Node core ship (rust/PLAN-CORE-PORT.md 5.1): the package manager removes the
+// resources/core and resources/runtime an older 2.0 package installed, and a process still
+// running from them keeps its deleted files.
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { packageVersion } from '../../../../desktop/build-cli-package.mjs'
-import { setPackageVersion } from '../../../../desktop/set-version.mjs'
-import { checkRuntime } from '../../../../desktop/payload-gate.mjs'
+import { checkNoNode } from '../../../../desktop/payload-gate.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '../../../..')
@@ -61,8 +62,7 @@ export const desktopPackageNames = ({ arch, version }) => [
 export const CORE = `${INSTALL_DIR}/resources/bin/spawnloft-core`
 
 export const USR_BIN = `#!/bin/sh
-# /usr/bin/spawnloft: the command line. The Rust core runs it, forwarding what it does not own yet
-# to the Node core on the runtime this package carries. No Node needed on PATH.
+# /usr/bin/spawnloft: the command line, the Rust core this package carries. No Node needed.
 exec ${CORE} "$@"
 `
 
@@ -151,9 +151,9 @@ export function debControl({ version, arch, installedKb, glibc }) {
     `Architecture: ${DEB_ARCH[arch]}`,
     'Maintainer: joogiebear <joogiebear@protonmail.com>',
     `Installed-Size: ${installedKb}`,
-    // the window (WebKitGTK 4.1, GTK 3: Ubuntu 22.04 / Debian 12 and later), the bundled Node
-    // (libstdc++), what unpacking a database engine shells out to, and opening links
-    `Depends: libc6 (>= ${glibc}), libwebkit2gtk-4.1-0, libgtk-3-0, libstdc++6, libgcc-s1, tar, xz-utils, xdg-utils`,
+    // the window (WebKitGTK 4.1, GTK 3: Ubuntu 22.04 / Debian 12 and later), what unpacking a
+    // database engine shells out to, and opening links
+    `Depends: libc6 (>= ${glibc}), libwebkit2gtk-4.1-0, libgtk-3-0, libgcc-s1, tar, xz-utils, xdg-utils`,
     'Conflicts: spawnloft-cli',
     'Section: utils',
     'Priority: optional',
@@ -174,7 +174,7 @@ export function rpmSpec({ version, staging, glibc }) {
     'URL: https://github.com/joogiebear/spawnloft',
     // prebuilt binaries and text: no stripping, dependency scanning or debuginfo
     'AutoReqProv: no',
-    `Requires: glibc >= ${glibc}, webkit2gtk4.1, gtk3, libstdc++, tar, xz, xdg-utils`,
+    `Requires: glibc >= ${glibc}, webkit2gtk4.1, gtk3, tar, xz, xdg-utils`,
     'Conflicts: spawnloft-cli',
     '%define debug_package %{nil}',
     '%define __os_install_post %{nil}',
@@ -203,21 +203,13 @@ export function rpmSpec({ version, staging, glibc }) {
 
 // Every file the package installs, as [path inside the package, { from | text, mode }]. One list
 // for both kinds, so the .deb and the .rpm cannot drift apart; only package-type differs.
-export function layout({ kind, version, info, shell, core, runtime }) {
+export function layout({ kind, info, shell, core }) {
   const files = []
   const add = (to, spec) => files.push([to, spec])
   add(`${INSTALL_DIR}/${EXECUTABLE}`, { from: shell, mode: 0o755 })
   add(CORE, { from: core, mode: 0o755 })
   for (const name of ['spawnloft', 'mcctl']) add(`${INSTALL_DIR}/resources/bin/${name}`, { text: forwarder(name), mode: 0o755 })
-  for (const file of ['mcctl.mjs', 'spawnloft.mjs', 'LICENSE']) add(`${INSTALL_DIR}/resources/core/${file}`, { from: path.join(ROOT, file), mode: 0o644 })
-  add(`${INSTALL_DIR}/resources/core/package.json`, {
-    text: setPackageVersion(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'), version).text,
-    mode: 0o644,
-  })
-  add(`${INSTALL_DIR}/resources/core/src`, { tree: path.join(ROOT, 'src') })
-  // the Node core starts Rust daemons (design 2.3, until R4), as the Windows and macOS builds do
-  add(`${INSTALL_DIR}/resources/core/internal-defaults.json`, { text: JSON.stringify({ daemon: 'rust' }, null, 2) + '\n', mode: 0o644 })
-  if (runtime) add(`${INSTALL_DIR}/resources/runtime`, { tree: runtime })
+  add(`${INSTALL_DIR}/resources/LICENSE`, { from: path.join(ROOT, 'LICENSE'), mode: 0o644 })
   add(`${INSTALL_DIR}/resources/package-type`, { text: kind, mode: 0o644 })
   add(`${INSTALL_DIR}/resources/build-info.json`, { text: JSON.stringify({ ...info, package: PACKAGE, kind }, null, 2) + '\n', mode: 0o644 })
   add(`${INSTALL_DIR}/resources/icon.png`, { from: path.join(ROOT, 'desktop/build/icon.png'), mode: 0o644 })
@@ -231,11 +223,6 @@ function stage(root, files) {
   for (const [to, spec] of files) {
     const dest = path.join(root, to)
     fs.mkdirSync(path.dirname(dest), { recursive: true })
-    if (spec.tree) {
-      // a tree keeps its own modes (the runtime's node is executable); symlinks stay symlinks
-      fs.cpSync(spec.tree, dest, { recursive: true, verbatimSymlinks: true })
-      continue
-    }
     if (spec.from) fs.copyFileSync(spec.from, dest)
     else fs.writeFileSync(dest, spec.text)
     fs.chmodSync(dest, spec.mode)
@@ -245,6 +232,9 @@ function stage(root, files) {
     if (entry.isDirectory()) fs.chmodSync(path.join(entry.parentPath, entry.name), 0o755)
   }
   fs.chmodSync(root, 0o755)
+  // the release gate's rule, before anything is packed (payload-gate.mjs)
+  const problems = checkNoNode([root])
+  if (problems.length) throw new Error(problems.join('\n'))
 }
 
 function kilobytes(dir) {
@@ -269,23 +259,16 @@ export function elfArch(buf) {
 }
 
 export function buildPackages(opts) {
-  const { version, arch, shell, core, out, runtime, debOnly } = opts
+  const { version, arch, shell, core, out, debOnly } = opts
   if (!DEB_ARCH[arch]) throw new Error(`--arch must be x64 or arm64, not ${arch}`)
   for (const [what, file] of [['shell', shell], ['core', core]]) {
     if (!file || !fs.existsSync(file)) throw new Error(`--${what} ${file ?? ''} does not exist`)
     const found = elfArch(fs.readFileSync(file))
     if (found !== arch) throw new Error(`${file} is a ${found ?? 'non-ELF'} binary, not ${arch}`)
   }
-  // the Node core runs every command the Rust core forwards, so a package without its runtime is
-  // a broken package; the folder must be what stage-runtime.mjs staged for this architecture
-  if (!runtime) throw new Error('--runtime is required (stage it with installer/stage-runtime.mjs)')
-  const runtimeProblems = checkRuntime(runtime, { run: false })
-  if (runtimeProblems.length) throw new Error(`${runtime}:\n  ${runtimeProblems.join('\n  ')}`)
-  const record = JSON.parse(fs.readFileSync(path.join(runtime, 'runtime.json'), 'utf8'))
-  if (record.platform !== 'linux' || record.arch !== arch) throw new Error(`${runtime} holds Node for ${record.platform}-${record.arch}, not linux-${arch}`)
-  // the glibc floor covers Node too, which needs a newer one than the shell
-  const binaries = [shell, path.join(runtime, record.exe)]
-  const glibc = glibcFloor(binaries.map(f => fs.readFileSync(f)))
+  // the core is static (musl) and references no glibc symbol; it is read anyway, so a core built
+  // against glibc by mistake raises the floor instead of failing on an older distribution
+  const glibc = glibcFloor([shell, core].map(f => fs.readFileSync(f)))
   const info = {
     version,
     commit: opts.commit ?? null,
@@ -301,7 +284,7 @@ export function buildPackages(opts) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-pkg-'))
   try {
     const debRoot = path.join(work, 'root-deb')
-    stage(debRoot, layout({ kind: 'deb', version, info, shell, core, runtime }))
+    stage(debRoot, layout({ kind: 'deb', info, shell, core }))
     const control = path.join(debRoot, 'DEBIAN')
     fs.mkdirSync(control)
     fs.writeFileSync(path.join(control, 'control'), debControl({ version, arch, installedKb: kilobytes(debRoot), glibc }))
@@ -311,7 +294,7 @@ export function buildPackages(opts) {
     const built = [debName]
     if (!debOnly) {
       const rpmRoot = path.join(work, 'root-rpm')
-      stage(rpmRoot, layout({ kind: 'rpm', version, info, shell, core, runtime }))
+      stage(rpmRoot, layout({ kind: 'rpm', info, shell, core }))
       const spec = path.join(work, `${PACKAGE}.spec`)
       fs.writeFileSync(spec, rpmSpec({ version, staging: rpmRoot, glibc }))
       const rpms = path.join(work, 'rpms')
@@ -350,7 +333,7 @@ function parsePackageArgs(argv) {
       case '--shell': out.shell = path.resolve(value()); break
       case '--core': out.core = path.resolve(value()); break
       case '--out': out.out = path.resolve(value()); break
-      case '--runtime': out.runtime = path.resolve(value()); break
+
       case '--commit': out.commit = value(); break
       case '--deb-only': out.debOnly = true; break
       default: throw new Error(`unknown argument ${a}`)

@@ -15,14 +15,13 @@
 //      `az login` session, a signing module, a beta version;
 //   2. builds spawnloft-core.exe at that version and signs it (sign-windows.ps1): the bundler
 //      copies resources as they are, so the core is signed before it is bundled;
-//   3. stages the bundled Node (installer-config.mjs); node.exe keeps the OpenJS Foundation
-//      signature it ships with, so its bytes still match the pinned archive (payload-gate);
+//   3. writes the installer configuration (installer-config.mjs);
 //   4. `tauri build` with bundle.windows.signCommand = sign-windows.ps1, which signs the shell,
 //      the uninstaller (inside makensis) and the setup;
 //   5. assembles the update asset set (desktop/release-feed.mjs), the same step as release.yml;
 //   6. runs the release gate in release mode on this Windows half (--release --partial) with
-//      --authenticode-cn "victor zemeckis" and --signed for the shell, the core and node.exe,
-//      --binary for the shell and core (what they trust), --runtime and --payload, and has it
+//      --authenticode-cn "victor zemeckis" and --signed for the shell and the core, --binary for
+//      the shell and core (what they trust), --payload (no Node, no test-build wording), and has it
 //      write <out>.gate-record.json: the Authenticode and trust checks bound to the setup's
 //      sha256, which the assembly and the publish step take as --evidence;
 //   7. writes <out>.signing-report.json beside the folder (commit, version, key, each file's
@@ -52,7 +51,6 @@ const SHELL = path.resolve(HERE, '..')
 const RUST = path.resolve(SHELL, '../..')
 const ROOT = path.resolve(RUST, '..')
 export const TAURI_CLI_VERSION = '2.12.4'
-export const OPENJS_CN = 'OpenJS Foundation'
 const { windowsPowerShellEnv } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'windows-powershell.mjs')).href)
 
 export function parseArgs(argv) {
@@ -88,11 +86,11 @@ export function signingSettings(desktopPackage) {
 // (--partial), the built shell and core read for what they trust (the setup is compressed, so this
 // is the machine that can prove it), and the record of the checks only Windows can make written
 // for the assembly and the publish step (--evidence there). A throwaway-key run says so.
-export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, nodeExe, runtime, payload, record, throwaway }) {
+export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, payload, record, throwaway }) {
   return ['--dir', out, '--version', version, '--pubkey', pubkey, '--release', '--partial', ...(throwaway ? ['--throwaway-key'] : []),
     '--authenticode-cn', publisher, '--check-binary-versions',
-    '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--binary', shellExe, '--binary', coreExe,
-    '--runtime', runtime, '--payload', payload, ...(record ? ['--write-record', record] : [])]
+    '--signed', shellExe, '--signed', coreExe, '--binary', shellExe, '--binary', coreExe,
+    '--payload', payload, ...(record ? ['--write-record', record] : [])]
 }
 
 // Left out of every build step: the release key (only the two signing steps get it), and the
@@ -243,11 +241,9 @@ async function main(argv) {
   step('Signing the Rust core (the bundler does not sign resources)')
   run(host, [...psFile(signScript), coreExe], { env })
 
-  step('Staging the installer configuration and the bundled Node')
+  step('Writing the installer configuration')
   const cfg = path.join(work, 'cfg')
   run(process.execPath, [path.join(HERE, 'installer-config.mjs'), version, pubB64File, cfg, '--sign-script', signScript], { cwd: SHELL, env })
-  const runtimeRecord = JSON.parse(fs.readFileSync(path.join(cfg, 'runtime', 'runtime.json'), 'utf8'))
-  const nodeExe = path.join(cfg, 'runtime', runtimeRecord.exe)
 
   step('Building and signing the shell, uninstaller and setup')
   // the sign command keeps a copy of each file as it signed it: the bundler rewrites the loose
@@ -266,7 +262,7 @@ async function main(argv) {
 
   step('The release gate')
   const record = `${out}.gate-record.json`
-  run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, nodeExe, runtime: path.join(cfg, 'runtime'), payload: cfg, record, throwaway: !opts.key })])
+  run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, payload: cfg, record, throwaway: !opts.key })])
 
   // beside the folder, not in it: the folder holds exactly the release assets, so the gate (and a
   // later publish step) find nothing unaccounted for
@@ -276,7 +272,6 @@ async function main(argv) {
     [`SpawnLoft-Setup-${version}.exe`]: path.join(out, `SpawnLoft-Setup-${version}.exe`),
     'SpawnLoft.exe': shellExe,
     'resources/bin/spawnloft-core.exe': coreExe,
-    [`resources/runtime/${runtimeRecord.exe.replaceAll('\\', '/')}`]: nodeExe,
   }
   const report = {
     version, commit, branch, builtAt: new Date().toISOString(), machine: os.hostname(),

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cliPackageNames, packageVersion, debControl, rpmSpec, WRAPPER, NODE_VERSION, NODE_SHA256, PACKAGE, PREFIX } from '../desktop/build-cli-package.mjs'
+import os from 'node:os'
+import { cliPackageNames, packageVersion, debControl, rpmSpec, stage, WRAPPER_2X, PACKAGE, PREFIX } from '../desktop/build-cli-package.mjs'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -36,7 +37,7 @@ test('the control file and the spec say the same things', () => {
   assert.match(control, /^Conflicts: spawnloft$/m)
   // Unpacking a database engine shells out to these, and a minimal server image has neither.
   assert.match(control, /^Depends: .*\btar, xz-utils$/m)
-  assert.doesNotMatch(control, /nodejs/, 'Node is carried, not depended on')
+  assert.doesNotMatch(control, /nodejs|libstdc\+\+/, 'no Node is carried or depended on')
   assert.ok(control.endsWith('\n'))
   for (const line of control.split('\n').slice(control.split('\n').findIndex(l => l.startsWith('Description:')) + 1, -1)) {
     assert.match(line, /^ \S/, 'a description continues on indented, non-empty lines')
@@ -47,6 +48,7 @@ test('the control file and the spec say the same things', () => {
   assert.match(spec, /^Version: 1\.2\.0~beta\.65$/m)
   assert.match(spec, /^Conflicts: spawnloft$/m)
   assert.match(spec, /^Requires: .*\btar, xz$/m)
+  assert.doesNotMatch(spec, /libstdc\+\+/)
   // A prebuilt binary: rpmbuild must not strip it, scan it, or split debug information out of it.
   assert.match(spec, /^AutoReqProv: no$/m)
   assert.match(spec, /^%define __os_install_post %\{nil\}$/m)
@@ -54,19 +56,34 @@ test('the control file and the spec say the same things', () => {
   assert.ok(spec.includes(`${PREFIX}\n`) && spec.includes('/usr/bin/spawnloft\n'))
 })
 
-test('the launcher runs the core on the runtime beside it, and is a program', () => {
-  assert.ok(WRAPPER.startsWith('#!/bin/sh\n'))
-  assert.doesNotMatch(WRAPPER, /\r/, '"#!/bin/sh\\r" is not a program')
-  assert.match(WRAPPER, new RegExp(`^exec ${PREFIX}/bin/node ${PREFIX}/core/mcctl\\.mjs "\\$@"$`, 'm'))
+test('the launcher runs the core, and is a program', () => {
+  assert.ok(WRAPPER_2X.startsWith('#!/bin/sh\n'))
+  assert.doesNotMatch(WRAPPER_2X, /\r/, '"#!/bin/sh\\r" is not a program')
+  assert.match(WRAPPER_2X, new RegExp(`^exec ${PREFIX}/bin/spawnloft-core "\\$@"$`, 'm'))
   assert.equal(PACKAGE, 'spawnloft-cli')
 })
 
-test('the runtime is pinned to a version and a published hash for each architecture', () => {
-  assert.match(NODE_VERSION, /^\d+\.\d+\.\d+$/)
-  assert.deepEqual(Object.keys(NODE_SHA256).sort(), ['arm64', 'x64'])
-  for (const hash of Object.values(NODE_SHA256)) assert.match(hash, /^[0-9a-f]{64}$/)
-  const wanted = Number(/>=(\d+)/.exec(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).engines.node)[1])
-  assert.ok(Number(NODE_VERSION.split('.')[0]) >= wanted)
+// rust/PLAN-CORE-PORT.md 5.1 and 5.2: the core alone; bin/node, the path 1.x shims and MCP
+// configs name, is a link to it; no Node, no Node core, no node field in build-info.json
+test('the package carries the core alone, with bin/node a link to it', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, () => {
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-cli-stage-'))
+  try {
+    const core = path.join(work, 'spawnloft-core')
+    fs.writeFileSync(core, 'core bytes')
+    const info = { version: '2.0.0-beta.7', commit: 'abc', platform: 'linux', arch: 'x64' }
+    const prefix = path.join(stage(work, 'deb', info, core), PREFIX)
+    assert.deepEqual(fs.readdirSync(prefix).sort(), ['LICENSE', 'bin', 'build-info.json', 'package-type'])
+    assert.deepEqual(fs.readdirSync(path.join(prefix, 'bin')).sort(), ['node', 'spawnloft-core'])
+    assert.equal(fs.readlinkSync(path.join(prefix, 'bin', 'node')), 'spawnloft-core')
+    assert.equal(fs.readFileSync(path.join(prefix, 'bin', 'node'), 'utf8'), 'core bytes')
+    const record = JSON.parse(fs.readFileSync(path.join(prefix, 'build-info.json'), 'utf8'))
+    assert.equal(record.package, PACKAGE)
+    assert.equal('node' in record, false)
+    assert.equal(fs.readFileSync(path.join(prefix, 'package-type'), 'utf8'), 'deb')
+    assert.equal(fs.readFileSync(path.join(prefix, 'LICENSE'), 'utf8'), fs.readFileSync(path.join(root, 'LICENSE'), 'utf8'))
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true })
+  }
 })
 
 // Swapping the 1.x desktop package for this one leaves task shims naming the removed

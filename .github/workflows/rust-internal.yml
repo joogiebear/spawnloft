@@ -157,7 +157,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
+          # the Node the tests and tools run on; SpawnLoft ships none (rust/PLAN-CORE-PORT.md 5.5)
           node-version-file: .node-version
       - name: Install the pinned toolchain
         if: matrix.daemon == 'rust'
@@ -223,7 +223,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
+          # the Node the tests and tools run on; SpawnLoft ships none (rust/PLAN-CORE-PORT.md 5.5)
           node-version-file: .node-version
       - name: Install the pinned toolchain
         working-directory: rust
@@ -435,7 +435,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
+          # the Node the tests and tools run on; SpawnLoft ships none (rust/PLAN-CORE-PORT.md 5.5)
           node-version-file: .node-version
       - name: Core and desktop tests
         env:
@@ -462,7 +462,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
+          # the Node the tests and tools run on; SpawnLoft ships none (rust/PLAN-CORE-PORT.md 5.5)
           node-version-file: .node-version
       - name: Install the pinned toolchain
         working-directory: rust

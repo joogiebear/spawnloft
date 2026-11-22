@@ -20,14 +20,14 @@
 //     CFBundleShortVersionString, checked when --check-binary-versions is set (the numeric
 //     resources carry no prerelease tag, so major.minor.patch is what must agree),
 //
-//   - the payload (desktop/payload-gate.mjs), when given: the bundled Node runtime folder is the
-//     pinned version from the pinned nodejs.org archive (--runtime), and no shipped file carries a
-//     test build's wording such as "internal spike" (--payload, repeatable: files or folders),
-//   - both cores inside an installed copy of the build report the release version, when one or
-//     more --installed folders are given (W4, plan D4): `spawnloft-core --version --json` and the
-//     Node core's resources/core/package.json, which the panel, data-format.json's writtenBy, the
-//     diagnostics bundle and the launcher read. The folder is an install folder (Windows, Linux
-//     /opt/...) or a macOS .app.
+//   - the payload (desktop/payload-gate.mjs), when given (--payload, repeatable: files or
+//     folders): no shipped file is a Node.js binary or a Node core .mjs file (rust/PLAN-CORE-PORT.md
+//     5.1: every 2.x package runs on spawnloft-core alone), and none carries a test build's
+//     wording such as "internal spike",
+//   - the core inside an installed copy of the build reports the release version, when one or
+//     more --installed folders are given (W4, plan D4): `spawnloft-core --version --json`, which
+//     must not be a test-hooks build, and the copy holds no Node either. The folder is an install
+//     folder (Windows, Linux /opt/...) or a macOS .app.
 //
 //   - the release is complete (rust/beta-review/REVIEW.md B4): Windows, macOS and both Linux
 //     architectures, every asset each one needs (the 1.x feeds, the mac .dmg and .zip, the
@@ -56,12 +56,12 @@
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //        [--signed <file>[=<cn>]]...  (Windows: this built file must carry a valid, timestamped
 //                                      Authenticode signature by <cn>, or by --authenticode-cn;
-//                                      the shell, the core, node.exe=OpenJS Foundation)
+//                                      the shell, the core)
 //        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
 //        [--check-linux-packages]     (read every .deb/.rpm with dpkg-deb / rpm: name, version,
 //                                      architecture, the 1.x paths; on a Linux host)
-//        [--installed <dir>]...       (an installed copy: both cores must report the version)
-//        [--runtime <resources/runtime dir>] [--payload <file or dir>]...
+//        [--installed <dir>]...       (an installed copy: the core must report the version)
+//        [--payload <file or dir>]...
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
@@ -72,7 +72,7 @@ import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
-import { checkRuntime, checkNoInternalStrings } from './payload-gate.mjs'
+import { checkNoNode, checkNoInternalStrings } from './payload-gate.mjs'
 import { windowsPowerShellEnv } from './windows-powershell.mjs'
 import { binaryKind, binaryProblems, statusProblems, releaseKeys, macTarballTrust, archiveTrust, tarFiles, cpioFiles } from './build-trust.mjs'
 
@@ -139,8 +139,8 @@ function parseArgs(argv) {
       // omitted for the unsigned dry run
       case '--authenticode-cn': out.authenticodeCn = value(); break
       // a built binary that must be Authenticode-signed (the installer is checked by itself): the
-      // bundler signs the shell, installer and uninstaller, but not resources, so the core and the
-      // bundled node.exe (which keeps OpenJS's signature) are named here (PLAN-2.0-REMAINING D2)
+      // bundler signs the shell, installer and uninstaller, but not resources, so the core is
+      // named here (PLAN-2.0-REMAINING D2)
       case '--signed': (out.signed ??= []).push(parseSigned(value())); break
       // when set, the version compiled into each built binary (the installer's VIProductVersion,
       // the mac app's Info.plist) must equal the release version; the real workflow sets it, the
@@ -150,7 +150,7 @@ function parseArgs(argv) {
       // architecture must be what its file name says, and the desktop package must carry the
       // paths 1.x installs and other programs remember (design 5.7); needs both tools
       case '--check-linux-packages': out.checkLinuxPackages = true; break
-      case '--runtime': out.runtime = value(); break
+
       case '--payload': (out.payload ??= []).push(value()); break
       case '--installed': (out.installed ??= []).push(value()); break
       // every check a publish needs (see the header)
@@ -231,7 +231,7 @@ function hasTool(cmd) {
 
 // Returns { ok, problems, notes, flags, targets, checks }. Reads the folder, touches no network.
 // `checks` lists the per-file checks that passed here ({ check, file, sha256 }), for --write-record.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, signed, checkBinaryVersions, installed, runtime, payload, checkLinuxPackages,
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, signed, checkBinaryVersions, installed, payload, checkLinuxPackages,
   release, partial, throwawayKey, unsigned, checkTrust, binaries, evidence, tools }) {
   const problems = []
   const notes = []
@@ -504,7 +504,7 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     }
   }
 
-  // Both cores of an installed copy report the release version (plan D4).
+  // The core of an installed copy reports the release version (plan D4), and no Node came with it.
   for (const root of installed ?? []) {
     const found = installedVersions(root)
     problems.push(...found.problems)
@@ -512,10 +512,7 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
       if (found.core !== version) problems.push(`${found.corePath}: spawnloft-core reports ${found.core}, expected ${version}`)
       else notes.push(`${found.corePath}: spawnloft-core reports ${version}`)
     }
-    if (found.node !== undefined) {
-      if (found.node !== version) problems.push(`${found.nodePath}: the Node core says ${found.node}, expected ${version}`)
-      else notes.push(`${found.nodePath}: the Node core says ${version}`)
-    }
+
   }
 
   // Assets not named by the update envelope: the mac .dmg (manual install) and the command-line
@@ -534,13 +531,11 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     if (!seen.has(name)) problems.push(`${name} is in the release folder but no check accounts for it`)
   }
 
-  // The payload, before it was bundled (PLAN-2.0-REMAINING.md A3, W1).
-  if (runtime) {
-    const found = checkRuntime(runtime)
-    problems.push(...found)
-    if (!found.length) notes.push(`the bundled Node in ${runtime} is the pinned version from the pinned archive`)
-  }
+  // The payload (PLAN-2.0-REMAINING.md A3, W1; rust/PLAN-CORE-PORT.md 5.1).
   if (payload?.length) {
+    const noNode = checkNoNode(payload)
+    problems.push(...noNode)
+    if (!noNode.length) notes.push(`no Node.js binary and no .mjs file in ${payload.length} payload path(s)`)
     const found = checkNoInternalStrings(payload)
     problems.push(...found)
     if (!found.length) notes.push(`no test-build wording in ${payload.length} payload path(s)`)
@@ -579,7 +574,11 @@ export function installedStatus(root, release = releaseKeys()) {
 // What a Linux package says about itself, against what its release name promises. The package
 // manager compares versions with `~` for a prerelease (1.x did the same), and 1.x installs upgrade
 // in place only because the name is `spawnloft`. Desktop packages must ship the two 1.x paths.
+// No package may ship Node or a Node core file (rust/PLAN-CORE-PORT.md 5.1); the command-line
+// package's bin/node is the one exception, a link to spawnloft-core that build-cli-package.mjs
+// checks before packing (5.2).
 export const LINUX_1X_PATHS = ['/opt/SpawnLoft/spawnloft-desktop', '/opt/SpawnLoft/resources/bin/spawnloft', '/usr/bin/spawnloft']
+export const LINUX_NODE_LINK = '/opt/spawnloft-cli/bin/node'
 export function expectedLinuxPackage(name, version) {
   const m = /^(SpawnLoft|spawnloft-cli)-(.+)-linux-(amd64|arm64|x86_64|aarch64)\.(deb|rpm)$/.exec(name)
   if (!m || m[2] !== version) return null
@@ -602,13 +601,18 @@ export function linuxPackageProblems(file, name, version, run = (cmd, args) => e
   const problems = []
   for (const k of ['package', 'version', 'arch']) if (got[k] !== want[k]) problems.push(`${k} is ${got[k]}, the release name says ${want[k]}`)
   if (want.desktop) for (const p of LINUX_1X_PATHS) if (!files.includes(p)) problems.push(`does not ship ${p}`)
+  for (const p of files) {
+    const base = p.slice(p.lastIndexOf('/') + 1).toLowerCase()
+    if ((base === 'node' || base === 'node.exe') && p !== LINUX_NODE_LINK) problems.push(`ships a Node.js binary, ${p}`)
+    else if (base.endsWith('.mjs')) problems.push(`ships a Node core file, ${p}`)
+  }
   return problems
 }
 
-// The versions the two cores in an installed copy report: the Rust core's `--version --json`
-// and the Node core's package.json. `root` is an install folder (resources/ directly under it) or
-// a macOS .app (Contents/Resources/resources/). Returns { core, corePath, node, nodePath,
-// problems }; a version is undefined when it could not be read, with the reason in problems.
+// The version the core in an installed copy reports (`--version --json`), and that the copy holds
+// no Node (payload-gate.mjs checkNoNode). `root` is an install folder (resources/ directly under
+// it) or a macOS .app (Contents/Resources/resources/). Returns { core, corePath, problems }; the
+// version is undefined when it could not be read, with the reason in problems.
 export function installedVersions(root) {
   const problems = []
   const bases = [path.join(root, 'resources'), path.join(root, 'Contents', 'Resources', 'resources')]
@@ -629,12 +633,7 @@ export function installedVersions(root) {
       problems.push(`${out.corePath}: --version --json failed (${e.message.split('\n')[0]})`)
     }
   }
-  out.nodePath = path.join(base, 'core', 'package.json')
-  try {
-    out.node = JSON.parse(fs.readFileSync(out.nodePath, 'utf8')).version
-  } catch (e) {
-    problems.push(`${out.nodePath}: unreadable (${e.code ?? e.message})`)
-  }
+  problems.push(...checkNoNode([root]))
   return out
 }
 

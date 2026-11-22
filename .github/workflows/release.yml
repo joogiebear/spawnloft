@@ -33,7 +33,7 @@ on:
       - 'desktop/update-envelope.test.mjs'
       - 'desktop/preview-artifacts.mjs'
       - 'desktop/payload-gate.mjs'
-      - 'desktop/node-pin.mjs'
+      - 'desktop/payload-gate.test.mjs'
       - 'desktop/set-version.mjs'
       - 'desktop/version-stamp.test.mjs'
       - 'package.json'
@@ -135,7 +135,7 @@ jobs:
             --out "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
             --tauri "$TAURI_CLI" --win "$DRY_SETUP" --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           ls -la "$RUNNER_TEMP/release"
-      - name: Install the built setup, so the gate can ask both cores their version
+      - name: Install the built setup, so the gate can ask its core its version
         shell: pwsh
         run: |
           $p = Start-Process $env:DRY_SETUP -ArgumentList '/S' -Wait -PassThru
@@ -145,10 +145,11 @@ jobs:
         run: |
           # release mode, as a publish runs it, with the three dry-run waivers said out loud: one
           # platform (--partial), a throwaway feed key, an unsigned setup. What the build trusts is
-          # read from the installed copy (its shell and core, and the core's update status).
+          # read from the installed copy (its shell and core, and the core's update status); the
+          # installed copy must hold no Node and no Node core (--payload, rust/PLAN-CORE-PORT.md 5.1).
           node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
             --release --partial --throwaway-key --unsigned --installed "$DRY_INSTALLED" \
-            --runtime "$DRY_INSTALLED/resources/runtime" --payload "$DRY_INSTALLED"
+            --payload "$DRY_INSTALLED"
       - name: The publish ordering, in dry mode (nothing is published)
         run: |
           node desktop/release-publish.mjs \
