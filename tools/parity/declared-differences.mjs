@@ -67,7 +67,8 @@ export const DECLARED = [
     where: '`repair --json`\'s `root`, `run/runtime.json`\'s `root`, the first-run wizard\'s `coreDir`',
     node: 'the Node core\'s folder (`resources/core`, a checkout in the rig)',
     rust: 'the folder holding spawnloft-core; `root` is written for 1.x and no longer compared',
-    apply: (text) => text.replace(/"(root|coreDir)"(\s*):(\s*)"(?:[^"\\]|\\.)*"/g, '"$1"$2:$3"<code folder>"'),
+    // a data root (always under the rig's <run> folder) is the same on both sides and kept
+    apply: (text) => text.replace(/"(root|coreDir)"(\s*):(\s*)"(?!<run>)(?:[^"\\]|\\.)*"/g, '"$1"$2:$3"<code folder>"'),
   },
   {
     id: 'collation-outside-ascii',
