@@ -1,0 +1,588 @@
+{
+ "about": "What the Node core did in scenario c3-running on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c3-running",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 17 (start db1 --timeout 60)",
+   "args": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"db1\"...\nReady - ready for connections\n  database pid <pid>   port 47821\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47830   rcon 47831\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (backup run1)",
+   "args": [
+    "backup",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Flushing world to disk (save-all), then snapshotting...\nWrote <run>/data/backups/run1/standard_<stamp>.tar.gz (<size>)\n  included: plugins, world, server.properties, eula.txt, databases\n  database: shop on db1 (<size>)\n  WARNING: database logs on db2 not included: the database is not running\n  WARNING: database 0 on kv1 not included: Redis (Garnet) keeps its own checkpoints; it is not dumped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (backup run1 --no-flush --label nf --json)",
+   "args": [
+    "backup",
+    "run1",
+    "--no-flush",
+    "--label",
+    "nf",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"run1\",\"path\":\"<run>/data/backups/run1/nf_standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"scope\":\"standard\",\"members\":[\"plugins\",\"world\",\"server.properties\",\"eula.txt\",\"databases\"],\"databases\":[{\"service\":\"db1\",\"engine\":\"mariadb\",\"version\":\"0.0.0-fake\",\"database\":\"shop\",\"user\":\"run1\",\"file\":\"databases/db1__shop.sql\",\"bytes\":81}],\"databasesSkipped\":[{\"service\":\"db2\",\"database\":\"logs\",\"reason\":\"the database is not running\"},{\"service\":\"kv1\",\"database\":\"0\",\"reason\":\"Redis (Garnet) keeps its own checkpoints; it is not dumped\"}],\"skipped\":[],\"warnings\":[\"database logs on db2 not included: the database is not running\",\"database 0 on kv1 not included: Redis (Garnet) keeps its own checkpoints; it is not dumped\"],\"mirrored\":null,\"mirrorError\":null,\"flushed\":false,\"flushWarning\":null,\"saveOnWarning\":null,\"pruned\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (snapshot run1 --label p --scope plugins --json)",
+   "args": [
+    "snapshot",
+    "run1",
+    "--label",
+    "p",
+    "--scope",
+    "plugins",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"run1\",\"path\":\"<run>/data/backups/run1/p_plugins_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"scope\":\"plugins\",\"members\":[\"plugins\"],\"databases\":[],\"databasesSkipped\":[],\"skipped\":[],\"warnings\":[],\"mirrored\":null,\"mirrorError\":null,\"flushed\":true,\"flushWarning\":null,\"saveOnWarning\":null,\"pruned\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (snapshots run1 --json)",
+   "args": [
+    "snapshots",
+    "run1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"run1\",\"backups\":[{\"name\":\"p_plugins_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/run1/p_plugins_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"plugins\",\"label\":\"p\",\"taskId\":null,\"members\":[\"plugins\"]},{\"name\":\"nf_standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/run1/nf_standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"standard\",\"label\":\"nf\",\"taskId\":null,\"members\":[\"plugins\",\"world\",\"server.properties\",\"eula.txt\",\"databases\"]},{\"name\":\"standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/run1/standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"standard\",\"label\":\"\",\"taskId\":null,\"members\":[\"plugins\",\"world\",\"server.properties\",\"eula.txt\",\"databases\"]}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (verify run1 --all)",
+   "args": [
+    "verify",
+    "run1",
+    "--all"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ok    p_plugins_<stamp>.tar.gz  (2 entries, <size>)\nok    nf_standard_<stamp>.tar.gz  (8 entries, <size>)\nok    standard_<stamp>.tar.gz  (8 entries, <size>)\n\nAll 3 snapshots read back whole.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (restore run1 nf --yes)",
+   "args": [
+    "restore",
+    "run1",
+    "nf",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"run1\" is running - stop it before restoring.\n"
+  },
+  {
+   "label": "step 25 (worlds run1 export)",
+   "args": [
+    "worlds",
+    "run1",
+    "export"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"world\" is the world the running server is saving into - stop the server first, or take a backup instead\n"
+  },
+  {
+   "label": "step 26 (worlds run1 use world)",
+   "args": [
+    "worlds",
+    "run1",
+    "use",
+    "world"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"run1\" is running - stop it before switching worlds.\n"
+  },
+  {
+   "label": "step 27 (worlds run1 delete other --yes)",
+   "args": [
+    "worlds",
+    "run1",
+    "delete",
+    "other",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"run1\" is running - stop it before deleting worlds.\n"
+  },
+  {
+   "label": "step 28 (worlds run1)",
+   "args": [
+    "worlds",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WORLD  ACTIVE  DIMENSIONS  SIZE\nworld  yes     -           <size>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (restore run1 nf)",
+   "args": [
+    "restore",
+    "run1",
+    "nf"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "About to restore into <run>/data/instances/run1:\n  snapshot: nf_standard_<stamp>.tar.gz (<size>, scope standard)\n  overwrites: plugins, world, server.properties, eula.txt, databases\n  imports:    database shop on db1 (needs \"db1\" running)\n  archive:    reads back cleanly\n\nThis overwrites existing files in place. Re-run with --yes to proceed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (restore run1 nf --yes)",
+   "args": [
+    "restore",
+    "run1",
+    "nf",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Restored nf_standard_<stamp>.tar.gz into <run>/data/instances/run1\n  imported database shop into db1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (snapshots run1)",
+   "args": [
+    "snapshots",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                        SCOPE     SIZE   CREATED\npre-restore_files_<stamp>.tar.gz  files     <size>  <time>\np_plugins_<stamp>.tar.gz          plugins   <size>  <time>\nnf_standard_<stamp>.tar.gz        standard  <size>  <time>\nstandard_<stamp>.tar.gz           standard  <size>  <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (backup run1 --label stopped)",
+   "args": [
+    "backup",
+    "run1",
+    "--label",
+    "stopped"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"run1\" (scope: standard)...\nWrote <run>/data/backups/run1/stopped_standard_<stamp>.tar.gz (<size>)\n  included: plugins, world, server.properties, eula.txt, databases\n  database: shop on db1 (<size>)\n  WARNING: database logs on db2 not included: the database is not running\n  WARNING: database 0 on kv1 not included: Redis (Garnet) keeps its own checkpoints; it is not dumped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47830   rcon 47831\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (backup run1 --label noflush --scope worlds)",
+   "args": [
+    "backup",
+    "run1",
+    "--label",
+    "noflush",
+    "--scope",
+    "worlds"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Flushing world to disk (save-all), then snapshotting...\nWrote <run>/data/backups/run1/noflush_worlds_<stamp>.tar.gz (<size>)\n  included: world\n  WARNING: could not flush the world before the snapshot (RCON error: RCON connection closed); the copy may be torn\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47830   rcon 47831\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (backup run1 --label nosaveon --scope worlds --json)",
+   "args": [
+    "backup",
+    "run1",
+    "--label",
+    "nosaveon",
+    "--scope",
+    "worlds",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"run1\",\"path\":\"<run>/data/backups/run1/nosaveon_worlds_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"scope\":\"worlds\",\"members\":[\"world\"],\"databases\":[],\"databasesSkipped\":[],\"skipped\":[],\"warnings\":[\"autosave may still be off: save-on was not confirmed (RCON error: RCON connection closed). Type save-on in the server's console if it is\"],\"mirrored\":null,\"mirrorError\":null,\"flushed\":true,\"flushWarning\":null,\"saveOnWarning\":\"autosave may still be off: save-on was not confirmed (RCON error: RCON connection closed). Type save-on in the server's console if it is\",\"pruned\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (stop db1)",
+   "args": [
+    "stop",
+    "db1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"db1\"...\n\"db1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (restore run1 nf --yes)",
+   "args": [
+    "restore",
+    "run1",
+    "nf",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Restored nf_standard_<stamp>.tar.gz into <run>/data/instances/run1\n  WARNING: database shop not imported: \"db1\" is not running; the dump is left at <run>/data/instances/run1/databases/db1__shop.sql\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (snapshots run1)",
+   "args": [
+    "snapshots",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                        SCOPE     SIZE   CREATED\npre-restore_files_<stamp>.tar.gz  files     <size>  <time>\nnosaveon_worlds_<stamp>.tar.gz    worlds    <size>  <time>\nnoflush_worlds_<stamp>.tar.gz     worlds    <size>  <time>\nstopped_standard_<stamp>.tar.gz   standard  <size>  <time>\npre-restore_files_<stamp>.tar.gz  files     <size>  <time>\np_plugins_<stamp>.tar.gz          plugins   <size>  <time>\nnf_standard_<stamp>.tar.gz        standard  <size>  <time>\nstandard_<stamp>.tar.gz           standard  <size>  <time>\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"db1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard, <size>\",\"snapshot\":\"standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (nf), <size>\",\"snapshot\":\"nf_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"plugins (p), <size>\",\"snapshot\":\"p_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"restore\",\"by\":{\"kind\":\"cli\"},\"detail\":\"nf_standard_<stamp>.tar.gz; how it was is kept as pre-restore_files_<stamp>.tar.gz\",\"snapshot\":\"pre-restore_files_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (stopped), <size>\",\"snapshot\":\"stopped_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"worlds (noflush), <size>\",\"snapshot\":\"noflush_worlds_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"worlds (nosaveon), <size>\",\"snapshot\":\"nosaveon_worlds_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"db1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"restore\",\"by\":{\"kind\":\"cli\"},\"detail\":\"nf_standard_<stamp>.tar.gz; how it was is kept as pre-restore_files_<stamp>.tar.gz\",\"snapshot\":\"pre-restore_files_<stamp>.tar.gz\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1/nf_standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"standard\",\n  \"label\": \"nf\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\",\n    \"databases\"\n  ],\n  \"databases\": [\n    {\n      \"service\": \"db1\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"database\": \"shop\",\n      \"user\": \"run1\",\n      \"file\": \"databases/db1__shop.sql\",\n      \"bytes\": 81\n    }\n  ],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": true,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": [\n    \"database logs on db2 not included: the database is not running\",\n    \"database 0 on kv1 not included: Redis (Garnet) keeps its own checkpoints; it is not dumped\"\n  ]\n}\n"
+  },
+  "data/backups/run1/nf_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nserver.properties type=0 mode=600 size=143 sha256=c939ba110968f61ba5c8f02840f14605bf48ea16680482e2264cf95432d0147e\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6\ndatabases/ type=5 mode=755 size=0\ndatabases/db1__shop.sql type=0 mode=644 size=81 sha256=3f34d9f0b5d0b45f236e85b9b589da393c1425709a2ef38af0260f388f650cb6"
+  },
+  "data/backups/run1/noflush_worlds_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"worlds\",\n  \"label\": \"noflush\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"world\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": true,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": [\n    \"could not flush the world before the snapshot (RCON error: RCON connection closed); the copy may be torn\"\n  ]\n}\n"
+  },
+  "data/backups/run1/noflush_worlds_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+  },
+  "data/backups/run1/nosaveon_worlds_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"worlds\",\n  \"label\": \"nosaveon\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"world\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": true,\n  \"flushed\": true,\n  \"skipped\": [],\n  \"warnings\": [\n    \"autosave may still be off: save-on was not confirmed (RCON error: RCON connection closed). Type save-on in the server's console if it is\"\n  ]\n}\n"
+  },
+  "data/backups/run1/nosaveon_worlds_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+  },
+  "data/backups/run1/p_plugins_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"plugins\",\n  \"label\": \"p\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": true,\n  \"flushed\": true,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/p_plugins_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd"
+  },
+  "data/backups/run1/pre-restore_files_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"files\",\n  \"label\": \"pre-restore\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/pre-restore_files_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=7 sha256=d67e2e944994496c8d8ec76eed0cf9f09679448d584b532bebf941852a37f5ed\nserver.properties type=0 mode=600 size=143 sha256=c939ba110968f61ba5c8f02840f14605bf48ea16680482e2264cf95432d0147e\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/run1/pre-restore_files_<stamp>.json#2": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"files\",\n  \"label\": \"pre-restore\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/pre-restore_files_<stamp>.tar.gz#2": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nserver.properties type=0 mode=600 size=143 sha256=c939ba110968f61ba5c8f02840f14605bf48ea16680482e2264cf95432d0147e\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/run1/standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"standard\",\n  \"label\": null,\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\",\n    \"databases\"\n  ],\n  \"databases\": [\n    {\n      \"service\": \"db1\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"database\": \"shop\",\n      \"user\": \"run1\",\n      \"file\": \"databases/db1__shop.sql\",\n      \"bytes\": 81\n    }\n  ],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": true,\n  \"flushed\": true,\n  \"skipped\": [],\n  \"warnings\": [\n    \"database logs on db2 not included: the database is not running\",\n    \"database 0 on kv1 not included: Redis (Garnet) keeps its own checkpoints; it is not dumped\"\n  ]\n}\n"
+  },
+  "data/backups/run1/standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nserver.properties type=0 mode=600 size=143 sha256=c939ba110968f61ba5c8f02840f14605bf48ea16680482e2264cf95432d0147e\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6\ndatabases/ type=5 mode=755 size=0\ndatabases/db1__shop.sql type=0 mode=644 size=81 sha256=3f34d9f0b5d0b45f236e85b9b589da393c1425709a2ef38af0260f388f650cb6"
+  },
+  "data/backups/run1/stopped_standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"standard\",\n  \"label\": \"stopped\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\",\n    \"databases\"\n  ],\n  \"databases\": [\n    {\n      \"service\": \"db1\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"database\": \"shop\",\n      \"user\": \"run1\",\n      \"file\": \"databases/db1__shop.sql\",\n      \"bytes\": 81\n    }\n  ],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": [\n    \"database logs on db2 not included: the database is not running\",\n    \"database 0 on kv1 not included: Redis (Garnet) keeps its own checkpoints; it is not dumped\"\n  ]\n}\n"
+  },
+  "data/backups/run1/stopped_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/a.jar type=0 mode=644 size=3 sha256=0163f1eea7894350060624d315234d40c508ab251ba121714e234503045faadd\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=5 sha256=0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6\nserver.properties type=0 mode=600 size=143 sha256=c939ba110968f61ba5c8f02840f14605bf48ea16680482e2264cf95432d0147e\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6\ndatabases/ type=5 mode=755 size=0\ndatabases/db1__shop.sql type=0 mode=644 size=81 sha256=3f34d9f0b5d0b45f236e85b9b589da393c1425709a2ef38af0260f388f650cb6"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines/mariadb-0.0.0-fake": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/** Stands in for mariadb-admin: `shutdown` over TCP. Refuses without a password in MYSQL_PWD. */\nimport net from 'node:net'\n\nconst port = Number(process.argv.find((a) => a.startsWith('--port='))?.slice(7))\nif (!process.env.MYSQL_PWD) {\n  process.stderr.write('fake admin: Access denied (no password)\\n')\n  process.exit(1)\n}\nif (process.argv.at(-1) !== 'shutdown') process.exit(2)\nconst s = net.createConnection(port, '127.0.0.1', () => s.write('shutdown\\n'))\ns.on('data', () => { s.end(); process.exit(0) })\ns.on('error', (e) => { process.stderr.write(`fake admin: ${e.message}\\n`); process.exit(1) })\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/** Stands in for mariadb-dump --databases <db>: asks the fake server for a dump and prints it. */\nimport net from 'node:net'\n\nconst argv = process.argv\nconst port = Number(argv.find((a) => a.startsWith('--port='))?.slice(7))\nconst db = argv[argv.indexOf('--databases') + 1]\nif (!process.env.MYSQL_PWD) {\n  process.stderr.write(\"fake dump: Access denied for user 'root'@'localhost'\\n\")\n  process.exit(1)\n}\nif (!db) process.exit(2)\nconst s = net.createConnection(port, '127.0.0.1', () => s.write(`dump ${Buffer.from(db).toString('base64')}\\n`))\nlet buf = ''\ns.on('data', (d) => { buf += d })\ns.on('end', () => {\n  const line = buf.trim()\n  if (!line.startsWith('ok ')) { process.stderr.write('fake dump: server refused\\n'); process.exit(1) }\n  process.stdout.write(Buffer.from(line.slice(3), 'base64').toString('utf8'))\n  process.exit(0)\n})\ns.on('error', (e) => { process.stderr.write(`fake dump: ${e.message}\\n`); process.exit(1) })\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/**\n * Stands in for mariadb-install-db: makes the data folder and records the root password in it,\n * which is where the other fakes look to check what the real tools check over the wire.\n */\nimport fs from 'node:fs'\nimport path from 'node:path'\n\nconst arg = (k) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3)\nconst datadir = arg('datadir')\nif (!datadir) {\n  process.stderr.write('fake install-db: --datadir is required\\n')\n  process.exit(2)\n}\nfs.mkdirSync(path.join(datadir, 'mysql'), { recursive: true })\nfs.writeFileSync(path.join(datadir, 'root.txt'), arg('password') ?? '')\nfs.writeFileSync(path.join(datadir, 'port.txt'), arg('port') ?? '')\nprocess.stdout.write('fake install-db: done\\n')\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/** Stands in for the mariadb client with --execute: ships the statements to the fake server. */\nimport net from 'node:net'\n\nconst argv = process.argv\nconst port = Number(argv.find((a) => a.startsWith('--port='))?.slice(7))\nconst at = argv.indexOf('--execute')\nif (!process.env.MYSQL_PWD) {\n  process.stderr.write(\"fake client: ERROR 1045 (28000): Access denied for user 'root'@'localhost'\\n\")\n  process.exit(1)\n}\n// --execute carries the statements; without it they arrive on stdin, the way an import does.\nconst text = at === -1 ? await new Promise((resolve) => { let b = ''; process.stdin.on('data', (c) => { b += c }); process.stdin.on('end', () => resolve(b)) }) : argv[at + 1]\nconst s = net.createConnection(port, '127.0.0.1', () => s.write(`sql ${Buffer.from(text).toString('base64')}\\n`))\ns.on('data', (d) => { s.end(); process.exit(String(d).startsWith('ok') ? 0 : 1) })\ns.on('error', (e) => { process.stderr.write(`fake client: ERROR 2002: Can't connect (${e.message})\\n`); process.exit(1) })\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs": {
+   "kind": "file",
+   "mode": "644",
+   "text": "/**\n * Stands in for mariadbd --console: reads the port and data folder from the ini, listens on\n * loopback, says \"ready for connections\" on stderr the way the real one does, takes no stdin,\n * and speaks a one-line protocol the fake admin and client use:\n *\n *   shutdown          exit 0 after saying so (and a line in <datadir>/fake-shutdowns.log, which\n *                     outlives the console log a restart starts again)\n *   sql <base64>      append the statements to <datadir>/sql.log, answer \"ok\"\n *   dump <base64 db>  answer \"ok <base64 dump text>\" and close, the way a dump streams\n *\n * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does.\n * FAKE_MARIADB_STABLE_DUMP=1 leaves the time out of a dump, so two runs dump the same bytes.\n */\nimport fs from 'node:fs'\nimport net from 'node:net'\nimport path from 'node:path'\n\nconst ini = process.argv.find((a) => a.startsWith('--defaults-file='))?.slice('--defaults-file='.length)\nconst text = ini ? fs.readFileSync(ini, 'utf8') : ''\nconst port = Number(/^port=(\\d+)/m.exec(text)?.[1])\nconst datadir = /^datadir=(.+)$/m.exec(text)?.[1]?.trim()\nconst note = (line) => process.stderr.write(`<time> 0 [Note] mariadbd: ${line}\\n`)\n\nnote(`Starting fake MariaDB ${process.argv.slice(2).join(' ')}`)\nif (process.env.FAKE_MARIADB_FAIL === 'start') {\n  process.stderr.write(\"<time> 0 [ERROR] Can't start server: Bind on TCP/IP port. Got error: 10048\\n\")\n  process.stderr.write('<time> 0 [ERROR] Aborting\\n')\n  process.exit(1)\n}\n\nconst server = net.createServer((socket) => {\n  let buf = ''\n  socket.on('data', (c) => {\n    buf += c.toString()\n    let nl\n    while ((nl = buf.indexOf('\\n')) !== -1) {\n      const line = buf.slice(0, nl).trim()\n      buf = buf.slice(nl + 1)\n      if (line === 'shutdown') {\n        note('Normal shutdown')\n        try {\n          fs.appendFileSync(path.join(datadir, 'fake-shutdowns.log'), JSON.stringify({ pid: process.pid, at: Date.now() }) + '\\n')\n        } catch {\n          /* the console line is the evidence then */\n        }\n        socket.end('ok\\n')\n        setTimeout(() => process.exit(0), 50)\n      } else if (line.startsWith('sql ')) {\n        const sql = Buffer.from(line.slice(4), 'base64').toString('utf8')\n        fs.appendFileSync(path.join(datadir, 'sql.log'), sql + '\\n')\n        socket.write('ok\\n')\n      } else if (line.startsWith('dump ')) {\n        const db = Buffer.from(line.slice(5), 'base64').toString('utf8')\n        const text = `-- MariaDB dump (fake) of ${db}\\nCREATE DATABASE IF NOT EXISTS \\`${db}\\`;\\nUSE \\`${db}\\`;\\n${process.env.FAKE_MARIADB_STABLE_DUMP === '1' ? '' : `-- dumped at ${Date.now()}\\n`}`\n        socket.end(`ok ${Buffer.from(text).toString('base64')}\\n`)\n      } else {\n        socket.write('error unknown\\n')\n      }\n    }\n  })\n  socket.on('error', () => {})\n})\nserver.listen(port, '127.0.0.1', () => setTimeout(() => note('ready for connections.'), 150))\nserver.on('error', (err) => {\n  process.stderr.write(`<time> 0 [ERROR] Can't start server: ${err.message}\\n`)\n  process.exit(1)\n})\nsetInterval(() => {}, 1 << 30)\n"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/databases": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/databases/db1__shop.sql": {
+   "kind": "file",
+   "mode": "644",
+   "text": "-- MariaDB dump (fake) of shop\nCREATE DATABASE IF NOT EXISTS `shop`;\nUSE `shop`;\n"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/plugins/a.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "jar"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "#Minecraft server properties\nenable-rcon=true\nrcon.port=47831\nrcon.password=test\nlevel-name=world\nserver-port=47830\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances/run1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "level"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47830,\n      \"rcon\": {\n        \"port\": 47831,\n        \"password\": \"test\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47821,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw-test\"\n      },\n      \"attachments\": {\n        \"run1\": {\n          \"database\": \"shop\",\n          \"user\": \"run1\",\n          \"password\": \"pw-run1\",\n          \"createdAt\": \"<time>\"\n        }\n      }\n    },\n    \"db2\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/db2\",\n      \"port\": 47822,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw-test\"\n      },\n      \"attachments\": {\n        \"run1\": {\n          \"database\": \"logs\",\n          \"user\": \"run1\",\n          \"password\": \"pw-run1\",\n          \"createdAt\": \"<time>\"\n        }\n      }\n    },\n    \"kv1\": {\n      \"kind\": \"database\",\n      \"engine\": \"garnet\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/kv1\",\n      \"port\": 47823,\n      \"root\": {\n        \"password\": \"pw-kv\"\n      },\n      \"attachments\": {\n        \"run1\": {\n          \"database\": \"0\",\n          \"user\": \"run1\",\n          \"password\": \"pw-run1\",\n          \"createdAt\": \"<time>\"\n        }\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db1/data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db1/data/sql.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "-- MariaDB dump (fake) of shop\nCREATE DATABASE IF NOT EXISTS `shop`;\nUSE `shop`;\n\n"
+  },
+  "data/services/db1/my.ini": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[mysqld]\ndatadir=<run>/data/services/db1/data\nport=47821\nbind-address=127.0.0.1\n"
+  },
+  "data/services/db2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db2/data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/db2/my.ini": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[mysqld]\ndatadir=<run>/data/services/db2/data\nport=47822\nbind-address=127.0.0.1\n"
+  },
+  "data/services/kv1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services/kv1/data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

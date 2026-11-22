@@ -1,0 +1,1123 @@
+{
+ "about": "What the Node core did in scenario c8-panel-plugins on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c8-panel-plugins",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 21 (panel, 38 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "GET /api/instances/srv/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"Alpha.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"alphaid\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": [\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"Alpha\",\n   \"version\": \"1.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Hand.jar\",\n   \"enabled\": true,\n   \"managed\": false,\n   \"source\": null,\n   \"project\": null,\n   \"installedVersion\": null,\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Hand\",\n   \"version\": \"0.1\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 142,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Hangared.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"hangar\",\n   \"project\": \"hplug\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"HPlug\",\n   \"version\": \"2.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"keepid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 129,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Off.jar.disabled\",\n   \"enabled\": false,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"offid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Off\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 128,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.4\",\n \"kind\": \"plugins\",\n \"word\": \"plugin\",\n \"hangar\": true,\n \"software\": \"Paper\",\n \"pack\": null\n}\n\nGET /api/instances/b1/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modpack\",\n   \"project\": \"beta\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 8,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"mine.jar\",\n   \"enabled\": true,\n   \"managed\": false,\n   \"source\": null,\n   \"project\": null,\n   \"installedVersion\": null,\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"mine\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 10,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"old.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modpack\",\n   \"project\": \"beta\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"old\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 7,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.4\",\n \"kind\": \"mods\",\n \"word\": \"mod\",\n \"hangar\": false,\n \"software\": \"Fabric\",\n \"pack\": {\n  \"name\": \"Beta Pack\",\n  \"version\": \"1.0\",\n  \"project\": \"beta\"\n }\n}\n\nGET /api/instances/van/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [],\n \"running\": false,\n \"gameVersion\": \"1.21.4\",\n \"kind\": \"none\",\n \"word\": \"plugin\",\n \"hangar\": false,\n \"software\": \"Vanilla\",\n \"pack\": null\n}\n\nGET /api/instances/nope/plugins\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no such instance\"\n}\n\nGET /api/instances/srv/plugins/search\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [],\n \"errors\": []\n}\n\nGET /api/instances/srv/plugins/search?q=%20%20\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [],\n \"errors\": []\n}\n\nGET /api/instances/srv/plugins/search?q=alpha\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"alphaid\",\n   \"slug\": \"alpha\",\n   \"title\": \"Alpha\",\n   \"description\": \"does alpha\",\n   \"downloads\": 10,\n   \"icon\": null\n  },\n  {\n   \"source\": \"hangar\",\n   \"id\": \"hplug\",\n   \"slug\": \"hplug\",\n   \"title\": \"HPlug\",\n   \"description\": \"\",\n   \"downloads\": 5,\n   \"author\": \"me\"\n  },\n  {\n   \"source\": \"hangar\",\n   \"id\": \"Bare\",\n   \"slug\": \"Bare\",\n   \"title\": \"Bare\",\n   \"description\": \"\",\n   \"downloads\": 0,\n   \"author\": null\n  }\n ],\n \"errors\": []\n}\n\nGET /api/instances/b1/plugins/search?q=sodium\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"sodid\",\n   \"slug\": \"sodium\",\n   \"title\": \"Sodium\",\n   \"description\": \"fast\",\n   \"downloads\": 99,\n   \"icon\": \"https://cdn.modrinth.com/i.png\"\n  }\n ],\n \"errors\": []\n}\n\nGET /api/instances/van/plugins/search?q=x\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [],\n \"errors\": [\n  \"Vanilla runs no plugins or mods\"\n ]\n}\n\nGET /api/instances/srv/plugins/search?q=alpha\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [],\n \"errors\": [\n  \"Modrinth answered 500 for /search?query=alpha&facets=%5B%5B%22project_type%3Aplugin%22%5D%2C%5B%22categories%3Apaper%22%2C%22categories%3Aspigot%22%2C%22categories%3Abukkit%22%2C%22categories%3Afolia%22%5D%5D&limit=20&index=relevance\",\n  \"Hangar answered 503 for /projects?q=alpha&limit=10&platform=PAPER\"\n ]\n}\n\nGET /api/modpacks/search\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": []\n}\n\nGET /api/modpacks/search?q=%20\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": []\n}\n\nGET /api/modpacks/search?q=%20pack%20\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"results\": [\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"packid\",\n   \"slug\": \"a-pack\",\n   \"title\": \"A Pack\",\n   \"description\": \"packed\",\n   \"downloads\": 3\n  }\n ]\n}\n\nGET /api/instances/srv/plugins/plan\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"projectId is required\"\n}\n\nGET /api/instances/srv/plugins/plan?projectId=alphaid&source=curse\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"unknown source\"\n}\n\nGET /api/instances/srv/plugins/plan?projectId=..\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"that is not a project id\"\n}\n\nGET /api/instances/srv/plugins/plan?projectId=alphaid\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"source\": \"modrinth\",\n \"project\": \"alphaid\",\n \"version\": \"2.0\",\n \"exactMatch\": true,\n \"builtFor\": null,\n \"requires\": [\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"depid\",\n   \"title\": \"Dep Lib\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": null,\n   \"builtFor\": \"1.20.4\",\n   \"mismatch\": true\n  },\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"vxproj\",\n   \"title\": \"vx\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": null,\n   \"builtFor\": null,\n   \"mismatch\": false\n  },\n  {\n   \"source\": \"modrinth\",\n   \"id\": null,\n   \"title\": \"something Modrinth does not name\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": null,\n   \"unnamed\": true,\n   \"builtFor\": null,\n   \"mismatch\": false\n  }\n ]\n}\n\nGET /api/instances/srv/plugins/plan?projectId=alphaid&source=\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"source\": \"modrinth\",\n \"project\": \"alphaid\",\n \"version\": \"2.0\",\n \"exactMatch\": true,\n \"builtFor\": null,\n \"requires\": [\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"depid\",\n   \"title\": \"Dep Lib\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": null,\n   \"builtFor\": \"1.20.4\",\n   \"mismatch\": true\n  },\n  {\n   \"source\": \"modrinth\",\n   \"id\": \"vxproj\",\n   \"title\": \"vx\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": null,\n   \"builtFor\": null,\n   \"mismatch\": false\n  },\n  {\n   \"source\": \"modrinth\",\n   \"id\": null,\n   \"title\": \"something Modrinth does not name\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": null,\n   \"unnamed\": true,\n   \"builtFor\": null,\n   \"mismatch\": false\n  }\n ]\n}\n\nGET /api/instances/srv/plugins/plan?projectId=hplug&source=hangar\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"source\": \"hangar\",\n \"project\": \"hplug\",\n \"version\": \"3.0\",\n \"exactMatch\": true,\n \"builtFor\": null,\n \"requires\": [\n  {\n   \"source\": \"hangar\",\n   \"id\": \"HDep\",\n   \"title\": \"HDep\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": \"https://hangar.papermc.io/?q=HDep\",\n   \"builtFor\": null,\n   \"mismatch\": false\n  },\n  {\n   \"source\": \"hangar\",\n   \"id\": \"Ext\",\n   \"title\": \"Ext\",\n   \"installed\": false,\n   \"off\": false,\n   \"external\": \"https://ext.example/ext\",\n   \"builtFor\": null,\n   \"mismatch\": false\n  },\n  {\n   \"source\": \"hangar\",\n   \"id\": \"Alpha\",\n   \"title\": \"Alpha\",\n   \"installed\": true,\n   \"off\": false,\n   \"external\": null,\n   \"builtFor\": null,\n   \"mismatch\": false\n  }\n ]\n}\n\nGET /api/instances/srv/plugins/plan?projectId=ghost\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Modrinth answered 404 for /project/ghost/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D\"\n}\n\nGET /api/instances/b1/plugins/plan?projectId=alphaid\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"source\": \"modrinth\",\n \"project\": \"alphaid\",\n \"version\": null,\n \"exactMatch\": true,\n \"builtFor\": null,\n \"requires\": []\n}\n\nGET /api/instances/srv/plugins/plan?projectId=extonly&source=hangar\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"source\": \"hangar\",\n \"project\": \"extonly\",\n \"version\": null,\n \"exactMatch\": true,\n \"builtFor\": null,\n \"requires\": []\n}\n\nGET /api/instances/srv/plugins/other\n  405\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"method not allowed\"\n}\n\nPATCH /api/instances/srv/plugins\n  405\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"method not allowed\"\n}\n\nPOST /api/instances/srv/plugins\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"not found\"\n}\n\nPOST /api/instances/srv/plugins/other\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"not found\"\n}\n\nPOST /api/instances/srv/plugins/other\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"not found\"\n}\n\nPOST /api/instances/srv/plugins/updates\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updates\": [\n  {\n   \"file\": \"Alpha.jar\",\n   \"name\": \"Alpha\",\n   \"installedVersion\": \"1.0\",\n   \"latestVersion\": \"2.0\",\n   \"projectId\": \"alphaid\",\n   \"source\": \"modrinth\"\n  },\n  {\n   \"file\": \"Hangared.jar\",\n   \"name\": \"HPlug\",\n   \"installedVersion\": \"2.0\",\n   \"latestVersion\": \"3.0\",\n   \"projectId\": \"hplug\",\n   \"source\": \"hangar\"\n  }\n ],\n \"checked\": 3,\n \"byHand\": 1,\n \"off\": 1,\n \"pack\": 0,\n \"unknown\": 0,\n \"unreachable\": []\n}\n\nPOST /api/instances/b1/plugins/updates\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updates\": [],\n \"checked\": 0,\n \"byHand\": 1,\n \"off\": 0,\n \"pack\": 2,\n \"unknown\": 0,\n \"unreachable\": []\n}\n\nPOST /api/instances/van/plugins/updates\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updates\": [],\n \"checked\": 0,\n \"byHand\": 0,\n \"off\": 0,\n \"pack\": 0,\n \"unknown\": 0,\n \"unreachable\": []\n}\n\nGET /api/instances/srv/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"software\": \"paper\",\n \"label\": \"Paper\",\n \"current\": {\n  \"version\": \"1.21.4\",\n  \"build\": 10\n },\n \"latestBuild\": {\n  \"build\": 15,\n  \"channel\": \"STABLE\",\n  \"time\": \"<time>\"\n },\n \"buildUpdate\": true,\n \"newerVersions\": [\n  \"1.21.5\"\n ],\n \"latestVersion\": \"1.21.5\"\n}\n\nGET /api/instances/cust/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"software\": null,\n \"label\": null,\n \"current\": null,\n \"latestBuild\": null,\n \"buildUpdate\": false,\n \"newerVersions\": [],\n \"latestVersion\": \"1.21.5\"\n}\n\nGET /api/instances/pur/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"software\": \"purpur\",\n \"label\": \"Purpur\",\n \"current\": {\n  \"version\": \"1.21.4\",\n  \"build\": 2399\n },\n \"latestBuild\": {\n  \"build\": 2400,\n  \"channel\": null,\n  \"time\": null\n },\n \"buildUpdate\": true,\n \"newerVersions\": [],\n \"latestVersion\": \"1.21.4\"\n}\n\nGET /api/instances/srv/upgrade/extra\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"software\": \"paper\",\n \"label\": \"Paper\",\n \"current\": {\n  \"version\": \"1.21.4\",\n  \"build\": 10\n },\n \"latestBuild\": {\n  \"build\": 15,\n  \"channel\": \"STABLE\",\n  \"time\": \"<time>\"\n },\n \"buildUpdate\": true,\n \"newerVersions\": [\n  \"1.21.5\"\n ],\n \"latestVersion\": \"1.21.5\"\n}\n\nPUT /api/instances/srv/upgrade\n  405\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"method not allowed\"\n}\n\nGET /api/instances/b1/pack\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"pack\": {\n  \"name\": \"Beta Pack\",\n  \"version\": \"1.0\",\n  \"project\": \"beta\",\n  \"mc\": \"1.21.4\"\n },\n \"latest\": {\n  \"version\": \"2.0\",\n  \"id\": \"vbeta20\"\n },\n \"updateAvailable\": true,\n \"running\": false\n}\n\nGET /api/instances/srv/pack\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"srv\\\" was not built from a modpack\"\n}\n\nDELETE /api/instances/b1/pack\n  405\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"method not allowed\"\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (panel, 22 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "POST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Hand.jar.disabled\",\n \"enabled\": false\n}\n\nPOST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Hand.jar.disabled\",\n \"enabled\": false\n}\n\nPOST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Hand.jar.disabled\",\n \"enabled\": false\n}\n\nPOST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Hand.jar\",\n \"enabled\": true\n}\n\nPOST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Hand.jar\",\n \"enabled\": true\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"../Hand.jar\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"sub/Hand.jar\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"a\\\\b.jar\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"notes.txt\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\".jar\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no plugin file \\\"Gone.jar\\\" in <run>/data/instances/srv/plugins\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Hand.jar.disabled\",\n \"enabled\": false\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"undefined\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'file')\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"undefined\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/toggle\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"file\": \"Off.jar\",\n \"enabled\": true\n}\n\nPOST /api/instances/srv/plugins/delete\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"../Hand.jar\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/delete\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"removed\": \"Hand.jar.disabled\"\n}\n\nPOST /api/instances/srv/plugins/delete\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no plugin file \\\"Hand.jar.disabled\\\" in <run>/data/instances/srv/plugins\"\n}\n\nPOST /api/instances/srv/plugins/delete\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"undefined\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/delete\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'file')\"\n}\n\nGET /api/instances/srv/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"Alpha.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"alphaid\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": [\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"Alpha\",\n   \"version\": \"1.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Hangared.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"hangar\",\n   \"project\": \"hplug\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"HPlug\",\n   \"version\": \"2.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"keepid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 129,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Off.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"offid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Off\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 128,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.4\",\n \"kind\": \"plugins\",\n \"word\": \"plugin\",\n \"hangar\": true,\n \"software\": \"Paper\",\n \"pack\": null\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (panel, 36 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "POST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"projectId is required\"\n}\n\nPOST /api/instances/srv/plugins/install\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'projectId')\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"projectId is required\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"projectId is required\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"that is not a project id\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Modrinth answered 404 for /project/ghost/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Modrinth offered a file named \\\"evil.txt\\\", which is not a plugin jar\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"the download did not match the checksum Modrinth published; nothing was installed\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no build of that plugin supports a paper server\"\n}\n\nPOST /api/instances/srv/plugins/install\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"installed\": \"Alpha-2.0.jar\",\n \"version\": \"2.0\",\n \"size\": 143,\n \"versionNote\": null,\n \"extras\": [\n  {\n   \"projectId\": \"depid\",\n   \"installed\": \"Dep-1.0.jar\",\n   \"version\": \"1.0\"\n  },\n  {\n   \"projectId\": \"hplug\",\n   \"installed\": \"HPlug-3.0.jar\",\n   \"version\": \"3.0\"\n  }\n ],\n \"failed\": [\n  {\n   \"projectId\": \"ghost\",\n   \"error\": \"Modrinth answered 404 for /project/ghost/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D\"\n  },\n  {\n   \"projectId\": \"../y\",\n   \"error\": \"that is not a project id\"\n  }\n ],\n \"snapshot\": \"<run>/data/backups/srv/pre-install_plugins_<stamp>.tar.gz\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"that project hosts its downloads elsewhere: https://ext.example/dl\\n  Download it by hand and drop it into the plugins folder - SpawnLoft will leave it alone.\"\n}\n\nPOST /api/instances/srv/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"that project has no downloadable Paper build on Hangar\"\n}\n\nPOST /api/instances/srv/plugins/install\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"installed\": \"HPlug-3.0.jar\",\n \"version\": \"3.0\",\n \"size\": 143,\n \"versionNote\": null,\n \"extras\": [],\n \"failed\": [],\n \"snapshot\": \"<run>/data/backups/srv/pre-install_plugins_<stamp>.tar.gz\"\n}\n\nPOST /api/instances/b1/plugins/install\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no build of that mod supports a fabric server\"\n}\n\nPOST /api/instances/van/plugins/install\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"installed\": \"Alpha-2.0.jar\",\n \"version\": \"2.0\",\n \"size\": 143,\n \"versionNote\": null,\n \"extras\": [],\n \"failed\": [],\n \"snapshot\": null\n}\n\nGET /api/instances/srv/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"Alpha-2.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"alphaid\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": [\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"Alpha\",\n   \"version\": \"2.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Alpha.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"alphaid\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": [\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"Alpha\",\n   \"version\": \"1.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Dep-1.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"depid\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": [\n    \"1.20.1\",\n    \"1.20.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"DepLib\",\n   \"version\": \"1.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 144,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"HPlug-3.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"hangar\",\n   \"project\": \"hplug\",\n   \"installedVersion\": \"3.0\",\n   \"gameVersions\": [\n    \"1.21.3\",\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"HPlug\",\n   \"version\": \"3.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Hangared.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"hangar\",\n   \"project\": \"hplug\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"HPlug\",\n   \"version\": \"2.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"keepid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 129,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Off.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"offid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Off\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 128,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.4\",\n \"kind\": \"plugins\",\n \"word\": \"plugin\",\n \"hangar\": true,\n \"software\": \"Paper\",\n \"pack\": null\n}\n\nPOST /api/instances/srv/plugins/updates\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updates\": [\n  {\n   \"file\": \"Alpha.jar\",\n   \"name\": \"Alpha\",\n   \"installedVersion\": \"1.0\",\n   \"latestVersion\": \"2.0\",\n   \"projectId\": \"alphaid\",\n   \"source\": \"modrinth\"\n  },\n  {\n   \"file\": \"Hangared.jar\",\n   \"name\": \"HPlug\",\n   \"installedVersion\": \"2.0\",\n   \"latestVersion\": \"3.0\",\n   \"projectId\": \"hplug\",\n   \"source\": \"hangar\"\n  }\n ],\n \"checked\": 4,\n \"byHand\": 0,\n \"off\": 0,\n \"pack\": 0,\n \"unknown\": 3,\n \"unreachable\": []\n}\n\nPOST /api/instances/srv/plugins/update\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"undefined\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/update\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'file')\"\n}\n\nPOST /api/instances/srv/plugins/update\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"../Alpha.jar\\\" is not a plugin file name\"\n}\n\nPOST /api/instances/srv/plugins/update\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no plugin file \\\"Nope.jar\\\" in <run>/data/instances/srv/plugins\"\n}\n\nPOST /api/instances/srv/plugins/update\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"no plugin file \\\"Off.jar.disabled\\\" in <run>/data/instances/srv/plugins\"\n}\n\nPOST /api/instances/srv/plugins/update\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"alreadyLatest\": true,\n \"version\": \"1\",\n \"snapshot\": \"<run>/data/backups/srv/pre-update_plugins_<stamp>.tar.gz\"\n}\n\nPOST /api/instances/srv/plugins/update\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updated\": \"Alpha-2.0.jar\",\n \"from\": \"Alpha.jar\",\n \"version\": \"2.0\",\n \"snapshot\": \"<run>/data/backups/srv/pre-update_plugins_<stamp>.tar.gz\"\n}\n\nPOST /api/instances/b1/plugins/update\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"this mod belongs to the modpack, which governs its version - update the pack, not the mod\"\n}\n\nPOST /api/instances/srv/plugins/update-all\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"files is required\"\n}\n\nPOST /api/instances/srv/plugins/update-all\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'files')\"\n}\n\nPOST /api/instances/srv/plugins/update-all\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updated\": [],\n \"failed\": [\n  {\n   \"file\": \"null\",\n   \"error\": \"\\\"null\\\" is not a plugin file name\"\n  }\n ],\n \"snapshot\": \"<run>/data/backups/srv/pre-update_plugins_<stamp>.tar.gz\"\n}\n\nPOST /api/instances/srv/plugins/update-all\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"files is required\"\n}\n\nPOST /api/instances/srv/plugins/update-all\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updated\": [\n  {\n   \"file\": \"HPlug-3.0.jar\",\n   \"alreadyLatest\": true,\n   \"version\": \"3.0\"\n  },\n  {\n   \"file\": \"Hangared.jar\",\n   \"updated\": \"HPlug-3.0.jar\",\n   \"from\": \"Hangared.jar\",\n   \"version\": \"3.0\",\n   \"versionNote\": null\n  },\n  {\n   \"file\": \"Keep.jar\",\n   \"alreadyLatest\": true,\n   \"version\": \"1\"\n  }\n ],\n \"failed\": [\n  {\n   \"file\": \"../x.jar\",\n   \"error\": \"\\\"../x.jar\\\" is not a plugin file name\"\n  },\n  {\n   \"file\": \"5\",\n   \"error\": \"\\\"5\\\" is not a plugin file name\"\n  }\n ],\n \"snapshot\": \"<run>/data/backups/srv/pre-update_plugins_<stamp>.tar.gz\"\n}\n\nGET /api/jobs/up1/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"up1\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Updated 3 of 5\",\n \"done\": true\n}\n\nPOST /api/instances/srv/plugins/update-all\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updated\": [\n  {\n   \"file\": \"Keep.jar\",\n   \"alreadyLatest\": true,\n   \"version\": \"1\"\n  }\n ],\n \"failed\": [],\n \"snapshot\": \"<run>/data/backups/srv/pre-update_plugins_<stamp>.tar.gz\"\n}\n\nPOST /api/instances/srv/plugins/update-all\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updated\": [\n  {\n   \"file\": \"Keep.jar\",\n   \"alreadyLatest\": true,\n   \"version\": \"1\"\n  }\n ],\n \"failed\": [],\n \"snapshot\": \"<run>/data/backups/srv/pre-update_plugins_<stamp>.tar.gz\"\n}\n\nGET /api/jobs/77/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"77\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Updated 1 of 1\",\n \"done\": true\n}\n\nGET /api/instances/srv/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"Alpha-2.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"alphaid\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": [\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"Alpha\",\n   \"version\": \"2.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Dep-1.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"depid\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": [\n    \"1.20.1\",\n    \"1.20.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"DepLib\",\n   \"version\": \"1.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 144,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"HPlug-3.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"hangar\",\n   \"project\": \"hplug\",\n   \"installedVersion\": \"3.0\",\n   \"gameVersions\": [\n    \"1.21.3\",\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"HPlug\",\n   \"version\": \"3.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"keepid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 129,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Off.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"offid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Off\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 128,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.4\",\n \"kind\": \"plugins\",\n \"word\": \"plugin\",\n \"hangar\": true,\n \"software\": \"Paper\",\n \"pack\": null\n}\n\nPOST /api/instances/srv/plugins/updates\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"updates\": [],\n \"checked\": 2,\n \"byHand\": 0,\n \"off\": 0,\n \"pack\": 0,\n \"unknown\": 3,\n \"unreachable\": []\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (panel, 11 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "POST /api/instances/b1/pack\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'jobId')\"\n}\n\nPOST /api/instances/srv/pack\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"srv\\\" was not built from a modpack\"\n}\n\nGET /api/jobs/p0/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"p0\",\n \"stage\": \"error\",\n \"percent\": null,\n \"message\": \"\\\"srv\\\" was not built from a modpack\",\n \"done\": true\n}\n\nPOST /api/instances/b1/pack\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"from\": \"1.0\",\n \"to\": \"2.0\",\n \"mc\": \"1.21.5\",\n \"mcChanged\": true,\n \"loader\": {\n  \"kind\": \"fabric\",\n  \"version\": \"0.16.10\"\n },\n \"files\": 3,\n \"removed\": 2,\n \"snapshot\": \"<run>/data/backups/b1/pre-pack-update_standard_<stamp>.tar.gz\"\n}\n\nGET /api/jobs/p1/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"p1\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Pack updated\",\n \"done\": true\n}\n\nPOST /api/instances/b1/pack\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"alreadyLatest\": true,\n \"version\": \"2.0\"\n}\n\nGET /api/jobs/p2/stream\n  200\n  cache-control: no-cache\n  content-type: text/event-stream\ndata: {\n \"id\": \"p2\",\n \"stage\": \"done\",\n \"percent\": 100,\n \"message\": \"Pack updated\",\n \"done\": true\n}\n\nPOST /api/instances/b1/pack\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"alreadyLatest\": true,\n \"version\": \"2.0\"\n}\n\nGET /api/instances/b1/pack\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"pack\": {\n  \"name\": \"Beta Pack\",\n  \"version\": \"2.0\",\n  \"project\": \"beta\",\n  \"mc\": \"1.21.5\"\n },\n \"latest\": {\n  \"version\": \"2.0\",\n  \"id\": \"vbeta20\"\n },\n \"updateAvailable\": false,\n \"running\": false\n}\n\nGET /api/instances/b1/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modpack\",\n   \"project\": \"beta\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 800,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"mine.jar\",\n   \"enabled\": true,\n   \"managed\": false,\n   \"source\": null,\n   \"project\": null,\n   \"installedVersion\": null,\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"mine\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 10,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"new.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modpack\",\n   \"project\": \"beta\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"new\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 1100,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.5\",\n \"kind\": \"mods\",\n \"word\": \"mod\",\n \"hangar\": false,\n \"software\": \"Fabric\",\n \"pack\": {\n  \"name\": \"Beta Pack\",\n  \"version\": \"2.0\",\n  \"project\": \"beta\"\n }\n}\n\nPOST /api/jobs/p1/cancel\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"cancelling\": false\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (panel, 10 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "POST /api/instances/cust/upgrade\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"server.jar\\\" is not a jar SpawnLoft can reason about - name a version: upgrade cust --version <v>\"\n}\n\nPOST /api/instances/srv/upgrade\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'version')\"\n}\n\nPOST /api/instances/srv/upgrade\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"PaperMC API returned 404 for https://fill.papermc.io/v3/projects/paper/versions/9.9/builds\"\n}\n\nPOST /api/instances/srv/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"from\": \"paper-1.21.4-10.jar\",\n \"to\": \"paper-1.21.4-15.jar\",\n \"label\": \"Paper\",\n \"version\": \"1.21.4\",\n \"build\": 15,\n \"channel\": \"STABLE\",\n \"crossVersion\": false,\n \"snapshot\": null,\n \"oldJars\": [\n  \"paper-1.21.4-10.jar\"\n ],\n \"running\": false\n}\n\nPOST /api/instances/srv/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"alreadyCurrent\": true,\n \"jar\": \"paper-1.21.4-15.jar\",\n \"running\": false\n}\n\nPOST /api/instances/srv/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"alreadyCurrent\": true,\n \"jar\": \"paper-1.21.4-15.jar\",\n \"running\": false\n}\n\nPOST /api/instances/cust/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"from\": \"server.jar\",\n \"to\": \"paper-1.21.4-15.jar\",\n \"label\": \"Paper\",\n \"version\": \"1.21.4\",\n \"build\": 15,\n \"channel\": \"STABLE\",\n \"crossVersion\": false,\n \"snapshot\": null,\n \"oldJars\": [\n  \"server.jar\"\n ],\n \"running\": false\n}\n\nPOST /api/instances/srv/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"from\": \"paper-1.21.4-15.jar\",\n \"to\": \"paper-1.21.5-3.jar\",\n \"label\": \"Paper\",\n \"version\": \"1.21.5\",\n \"build\": 3,\n \"channel\": \"STABLE\",\n \"crossVersion\": true,\n \"snapshot\": \"<run>/data/backups/srv/pre-upgrade_standard_<stamp>.tar.gz\",\n \"oldJars\": [\n  \"paper-1.21.4-10.jar\",\n  \"paper-1.21.4-15.jar\"\n ],\n \"running\": false\n}\n\nGET /api/instances/srv/upgrade\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"software\": \"paper\",\n \"label\": \"Paper\",\n \"current\": {\n  \"version\": \"1.21.5\",\n  \"build\": 3\n },\n \"latestBuild\": {\n  \"build\": 3,\n  \"channel\": \"STABLE\",\n  \"time\": \"<time>\"\n },\n \"buildUpdate\": false,\n \"newerVersions\": [],\n \"latestVersion\": \"1.21.5\"\n}\n\nGET /api/instances/srv/plugins\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"plugins\": [\n  {\n   \"file\": \"Alpha-2.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"alphaid\",\n   \"installedVersion\": \"2.0\",\n   \"gameVersions\": [\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"Alpha\",\n   \"version\": \"2.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Dep-1.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"depid\",\n   \"installedVersion\": \"1.0\",\n   \"gameVersions\": [\n    \"1.20.1\",\n    \"1.20.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"DepLib\",\n   \"version\": \"1.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 144,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"HPlug-3.0.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"hangar\",\n   \"project\": \"hplug\",\n   \"installedVersion\": \"3.0\",\n   \"gameVersions\": [\n    \"1.21.3\",\n    \"1.21.4\"\n   ],\n   \"modId\": null,\n   \"name\": \"HPlug\",\n   \"version\": \"3.0\",\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 143,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Keep.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"keepid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Keep\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 129,\n   \"mtime\": \"<time>\"\n  },\n  {\n   \"file\": \"Off.jar\",\n   \"enabled\": true,\n   \"managed\": true,\n   \"source\": \"modrinth\",\n   \"project\": \"offid\",\n   \"installedVersion\": \"1\",\n   \"gameVersions\": null,\n   \"modId\": null,\n   \"name\": \"Off\",\n   \"version\": null,\n   \"description\": null,\n   \"authors\": [],\n   \"apiVersion\": null,\n   \"website\": null,\n   \"size\": 128,\n   \"mtime\": \"<time>\"\n  }\n ],\n \"running\": false,\n \"gameVersion\": \"1.21.5\",\n \"kind\": \"plugins\",\n \"word\": \"plugin\",\n \"hangar\": true,\n \"software\": \"Paper\",\n \"pack\": null\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"b1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/b1\",\"jar\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\"memory\":\"2G\",\"port\":25566,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/b1/console.log\"},{\"name\":\"cust\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/cust\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25568,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/cust/console.log\"},{\"name\":\"pur\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/pur\",\"jar\":\"purpur-1.21.4-2399.jar\",\"memory\":\"2G\",\"port\":25569,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/pur/console.log\"},{\"name\":\"srv\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/srv\",\"jar\":\"paper-1.21.5-3.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/srv/console.log\"},{\"name\":\"van\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/van\",\"jar\":\"vanilla-1.21.4.jar\",\"memory\":\"2G\",\"port\":25567,\"rconPort\":null,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/van/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (plugins srv --json)",
+   "args": [
+    "plugins",
+    "srv",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"srv\",\"plugins\":[{\"file\":\"Alpha-2.0.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modrinth\",\"project\":\"alphaid\",\"installedVersion\":\"2.0\",\"gameVersions\":[\"1.21.4\"],\"modId\":null,\"name\":\"Alpha\",\"version\":\"2.0\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":143,\"mtime\":\"<time>\"},{\"file\":\"Dep-1.0.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modrinth\",\"project\":\"depid\",\"installedVersion\":\"1.0\",\"gameVersions\":[\"1.20.1\",\"1.20.4\"],\"modId\":null,\"name\":\"DepLib\",\"version\":\"1.0\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":144,\"mtime\":\"<time>\"},{\"file\":\"HPlug-3.0.jar\",\"enabled\":true,\"managed\":true,\"source\":\"hangar\",\"project\":\"hplug\",\"installedVersion\":\"3.0\",\"gameVersions\":[\"1.21.3\",\"1.21.4\"],\"modId\":null,\"name\":\"HPlug\",\"version\":\"3.0\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":143,\"mtime\":\"<time>\"},{\"file\":\"Keep.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modrinth\",\"project\":\"keepid\",\"installedVersion\":\"1\",\"gameVersions\":null,\"modId\":null,\"name\":\"Keep\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":129,\"mtime\":\"<time>\"},{\"file\":\"Off.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modrinth\",\"project\":\"offid\",\"installedVersion\":\"1\",\"gameVersions\":null,\"modId\":null,\"name\":\"Off\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":128,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22fabric%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22fabric%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/alphaid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/badname/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/beta/version?loaders=%5B%22fabric%22%2C%22neoforge%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/depid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/depid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/depid/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/fabonly/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/ghost/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/ghost/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/ghost/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/plugsum/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/vxproj/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/project/vxproj/version?loaders=%5B%22paper%22%2C%22spigot%22%2C%22bukkit%22%2C%22folia%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/projects?ids=%5B%22depid%22%2C%22vxproj%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/projects?ids=%5B%22depid%22%2C%22vxproj%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/search?query=alpha&facets=%5B%5B%22project_type%3Aplugin%22%5D%2C%5B%22categories%3Apaper%22%2C%22categories%3Aspigot%22%2C%22categories%3Abukkit%22%2C%22categories%3Afolia%22%5D%5D&limit=20&index=relevance",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/search?query=alpha&facets=%5B%5B%22project_type%3Aplugin%22%5D%2C%5B%22categories%3Apaper%22%2C%22categories%3Aspigot%22%2C%22categories%3Abukkit%22%2C%22categories%3Afolia%22%5D%5D&limit=20&index=relevance",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/search?query=pack&facets=%5B%5B%22project_type%3Amodpack%22%5D%2C%5B%22server_side%3Arequired%22%2C%22server_side%3Aoptional%22%5D%2C%5B%22categories%3Afabric%22%2C%22categories%3Aneoforge%22%5D%5D&limit=20&index=relevance",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/search?query=sodium&facets=%5B%5B%22project_type%3Amod%22%5D%2C%5B%22categories%3Afabric%22%5D%5D&limit=20&index=relevance",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/versions?ids=%5B%22vx1%22%2C%22vgone%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "GET",
+   "url": "/v2/versions?ids=%5B%22vx1%22%2C%22vgone%22%5D",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 147,
+   "bodySha256": "7c8271461f2d022f48c65b22e8f638623d2e45ecf28cd255840a4ce4b4fccc29"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 147,
+   "bodySha256": "7c8271461f2d022f48c65b22e8f638623d2e45ecf28cd255840a4ce4b4fccc29"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 147,
+   "bodySha256": "7c8271461f2d022f48c65b22e8f638623d2e45ecf28cd255840a4ce4b4fccc29"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 147,
+   "bodySha256": "7c8271461f2d022f48c65b22e8f638623d2e45ecf28cd255840a4ce4b4fccc29"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 147,
+   "bodySha256": "d74a500b0e3e84ee1bed3e261ed1b33b6c3293b0db3fd3ab92f5cdcba9be1a53"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 190,
+   "bodySha256": "14d92fb14fa437812f815cc0cfa657921c4d6aa6a48b0ba734e82c767596a17a"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 276,
+   "bodySha256": "898abbcd206d13836aa5758f6edfea17526c0e8ba5fc5b9855e29530ad82a1c4"
+  },
+  {
+   "origin": "https://api.modrinth.com",
+   "method": "POST",
+   "url": "/v2/version_files/update",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 319,
+   "bodySha256": "738b72177796f6357a0ca7b6edae2ec6e899638bf1f9c6e8e9a3ed84c35ce574"
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/beta/2.0.mrpack",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/config_new.cfg",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_keep.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/files/mods_new.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/plug/Alpha-2.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/plug/Alpha-2.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/plug/Alpha-2.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/plug/Dep-1.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/plug/Dep-1.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://cdn.modrinth.com",
+   "method": "GET",
+   "url": "/data/plug/Dep-1.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/15/paper-1.21.4-15.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/3/paper-1.21.5-3.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.5/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.5/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/9.9/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/HDep/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/HDep/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/extonly/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/extonly/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects/hplug/versions?limit=25&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects?q=alpha&limit=10&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangar.papermc.io",
+   "method": "GET",
+   "url": "/api/v1/projects?q=alpha&limit=10&platform=PAPER",
+   "userAgent": "joogiebear/spawnloft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangarcdn.papermc.io",
+   "method": "GET",
+   "url": "/plugins/hplug-3.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangarcdn.papermc.io",
+   "method": "GET",
+   "url": "/plugins/hplug-3.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hangarcdn.papermc.io",
+   "method": "GET",
+   "url": "/plugins/hplug-3.0.jar",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.21.5/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Hand.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-enable\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Hand.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Hand.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-enable\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Off.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-remove\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Hand.jar.disabled\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-install\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Alpha-2.0.jar 2.0\",\"snapshot\":\"pre-install_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-install\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Dep-1.0.jar 1.0\",\"snapshot\":\"pre-install_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-install\",\"by\":{\"kind\":\"panel\"},\"detail\":\"HPlug-3.0.jar 3.0\",\"snapshot\":\"pre-install_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-install\",\"by\":{\"kind\":\"panel\"},\"detail\":\"HPlug-3.0.jar 3.0\",\"snapshot\":\"pre-install_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"van\",\"action\":\"plugin-install\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Alpha-2.0.jar 2.0\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-update\",\"by\":{\"kind\":\"panel\"},\"detail\":\"undefined to undefined\",\"snapshot\":\"pre-update_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-update\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Alpha.jar to Alpha-2.0.jar\",\"snapshot\":\"pre-update_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-update\",\"by\":{\"kind\":\"panel\"},\"detail\":\", HPlug-3.0.jar, ; 2 failed\",\"snapshot\":\"pre-update_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-update\",\"by\":{\"kind\":\"panel\"},\"snapshot\":\"pre-update_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-update\",\"by\":{\"kind\":\"panel\"},\"snapshot\":\"pre-update_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"b1\",\"action\":\"backup\",\"by\":{\"kind\":\"panel\"},\"detail\":\"standard (pre-pack-update), <size>\",\"snapshot\":\"pre-pack-update_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"upgrade\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Paper 1.21.4, build 10 to 15\"}\n{\"at\":\"<time>\",\"server\":\"cust\",\"action\":\"upgrade\",\"by\":{\"kind\":\"panel\"},\"detail\":\"server.jar to paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"upgrade\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Paper 1.21.4 (build 15) to 1.21.5 (build 3)\",\"snapshot\":\"pre-upgrade_standard_<stamp>.tar.gz\"}\n"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/.mcctl-pack.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"project\": \"beta\",\n  \"versionId\": \"beta-2\",\n  \"versionNumber\": \"2.0\",\n  \"name\": \"Beta Pack\",\n  \"mc\": \"1.21.5\",\n  \"loader\": {\n    \"kind\": \"fabric\",\n    \"version\": \"0.16.10\"\n  },\n  \"installedAt\": \"<time>\",\n  \"files\": [\n    \"mods/keep.jar\",\n    \"mods/new.jar\",\n    \"config/new.cfg\",\n    \"config/over.txt\"\n  ],\n  \"skippedClientOnly\": 0\n}\n"
+  },
+  "data/instances/b1/config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/config/new.cfg": {
+   "kind": "file",
+   "mode": "644",
+   "text": "new\n"
+  },
+  "data/instances/b1/config/over.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "two\n"
+  },
+  "data/instances/b1/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'b1'\n"
+  },
+  "data/instances/b1/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/mods/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"keep.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"beta\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    },\n    \"new.jar\": {\n      \"source\": \"modpack\",\n      \"project\": \"beta\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/instances/b1/mods/keep.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 800,
+   "sha256": "bdb684913ec73d92985f7900af4ae87ae05dcab84c8d323233f1970c990ace60"
+  },
+  "data/instances/b1/mods/mine.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "my own mod"
+  },
+  "data/instances/b1/mods/new.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1100,
+   "sha256": "f20bcf88318df05f60f507ad61e76bd1e3770b81176e9e3c743f6012243fc937"
+  },
+  "data/instances/b1/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-port=25566\nlevel-name=world\n"
+  },
+  "data/instances/b1/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'b1' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'b1'\n"
+  },
+  "data/instances/b1/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'b1'\n"
+  },
+  "data/instances/b1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/b1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "world\n"
+  },
+  "data/instances/cust": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/cust/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'cust'\n"
+  },
+  "data/instances/cust/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/cust/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "custom"
+  },
+  "data/instances/cust/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'cust' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'cust'\n"
+  },
+  "data/instances/cust/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'cust'\n"
+  },
+  "data/instances/pur": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/pur/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'pur'\n"
+  },
+  "data/instances/pur/purpur-1.21.4-2399.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "purpur"
+  },
+  "data/instances/pur/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'pur' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'pur'\n"
+  },
+  "data/instances/pur/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'pur'\n"
+  },
+  "data/instances/srv": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'srv'\n"
+  },
+  "data/instances/srv/paper-1.21.4-10.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "old jar"
+  },
+  "data/instances/srv/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/srv/paper-1.21.5-3.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2500,
+   "sha256": "e7c04136c977182b088cafa484bc55725fcfe3ba3cdaee1402498bc7aa0500b0"
+  },
+  "data/instances/srv/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv/plugins/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"Keep.jar\": {\n      \"source\": \"modrinth\",\n      \"project\": \"keepid\",\n      \"version\": \"1\",\n      \"installedAt\": \"<time>\"\n    },\n    \"Off.jar\": {\n      \"source\": \"modrinth\",\n      \"project\": \"offid\",\n      \"version\": \"1\",\n      \"installedAt\": \"<time>\"\n    },\n    \"Alpha-2.0.jar\": {\n      \"source\": \"modrinth\",\n      \"project\": \"alphaid\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\",\n      \"gameVersions\": [\n        \"1.21.4\"\n      ]\n    },\n    \"Dep-1.0.jar\": {\n      \"source\": \"modrinth\",\n      \"project\": \"depid\",\n      \"version\": \"1.0\",\n      \"installedAt\": \"<time>\",\n      \"gameVersions\": [\n        \"1.20.1\",\n        \"1.20.4\"\n      ]\n    },\n    \"HPlug-3.0.jar\": {\n      \"source\": \"hangar\",\n      \"project\": \"hplug\",\n      \"version\": \"3.0\",\n      \"installedAt\": \"<time>\",\n      \"gameVersions\": [\n        \"1.21.3\",\n        \"1.21.4\"\n      ]\n    }\n  }\n}\n"
+  },
+  "data/instances/srv/plugins/Alpha-2.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=25 csize=25 crc=08e86431 attr=0x1a40000"
+  },
+  "data/instances/srv/plugins/Dep-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=26 csize=26 crc=9e3ec49a attr=0x1a40000"
+  },
+  "data/instances/srv/plugins/HPlug-3.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=25 csize=25 crc=4ed55ab2 attr=0x1a40000"
+  },
+  "data/instances/srv/plugins/Keep.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=11 csize=11 crc=cbb5a3d0 attr=0x1a40000"
+  },
+  "data/instances/srv/plugins/Off.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=10 csize=10 crc=cda3ce73 attr=0x1a40000"
+  },
+  "data/instances/srv/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-port=25565\nlevel-name=world\n"
+  },
+  "data/instances/srv/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'srv' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'srv'\n"
+  },
+  "data/instances/srv/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'srv'\n"
+  },
+  "data/instances/van": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/van/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'van'\n"
+  },
+  "data/instances/van/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/van/plugins/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"Alpha-2.0.jar\": {\n      \"source\": \"modrinth\",\n      \"project\": \"alphaid\",\n      \"version\": \"2.0\",\n      \"installedAt\": \"<time>\",\n      \"gameVersions\": [\n        \"1.21.4\"\n      ]\n    }\n  }\n}\n"
+  },
+  "data/instances/van/plugins/Alpha-2.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=25 csize=25 crc=08e86431 attr=0x1a40000"
+  },
+  "data/instances/van/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'van' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'van'\n"
+  },
+  "data/instances/van/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'van'\n"
+  },
+  "data/instances/van/vanilla-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "vanilla"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv\": {\n      \"dir\": \"<run>/data/instances/srv\",\n      \"jar\": \"paper-1.21.5-3.jar\",\n      \"port\": 25565,\n      \"memory\": \"2G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.5\"\n    },\n    \"b1\": {\n      \"dir\": \"<run>/data/instances/b1\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"port\": 25566,\n      \"memory\": \"2G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.21.5\"\n    },\n    \"van\": {\n      \"dir\": \"<run>/data/instances/van\",\n      \"jar\": \"vanilla-1.21.4.jar\",\n      \"port\": 25567,\n      \"memory\": \"2G\",\n      \"loader\": \"vanilla\"\n    },\n    \"cust\": {\n      \"dir\": \"<run>/data/instances/cust\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"port\": 25568,\n      \"memory\": \"2G\",\n      \"loader\": \"paper\"\n    },\n    \"pur\": {\n      \"dir\": \"<run>/data/instances/pur\",\n      \"jar\": \"purpur-1.21.4-2399.jar\",\n      \"port\": 25569,\n      \"memory\": \"2G\",\n      \"loader\": \"purpur\"\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/fabric-server-mc.1.21.5-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "8305e54608f400b3091e4018f8a3aadf99e8094fa01afead13b6b317e2d09225"
+  },
+  "data/jars/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/jars/paper-1.21.5-3.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2500,
+   "sha256": "e7c04136c977182b088cafa484bc55725fcfe3ba3cdaee1402498bc7aa0500b0"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/panel.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[<time>] installation moved: rewrote 0 task shim(s) and launchers for 5 server(s)\n"
+  },
+  "data/run/runtime.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<code folder>\"\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

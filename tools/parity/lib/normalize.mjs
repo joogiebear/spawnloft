@@ -16,6 +16,8 @@ const VOLATILE = [
   // a pid, in JSON (pid, javaPid, daemonPid, holderPid, ...) and in text
   [/"(\w*[pP]id)"(\s*):(\s*)\d+/g, '"$1"$2:$3<pid>'],
   [/\b(pid)([ =:]+)\d+/gi, '$1$2<pid>'],
+  // the Rust daemon's own start time as the system reports it (a state file's daemonStartTime)
+  [/"(daemonStartTime)"(\s*):(\s*)"\d+"/g, '"$1"$2:$3"<start-time>"'],
   // a lock's token (src/util.mjs tryLock)
   [/"(token)"(\s*):(\s*)"[^"]*"/g, '"$1"$2:$3"<token>"'],
   // milliseconds since 1970 under a key that names a time (startedAt, at, mtime, ...)

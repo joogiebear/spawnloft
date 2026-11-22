@@ -70,6 +70,12 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
     SPAWNLOFT_NODE: process.execPath,
     SPAWNLOFT_CORE_DIR: ctx.repo,
     SPAWNLOFT_HARNESS_INDEX_FETCH: 'off',
+    // the daemon every 2.0 package runs (and the only one once the Node core is gone); a
+    // scenario about the Node daemon says so in its own env
+    SPAWNLOFT_DAEMON: 'rust',
+    // the daemon binary: the core under test, which the Node core would otherwise look for in an
+    // installed layout beside its code folder
+    ...(ctx.core ? { SPAWNLOFT_CORE_BIN: ctx.core } : {}),
     // an empty map still refuses every host that is not on this machine: no scenario downloads
     // anything real, whether or not it fakes a host
     SPAWNLOFT_TEST_ORIGINS: origins ?? '{}',
@@ -203,7 +209,27 @@ function applySetup(step, ctx, baseDir) {
   }
 }
 
+// `{ "daemonGone": "<name>" }`: waits until the daemon named in data/run/<name>/state.json has
+// exited, so a step that follows a kill does not race the daemon's own exit (and the socket it
+// removes on the way out).
+// On Windows the control channel is a named pipe that goes with the daemon's handles, so there
+// is no socket file to race, and a daemon there outlives a kill by more than the wait (seen on
+// the CI runner): the step does nothing.
+async function daemonGone(ctx, name, timeoutMs) {
+  if (process.platform === 'win32') return null
+  let pid
+  try { pid = JSON.parse(fs.readFileSync(path.join(ctx.data, 'run', name, 'state.json'), 'utf8')).daemonPid } catch { return null }
+  if (!Number.isInteger(pid)) return null
+  const until = Date.now() + timeoutMs
+  for (;;) {
+    try { process.kill(pid, 0) } catch (e) { if (e.code === 'ESRCH') return null }
+    if (Date.now() > until) return `the daemon of "${name}" (pid ${pid}) was still running after ${timeoutMs} ms`
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+}
+
 function stepLabel(i, step) {
+  if (step.daemonGone !== undefined) return `step ${i + 1} (wait for the daemon of ${step.daemonGone} to exit)`
   if (step.panel) return `step ${i + 1} (panel, ${step.panel.length} requests)`
   return `step ${i + 1} (${step.run.join(' ')})`
 }
@@ -233,7 +259,7 @@ function checkExpect(step, result, side, label) {
 async function runSide(scenario, side, o) {
   const run = path.join(o.scratch, 'run')
   fs.rmSync(run, { recursive: true, force: true })
-  const ctx = { run, data: path.join(run, 'data'), home: path.join(run, 'home'), repo: o.repo, scheduler: findFakeScheduler(o.core) }
+  const ctx = { run, data: path.join(run, 'data'), home: path.join(run, 'home'), repo: o.repo, core: o.core, scheduler: findFakeScheduler(o.core) }
   fs.mkdirSync(ctx.data, { recursive: true })
   fs.mkdirSync(ctx.home, { recursive: true })
   const extra = scenario.normalize ?? []
@@ -253,7 +279,12 @@ async function runSide(scenario, side, o) {
         if (!res.text.includes(want)) problems.push(`${side}: ${label} answers do not include ${JSON.stringify(want)}`)
       }
       const text = applyDeclared(normalizeText(res.text.replace(/\r\n/g, '\n'), extra), 'ui')
-      steps.push({ index: i, label, args: ['ui', 'replay'], golden: false, code: 0, signal: null, stdout: text, stderr: '', raw: { stdout: res.text, stderr: '' } })
+      steps.push({ index: i, label, args: ['ui', 'replay'], golden: false, frozen: raw.frozen !== false, code: 0, signal: null, stdout: text, stderr: '', raw: { stdout: res.text, stderr: '' } })
+      continue
+    }
+    if (raw.daemonGone !== undefined) {
+      const problem = await daemonGone(ctx, raw.daemonGone, raw.timeoutMs ?? 20000)
+      if (problem) problems.push(`${side}: ${stepLabel(i, raw)}: ${problem}`)
       continue
     }
     if (!raw.run) { applySetup(raw, ctx, o.baseDir); continue }
@@ -266,7 +297,7 @@ async function runSide(scenario, side, o) {
     if (res.timedOut) problems.push(`${side}: ${label} did not finish in ${step.timeoutMs ?? STEP_TIMEOUT_MS} ms`)
     problems.push(...checkExpect(step, res, side, label))
     const even = (t) => applyDeclared(normalizeText(t.replace(/\r\n/g, '\n'), extra), command)
-    steps.push({ index: i, label, args: raw.run, golden: raw.golden !== false, code: res.code, signal: res.signal, stdout: even(res.stdout), stderr: even(res.stderr), raw: { stdout: res.stdout, stderr: res.stderr } })
+    steps.push({ index: i, label, args: raw.run, golden: raw.golden !== false, frozen: raw.frozen !== false, code: res.code, signal: res.signal, stdout: even(res.stdout), stderr: even(res.stderr), raw: { stdout: res.stdout, stderr: res.stderr } })
   }
   // as a sorted list: parallel downloads (a modpack, a client's libraries) arrive in any order,
   // and what matters is that both sides asked for the same things
@@ -277,7 +308,12 @@ async function runSide(scenario, side, o) {
     acl: Boolean(scenario.acl),
     normalizePath: (p) => normalizeText(p, extra),
     // a file's text is evened out as the output of every command the scenario ran would be
-    normalize: (t) => [...commands].reduce((acc, c) => applyDeclared(acc, c), normalizeText(t, extra)),
+    normalize: (t, rel) => {
+      const even = [...commands].reduce((acc, c) => applyDeclared(acc, c), normalizeText(t, extra))
+      // the Rust daemon logs from two threads (the server's exit and its control socket), so a
+      // daemon.log is compared as its set of lines
+      return /(^|\/)daemon\.log$/.test(rel) ? even.split('\n').sort().join('\n') : even
+    },
   })
   if (o.keep) {
     const kept = path.join(o.scratch, side)
@@ -373,11 +409,82 @@ function compareGolden(side, golden, paths) {
   return diffs
 }
 
+// ---------------------------------------------------------------------- frozen records
+//
+// Before the Node core leaves (C10, plan section 6), what its side does in every scenario is
+// frozen per platform under tools/parity/frozen/<platform>-<arch>/<scenario>.json: every step's
+// output and exit code, the fake-host requests and the whole data tree, with this machine's
+// paths, the fake hosts' loopback ports and the rig's own pid replaced by names. A Rust side is
+// then compared with the record exactly as it was compared with the Node side.
+
+export const FROZEN_DIR = path.join('tools', 'parity', 'frozen')
+
+export function platformKey(platform = process.platform, arch = process.arch) {
+  return `${platform}-${arch}`
+}
+
+export function frozenFile(repo, name, key = platformKey()) {
+  return path.join(repo, FROZEN_DIR, key, `${name}.json`)
+}
+
+// What differs between two machines (or two runs on one) but not between the sides of one run.
+export function neutralizer({ paths, hostMap = {}, rigPid = null }) {
+  const ports = Object.entries(hostMap).map(([origin, local]) => [local.replace(/^http:\/\//, ''), origin])
+    // longest first, so 127.0.0.1:4100 is not taken out of 127.0.0.1:41000
+    .sort((a, b) => b[0].length - a[0].length)
+  return (text) => {
+    if (typeof text !== 'string') return text
+    let out = machineNeutral(text, paths)
+    for (const [hostPort, origin] of ports) out = out.split(hostPort).join(`<fake ${origin}>`)
+    if (rigPid !== null) out = out.replace(new RegExp(`\\b${rigPid}\\b`, 'g'), '<rig-pid>')
+    return out
+  }
+}
+
+function neutralEntry(entry, neutral) {
+  return Object.fromEntries(Object.entries(entry).map(([k, v]) => [k, typeof v === 'string' ? neutral(v) : v]))
+}
+
+// A side as a frozen record: the steps compared by compareSides, the requests and the tree.
+export function recordOf(side, neutral) {
+  return {
+    steps: side.steps.filter(s => s.frozen !== false).map(s => ({ label: s.label, args: s.args, code: s.code, signal: s.signal, stdout: neutral(s.stdout), stderr: neutral(s.stderr) })),
+    requests: JSON.parse(neutral(JSON.stringify(side.requests))),
+    tree: Object.fromEntries([...side.tree].map(([p, e]) => [neutral(p), neutralEntry(e, neutral)])),
+  }
+}
+
+// A record with the scenario's normalize rules run over its text again.
+function renormalized(record, extra) {
+  const even = (t) => typeof t === 'string' ? normalizeText(t, extra) : t
+  return {
+    ...record,
+    steps: record.steps.map(s => ({ ...s, stdout: even(s.stdout), stderr: even(s.stderr) })),
+    tree: Object.fromEntries(Object.entries(record.tree).map(([p, e]) => [p, e && typeof e.text === 'string' ? { ...e, text: even(e.text) } : e])),
+  }
+}
+
+// A side as it is held against a record frozen on another runner: a tar's members come in the
+// order the runner's file system listed the folder, so they are compared as a sorted list. Two
+// cores on one machine are still held to the same order.
+function acrossRunners(side) {
+  const tree = new Map([...side.tree].map(([p, e]) => [p, e && typeof e.tar === 'string' ? { ...e, tar: e.tar.split('\n').sort().join('\n') } : e]))
+  return { ...side, tree }
+}
+
+// A frozen record read back as a side compareSides takes.
+export function sideOfRecord(record) {
+  return { steps: record.steps, requests: record.requests, tree: new Map(Object.entries(record.tree)) }
+}
+
 // Runs one scenario on the given sides. Returns { name, ok, diffs, problems, sides }.
 //   expect: 'same' (the default) passes when the sides agree; 'differ' is a self-test of the rig
 //   and passes only when it finds a difference. Steps marked `side` (the seeded difference) are
 //   allowed only in a 'differ' scenario, so no real scenario can run different steps per side.
-export async function runScenario(scenario, { core, repo, scratch, sides = SIDES, keep = false, baseDir = repo, golden = 'check' }) {
+//   frozen: 'check' compares a Rust side with this platform's frozen record when there is one
+//   (and fails without one when no Node side ran); 'record' writes the record from the side
+//   `recordFrom` names; 'off' does neither.
+export async function runScenario(scenario, { core, repo, scratch, sides = SIDES, keep = false, baseDir = repo, golden = 'check', frozen = 'check', recordFrom = 'node' }) {
   const expect = scenario.expect ?? 'same'
   if (!['same', 'differ'].includes(expect)) throw new Error(`${scenario.name}: expect is "same" or "differ"`)
   if (expect !== 'differ' && scenario.steps.some(s => s.side)) throw new Error(`${scenario.name}: a step for one side only is allowed only in a self-test (expect: "differ")`)
@@ -390,6 +497,7 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   fs.mkdirSync(scratch, { recursive: true })
   const hosts = await startHosts(scenario.hosts ?? {}, { baseDir })
   const results = {}
+  const hostMap = hosts.map
   try {
     for (const side of sides) {
       results[side] = await runSide(scenario, side, { core, repo, scratch, keep, baseDir, origins: hosts.env, takeRequests: () => hosts.take() })
@@ -403,23 +511,57 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   let goldenDiffs = []
   const goldenFile = scenario.golden && path.resolve(repo, scenario.golden)
   const goldenHere = goldenFile && (!scenario.goldenPlatforms || scenario.goldenPlatforms.includes(process.platform))
-  if (goldenHere && results.node) {
+  // the contract fixtures are the Node side's while it runs, the Rust side's once it is gone
+  const goldenSide = results.node ?? results.rust
+  if (goldenHere && goldenSide) {
     if (golden === 'update') {
       fs.mkdirSync(path.dirname(goldenFile), { recursive: true })
-      fs.writeFileSync(goldenFile, JSON.stringify({ about: scenario.goldenAbout ?? `What the Node core prints for scenario ${scenario.name} (tools/parity/). Regenerate with node tools/parity/run.mjs --update-golden; a change here is a change to the CLI's contract.`, scenario: scenario.name, platform: process.platform, ...goldenOf(results.node, paths) }, null, 2) + '\n')
+      fs.writeFileSync(goldenFile, JSON.stringify({ about: scenario.goldenAbout ?? `What the Node core prints for scenario ${scenario.name} (tools/parity/). Regenerate with node tools/parity/run.mjs --update-golden; a change here is a change to the CLI's contract.`, scenario: scenario.name, platform: process.platform, ...goldenOf(goldenSide, paths) }, null, 2) + '\n')
     } else if (!fs.existsSync(goldenFile)) {
       problems.push(`golden file ${scenario.golden} is missing: run with --update-golden`)
     } else {
-      goldenDiffs = compareGolden(results.node, JSON.parse(fs.readFileSync(goldenFile, 'utf8')), paths)
+      goldenDiffs = compareGolden(goldenSide, JSON.parse(fs.readFileSync(goldenFile, 'utf8')), paths)
     }
   }
+  // the frozen record of this platform (C10)
+  const neutral = neutralizer({ paths, hostMap, rigPid: JSON.stringify(scenario).includes('{rig-pid}') ? process.pid : null })
+  const recordPath = frozenFile(repo, scenario.name)
+  let frozenDiffs = []
+  // a scenario about what leaves with the Node core (its daemon) is not frozen
+  if (scenario.frozen === false) {
+    if (!results.node) problems.push('this scenario is about the Node core and cannot run without it')
+  } else if (frozen === 'record') {
+    if (!results[recordFrom]) {
+      problems.push(`cannot record: the ${recordFrom} side did not run`)
+    } else if (expect === 'differ' && recordFrom !== 'node') {
+      // the seeded side is the Rust one, so its record would hold the seeded difference
+      problems.push('a self-test is recorded from the Node side only')
+    } else if (!problems.length && (expect === 'differ' || !diffs.length)) {
+      // only a clean run is frozen: a problem or a difference between the sides may be a flake
+      fs.mkdirSync(path.dirname(recordPath), { recursive: true })
+      fs.writeFileSync(recordPath, JSON.stringify({ about: `What the ${recordFrom === 'node' ? 'Node' : 'Rust'} core did in scenario ${scenario.name} on ${platformKey()}, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.`, scenario: scenario.name, platform: platformKey(), from: recordFrom, ...recordOf(results[recordFrom], neutral) }, null, 1) + '\n')
+    }
+  } else if (frozen === 'check' && results.rust) {
+    if (fs.existsSync(recordPath)) {
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'))
+      // a self-test's record is the unseeded run: with a Node side its seeded difference is
+      // already found between the sides
+      // the scenario's normalize rules run over the record too, so a rule added after it was
+      // frozen (a runner's tool version, say) holds without recording it again
+      if (!(expect === 'differ' && results.node)) frozenDiffs = compareSides(acrossRunners(sideOfRecord(renormalized(record, scenario.normalize ?? []))), acrossRunners(sideOfRecord(recordOf(results.rust, neutral))), ['frozen', 'rust'])
+    } else if (!results.node) {
+      problems.push(`no frozen record for ${platformKey()}: ${path.relative(repo, recordPath)}`)
+    }
+  }
+  // what the Rust side is held to: the Node side when it ran, else the frozen record
+  const sideDiffs = results.node ? diffs : frozenDiffs
   // a self-test names the differences it seeded, so finding some other difference is not a pass
   if (expect === 'differ') {
     for (const want of scenario.expectDifferences ?? []) {
-      if (!diffs.some(d => d.what.includes(want))) problems.push(`self-test: no reported difference matches "${want}" (found: ${diffs.map(d => d.what).join('; ') || 'none'})`)
+      if (!sideDiffs.some(d => d.what.includes(want))) problems.push(`self-test: no reported difference matches "${want}" (found: ${sideDiffs.map(d => d.what).join('; ') || 'none'})`)
     }
   }
-  const allDiffs = [...diffs, ...goldenDiffs]
-  const ok = problems.length === 0 && (expect === 'differ' ? diffs.length > 0 && goldenDiffs.length === 0 : allDiffs.length === 0)
+  const allDiffs = results.node ? [...diffs, ...goldenDiffs, ...frozenDiffs] : [...frozenDiffs, ...goldenDiffs]
+  const ok = problems.length === 0 && (expect === 'differ' ? sideDiffs.length > 0 && goldenDiffs.length === 0 : allDiffs.length === 0)
   return { name: scenario.name, expect, ok, diffs: allDiffs, problems, sides: results }
 }

@@ -1,0 +1,211 @@
+{
+ "about": "What the Node core did in scenario c1-running on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c1-running",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 4 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.<secs> )!\n  java pid <pid>   port 47731   rcon 47741\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\nrun1  running  47731  47741  1G   <secs> <run>/data/instances/run1\n\nDATABASE  STATUS   ENGINE          PORT   ATTACHED  UPTIME  DIR\ndb1       stopped  MariaDB 11.4.5  47751  -         -       <run>/data/services/db1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 6 (status)",
+   "args": [
+    "status"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\nrun1  running  47731  47741  1G   <secs> <run>/data/instances/run1\n\nDATABASE  STATUS   ENGINE          PORT   ATTACHED  UPTIME  DIR\ndb1       stopped  MariaDB 11.4.5  47751  -         -       <run>/data/services/db1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (status run1)",
+   "args": [
+    "status",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     run1\nlabel:        (none)\nstatus:       running\ndirectory:    <run>/data/instances/run1\njar:          server.jar\nmemory:       1G\njava:         <repo>/test/fixtures/fake-java.mjs\nport:         47731\nrcon port:    47741\nlevel-name:   (unset)\nmotd:         (unset)\nonline-mode:  (unset)\njava pid:     <pid>\ndaemon pid:   <pid>\nuptime:       <secs> \nconsole log:  <run>/data/run/run1/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (status run1 --json)",
+   "args": [
+    "status",
+    "run1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"running\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47731,\"rconPort\":47741,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":true,\"startedAt\":<epoch-ms>,\"uptimeMs\":<ms>,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/run1/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"running\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47731,\"rconPort\":47741,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":true,\"startedAt\":<epoch-ms>,\"uptimeMs\":<ms>,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/run1/console.log\"}],\"databases\":[{\"name\":\"db1\",\"label\":null,\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/db1\",\"jar\":null,\"memory\":null,\"port\":47751,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/db1/console.log\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (why run1)",
+   "args": [
+    "why",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Nothing SpawnLoft recognises in the recent console. The last lines of the log are the\nnext place to look: spawnloft logs run1 -n 60 --grep \" ERROR]| WARN]|Exception\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (logs run1 --grep done \\()",
+   "args": [
+    "logs",
+    "run1",
+    "--grep",
+    "done \\("
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[00:00:00 INFO]: Done (0.<secs> )! For help, type \"help\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (metrics run1 --json)",
+   "args": [
+    "metrics",
+    "run1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":true,\"data\":{\"instance\":\"run1\",\"runId\":\"run1:<epoch-ms>\",\"startedAt\":<epoch-ms>,\"running\":true,\"samplingAvailable\":true,\"sampleSeconds\":10,\"cores\":4,\"cpuScale\":\"whole-machine\",\"samples\":<samples>}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (status run1)",
+   "args": [
+    "status",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:        run1\nlabel:           (none)\nstatus:          stopped\ndirectory:       <run>/data/instances/run1\njar:             server.jar\nmemory:          1G\njava:            <repo>/test/fixtures/fake-java.mjs\nport:            47731\nrcon port:       47741\nlevel-name:      (unset)\nmotd:            (unset)\nonline-mode:     (unset)\nlast exit code:  0\nconsole log:     <run>/data/run/run1/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (status run1 --json)",
+   "args": [
+    "status",
+    "run1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47731,\"rconPort\":47741,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":0,\"consoleLog\":\"<run>/data/run/run1/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\nrun1  stopped  47731  47741  1G   -       <run>/data/instances/run1\n\nDATABASE  STATUS   ENGINE          PORT   ATTACHED  UPTIME  DIR\ndb1       stopped  MariaDB 11.4.5  47751  -         -       <run>/data/services/db1\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances/run1": {
+   "kind": "dir"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "text": "server-port=47731\nenable-rcon=true\nrcon.port=47741\nrcon.password=test\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47731,\n      \"rcon\": {\n        \"port\": 47741,\n        \"password\": \"test\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"11.4.5\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47751\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/run/run1": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

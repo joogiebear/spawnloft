@@ -1,0 +1,285 @@
+{
+ "about": "What the Node core did in scenario c2-rust-daemon on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c2-rust-daemon",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 10 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" was not running.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (kill run1)",
+   "args": [
+    "kill",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" was not running.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (start run1 --timeout 60)",
+   "args": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47761   rcon 47771\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (cmd run1 tps)",
+   "args": [
+    "cmd",
+    "run1",
+    "tps"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "TPS from last 1m, 5m, 15m: *20.0, *20.0, *20.0\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (cmd run1 tps --raw)",
+   "args": [
+    "cmd",
+    "run1",
+    "tps",
+    "--raw"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "§6TPS from last 1m, 5m, 15m: §a*20.0§r, §a*20.0§r, §a*20.0\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (rcon run1 say nothing)",
+   "args": [
+    "rcon",
+    "run1",
+    "say",
+    "nothing"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "(no output)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (players run1)",
+   "args": [
+    "players",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "There are 0 of a max of 20 players online:\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (send run1 hello there)",
+   "args": [
+    "send",
+    "run1",
+    "hello",
+    "there"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "> hello there\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (console run1)",
+   "args": [
+    "console",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "--- attached to \"run1\" (ctrl-c or \"/detach\" to leave; the server keeps running) ---\n[00:00:00 INFO]: Starting minecraft server (fake) with -Xms1G -Xmx1G -Dterminal.jline=false -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true -jar server.jar --nogui\n[00:00:00 INFO]: Done (0.042s)! For help, type \"help\"\n[00:00:00 INFO]: fake got: hello there\n--- detached from \"run1\" (still running) ---\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (restart run1 --timeout 60)",
+   "args": [
+    "restart",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47761   rcon 47771\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (restart run1 --timeout 60)",
+   "args": [
+    "restart",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\nStarting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47761   rcon 47771\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (kill run1)",
+   "args": [
+    "kill",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" force-killed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (kill run1)",
+   "args": [
+    "kill",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"run1\" was not running.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (start run1 --no-wait)",
+   "args": [
+    "start",
+    "run1",
+    "--no-wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nLaunched (java pid <pid>). Not waiting for ready.\nFollow with: spawnloft logs run1 -f\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (stop run1 --timeout 30)",
+   "args": [
+    "stop",
+    "run1",
+    "--timeout",
+    "30"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"tps\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"tps\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"say nothing\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"cli\"},\"detail\":\"hello there\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"kill\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances/bad1": {
+   "kind": "dir"
+  },
+  "data/instances/bad1/eula.txt": {
+   "kind": "file",
+   "text": "eula=true\n"
+  },
+  "data/instances/bad1/server.jar": {
+   "kind": "file",
+   "text": ""
+  },
+  "data/instances/noeula": {
+   "kind": "dir"
+  },
+  "data/instances/noeula/server.jar": {
+   "kind": "file",
+   "text": ""
+  },
+  "data/instances/nojar": {
+   "kind": "dir"
+  },
+  "data/instances/run1": {
+   "kind": "dir"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/old-server.jar": {
+   "kind": "file",
+   "text": "old"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "text": "#Minecraft server properties\nmotd=A Minecraft Server\nmax-players=20\nserver-port=47761\nenable-rcon=true\nrcon.port=47771\nrcon.password=test\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47761,\n      \"rcon\": {\n        \"port\": 47771,\n        \"password\": \"test\"\n      }\n    },\n    \"noeula\": {\n      \"dir\": \"<run>/data/instances/noeula\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47762,\n      \"rcon\": {\n        \"port\": 47772,\n        \"password\": \"test\"\n      }\n    },\n    \"nojar\": {\n      \"dir\": \"<run>/data/instances/nojar\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47763,\n      \"rcon\": {\n        \"port\": 47773,\n        \"password\": \"test\"\n      }\n    },\n    \"bad1\": {\n      \"dir\": \"<run>/data/instances/bad1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47764,\n      \"rcon\": {\n        \"port\": 47774,\n        \"password\": \"test\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"11.4.5\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47781\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/jars/paper-1.21.4-100.jar": {
+   "kind": "file",
+   "text": "new jar"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/run/run1": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

@@ -1,0 +1,253 @@
+{
+ "about": "What the Node core did in scenario c7-client-login-odd on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-login-odd",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://x/l and enter the code U (valid 15 minutes). Waiting...\nerror: Minecraft refused the sign-in (HTTP 403) for client id 946097b5-241d-4f83-9981-c6d0778e5507 (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa�\"). Either Mojang has not approved that id for Minecraft sign-in, or its Azure app registration does not allow public client flows (Authentication > Allow public client flows). Offline profiles still work\n"
+  },
+  {
+   "label": "step 2 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Signed in as 123. Use it: spawnloft client launch <profile> --account 123, or spawnloft client set <profile> account=123\n",
+   "stderr": "Open https://x/l and enter the code U (valid 15 minutes). Waiting...\n"
+  },
+  {
+   "label": "step 3 (client accounts --json)",
+   "args": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"accounts\":[{\"name\":123,\"uuid\":\"AAAAAAAA-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":null}],\"defaultAccount\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://x/l and enter the code U (valid 15 minutes). Waiting...\nTypeError: account.name.toLowerCase is not a function\n"
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 32,
+   "bodySha256": "512a8f36d9617c773f25faea3b8d0b8235c44d629b60087332d1aaf0d7a01056"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 32,
+   "bodySha256": "512a8f36d9617c773f25faea3b8d0b8235c44d629b60087332d1aaf0d7a01056"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 32,
+   "bodySha256": "512a8f36d9617c773f25faea3b8d0b8235c44d629b60087332d1aaf0d7a01056"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 126,
+   "bodySha256": "9232394aed6bca8c027296cab576367a587d5bae752ffeb6bd02c5685f83b166"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 126,
+   "bodySha256": "9232394aed6bca8c027296cab576367a587d5bae752ffeb6bd02c5685f83b166"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 126,
+   "bodySha256": "9232394aed6bca8c027296cab576367a587d5bae752ffeb6bd02c5685f83b166"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 149,
+   "bodySha256": "cfee9e1c108db569b7849f3fb5937261faf98f2a05b305fb868883fb3ef7d807"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 149,
+   "bodySha256": "cfee9e1c108db569b7849f3fb5937261faf98f2a05b305fb868883fb3ef7d807"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 149,
+   "bodySha256": "cfee9e1c108db569b7849f3fb5937261faf98f2a05b305fb868883fb3ef7d807"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 123,
+   "bodySha256": "7b1c09919021e170e99d59ed5afc6a876bab9e4194af01ced722a62427325369"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 123,
+   "bodySha256": "7b1c09919021e170e99d59ed5afc6a876bab9e4194af01ced722a62427325369"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 123,
+   "bodySha256": "7b1c09919021e170e99d59ed5afc6a876bab9e4194af01ced722a62427325369"
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/accounts.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"accounts\": [\n    {\n      \"type\": \"offline\",\n      \"name\": \"Alex\",\n      \"uuid\": \"bbbbbbbb-1111-2222-3333-444444444444\"\n    }\n  ]\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

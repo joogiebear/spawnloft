@@ -1,0 +1,63 @@
+{
+ "about": "What the Node core did in scenario seeded-exit-code on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "seeded-exit-code",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 3 (status alpha)",
+   "args": [
+    "status",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "instance:     alpha\nlabel:        (none)\nstatus:       stopped\ndirectory:    <run>/data/instances/alpha\njar:          server.jar\nmemory:       2G\njava:         java\nport:         25565\nrcon port:    25575\nlevel-name:   (unset)\nmotd:         (unset)\nonline-mode:  (unset)\nconsole log:  <run>/data/run/alpha/console.log\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"alpha\": {\n      \"dir\": \"<run>/data/instances/alpha\",\n      \"jar\": \"server.jar\",\n      \"java\": \"java\",\n      \"memory\": \"2G\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"pw\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

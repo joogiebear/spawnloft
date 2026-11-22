@@ -9,6 +9,12 @@
   "data/instances/run1/logs/**"
  ],
  "normalize": [
+  {"pattern": "\"memoryMb\": \\d+", "replace": "\"memoryMb\": <n>"},
+  {"pattern": "\"error\": \"(?:instance \\\\\"run1\\\\\" is not running|server process is not running)\"", "replace": "\"error\": \"<not running>\""},
+  {
+   "pattern": "\"lan\": \\[[^\\]]*\\]",
+   "replace": "\"lan\": [<lan>]"
+  },
   {
    "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
    "replace": ""
@@ -535,7 +541,15 @@
     },
     {
      "get": "/api/instances/run1/join"
-    },
+    }
+   ],
+   "timeoutMs": 400000
+  },
+  {
+   "daemonGone": "run1"
+  },
+  {
+   "panel": [
     {
      "post": "/api/instances/run1/rename",
      "json": {
@@ -557,12 +571,19 @@
     {
      "post": "/api/instances/run1/stop",
      "timeoutMs": 90000
-    },
-    {
-     "post": "/api/instances/run1/stop"
     }
    ],
    "timeoutMs": 400000
+  },
+  {
+   "daemonGone": "run1"
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/run1/stop"
+    }
+   ]
   },
   {
    "panel": [

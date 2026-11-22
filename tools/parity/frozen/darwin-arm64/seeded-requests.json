@@ -1,0 +1,82 @@
+{
+ "about": "What the Node core did in scenario seeded-requests on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "seeded-requests",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 2 (paper fetch 1.21.4)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.21.4-15.jar — build 15, STABLE, 64 B, checksum verified.\nUse it with: spawnloft new <name> --jar paper-1.21.4-15.jar\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/15/paper-1.21.4-15.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 64,
+   "sha256": "dda0ce52030fc57e73312ca2563e784205b263bce095fd6a67ad199087408c9f"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

@@ -1,0 +1,216 @@
+{
+ "about": "What the Node core did in scenario c7-client-edges on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-edges",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 3 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: list.findIndex is not a function\n"
+  },
+  {
+   "label": "step 4 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: clientAuth.loadAccounts(...).map is not a function\n"
+  },
+  {
+   "label": "step 5 (client logout x)",
+   "args": [
+    "client",
+    "logout",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: list.findIndex is not a function\n"
+  },
+  {
+   "label": "step 6 (client status zz)",
+   "args": [
+    "client",
+    "status",
+    "zz"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"zz\". Known profiles: 2, 10, b\n"
+  },
+  {
+   "label": "step 8 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: Cannot read properties of null (reading 'name')\n"
+  },
+  {
+   "label": "step 9 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: Cannot read properties of null (reading 'name')\n"
+  },
+  {
+   "label": "step 10 (client logout x)",
+   "args": [
+    "client",
+    "logout",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: Cannot read properties of null (reading 'name')\n"
+  },
+  {
+   "label": "step 12 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "A  undefined  token until null\n5  u  token until null\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (client logout x)",
+   "args": [
+    "client",
+    "logout",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: a.name.toLowerCase is not a function\n"
+  },
+  {
+   "label": "step 14 (client logout a)",
+   "args": [
+    "client",
+    "logout",
+    "a"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Signed out A. Microsoft keeps its own session; sign out of your browser too if the machine is shared.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (client logout Z --json)",
+   "args": [
+    "client",
+    "logout",
+    "Z",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"removed\":\"Z\",\"uuid\":\"aaaaaaaa-1111-2222-3333-444444444444\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Q    token until null\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (client logs b -n 0x2)",
+   "args": [
+    "client",
+    "logs",
+    "b",
+    "-n",
+    "0x2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (client logs b --n= --json)",
+   "args": [
+    "client",
+    "logs",
+    "b",
+    "--n=",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"-n must be a positive whole number\"}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/client": {
+   "kind": "dir"
+  },
+  "data/client/accounts.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"accounts\": [\n    {\n      \"name\": \"Q\",\n      \"uuid\": \"\"\n    }\n  ]\n}\n"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"b\": {\n      \"mc\": \"1\"\n    }\n  }\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

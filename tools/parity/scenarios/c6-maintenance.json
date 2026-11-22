@@ -9,7 +9,7 @@
  ],
  "normalize": [
   {
-   "pattern": "\"runtime\":\"[^\"]*\"",
+   "pattern": "\"runtime\":\"(?!<)[^\"]*\"",
    "replace": "\"runtime\":\"<exe>\""
   },
   {

@@ -3,6 +3,7 @@
 //
 //   node tools/parity/run.mjs [scenario.json | folder ...] [--core <spawnloft-core>]
 //        [--only <name>] [--keep] [--out <dir>] [--sides node,rust] [--update-golden] [--declared]
+//        [--record [--record-from node|rust]] [--frozen check|off]
 //
 // With no scenario named, runs tools/parity/scenarios/ and tools/parity/selftest/. Exit 0 when
 // every scenario passes, 1 when one fails, 2 for a usage error.
@@ -43,9 +44,9 @@ export function loadScenarios(targets) {
 }
 
 async function main() {
-  const { flags, positional } = parseArgs(process.argv.slice(2), { booleanFlags: ['keep', 'updateGolden', 'declared'] })
+  const { flags, positional } = parseArgs(process.argv.slice(2), { booleanFlags: ['keep', 'updateGolden', 'declared', 'record'] })
   if (flags.declared) { process.stdout.write(declaredTable() + '\n'); return }
-  const known = ['core', 'only', 'keep', 'out', 'sides', 'updateGolden', 'declared', 'scratch']
+  const known = ['core', 'only', 'keep', 'out', 'sides', 'updateGolden', 'declared', 'scratch', 'record', 'recordFrom', 'frozen']
   for (const k of Object.keys(flags)) if (!known.includes(k)) usage(`unknown option --${k}`)
   const core = flags.core ? path.resolve(flags.core) : findCore(repo)
   if (!core || !fs.existsSync(core)) usage('no spawnloft-core found: build it (cd rust && cargo build -p spawnloft-core --features test-hooks) or pass --core')
@@ -56,13 +57,25 @@ async function main() {
   if (!hooks) usage(`${core} is not a test-hooks build (--version --json has no testHooks): cd rust && cargo build -p spawnloft-core --features test-hooks`)
   const sides = flags.sides ? String(flags.sides).split(',') : SIDES
   if (!sides.every(s => SIDES.includes(s)) || !sides.length) usage(`--sides takes ${SIDES.join(',')}`)
+  const recordFrom = flags.recordFrom ? String(flags.recordFrom) : 'node'
+  if (!SIDES.includes(recordFrom)) usage(`--record-from takes ${SIDES.join(' or ')}`)
+  if (flags.record && !sides.includes(recordFrom)) usage(`--record needs the ${recordFrom} side`)
+  if (flags.frozen !== undefined && !['check', 'off'].includes(String(flags.frozen))) usage('--frozen takes check or off')
+  const frozen = flags.record ? 'record' : String(flags.frozen ?? 'check')
   const targets = positional.length ? positional : [path.join(here, 'scenarios'), path.join(here, 'selftest')]
   let scenarios = loadScenarios(targets)
   if (flags.only) scenarios = scenarios.filter(s => s.name === flags.only)
   if (!scenarios.length) usage('no scenario to run')
   // a short base: Windows paths have a length limit, and the scratch folder is in every path
   // the real path (no /var -> /private/var, no Windows 8.3 short names), so a golden file's <run> is found
-  const base = flags.scratch ? path.resolve(flags.scratch) : fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'sl-parity-')))
+  // the same folder every run: some names are made from the data root's path (a scheduled task's
+  // `spawnloft-<hash>-` prefix, a loader step cache key), so a frozen record holds only for the
+  // path it was made in. CI runs with TMPDIR set to the runner's temp folder, the same each run.
+  const base = flags.scratch ? path.resolve(flags.scratch) : path.join(fs.realpathSync.native(os.tmpdir()), 'sl-parity')
+  if (!flags.scratch) {
+    fs.rmSync(base, { recursive: true, force: true })
+    fs.mkdirSync(base, { recursive: true })
+  }
   const results = []
   let failed = 0
   for (const s of scenarios) {
@@ -74,7 +87,7 @@ async function main() {
     const started = Date.now()
     let r
     try {
-      r = await runScenario(s, { core, repo, scratch, sides, keep: Boolean(flags.keep), baseDir: path.dirname(s.file), golden: flags.updateGolden ? 'update' : 'check' })
+      r = await runScenario(s, { core, repo, scratch, sides, keep: Boolean(flags.keep), baseDir: path.dirname(s.file), golden: flags.updateGolden ? 'update' : 'check', frozen, recordFrom })
     } catch (e) {
       r = { name: s.name, ok: false, diffs: [], problems: [`the scenario could not run: ${e.stack || e.message}`] }
     }

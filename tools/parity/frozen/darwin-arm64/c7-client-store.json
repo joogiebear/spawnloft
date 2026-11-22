@@ -1,0 +1,983 @@
+{
+ "about": "What the Node core did in scenario c7-client-store on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-store",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No client profiles yet. Make one: spawnloft client new <name> --mc 1.21.11\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (client list --json)",
+   "args": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profiles\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 3 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No Microsoft account is signed in. Sign in: spawnloft client login\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 4 (client accounts --json)",
+   "args": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"accounts\":[],\"defaultAccount\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (client status nope)",
+   "args": [
+    "client",
+    "status",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Create one with: spawnloft client new <name> --mc <version>\n"
+  },
+  {
+   "label": "step 6 (client status nope --json)",
+   "args": [
+    "client",
+    "status",
+    "nope",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no profile named \\\"nope\\\". Create one with: spawnloft client new <name> --mc <version>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (client logs nope)",
+   "args": [
+    "client",
+    "logs",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Create one with: spawnloft client new <name> --mc <version>\n"
+  },
+  {
+   "label": "step 8 (client remove nope)",
+   "args": [
+    "client",
+    "remove",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Create one with: spawnloft client new <name> --mc <version>\n"
+  },
+  {
+   "label": "step 9 (client stop nope)",
+   "args": [
+    "client",
+    "stop",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Create one with: spawnloft client new <name> --mc <version>\n"
+  },
+  {
+   "label": "step 10 (client logout nobody)",
+   "args": [
+    "client",
+    "logout",
+    "nobody"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no signed-in account named \"nobody\"; spawnloft client accounts lists them\n"
+  },
+  {
+   "label": "step 11 (client status bad name)",
+   "args": [
+    "client",
+    "status",
+    "bad name"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid profile name \"bad name\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 14 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "alpha  1.20.1  fabric  4G  account Steve  stopped\nBeta  1.8.9  vanilla  1536M  account Bob  stopped\ngone-acct  1.21.4  undefined  undefined  account OldName  stopped\nnum  26.1  undefined  3  offline  stopped\nzeta  1.21.11  vanilla  2G  offline  stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (client list --json)",
+   "args": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profiles\":[{\"name\":\"alpha\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"fabric\",\"loaderVersion\":\"0.16.9\",\"java\":null,\"memory\":\"4G\",\"harness\":true,\"server\":\"s1\",\"account\":\"aaaaaaaa-1111-2222-3333-444444444444\",\"createdAt\":\"<time>\",\"accountName\":\"Steve\",\"accountType\":\"microsoft\",\"running\":false},{\"name\":\"Beta\",\"assistantAccount\":true,\"serverList\":false,\"mc\":\"1.8.9\",\"loader\":\"vanilla\",\"memory\":\"1536M\",\"account\":\"offline:Bob\",\"accountName\":\"Bob\",\"accountType\":\"offline\",\"running\":false},{\"name\":\"gone-acct\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.4\",\"account\":\"OldName\",\"accountName\":\"OldName\",\"accountType\":null,\"running\":false},{\"name\":\"num\",\"assistantAccount\":false,\"serverList\":true,\"mc\":26.1,\"memory\":3,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"zeta\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"vanilla\",\"loaderVersion\":null,\"java\":null,\"memory\":\"2G\",\"harness\":false,\"server\":null,\"account\":null,\"createdAt\":\"<time>\",\"accountName\":null,\"accountType\":null,\"running\":false}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (client status alpha)",
+   "args": [
+    "client",
+    "status",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"alpha\" is stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (client status alpha --json)",
+   "args": [
+    "client",
+    "status",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"alpha\",\"running\":false,\"pid\":null,\"startedAt\":null,\"uptimeMs\":null,\"account\":null,\"launchedBy\":null,\"server\":null,\"address\":null,\"harness\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (client status beta)",
+   "args": [
+    "client",
+    "status",
+    "beta"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"beta\". Known profiles: zeta, alpha, Beta, gone-acct, num\n"
+  },
+  {
+   "label": "step 19 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Steve  aaaaaaaa-1111-2222-3333-444444444444  token until <time>\nAlex  bbbbbbbb-1111-2222-3333-444444444444  offline (offline-mode servers only)  (default)\nLegacy  cccccccc-1111-2222-3333-444444444444  sign in again (the saved sign-in stopped working <time>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (client accounts --json)",
+   "args": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"accounts\":[{\"name\":\"Steve\",\"uuid\":\"aaaaaaaa-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":null},{\"name\":\"Alex\",\"uuid\":\"bbbbbbbb-1111-2222-3333-444444444444\",\"type\":\"offline\",\"expiresAt\":null,\"refreshFailedAt\":null},{\"name\":\"Legacy\",\"uuid\":\"cccccccc-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":\"<time>\"}],\"defaultAccount\":\"bbbbbbbb-1111-2222-3333-444444444444\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (client logs alpha)",
+   "args": [
+    "client",
+    "logs",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (client logs alpha --json)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"lines\":[],\"file\":\"<run>/data/client/run/alpha/client.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (client logs alpha)",
+   "args": [
+    "client",
+    "logs",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[00:00:00] [main/INFO]: plain before\n[09:23:01] [Render thread/INFO]: Setting user: Steve\n[09:23:02] [Worker & Co/ERROR]: a <b> ]]> c\njava.lang.RuntimeException: boom\n\tat x.y(z.java:1)\nError: Could not create the Java Virtual Machine.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (client logs alpha -n 2)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "-n",
+    "2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\tat x.y(z.java:1)\nError: Could not create the Java Virtual Machine.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (client logs alpha -n 1 --json)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "-n",
+    "1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"lines\":[\"Error: Could not create the Java Virtual Machine.\"],\"file\":\"<run>/data/client/run/alpha/client.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (client logs alpha -n 0)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "-n",
+    "0"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: -n must be a positive whole number\n"
+  },
+  {
+   "label": "step 28 (client logs alpha -n 1.5)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "-n",
+    "1.5"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: -n must be a positive whole number\n"
+  },
+  {
+   "label": "step 29 (client logs alpha -n x)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "-n",
+    "x"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: -n must be a positive whole number\n"
+  },
+  {
+   "label": "step 30 (client logs alpha -n)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "-n"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: -n must be a positive whole number\n"
+  },
+  {
+   "label": "step 31 (client logs nope -n 0)",
+   "args": [
+    "client",
+    "logs",
+    "nope",
+    "-n",
+    "0"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Known profiles: zeta, alpha, Beta, gone-acct, num\n"
+  },
+  {
+   "label": "step 32 (client logs alpha --latest)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "--latest"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (client logs alpha --latest)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "--latest"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[10:00:00] [main/INFO]: one\n[10:00:01] [main/INFO]: two\n\n[10:00:02] [main/INFO]: three\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (client logs alpha --latest -n 2 --json)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "--latest",
+    "-n",
+    "2",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"lines\":[\"\",\"[10:00:02] [main/INFO]: three\"],\"file\":\"<run>/data/client/profiles/alpha/logs/latest.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (client logs alpha --bogus)",
+   "args": [
+    "client",
+    "logs",
+    "alpha",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 39 (client status zeta --json)",
+   "args": [
+    "client",
+    "status",
+    "zeta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"zeta\",\"running\":false,\"pid\":null,\"startedAt\":null,\"uptimeMs\":null,\"account\":null,\"launchedBy\":null,\"server\":null,\"address\":null,\"harness\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (client stop zeta)",
+   "args": [
+    "client",
+    "stop",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"zeta\" was not running\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (client stop zeta --json)",
+   "args": [
+    "client",
+    "stop",
+    "zeta",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"stopped\":false,\"wasRunning\":false}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (client status zeta)",
+   "args": [
+    "client",
+    "status",
+    "zeta"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 44 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 46 (client status zeta)",
+   "args": [
+    "client",
+    "status",
+    "zeta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"zeta\" is stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (client list extra)",
+   "args": [
+    "client",
+    "list",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 48 (client list --all)",
+   "args": [
+    "client",
+    "list",
+    "--all"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --all\n"
+  },
+  {
+   "label": "step 49 (client status)",
+   "args": [
+    "client",
+    "status"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 50 (client status a b)",
+   "args": [
+    "client",
+    "status",
+    "a",
+    "b"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 51 (client stop)",
+   "args": [
+    "client",
+    "stop"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 52 (client logs)",
+   "args": [
+    "client",
+    "logs"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 53 (client logout)",
+   "args": [
+    "client",
+    "logout"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 54 (client accounts x)",
+   "args": [
+    "client",
+    "accounts",
+    "x"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 55 (client remove)",
+   "args": [
+    "client",
+    "remove"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 56 (client remove zeta --json=1)",
+   "args": [
+    "client",
+    "remove",
+    "zeta",
+    "--json=1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (client stop zeta --purge)",
+   "args": [
+    "client",
+    "stop",
+    "zeta",
+    "--purge"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --purge\n"
+  },
+  {
+   "label": "step 58 (client logout alex)",
+   "args": [
+    "client",
+    "logout",
+    "alex"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed the offline account Alex.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (client accounts --json)",
+   "args": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"accounts\":[{\"name\":\"Steve\",\"uuid\":\"aaaaaaaa-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":null},{\"name\":\"Legacy\",\"uuid\":\"cccccccc-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":\"<time>\"}],\"defaultAccount\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (client logout AAAAAAAA111122223333444444444444 --json)",
+   "args": [
+    "client",
+    "logout",
+    "AAAAAAAA111122223333444444444444",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"removed\":\"Steve\",\"uuid\":\"aaaaaaaa-1111-2222-3333-444444444444\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (client logout legacy)",
+   "args": [
+    "client",
+    "logout",
+    "legacy"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Signed out Legacy. Microsoft keeps its own session; sign out of your browser too if the machine is shared.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No Microsoft account is signed in. Sign in: spawnloft client login\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 63 (client list --json)",
+   "args": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profiles\":[{\"name\":\"alpha\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"fabric\",\"loaderVersion\":\"0.16.9\",\"java\":null,\"memory\":\"4G\",\"harness\":true,\"server\":\"s1\",\"account\":\"aaaaaaaa-1111-2222-3333-444444444444\",\"createdAt\":\"<time>\",\"accountName\":\"aaaaaaaa-1111-2222-3333-444444444444\",\"accountType\":null,\"running\":false},{\"name\":\"Beta\",\"assistantAccount\":true,\"serverList\":false,\"mc\":\"1.8.9\",\"loader\":\"vanilla\",\"memory\":\"1536M\",\"account\":\"offline:Bob\",\"accountName\":\"Bob\",\"accountType\":\"offline\",\"running\":false},{\"name\":\"gone-acct\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.4\",\"account\":\"OldName\",\"accountName\":\"OldName\",\"accountType\":null,\"running\":false},{\"name\":\"num\",\"assistantAccount\":false,\"serverList\":true,\"mc\":26.1,\"memory\":3,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"zeta\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"vanilla\",\"loaderVersion\":null,\"java\":null,\"memory\":\"2G\",\"harness\":false,\"server\":null,\"account\":null,\"createdAt\":\"<time>\",\"accountName\":null,\"accountType\":null,\"running\":false}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (client remove alpha)",
+   "args": [
+    "client",
+    "remove",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"alpha\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (client remove alpha)",
+   "args": [
+    "client",
+    "remove",
+    "alpha"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"alpha\". Known profiles: zeta, Beta, gone-acct, num\n"
+  },
+  {
+   "label": "step 71 (client remove Beta --purge --json)",
+   "args": [
+    "client",
+    "remove",
+    "Beta",
+    "--purge",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"removed\":\"Beta\",\"purged\":true}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 72 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "gone-acct  1.21.4  undefined  undefined  account OldName  stopped\nnum  26.1  undefined  3  offline  stopped\nzeta  1.21.11  vanilla  2G  offline  stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 75 (client launch live --as tester --wait)",
+   "args": [
+    "client",
+    "launch",
+    "live",
+    "--as",
+    "tester",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Launched \"live\" as tester (pid <pid>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 76 (client status live)",
+   "args": [
+    "client",
+    "status",
+    "live"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"live\" is running (pid <pid>, up <n>s) as tester\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 77 (client status live --json)",
+   "args": [
+    "client",
+    "status",
+    "live",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"live\",\"running\":true,\"pid\":<pid>,\"startedAt\":\"<time>\",\"uptimeMs\":<ms>,\"account\":{\"type\":\"offline\",\"name\":\"tester\"},\"launchedBy\":\"cli\",\"server\":null,\"address\":null,\"harness\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 78 (client list)",
+   "args": [
+    "client",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "live  1.21.11  vanilla  1G  offline  running\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 79 (client logs live -n 1)",
+   "args": [
+    "client",
+    "logs",
+    "live",
+    "-n",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 80 (client remove live)",
+   "args": [
+    "client",
+    "remove",
+    "live"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: profile \"live\" is running; stop it first: spawnloft client stop live\n"
+  },
+  {
+   "label": "step 81 (client stop live --json)",
+   "args": [
+    "client",
+    "stop",
+    "live",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"stopped\":true,\"wasRunning\":true}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 82 (client status live --json)",
+   "args": [
+    "client",
+    "status",
+    "live",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"live\",\"running\":false,\"pid\":null,\"startedAt\":null,\"uptimeMs\":null,\"account\":null,\"launchedBy\":null,\"server\":null,\"address\":null,\"harness\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 83 (client stop live)",
+   "args": [
+    "client",
+    "stop",
+    "live"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"live\" was not running\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 85 (client remove live --purge)",
+   "args": [
+    "client",
+    "remove",
+    "live",
+    "--purge"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"live\"\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/accounts.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"accounts\": []\n}\n"
+  },
+  "data/client/profiles": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/alpha/logs": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/alpha/logs/latest.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[10:00:00] [main/INFO]: one\r\n[10:00:01] [main/INFO]: two\n\n[10:00:02] [main/INFO]: three\n"
+  },
+  "data/client/profiles/alpha/options.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "lang:en_us\n"
+  },
+  "data/client/profiles/zeta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/zeta/spawnloft-harness.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"port\": 1,\n  \"pid\": <pid>\n}\n"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {}\n}\n"
+  },
+  "data/client/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/alpha/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "ight\"><log4j:Message><![CDATA[cut]]></log4j:Message>\n</log4j:Event>\n[00:00:00] [main/INFO]: plain before\n<log4j:Event logger=\"net.minecraft\" timestamp=\"1763716981000\" level=\"INFO\" thread=\"Render thread\">\n  <log4j:Message><![CDATA[Setting user: Steve]]></log4j:Message>\n</log4j:Event>\n<log4j:Event logger=\"x\" timestamp=\"1763716982500\" level=\"ERROR\" thread=\"Worker &amp; Co\">\n  <log4j:Message><![CDATA[a <b> ]]>]]&gt;<![CDATA[ c]]></log4j:Message>\n  <log4j:Throwable><![CDATA[java.lang.RuntimeException: boom\n\tat x.y(z.java:1)\n]]></log4j:Throwable>\n</log4j:Event>\nError: Could not create the Java Virtual Machine.\r\n<log4j:Event logger=\"x\" timestamp=\"1763716983000\" level=\"INFO\" thread=\"Render thread\">\n  <log4j:Message><![CDATA[half"
+  },
+  "data/client/run/zeta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/zeta/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "null"
+  },
+  "data/client/versions": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.21.11": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.21.11/1.21.11.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"arguments\": {\n    \"game\": [\n      \"--username\",\n      \"${auth_player_name}\",\n      \"--version\",\n      \"${version_name}\",\n      \"--gameDir\",\n      \"${game_directory}\",\n      \"--assetsDir\",\n      \"${assets_root}\",\n      \"--assetIndex\",\n      \"${assets_index_name}\",\n      \"--uuid\",\n      \"${auth_uuid}\",\n      \"--accessToken\",\n      \"${auth_access_token}\",\n      \"--clientId\",\n      \"${clientid}\",\n      \"--xuid\",\n      \"${auth_xuid}\",\n      \"--versionType\",\n      \"${version_type}\",\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_demo_user\": true\n            }\n          }\n        ],\n        \"value\": \"--demo\"\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"has_custom_resolution\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--width\",\n          \"${resolution_width}\",\n          \"--height\",\n          \"${resolution_height}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"has_quick_plays_support\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlayPath\",\n          \"${quickPlayPath}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_quick_play_singleplayer\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlaySingleplayer\",\n          \"${quickPlaySingleplayer}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_quick_play_multiplayer\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlayMultiplayer\",\n          \"${quickPlayMultiplayer}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_quick_play_realms\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlayRealms\",\n          \"${quickPlayRealms}\"\n        ]\n      }\n    ],\n    \"jvm\": [\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"os\": {\n              \"name\": \"osx\"\n            }\n          }\n        ],\n        \"value\": [\n          \"-XstartOnFirstThread\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"os\": {\n              \"name\": \"windows\"\n            }\n          }\n        ],\n        \"value\": \"-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\"\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"os\": {\n              \"arch\": \"x86\"\n            }\n          }\n        ],\n        \"value\": \"-Xss1M\"\n      },\n      \"-Djava.library.path=${natives_directory}\",\n      \"-Djna.tmpdir=${natives_directory}\",\n      \"-Dorg.lwjgl.system.SharedLibraryExtractPath=${natives_directory}\",\n      \"-Dio.netty.native.workdir=${natives_directory}\",\n      \"-Dminecraft.launcher.brand=${launcher_name}\",\n      \"-Dminecraft.launcher.version=${launcher_version}\",\n      \"-cp\",\n      \"${classpath}\"\n    ]\n  },\n  \"assetIndex\": {\n    \"id\": \"29\",\n    \"sha1\": \"a2f0558bd140ae4f8f6a48d0ea6f1dbc16a84baa\",\n    \"size\": 529966,\n    \"totalSize\": 452742718,\n    \"url\": \"https://piston-meta.mojang.com/v1/packages/a2f0558bd140ae4f8f6a48d0ea6f1dbc16a84baa/29.json\"\n  },\n  \"assets\": \"29\",\n  \"complianceLevel\": 1,\n  \"downloads\": {\n    \"client\": {\n      \"sha1\": \"ba2df812c2d12e0219c489c4cd9a5e1f0760f5bd\",\n      \"size\": 31152600,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/ba2df812c2d12e0219c489c4cd9a5e1f0760f5bd/client.jar\"\n    },\n    \"client_mappings\": {\n      \"sha1\": \"031a68bebf55d824f66d6573d8c752f0e1bf232a\",\n      \"size\": 11779287,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/031a68bebf55d824f66d6573d8c752f0e1bf232a/client.txt\"\n    },\n    \"server\": {\n      \"sha1\": \"64bb6d763bed0a9f1d632ec347938594144943ed\",\n      \"size\": 56327581,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/64bb6d763bed0a9f1d632ec347938594144943ed/server.jar\"\n    },\n    \"server_mappings\": {\n      \"sha1\": \"5621e9253f05fd57872bbe7f8ddf5f9a7d525955\",\n      \"size\": 8678606,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/5621e9253f05fd57872bbe7f8ddf5f9a7d525955/server.txt\"\n    }\n  },\n  \"id\": \"1.21.11\",\n  \"javaVersion\": {\n    \"component\": \"java-runtime-delta\",\n    \"majorVersion\": 21\n  },\n  \"libraries\": [\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar\",\n          \"sha1\": \"1227f9e0666314f9de41477e3ec277e542ed7f7b\",\n          \"size\": 1330045,\n          \"url\": \"https://libraries.minecraft.net/ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar\"\n        }\n      },\n      \"name\": \"ca.weblite:java-objc-bridge:1.1\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"osx\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\",\n          \"sha1\": \"6ff6d710fd4ffd470f2799653fab57e27fed0c9d\",\n          \"size\": 46763,\n          \"url\": \"https://libraries.minecraft.net/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\"\n        }\n      },\n      \"name\": \"com.mojang:jtracy:1.0.37:natives-windows\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"windows\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar\",\n          \"sha1\": \"908ce8e5e196e52061dc11290723d19e2c574bfd\",\n          \"size\": 100000,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-linux\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"linux\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar\",\n          \"sha1\": \"9c2086997079f664149bd1a6ff5aedd313e0c772\",\n          \"size\": 100001,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-macos\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"osx\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar\",\n          \"sha1\": \"8be5e9f608e7d6b78c56d047982b5ea0d6cc7033\",\n          \"size\": 100002,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-macos-arm64\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"osx\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-arm64.jar\",\n          \"sha1\": \"b8eae2308625740adfb9c4d62e20ad7c28984005\",\n          \"size\": 100003,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-arm64.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-windows-arm64\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"windows\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-x86.jar\",\n          \"sha1\": \"e553dd7836f2decb46d66c8e34e410032c6e8a8d\",\n          \"size\": 100004,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-x86.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-windows-x86\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"windows\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\",\n          \"sha1\": \"29589b5f87ed335a6c7e7ee6a5775f81f97ecb84\",\n          \"size\": 785029,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\"\n        },\n        \"classifiers\": {\n          \"natives-windows\": {\n            \"path\": \"com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\",\n            \"sha1\": \"6ff6d710fd4ffd470f2799653fab57e27fed0c9d\",\n            \"size\": 46763,\n            \"url\": \"https://libraries.minecraft.net/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\"\n          }\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3\",\n      \"natives\": {\n        \"windows\": \"natives-windows\"\n      },\n      \"extract\": {\n        \"exclude\": [\n          \"META-INF/\"\n        ]\n      }\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\",\n          \"sha1\": \"29589b5f87ed335a6c7e7ee6a5775f81f97ecb84\",\n          \"size\": 785029,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3\"\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar\",\n          \"sha1\": \"1f30a180ee04ccd53339a716aec13cae60a013b5\",\n          \"size\": 683071,\n          \"url\": \"https://libraries.minecraft.net/at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar\"\n        }\n      },\n      \"name\": \"at.yawk.lz4:lz4-java:1.8.1\"\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"com/azure/azure-json/1.4.0/azure-json-1.4.0.jar\",\n          \"sha1\": \"fcc1d354dbc3e0300e5276b1bf124d0247799cd8\",\n          \"size\": 325945,\n          \"url\": \"https://libraries.minecraft.net/com/azure/azure-json/1.4.0/azure-json-1.4.0.jar\"\n        }\n      },\n      \"name\": \"com.azure:azure-json:1.4.0\"\n    }\n  ],\n  \"logging\": {\n    \"client\": {\n      \"argument\": \"-Dlog4j.configurationFile=${path}\",\n      \"file\": {\n        \"id\": \"client-1.21.2.xml\",\n        \"sha1\": \"39384bd14c0606d812afec88d8aff595b2587dd9\",\n        \"size\": 1073,\n        \"url\": \"https://piston-data.mojang.com/v1/objects/39384bd14c0606d812afec88d8aff595b2587dd9/client-1.21.2.xml\"\n      },\n      \"type\": \"log4j2-xml\"\n    }\n  },\n  \"mainClass\": \"net.minecraft.client.main.Main\",\n  \"minimumLauncherVersion\": 21,\n  \"releaseTime\": \"<time>\",\n  \"time\": \"<time>\",\n  \"type\": \"release\"\n}"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

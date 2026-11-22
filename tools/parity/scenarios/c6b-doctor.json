@@ -179,5 +179,15 @@
         "code": 1
       }
     }
+  ],
+  "normalize": [
+    {
+      "pattern": "((?:openjdk|java) version \\\\?\")[^\"\\\\]+",
+      "replace": "$1<java version>"
+    },
+    {
+      "pattern": "(tar: )[^\"\\\\\\n]+",
+      "replace": "$1<tar version>"
+    }
   ]
 }

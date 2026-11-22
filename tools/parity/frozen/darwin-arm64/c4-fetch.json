@@ -1,0 +1,2329 @@
+{
+ "about": "What the Node core did in scenario c4-fetch on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c4-fetch",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 5 (new x --paper 1.21.4 --fabric 1.21.4)",
+   "args": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--fabric",
+    "1.21.4"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: pick one of --paper, --fabric\n"
+  },
+  {
+   "label": "step 6 (new x --purpur 1.21.4 --neoforge 26.1)",
+   "args": [
+    "new",
+    "x",
+    "--purpur",
+    "1.21.4",
+    "--neoforge",
+    "26.1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: pick one of --purpur, --neoforge\n"
+  },
+  {
+   "label": "step 7 (new x --paper 1.21.4 --java)",
+   "args": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError [ERR_INVALID_ARG_TYPE]: The \"file\" argument must be of type string. Received type boolean (true)\n"
+  },
+  {
+   "label": "step 8 (new x --paper 1.21.4 --java {run}/nope/java)",
+   "args": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/nope/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: <run>/nope/java could not be run: Java is not installed, or not on PATH.\n"
+  },
+  {
+   "label": "step 9 (new x --paper 1.21.4 --java {run}/old/java)",
+   "args": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/old/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Minecraft 1.21.4 needs Java 21, and <run>/old/java is Java 17. Pick a newer Java, or pass --force to use it anyway.\n"
+  },
+  {
+   "label": "step 10 (new p1 --paper 1.21.4 --java {run}/bin/java --accept-eula)",
+   "args": [
+    "new",
+    "p1",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java",
+    "--accept-eula"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.21.4-15.jar (build 15), 2.0 KB.\nCreated instance \"p1\"\ndirectory:  <run>/data/instances/p1\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       25565\nrcon port:  25575\n\nStart it with: spawnloft start p1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (new p2 --paper 1.21.4 --build 16 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "p2",
+    "--paper",
+    "1.21.4",
+    "--build",
+    "16",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.21.4-16.jar (build 16), 2.9 KB.\nCreated instance \"p2\"\ndirectory:  <run>/data/instances/p2\njar:        paper-1.21.4-16.jar\nmemory:     4G\nport:       25566\nrcon port:  25576\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/p2/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (new p3 --paper 1.21.4 --java {run}/bin/java --port 26100)",
+   "args": [
+    "new",
+    "p3",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java",
+    "--port",
+    "26100"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Using stored paper-1.21.4-15.jar.\nCreated instance \"p3\"\ndirectory:  <run>/data/instances/p3\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       26100\nrcon port:  25577\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/p3/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (new p4 --paper 1.21.4 --build 99 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "p4",
+    "--paper",
+    "1.21.4",
+    "--build",
+    "99",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Paper 1.21.4 has no build 99. Newest is 16.\n"
+  },
+  {
+   "label": "step 14 (new p5 --paper 1.21.4 --java {run}/old/java --force)",
+   "args": [
+    "new",
+    "p5",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/old/java",
+    "--force"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Using stored paper-1.21.4-15.jar.\nCreated instance \"p5\"\ndirectory:  <run>/data/instances/p5\njar:        paper-1.21.4-15.jar\nmemory:     4G\nport:       25567\nrcon port:  25578\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/p5/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (new f1 --folia 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "f1",
+    "--folia",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded folia-1.21.4-7.jar (build 7), 2.1 KB.\nCreated instance \"f1\"\ndirectory:  <run>/data/instances/f1\njar:        folia-1.21.4-7.jar\nmemory:     4G\nport:       25568\nrcon port:  25579\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/f1/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (new pu --purpur 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "pu",
+    "--purpur",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded purpur-1.21.4-2400.jar (build 2400), 1.1 MB.\nCreated instance \"pu\"\ndirectory:  <run>/data/instances/pu\njar:        purpur-1.21.4-2400.jar\nmemory:     4G\nport:       25569\nrcon port:  25580\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/pu/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (new pu2 --purpur 1.21.4 --build 2399 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "pu2",
+    "--purpur",
+    "1.21.4",
+    "--build",
+    "2399",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: checksum mismatch for purpur-1.21.4-2399.jar\n  expected 00000000000000000000000000000000\n  got      dd0d395b83c2ee3cae5913116f60a1f2\n"
+  },
+  {
+   "label": "step 18 (new pu3 --purpur 1.21.4 --build 1 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "pu3",
+    "--purpur",
+    "1.21.4",
+    "--build",
+    "1",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Purpur 1.21.4 has no build 1. Newest is 2400.\n"
+  },
+  {
+   "label": "step 19 (new v1 --vanilla 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "v1",
+    "--vanilla",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded vanilla-1.21.4.jar, 1.1 MB.\nCreated instance \"v1\"\ndirectory:  <run>/data/instances/v1\njar:        vanilla-1.21.4.jar\nmemory:     4G\nport:       25570\nrcon port:  25581\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/v1/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (new v2 --vanilla 9.9 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "v2",
+    "--vanilla",
+    "9.9",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Mojang lists no Minecraft version 9.9.\n"
+  },
+  {
+   "label": "step 21 (new v3 --vanilla 1.0 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "v3",
+    "--vanilla",
+    "1.0",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Minecraft 1.0 publishes no server jar.\n"
+  },
+  {
+   "label": "step 22 (new a1 --asp 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "a1",
+    "--asp",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded asp-1.21.4-b77d5e97.jar (build b77d5e97c0ffee0000000000), 1.1 MB.\nCreated instance \"a1\"\ndirectory:  <run>/data/instances/a1\njar:        asp-1.21.4-b77d5e97.jar\nmemory:     4G\nport:       25571\nrcon port:  25582\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/a1/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (new a2 --asp 1.21.3 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "a2",
+    "--asp",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Advanced Slime Paper has no build for Minecraft 1.21.3.\n"
+  },
+  {
+   "label": "step 24 (new fa --fabric 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "fa",
+    "--fabric",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar, 200.0 KB.\nCreated instance \"fa\"\ndirectory:  <run>/data/instances/fa\njar:        fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\nmemory:     4G\nport:       25572\nrcon port:  25583\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/fa/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (new fa2 --fabric 1.99 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "fa2",
+    "--fabric",
+    "1.99",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Fabric has no server launcher for 1.99 - it may not support that version.\n"
+  },
+  {
+   "label": "step 26 (new fa3 --fabric 1.98 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "fa3",
+    "--fabric",
+    "1.98",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Fabric launcher download came back 1000 B, which is not a server jar\n"
+  },
+  {
+   "label": "step 27 (new fa4 --fabric ../x --java {run}/bin/java)",
+   "args": [
+    "new",
+    "fa4",
+    "--fabric",
+    "../x",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the Minecraft version \"../x\" is not a valid version\n"
+  },
+  {
+   "label": "step 28 (new fa5 --fabric --java {run}/bin/java)",
+   "args": [
+    "new",
+    "fa5",
+    "--fabric",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Fabric has no server launcher for true - it may not support that version.\n"
+  },
+  {
+   "label": "step 29 (new s1 --spigot 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "s1",
+    "--spigot",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Spigot is compiled here by BuildTools - this takes several minutes the first time.\n  Downloading BuildTools from SpigotMC\n  Building spigot 1.21.4 - this takes several minutes the first time\n  Loading BuildTools version: stand-in\n  Attempting to build version: '1.21.4'\n  Success! Everything completed successfully.\nDownloaded spigot-1.21.4.jar, 4.0 KB.\nCreated instance \"s1\"\ndirectory:  <run>/data/instances/s1\njar:        spigot-1.21.4.jar\nmemory:     4G\nport:       25573\nrcon port:  25584\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/s1/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (new s2 --spigot 1.21.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "s2",
+    "--spigot",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Spigot is compiled here by BuildTools - this takes several minutes the first time.\n  Using the spigot-1.21.4.jar already built\nUsing stored spigot-1.21.4.jar.\nCreated instance \"s2\"\ndirectory:  <run>/data/instances/s2\njar:        spigot-1.21.4.jar\nmemory:     4G\nport:       25574\nrcon port:  25585\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/s2/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (new s3 --craftbukkit 9.9 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "s3",
+    "--craftbukkit",
+    "9.9",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "CraftBukkit is compiled here by BuildTools - this takes several minutes the first time.\n  Downloading BuildTools from SpigotMC\n  Building craftbukkit 9.9 - this takes several minutes the first time\n  Loading BuildTools version: stand-in\n  Attempting to build version: '9.9'\n  Could not get version 9.9\n  it does not exist\n",
+   "stderr": "error: BuildTools exited 3 without producing craftbukkit-9.9.jar. Its last words:\nLoading BuildTools version: stand-in\n   Attempting to build version: '9.9'   \n\nAttempting to build version: '9.9'\nCould not get version 9.9\nit does not exist\n"
+  },
+  {
+   "label": "step 32 (new s4 --craftbukkit 1.21.3 --java {run}/jre/java)",
+   "args": [
+    "new",
+    "s4",
+    "--craftbukkit",
+    "1.21.3",
+    "--java",
+    "{run}/jre/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "CraftBukkit is compiled here by BuildTools - this takes several minutes the first time.\n",
+   "stderr": "error: BuildTools needs a JDK - javac was not found beside java. A JRE runs servers but cannot compile one; install a JDK (https://adoptium.net/temurin/releases/) and try again.\n"
+  },
+  {
+   "label": "step 33 (new s5 --craftbukkit 1.21.3 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "s5",
+    "--craftbukkit",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "CraftBukkit is compiled here by BuildTools - this takes several minutes the first time.\n  Downloading BuildTools from SpigotMC\n  Building craftbukkit 1.21.3 - this takes several minutes the first time\n  Loading BuildTools version: stand-in\n  Attempting to build version: '1.21.3'\n  Success! Everything completed successfully.\nDownloaded craftbukkit-1.21.3.jar, 4.0 KB.\nCreated instance \"s5\"\ndirectory:  <run>/data/instances/s5\njar:        craftbukkit-1.21.3.jar\nmemory:     4G\nport:       25586\nrcon port:  25587\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/s5/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (new n1 --neoforge 26.1 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "n1",
+    "--neoforge",
+    "26.1",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Downloading the NeoForge 26.1.0.6 installer\n  Installing NeoForge (this downloads its libraries and takes a few minutes)\nCreated instance \"n1\" — NeoForge 26.1.0.6 (minecraft 26.1), port 25588\nStart it with: spawnloft start n1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (new n2 --neoforge 26.2 --java {run}/bin/java --port 26200 --offline --memory 3G)",
+   "args": [
+    "new",
+    "n2",
+    "--neoforge",
+    "26.2",
+    "--java",
+    "{run}/bin/java",
+    "--port",
+    "26200",
+    "--offline",
+    "--memory",
+    "3G"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "  Downloading the NeoForge 26.2.0.1-beta installer\n  Installing NeoForge (this downloads its libraries and takes a few minutes)\nCreated instance \"n2\" — NeoForge 26.2.0.1-beta (minecraft 26.2), port 26200\nStart it with: spawnloft start n2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (new n3 --neoforge 9.9 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "n3",
+    "--neoforge",
+    "9.9",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: NeoForge has no build for Minecraft 9.9\n"
+  },
+  {
+   "label": "step 37 (new n4 --neoforge 26.3 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "n4",
+    "--neoforge",
+    "26.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Downloading the NeoForge 26.3.0.9 installer\n  Installing NeoForge (this downloads its libraries and takes a few minutes)\n",
+   "stderr": "error: the NeoForge installer exited 1. Its last words:\ninstalling into the server folder\nDownloading libraries\nERROR: a library failed its checksum\n"
+  },
+  {
+   "label": "step 38 (new n5 --neoforge 26.4 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "n5",
+    "--neoforge",
+    "26.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "  Downloading the NeoForge 26.4.0.1 installer\n",
+   "stderr": "error: the installer did not match the checksum the maven publishes; nothing was installed\n"
+  },
+  {
+   "label": "step 39 (new n1 --neoforge 26.1 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "n1",
+    "--neoforge",
+    "26.1",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"n1\" already exists\n"
+  },
+  {
+   "label": "step 40 (new n6 --neoforge 26.1 --java {run}/old/java)",
+   "args": [
+    "new",
+    "n6",
+    "--neoforge",
+    "26.1",
+    "--java",
+    "{run}/old/java"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Minecraft 26.1 needs Java 25, and <run>/old/java is Java 17. Pick a newer Java, or pass --force to use it anyway.\n"
+  },
+  {
+   "label": "step 41 (upgrade)",
+   "args": [
+    "upgrade"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: upgrade requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 42 (upgrade nope)",
+   "args": [
+    "upgrade",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: p1, p2, p3, p5, f1, pu, v1, a1, fa, s1, s2, s5, n1, n2\n"
+  },
+  {
+   "label": "step 43 (upgrade p1 --check)",
+   "args": [
+    "upgrade",
+    "p1",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "p1 runs Paper 1.21.4 build 15.\nThat is the newest stable build for 1.21.4.\nMinecraft 1.21.5 is out. Cross with: spawnloft upgrade p1 --version 1.21.5 --yes\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (upgrade p2 --check)",
+   "args": [
+    "upgrade",
+    "p2",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "p2 runs Paper 1.21.4 build 16.\nThat is the newest stable build for 1.21.4.\nMinecraft 1.21.5 is out. Cross with: spawnloft upgrade p2 --version 1.21.5 --yes\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (upgrade p1 --build 16)",
+   "args": [
+    "upgrade",
+    "p1",
+    "--build",
+    "16"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "p1: paper-1.21.4-15.jar -> paper-1.21.4-16.jar (EXPERIMENTAL)\n  Old jar kept in the instance folder - the way back if this build misbehaves.\n  Takes effect at the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (upgrade p1)",
+   "args": [
+    "upgrade",
+    "p1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "p1: paper-1.21.4-16.jar -> paper-1.21.4-15.jar\n  Old jar kept in the instance folder - the way back if this build misbehaves.\n  Takes effect at the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (upgrade p3)",
+   "args": [
+    "upgrade",
+    "p3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "p3 already runs paper-1.21.4-15.jar - nothing to do.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (upgrade p1 --version 1.21.5)",
+   "args": [
+    "upgrade",
+    "p1",
+    "--version",
+    "1.21.5"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: upgrading \"p1\" from 1.21.4 to 1.21.5 migrates its worlds, and worlds do not migrate back.\n  A snapshot is taken first, but read your plugins' release notes too. Re-run with --yes.\n"
+  },
+  {
+   "label": "step 51 (upgrade p1 --version 1.21.5 --yes)",
+   "args": [
+    "upgrade",
+    "p1",
+    "--version",
+    "1.21.5",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshot: <run>/data/backups/p1/pre-upgrade_standard_<stamp>.tar.gz\np1: paper-1.21.4-15.jar -> paper-1.21.5-3.jar\n  Old jar kept in the instance folder - the way back if this build misbehaves.\n  Takes effect at the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (upgrade f1 --check)",
+   "args": [
+    "upgrade",
+    "f1",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "f1 runs Folia 1.21.4 build 7.\nThat is the newest stable build for 1.21.4.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (upgrade pu --check)",
+   "args": [
+    "upgrade",
+    "pu",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "pu runs Purpur 1.21.4 build 2400.\nThat is the newest build for 1.21.4.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (upgrade a1 --check)",
+   "args": [
+    "upgrade",
+    "a1",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "a1 runs Advanced Slime Paper 1.21.4 build b77d5e97.\nThat is the newest build for 1.21.4.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (upgrade a1 --build x)",
+   "args": [
+    "upgrade",
+    "a1",
+    "--build",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Advanced Slime Paper builds cannot be chosen by id; SpawnLoft fetches the newest one.\n"
+  },
+  {
+   "label": "step 56 (upgrade v1 --check)",
+   "args": [
+    "upgrade",
+    "v1",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "vanilla-1.21.4.jar is not a jar SpawnLoft can update: it updates the Paper, Purpur, Folia and Advanced Slime Paper jars it downloaded itself.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (upgrade v1)",
+   "args": [
+    "upgrade",
+    "v1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"vanilla-1.21.4.jar\" is not a jar SpawnLoft can reason about - name a version: upgrade v1 --version <v>\n"
+  },
+  {
+   "label": "step 58 (upgrade v1 --version 1.21.4)",
+   "args": [
+    "upgrade",
+    "v1",
+    "--version",
+    "1.21.4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "v1: vanilla-1.21.4.jar -> paper-1.21.4-15.jar\n  Old jar kept in the instance folder - the way back if this build misbehaves.\n  Takes effect at the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (upgrade fa --check)",
+   "args": [
+    "upgrade",
+    "fa",
+    "--check"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar is not a jar SpawnLoft can update: it updates the Paper, Purpur, Folia and Advanced Slime Paper jars it downloaded itself.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (paper versions --limit 1)",
+   "args": [
+    "paper",
+    "versions",
+    "--limit",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Paper versions (newest first):\n  1.21.5\n  ... 2 older (use --limit 3)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (paper versions --limit -1)",
+   "args": [
+    "paper",
+    "versions",
+    "--limit",
+    "-1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Paper versions (newest first):\n  1.21.5\n  ... 2 older (use --limit 3)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (paper versions --limit x)",
+   "args": [
+    "paper",
+    "versions",
+    "--limit",
+    "x"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Paper versions (newest first):\n  \n",
+   "stderr": ""
+  },
+  {
+   "label": "step 63 (paper builds 1.21.4 --limit 1)",
+   "args": [
+    "paper",
+    "builds",
+    "1.21.4",
+    "--limit",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "BUILD  CHANNEL       DATE        FILE\n16     EXPERIMENTAL  <date>  paper-1.21.4-16.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (paper builds)",
+   "args": [
+    "paper",
+    "builds"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft paper builds <version>\n"
+  },
+  {
+   "label": "step 65 (paper builds ..)",
+   "args": [
+    "paper",
+    "builds",
+    ".."
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: PaperMC API returned 404 for https://fill.papermc.io/v3/projects/paper/versions/../builds\n"
+  },
+  {
+   "label": "step 66 (paper builds 1.20.6)",
+   "args": [
+    "paper",
+    "builds",
+    "1.20.6"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "BUILD  CHANNEL  DATE        FILE\n5               <date>  paper-1.20.6-5.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (paper fetch 1.20.6)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.20.6"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.20.6-5.jar — build 5, null, 1000 B, checksum verified.\nUse it with: spawnloft new <name> --jar paper-1.20.6-5.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (new pb --purpur 1.21.3 --java {run}/bin/java)",
+   "args": [
+    "new",
+    "pb",
+    "--purpur",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded purpur-1.21.3-7.jar (build 7), 1.1 MB.\nCreated instance \"pb\"\ndirectory:  <run>/data/instances/pb\njar:        purpur-1.21.3-7.jar\nmemory:     4G\nport:       25591\nrcon port:  25592\n\nEULA is NOT accepted. The server will refuse to start until you either\n  set eula=true in <run>/data/instances/pb/eula.txt\n  (see https://aka.ms/MinecraftEULA)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 69 (paper fetch 1.21.4 16)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4",
+    "16"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Already stored: paper-1.21.4-16.jar (build 16, EXPERIMENTAL). Re-download with --force.\nUse it with: spawnloft new <name> --jar paper-1.21.4-16.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 70 (paper fetch 1.21.4 16 --force)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4",
+    "16",
+    "--force"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.21.4-16.jar — build 16, EXPERIMENTAL, 2.9 KB, checksum verified.\nUse it with: spawnloft new <name> --jar paper-1.21.4-16.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 71 (paper nope)",
+   "args": [
+    "paper",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft paper [versions|builds <version>|fetch <version> [build]]\n"
+  },
+  {
+   "label": "step 72 (jars)",
+   "args": [
+    "jars"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                                       SIZE      ADDED\nasp-1.21.4-b77d5e97.jar                                    1.1 MB    <date>\ncraftbukkit-1.21.3.jar                                     4.0 KB    <date>\nfabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar  200.0 KB  <date>\nfolia-1.21.4-7.jar                                         2.1 KB    <date>\nneoforge-26.1.0.6-installer.jar                            4.9 KB    <date>\nneoforge-26.2.0.1-beta-installer.jar                       4.9 KB    <date>\nneoforge-26.3.0.9-installer.jar                            4.9 KB    <date>\npaper-1.20.6-5.jar                                         1000 B    <date>\npaper-1.21.4-15.jar                                        2.0 KB    <date>\npaper-1.21.4-16.jar                                        2.9 KB    <date>\npaper-1.21.5-3.jar                                         2.4 KB    <date>\npurpur-1.21.3-7.jar                                        1.1 MB    <date>\npurpur-1.21.4-2400.jar                                     1.1 MB    <date>\nspigot-1.21.4.jar                                          4.0 KB    <date>\nvanilla-1.21.4.jar                                         1.1 MB    <date>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 73 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  STATUS   PORT   RCON   MEM  UPTIME  DIR\na1    stopped  25571  25582  4G   -       <run>/data/instances/a1\nf1    stopped  25568  25579  4G   -       <run>/data/instances/f1\nfa    stopped  25572  25583  4G   -       <run>/data/instances/fa\nn1    stopped  25588  25589  4G   -       <run>/data/instances/n1\nn2    stopped  26200  25590  3G   -       <run>/data/instances/n2\np1    stopped  25565  25575  4G   -       <run>/data/instances/p1\np2    stopped  25566  25576  4G   -       <run>/data/instances/p2\np3    stopped  26100  25577  4G   -       <run>/data/instances/p3\np5    stopped  25567  25578  4G   -       <run>/data/instances/p5\npb    stopped  25591  25592  4G   -       <run>/data/instances/pb\npu    stopped  25569  25580  4G   -       <run>/data/instances/pu\ns1    stopped  25573  25584  4G   -       <run>/data/instances/s1\ns2    stopped  25574  25585  4G   -       <run>/data/instances/s2\ns5    stopped  25586  25587  4G   -       <run>/data/instances/s5\nv1    stopped  25570  25581  4G   -       <run>/data/instances/v1\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.infernalsuite.com",
+   "method": "GET",
+   "url": "/v1/projects/asp",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.infernalsuite.com",
+   "method": "GET",
+   "url": "/v1/projects/asp",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.infernalsuite.com",
+   "method": "GET",
+   "url": "/v1/projects/asp",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.infernalsuite.com",
+   "method": "GET",
+   "url": "/v1/projects/asp/b77d5e97c0ffee0000000000/download/f1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.3",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.3/7",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.3/7/download",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4/2399",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4/2399/download",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4/2400",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.purpurmc.org",
+   "method": "GET",
+   "url": "/v2/purpur/1.21.4/2400/download",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/15/paper-1.21.4-15.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/16/paper-1.21.4-16.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/16/paper-1.21.4-16.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/3/paper-1.21.5-3.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/7/folia-1.21.4-7.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/a%20b.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/folia",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/folia/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/folia/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.20.6/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.20.6/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.5/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hub.spigotmc.org",
+   "method": "GET",
+   "url": "/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hub.spigotmc.org",
+   "method": "GET",
+   "url": "/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://hub.spigotmc.org",
+   "method": "GET",
+   "url": "/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar.sha256",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar.sha256",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar.sha256",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.4.0.1/neoforge-26.4.0.1-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/26.4.0.1/neoforge-26.4.0.1-installer.jar.sha256",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/installer",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.21.4/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.98/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/1.99/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://meta.fabricmc.net",
+   "method": "GET",
+   "url": "/v2/versions/loader/true/0.16.10/1.0.1/server/jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/aaa/server.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/r/1.0.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/r/1.21.4.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "bin": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "bin/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"25.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  },
+  "bin/javac": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\necho 'javac 25.0.1'\n"
+  },
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"p1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"p2\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-16.jar\"}\n{\"at\":\"<time>\",\"server\":\"p3\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"p5\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"f1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"folia-1.21.4-7.jar\"}\n{\"at\":\"<time>\",\"server\":\"pu\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"purpur-1.21.4-2400.jar\"}\n{\"at\":\"<time>\",\"server\":\"v1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"vanilla-1.21.4.jar\"}\n{\"at\":\"<time>\",\"server\":\"a1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"asp-1.21.4-b77d5e97.jar\"}\n{\"at\":\"<time>\",\"server\":\"fa\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\"}\n{\"at\":\"<time>\",\"server\":\"s1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"spigot-1.21.4.jar\"}\n{\"at\":\"<time>\",\"server\":\"s2\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"spigot-1.21.4.jar\"}\n{\"at\":\"<time>\",\"server\":\"s5\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"craftbukkit-1.21.3.jar\"}\n{\"at\":\"<time>\",\"server\":\"n1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"server.jar\"}\n{\"at\":\"<time>\",\"server\":\"n2\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"server.jar\"}\n{\"at\":\"<time>\",\"server\":\"n4\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"server.jar\"}\n{\"at\":\"<time>\",\"server\":\"p1\",\"action\":\"upgrade\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Paper 1.21.4, build 15 to 16\"}\n{\"at\":\"<time>\",\"server\":\"p1\",\"action\":\"upgrade\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Paper 1.21.4, build 16 to 15\"}\n{\"at\":\"<time>\",\"server\":\"p1\",\"action\":\"upgrade\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Paper 1.21.4 (build 15) to 1.21.5 (build 3)\",\"snapshot\":\"pre-upgrade_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"v1\",\"action\":\"upgrade\",\"by\":{\"kind\":\"cli\"},\"detail\":\"vanilla-1.21.4.jar to paper-1.21.4-15.jar\"}\n{\"at\":\"<time>\",\"server\":\"pb\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"purpur-1.21.3-7.jar\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/p1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/p1/pre-upgrade_standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"p1\",\n  \"scope\": \"standard\",\n  \"label\": \"pre-upgrade\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/p1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/p1/pre-upgrade_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "server.properties type=0 mode=600 size=68 sha256=c99b008a4b6224d85d31c17b1c7af7f835e060b3882dfeeb892db75a557d214a\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/a1/asp-1.21.4-b77d5e97.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "a9265cbdae2118e8bd8e393b282e5b243ee09f79c801f65effc97e9d1e80eb44"
+  },
+  "data/instances/a1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle a1 console - SpawnLoft\n\"<core>\" console a1\npause\n"
+  },
+  "data/instances/a1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25571\nenable-rcon=true\nrcon.port=25582\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=a1 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/a1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle a1 - SpawnLoft\n\"<core>\" start a1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console a1\n"
+  },
+  "data/instances/a1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle a1 - SpawnLoft\n\"<core>\" stop a1\npause\n"
+  },
+  "data/instances/f1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/f1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle f1 console - SpawnLoft\n\"<core>\" console f1\npause\n"
+  },
+  "data/instances/f1/folia-1.21.4-7.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2200,
+   "sha256": "78e7eea14cdec1cc1c2a056424eb69dbdc5244624f98e97ad2faf7be4e6a457d"
+  },
+  "data/instances/f1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25568\nenable-rcon=true\nrcon.port=25579\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=f1 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/f1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle f1 - SpawnLoft\n\"<core>\" start f1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console f1\n"
+  },
+  "data/instances/f1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle f1 - SpawnLoft\n\"<core>\" stop f1\npause\n"
+  },
+  "data/instances/fa": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/fa/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle fa console - SpawnLoft\n\"<core>\" console fa\npause\n"
+  },
+  "data/instances/fa/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/instances/fa/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25572\nenable-rcon=true\nrcon.port=25583\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=fa (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/fa/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle fa - SpawnLoft\n\"<core>\" start fa\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console fa\n"
+  },
+  "data/instances/fa/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle fa - SpawnLoft\n\"<core>\" stop fa\npause\n"
+  },
+  "data/instances/n1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle n1 console - SpawnLoft\n\"<core>\" console n1\npause\n"
+  },
+  "data/instances/n1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/n1/libraries": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/libraries/net": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/libraries/net/neoforged": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad"
+  },
+  "data/instances/n1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25588\nenable-rcon=true\nrcon.port=25589\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=n1 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/n1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle n1 - SpawnLoft\n\"<core>\" start n1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console n1\n"
+  },
+  "data/instances/n1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle n1 - SpawnLoft\n\"<core>\" stop n1\npause\n"
+  },
+  "data/instances/n2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n2/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle n2 console - SpawnLoft\n\"<core>\" console n2\npause\n"
+  },
+  "data/instances/n2/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/n2/libraries": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n2/libraries/net": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n2/libraries/net/neoforged": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/n2/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad"
+  },
+  "data/instances/n2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=26200\nenable-rcon=true\nrcon.port=25590\nrcon.password=<password>\nserver-ip=\nonline-mode=false\nmotd=n2 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/n2/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle n2 - SpawnLoft\n\"<core>\" start n2\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console n2\n"
+  },
+  "data/instances/n2/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle n2 - SpawnLoft\n\"<core>\" stop n2\npause\n"
+  },
+  "data/instances/p1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/p1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p1 console - SpawnLoft\n\"<core>\" console p1\npause\n"
+  },
+  "data/instances/p1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/p1/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/p1/paper-1.21.4-16.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 3000,
+   "sha256": "8da3de0adfc617a88937539bb543aad5aaf4445c6dc65eb3f56d08e238a94fbb"
+  },
+  "data/instances/p1/paper-1.21.5-3.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2500,
+   "sha256": "e7c04136c977182b088cafa484bc55725fcfe3ba3cdaee1402498bc7aa0500b0"
+  },
+  "data/instances/p1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25565\nrcon.port=25575\nrcon.password=SameOnBothSidesAAAA\n"
+  },
+  "data/instances/p1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p1 - SpawnLoft\n\"<core>\" start p1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console p1\n"
+  },
+  "data/instances/p1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p1 - SpawnLoft\n\"<core>\" stop p1\npause\n"
+  },
+  "data/instances/p2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/p2/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p2 console - SpawnLoft\n\"<core>\" console p2\npause\n"
+  },
+  "data/instances/p2/paper-1.21.4-16.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 3000,
+   "sha256": "8da3de0adfc617a88937539bb543aad5aaf4445c6dc65eb3f56d08e238a94fbb"
+  },
+  "data/instances/p2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25566\nenable-rcon=true\nrcon.port=25576\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=p2 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/p2/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p2 - SpawnLoft\n\"<core>\" start p2\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console p2\n"
+  },
+  "data/instances/p2/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p2 - SpawnLoft\n\"<core>\" stop p2\npause\n"
+  },
+  "data/instances/p3": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/p3/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p3 console - SpawnLoft\n\"<core>\" console p3\npause\n"
+  },
+  "data/instances/p3/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/p3/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=26100\nenable-rcon=true\nrcon.port=25577\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=p3 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/p3/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p3 - SpawnLoft\n\"<core>\" start p3\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console p3\n"
+  },
+  "data/instances/p3/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p3 - SpawnLoft\n\"<core>\" stop p3\npause\n"
+  },
+  "data/instances/p5": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/p5/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p5 console - SpawnLoft\n\"<core>\" console p5\npause\n"
+  },
+  "data/instances/p5/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/p5/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25567\nenable-rcon=true\nrcon.port=25578\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=p5 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/p5/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p5 - SpawnLoft\n\"<core>\" start p5\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console p5\n"
+  },
+  "data/instances/p5/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle p5 - SpawnLoft\n\"<core>\" stop p5\npause\n"
+  },
+  "data/instances/pb": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/pb/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle pb console - SpawnLoft\n\"<core>\" console pb\npause\n"
+  },
+  "data/instances/pb/purpur-1.21.3-7.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "467514f5a2a9b206ed3a82e55f1db8134d90f5a59ec576c74d540f606217e535"
+  },
+  "data/instances/pb/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25591\nenable-rcon=true\nrcon.port=25592\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=pb (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/pb/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle pb - SpawnLoft\n\"<core>\" start pb\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console pb\n"
+  },
+  "data/instances/pb/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle pb - SpawnLoft\n\"<core>\" stop pb\npause\n"
+  },
+  "data/instances/pu": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/pu/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle pu console - SpawnLoft\n\"<core>\" console pu\npause\n"
+  },
+  "data/instances/pu/purpur-1.21.4-2400.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "402d122b79d4065c9d641f8231828ca004fcb820b5bf66711f6da3921143c9e4"
+  },
+  "data/instances/pu/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25569\nenable-rcon=true\nrcon.port=25580\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=pu (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/pu/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle pu - SpawnLoft\n\"<core>\" start pu\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console pu\n"
+  },
+  "data/instances/pu/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle pu - SpawnLoft\n\"<core>\" stop pu\npause\n"
+  },
+  "data/instances/s1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s1 console - SpawnLoft\n\"<core>\" console s1\npause\n"
+  },
+  "data/instances/s1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25573\nenable-rcon=true\nrcon.port=25584\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=s1 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/s1/spigot-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/instances/s1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s1 - SpawnLoft\n\"<core>\" start s1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console s1\n"
+  },
+  "data/instances/s1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s1 - SpawnLoft\n\"<core>\" stop s1\npause\n"
+  },
+  "data/instances/s2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s2/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s2 console - SpawnLoft\n\"<core>\" console s2\npause\n"
+  },
+  "data/instances/s2/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25574\nenable-rcon=true\nrcon.port=25585\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=s2 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/s2/spigot-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/instances/s2/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s2 - SpawnLoft\n\"<core>\" start s2\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console s2\n"
+  },
+  "data/instances/s2/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s2 - SpawnLoft\n\"<core>\" stop s2\npause\n"
+  },
+  "data/instances/s5": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s5/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s5 console - SpawnLoft\n\"<core>\" console s5\npause\n"
+  },
+  "data/instances/s5/craftbukkit-1.21.3.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/instances/s5/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25586\nenable-rcon=true\nrcon.port=25587\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=s5 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/s5/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s5 - SpawnLoft\n\"<core>\" start s5\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console s5\n"
+  },
+  "data/instances/s5/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle s5 - SpawnLoft\n\"<core>\" stop s5\npause\n"
+  },
+  "data/instances/v1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/v1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle v1 console - SpawnLoft\n\"<core>\" console v1\npause\n"
+  },
+  "data/instances/v1/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/instances/v1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25570\nenable-rcon=true\nrcon.port=25581\nrcon.password=<password>\nserver-ip=\nonline-mode=true\nmotd=v1 (SpawnLoft)\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/v1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle v1 - SpawnLoft\n\"<core>\" start v1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console v1\n"
+  },
+  "data/instances/v1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle v1 - SpawnLoft\n\"<core>\" stop v1\npause\n"
+  },
+  "data/instances/v1/vanilla-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "19f1bba7a0862476778d8811fd2fe48eb59d77cdd3762e4db8049f300b03dc00"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"p1\": {\n      \"dir\": \"<run>/data/instances/p1\",\n      \"jar\": \"paper-1.21.5-3.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.5\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"p2\": {\n      \"dir\": \"<run>/data/instances/p2\",\n      \"jar\": \"paper-1.21.4-16.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"p3\": {\n      \"dir\": \"<run>/data/instances/p3\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 26100,\n      \"rcon\": {\n        \"port\": 25577,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"p5\": {\n      \"dir\": \"<run>/data/instances/p5\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/old/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25567,\n      \"rcon\": {\n        \"port\": 25578,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"f1\": {\n      \"dir\": \"<run>/data/instances/f1\",\n      \"jar\": \"folia-1.21.4-7.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"folia\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25568,\n      \"rcon\": {\n        \"port\": 25579,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"pu\": {\n      \"dir\": \"<run>/data/instances/pu\",\n      \"jar\": \"purpur-1.21.4-2400.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"purpur\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25569,\n      \"rcon\": {\n        \"port\": 25580,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"v1\": {\n      \"dir\": \"<run>/data/instances/v1\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"vanilla\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25570,\n      \"rcon\": {\n        \"port\": 25581,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"a1\": {\n      \"dir\": \"<run>/data/instances/a1\",\n      \"jar\": \"asp-1.21.4-b77d5e97.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"asp\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25571,\n      \"rcon\": {\n        \"port\": 25582,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"fa\": {\n      \"dir\": \"<run>/data/instances/fa\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"fabric\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25572,\n      \"rcon\": {\n        \"port\": 25583,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"s1\": {\n      \"dir\": \"<run>/data/instances/s1\",\n      \"jar\": \"spigot-1.21.4.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"spigot\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25573,\n      \"rcon\": {\n        \"port\": 25584,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"s2\": {\n      \"dir\": \"<run>/data/instances/s2\",\n      \"jar\": \"spigot-1.21.4.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"spigot\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25574,\n      \"rcon\": {\n        \"port\": 25585,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"s5\": {\n      \"dir\": \"<run>/data/instances/s5\",\n      \"jar\": \"craftbukkit-1.21.3.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"craftbukkit\",\n      \"mcVersion\": \"1.21.3\",\n      \"port\": 25586,\n      \"rcon\": {\n        \"port\": 25587,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"n1\": {\n      \"dir\": \"<run>/data/instances/n1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"neoforge\",\n      \"mcVersion\": \"26.1\",\n      \"port\": 25588,\n      \"rcon\": {\n        \"port\": 25589,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"n2\": {\n      \"dir\": \"<run>/data/instances/n2\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"3G\",\n      \"loader\": \"neoforge\",\n      \"mcVersion\": \"26.2\",\n      \"port\": 26200,\n      \"rcon\": {\n        \"port\": 25590,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    },\n    \"pb\": {\n      \"dir\": \"<run>/data/instances/pb\",\n      \"jar\": \"purpur-1.21.3-7.jar\",\n      \"java\": \"<run>/bin/java\",\n      \"memory\": \"4G\",\n      \"loader\": \"purpur\",\n      \"mcVersion\": \"1.21.3\",\n      \"port\": 25591,\n      \"rcon\": {\n        \"port\": 25592,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"scratch\": true\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/asp-1.21.4-b77d5e97.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "a9265cbdae2118e8bd8e393b282e5b243ee09f79c801f65effc97e9d1e80eb44"
+  },
+  "data/jars/buildtools": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/buildtools/BuildTools.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "2830b994c823883ac16b97dfe5131aa7f6c00913a7e7455c2dad44a5927cd53c"
+  },
+  "data/jars/buildtools/out": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/craftbukkit-1.21.3.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/jars/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 204800,
+   "sha256": "aa103b862d2b452ff407d4ca934638752e89eb7b18cf1786345a8e77f001d452"
+  },
+  "data/jars/folia-1.21.4-7.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2200,
+   "sha256": "78e7eea14cdec1cc1c2a056424eb69dbdc5244624f98e97ad2faf7be4e6a457d"
+  },
+  "data/jars/neoforge-26.1.0.6-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 5000,
+   "sha256": "6fed287ccffa43763bbcb945f6f8612838f0eec9a9557e0655cf1731699827f9"
+  },
+  "data/jars/neoforge-26.2.0.1-beta-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 5000,
+   "sha256": "e55514943ad15f56784e40862fb603a626abebf8888de38dbe8bb57b0b9b1ca5"
+  },
+  "data/jars/neoforge-26.3.0.9-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 5000,
+   "sha256": "32dbe3ff64cc8599ac89e9d73f4a2f06f7c936a0d594d5ea719f332ea6d7d7ae"
+  },
+  "data/jars/paper-1.20.6-5.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1000,
+   "sha256": "86bad3fb6a8c742263ba07e2bf7cec4ae79414f332494ccc9f0d9839f3f5eef7"
+  },
+  "data/jars/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/jars/paper-1.21.4-16.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 3000,
+   "sha256": "8da3de0adfc617a88937539bb543aad5aaf4445c6dc65eb3f56d08e238a94fbb"
+  },
+  "data/jars/paper-1.21.5-3.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2500,
+   "sha256": "e7c04136c977182b088cafa484bc55725fcfe3ba3cdaee1402498bc7aa0500b0"
+  },
+  "data/jars/purpur-1.21.3-7.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "467514f5a2a9b206ed3a82e55f1db8134d90f5a59ec576c74d540f606217e535"
+  },
+  "data/jars/purpur-1.21.4-2400.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "402d122b79d4065c9d641f8231828ca004fcb820b5bf66711f6da3921143c9e4"
+  },
+  "data/jars/spigot-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 4096,
+   "sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "data/jars/vanilla-1.21.4.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 1126400,
+   "sha256": "19f1bba7a0862476778d8811fd2fe48eb59d77cdd3762e4db8049f300b03dc00"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "jre": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "jre/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"25.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  },
+  "old": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "old/java": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 17, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"17.0.1\" <date>' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n"
+  }
+ }
+}

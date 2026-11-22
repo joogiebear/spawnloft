@@ -1,0 +1,207 @@
+{
+ "about": "What the Node core did in scenario c4-running on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c4-running",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 6 (start run1)",
+   "args": [
+    "start",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"run1\"...\nReady - Done (0.042s)!\n  java pid <pid>   port 47781   rcon 47791\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (rebuild run1 --yes)",
+   "args": [
+    "rebuild",
+    "run1",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"run1\" is running - stop it before rebuilding it.\n"
+  },
+  {
+   "label": "step 8 (templates save run1 tp1)",
+   "args": [
+    "templates",
+    "save",
+    "run1",
+    "tp1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Saved template \"tp1\" -> <run>/data/templates/tp1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (clone run1 cl1 --port 47782)",
+   "args": [
+    "clone",
+    "run1",
+    "cl1",
+    "--port",
+    "47782"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Cloned \"run1\" -> \"cl1\" (fresh worlds)\ndirectory:  <run>/data/instances/cl1\nport:       47782\nrcon port:  25575\n\nStart it with: spawnloft start cl1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (stop run1)",
+   "args": [
+    "stop",
+    "run1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"run1\"...\n\"run1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (rebuild run1 --yes --no-snapshot)",
+   "args": [
+    "rebuild",
+    "run1",
+    "--yes",
+    "--no-snapshot"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Rebuilt \"run1\" — removed: world\nPlugins kept.\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"cl1\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"},\"detail\":\"server.jar\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"rebuild\",\"by\":{\"kind\":\"cli\"},\"detail\":\"fresh worlds, plugins kept\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/cl1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/cl1/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'cl1'\n"
+  },
+  "data/instances/cl1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "# Accepted via SpawnLoft on <time>\n# https://aka.ms/MinecraftEULA\neula=true\n"
+  },
+  "data/instances/cl1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/cl1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=cl1 (clone of run1)\nserver-port=47782\nenable-rcon=true\nrcon.port=25575\nrcon.password=<password>\nbroadcast-rcon-to-ops=true\nserver-ip=\nonline-mode=true\nmax-players=10\nspawn-protection=0\n"
+  },
+  "data/instances/cl1/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'cl1' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'cl1'\n"
+  },
+  "data/instances/cl1/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'cl1'\n"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=Run\nserver-port=47781\nenable-rcon=true\nrcon.port=47791\nrcon.password=test\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47781,\n      \"rcon\": {\n        \"port\": 47791,\n        \"password\": \"test\"\n      }\n    },\n    \"cl1\": {\n      \"dir\": \"<run>/data/instances/cl1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"/usr/lib/jvm/temurin-25-jdk-amd64/bin/java\",\n      \"memory\": \"1G\",\n      \"loader\": \"paper\",\n      \"port\": 47782,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"<password>\"\n      },\n      \"createdAt\": \"<time>\",\n      \"origin\": {\n        \"clonedFrom\": \"run1\",\n        \"withWorlds\": false\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates/tp1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates/tp1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/templates/tp1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=Run\nserver-port=47781\nenable-rcon=true\nrcon.port=47791\nrcon.password=test\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/templates/tp1/template.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"name\": \"tp1\",\n  \"jar\": \"server.jar\",\n  \"memory\": \"1G\",\n  \"includesWorlds\": false,\n  \"sourceInstance\": \"run1\",\n  \"createdAt\": \"<time>\"\n}\n"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

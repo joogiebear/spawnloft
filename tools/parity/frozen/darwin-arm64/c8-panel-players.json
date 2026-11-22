@@ -1,0 +1,235 @@
+{
+ "about": "What the Node core did in scenario c8-panel-players on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c8-panel-players",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 13 (panel, 35 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "GET /api/instances/run1/players\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"players\": [\n  {\n   \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n   \"name\": \"Admin\",\n   \"op\": true,\n   \"opLevel\": 4,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": false\n  },\n  {\n   \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n   \"name\": \"Griefer\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": true,\n   \"banReason\": \"Banned by an operator.\",\n   \"banSource\": \"Server\",\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n   \"name\": \"Wunga_\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": false\n  }\n ],\n \"running\": false,\n \"onlineMode\": true,\n \"whitelistOn\": false,\n \"whitelistEnforced\": false\n}\n\nGET /api/instances/run1/players/more\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"players\": [\n  {\n   \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n   \"name\": \"Admin\",\n   \"op\": true,\n   \"opLevel\": 4,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": false\n  },\n  {\n   \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n   \"name\": \"Griefer\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": true,\n   \"banReason\": \"Banned by an operator.\",\n   \"banSource\": \"Server\",\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n   \"name\": \"Wunga_\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": false\n  }\n ],\n \"running\": false,\n \"onlineMode\": true,\n \"whitelistOn\": false,\n \"whitelistEnforced\": false\n}\n\nDELETE /api/instances/run1/players\n  405\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"method not allowed\"\n}\n\nGET /api/instances/db1/players\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"players\": [],\n \"running\": false,\n \"onlineMode\": true,\n \"whitelistOn\": false,\n \"whitelistEnforced\": false\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"on or off?\"\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"on or off?\"\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"on\": true,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"on\": false,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  500\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Cannot read properties of null (reading 'on')\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"A player name is up to 16 letters, digits or underscores, with no spaces.\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"A player name is up to 16 letters, digits or underscores, with no spaces.\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"unknown way to add a player: king\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"No Minecraft account is called \\\"5\\\". Check the spelling.\"\n}\n\nPOST /api/instances/run1/players/add\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf6\",\n \"whitelisted\": true,\n \"via\": \"file\",\n \"name\": \"Notch\",\n \"as\": \"whitelist\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"No Minecraft account is called \\\"nobody_here\\\". Check the spelling.\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"Could not look up \\\"Broken\\\" with Mojang (Mojang answered 500). Check the connection, or start the server and add them again: a running server finds players itself.\"\n}\n\nPOST /api/instances/run1/players/add\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"banned\": true,\n \"via\": \"file\",\n \"name\": \"Wunga_\",\n \"as\": \"ban\"\n}\n\nPOST /api/instances/run1/players/add\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"No Minecraft account is called \\\"Jeb_\\\". Check the spelling.\"\n}\n\nPOST /api/instances/run1/players/op\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"which player?\"\n}\n\nPOST /api/instances/run1/players/op\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"run1\\\" has no record of a player with that id\"\n}\n\nPOST /api/instances/run1/players/op\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"op\": true,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/op\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"op\": false,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/op\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n \"op\": true,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/ban\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n \"banned\": true,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/ban\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n \"banned\": false,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/ban\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"banned\": false,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/whitelist\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n \"whitelisted\": true,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/whitelist\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n \"whitelisted\": false,\n \"via\": \"file\"\n}\n\nPOST /api/instances/run1/players/nope\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"not found\"\n}\n\nPOST /api/instances/run1/players/\n  404\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"not found\"\n}\n\nPOST /api/instances/run1/players/forget\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"run1\\\" has no record of a player with that id\"\n}\n\nPOST /api/instances/run1/players/forget\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n \"name\": \"Admin\",\n \"removed\": 1,\n \"files\": [\n  \"world/playerdata/11111111-2222-4333-8444-555555555555.dat\"\n ]\n}\n\nPOST /api/instances/run1/players/forget\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n \"name\": \"Griefer\",\n \"removed\": 0,\n \"files\": []\n}\n\nGET /api/instances/run1/players\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"players\": [\n  {\n   \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n   \"name\": \"Admin\",\n   \"op\": true,\n   \"opLevel\": 4,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n   \"name\": \"Griefer\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": true,\n   \"banReason\": \"Banned by an operator.\",\n   \"banSource\": \"Server\",\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf6\",\n   \"name\": \"Notch\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": true,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n   \"name\": \"Wunga_\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": false\n  }\n ],\n \"running\": false,\n \"onlineMode\": true,\n \"whitelistOn\": false,\n \"whitelistEnforced\": false\n}\n\nGET /api/instances/run1/activity\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"entries\": [\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-forget\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Griefer\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-forget\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Admin\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-unwhitelist\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Griefer\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-whitelist\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Griefer\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-unban\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Wunga_\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-unban\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Admin\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-ban\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Admin: griefing\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-op\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Admin\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-deop\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"069A79F4-44E9-4726-A5BE-FCA90E38AAF5\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-op\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Wunga_\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-ban\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Wunga_:   being \\t rude  \"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-whitelist\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Notch\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"whitelist-off\",\n   \"by\": {\n    \"kind\": \"panel\"\n   }\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"whitelist-on\",\n   \"by\": {\n    \"kind\": \"panel\"\n   }\n  }\n ],\n \"more\": false,\n \"running\": false\n}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (panel, 15 requests)",
+   "args": [
+    "ui",
+    "replay"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "POST /api/instances/run1/start\n  200\n  cache-control: no-store\n  content-type: application/json\n(application/json, not compared)\n\nGET /api/instances/run1/players\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"players\": [\n  {\n   \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n   \"name\": \"Admin\",\n   \"op\": true,\n   \"opLevel\": 4,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n   \"name\": \"Griefer\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": true,\n   \"banReason\": \"Banned by an operator.\",\n   \"banSource\": \"Server\",\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf6\",\n   \"name\": \"Notch\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": true,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n   \"name\": \"Wunga_\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": true\n  }\n ],\n \"running\": true,\n \"onlineMode\": true,\n \"whitelistOn\": false,\n \"whitelistEnforced\": false\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"on\": true,\n \"via\": \"console\",\n \"reply\": \"Whitelist is now turned on\",\n \"took\": true\n}\n\nPOST /api/instances/run1/players/whitelist-mode\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"on\": false,\n \"via\": \"console\",\n \"reply\": \"Nothing changed\",\n \"took\": false\n}\n\nPOST /api/instances/run1/players/add\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"\",\n \"whitelisted\": true,\n \"via\": \"console\",\n \"reply\": \"Added Steve to the whitelist\",\n \"took\": false,\n \"name\": \"Steve\",\n \"as\": \"whitelist\"\n}\n\nPOST /api/instances/run1/players/add\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"\",\n \"op\": true,\n \"via\": \"console\",\n \"reply\": \"Made Alex a server operator\",\n \"took\": false,\n \"name\": \"Alex\",\n \"as\": \"op\"\n}\n\nPOST /api/instances/run1/players/add\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"\",\n \"banned\": true,\n \"via\": \"console\",\n \"reply\": \"\",\n \"took\": false,\n \"name\": \"Herobrine\",\n \"as\": \"ban\"\n}\n\nPOST /api/instances/run1/players/op\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"op\": true,\n \"via\": \"console\",\n \"reply\": \"Made Wunga_ a server operator\",\n \"took\": false\n}\n\nPOST /api/instances/run1/players/op\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n \"op\": true,\n \"via\": \"console\",\n \"reply\": \"\",\n \"took\": false\n}\n\nPOST /api/instances/run1/players/ban\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"banned\": true,\n \"via\": \"console\",\n \"reply\": \"\",\n \"took\": false\n}\n\nPOST /api/instances/run1/players/whitelist\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n \"whitelisted\": false,\n \"via\": \"console\",\n \"reply\": \"\",\n \"took\": true\n}\n\nPOST /api/instances/run1/players/forget\n  400\n  cache-control: no-store\n  content-type: application/json\n{\n \"error\": \"\\\"run1\\\" is running. Stop it before deleting player data - a running server holds that player's state in memory and writes it back over whatever is deleted.\"\n}\n\nGET /api/instances/run1/players\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"players\": [\n  {\n   \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n   \"name\": \"Admin\",\n   \"op\": true,\n   \"opLevel\": 4,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n   \"name\": \"Griefer\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": true,\n   \"banReason\": \"Banned by an operator.\",\n   \"banSource\": \"Server\",\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf6\",\n   \"name\": \"Notch\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": true,\n   \"joined\": false,\n   \"lastSeen\": null,\n   \"online\": false\n  },\n  {\n   \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n   \"name\": \"Wunga_\",\n   \"op\": false,\n   \"opLevel\": null,\n   \"banned\": false,\n   \"banReason\": null,\n   \"banSource\": null,\n   \"banExpires\": null,\n   \"whitelisted\": false,\n   \"joined\": true,\n   \"lastSeen\": \"<time>\",\n   \"online\": true\n  }\n ],\n \"running\": true,\n \"onlineMode\": true,\n \"whitelistOn\": true,\n \"whitelistEnforced\": false\n}\n\nGET /api/instances/run1/activity?limit=4\n  200\n  cache-control: no-store\n  content-type: application/json\n{\n \"entries\": [\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-unwhitelist\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Wunga_\"\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"whitelist-on\",\n   \"by\": {\n    \"kind\": \"panel\"\n   }\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"start\",\n   \"by\": {\n    \"kind\": \"panel\"\n   }\n  },\n  {\n   \"at\": \"<time>\",\n   \"server\": \"run1\",\n   \"action\": \"player-forget\",\n   \"by\": {\n    \"kind\": \"panel\"\n   },\n   \"detail\": \"Griefer\"\n  }\n ],\n \"more\": true,\n \"running\": true\n}\n\nPOST /api/instances/run1/stop\n  200\n  cache-control: no-store\n  content-type: application/json\n(application/json, not compared)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"run1\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/run1\",\"jar\":\"server.jar\",\"memory\":\"1G\",\"port\":47891,\"rconPort\":47892,\"engine\":null,\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":0,\"consoleLog\":\"<run>/data/run/run1/console.log\"}],\"databases\":[{\"name\":\"db1\",\"label\":null,\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/db1\",\"jar\":null,\"memory\":null,\"port\":47893,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/db1/console.log\"}]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.mojang.com",
+   "method": "GET",
+   "url": "/users/profiles/minecraft/5",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://api.mojang.com",
+   "method": "GET",
+   "url": "/users/profiles/minecraft/Broken",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.mojang.com",
+   "method": "GET",
+   "url": "/users/profiles/minecraft/Jeb_",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.mojang.com",
+   "method": "GET",
+   "url": "/users/profiles/minecraft/Notch",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.mojang.com",
+   "method": "GET",
+   "url": "/users/profiles/minecraft/nobody_here",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"whitelist-on\",\"by\":{\"kind\":\"panel\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"whitelist-off\",\"by\":{\"kind\":\"panel\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-whitelist\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Notch\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-ban\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Wunga_:   being \\t rude  \"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-op\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Wunga_\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-deop\",\"by\":{\"kind\":\"panel\"},\"detail\":\"069A79F4-44E9-4726-A5BE-FCA90E38AAF5\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-op\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Admin\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-ban\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Admin: griefing\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-unban\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Admin\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-unban\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Wunga_\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-whitelist\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Griefer\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-unwhitelist\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Griefer\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-forget\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Admin\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-forget\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Griefer\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"panel\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"whitelist-on\",\"by\":{\"kind\":\"panel\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"player-unwhitelist\",\"by\":{\"kind\":\"panel\"},\"detail\":\"Wunga_\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"panel\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/banned-players.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[\n  {\n    \"uuid\": \"aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee\",\n    \"name\": \"Griefer\",\n    \"created\": \"<time> +0000\",\n    \"source\": \"Server\",\n    \"expires\": \"forever\",\n    \"reason\": \"Banned by an operator.\"\n  }\n]\n"
+  },
+  "data/instances/run1/console.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle run1 console - SpawnLoft\n\"<core>\" console run1\npause\n"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/ops.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[\n  {\n    \"uuid\": \"11111111-2222-4333-8444-555555555555\",\n    \"name\": \"Admin\",\n    \"level\": 4,\n    \"bypassesPlayerLimit\": false\n  }\n]\n"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "#Minecraft server properties\nserver-port=47891\nenable-rcon=true\nrcon.port=47892\nrcon.password=test\nlevel-name=world\nwhite-list=true\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances/run1/start.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle run1 - SpawnLoft\n\"<core>\" start run1\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<core>\" console run1\n"
+  },
+  "data/instances/run1/stop.bat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "@echo off\ntitle run1 - SpawnLoft\n\"<core>\" stop run1\npause\n"
+  },
+  "data/instances/run1/usercache.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[\n  {\n    \"name\": \"Wunga_\",\n    \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf5\",\n    \"expiresOn\": \"<time> +0000\"\n  }\n]\n"
+  },
+  "data/instances/run1/whitelist.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[\n  {\n    \"uuid\": \"069a79f4-44e9-4726-a5be-fca90e38aaf6\",\n    \"name\": \"Notch\"\n  }\n]\n"
+  },
+  "data/instances/run1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/world/playerdata": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/world/playerdata/069a79f4-44e9-4726-a5be-fca90e38aaf5.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "dat"
+  },
+  "data/instances/run1/world/playerdata/069a79f4-44e9-4726-a5be-fca90e38aaf5.dat_old": {
+   "kind": "file",
+   "mode": "644",
+   "text": "dat"
+  },
+  "data/instances/run1/world/stats": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/world/stats/069a79f4-44e9-4726-a5be-fca90e38aaf5.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{}"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47891,\n      \"rcon\": {\n        \"port\": 47892,\n        \"password\": \"test\"\n      }\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"11.4.5\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47893\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/panel.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[<time>] installation moved: rewrote 0 task shim(s) and launchers for 1 server(s)\n"
+  },
+  "data/run/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/runtime.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<code folder>\"\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

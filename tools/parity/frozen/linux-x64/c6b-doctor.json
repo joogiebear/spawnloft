@@ -1,0 +1,201 @@
+{
+ "about": "What the Node core did in scenario c6b-doctor on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c6b-doctor",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 13 (doctor --json)",
+   "args": [
+    "doctor",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"<java version>\\\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-amd64/bin/java (not on PATH)\",\"java (also): openjdk version \\\"<java version>\\\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"<java version>\\\" <date> at java\",\"java (also): openjdk version \\\"<java version>\\\" <date> at /usr/lib/jvm/temurin-11-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"<java version>\\\" at /usr/lib/jvm/temurin-8-jdk-amd64/bin/java\",\"tar: <tar version>\",\"data root: <run>/data\",\"data format: this data folder was last used by SpawnLoft 9.0.0 (<run>/data/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \\\"spawnloft repair\\\".\",\"alpha: 136 B on disk at <run>/data/instances/alpha\",\"beta: 29 B on disk at <run>/data/instances/beta\",\"gamma: 10 B on disk at <run>/data/instances/gamma\",\"client p: Minecraft 1.21.4 vanilla, not installed yet: spawnloft client install p, stopped\"],\"problems\":[\"alpha: stale state file; run doctor without --json to clear it\",\"beta: EULA not accepted (<run>/data/instances/beta/eula.txt)\",\"beta: port 47921 collides with alpha rcon\",\"gamma: jar missing (<run>/data/instances/gamma/server.jar)\",\"ghost: directory missing (<run>/nowhere/ghost)\",\"client p: pinned Java <run>/no/such/java does not exist; spawnloft client set p java=<path>, or java= to let SpawnLoft pick\",\"accounts file (Microsoft sign-in tokens): other users on this computer can read <run>/data/client/accounts.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"8 environment problem(s) found\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (doctor extra --json)",
+   "args": [
+    "doctor",
+    "extra",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft doctor --json\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (doctor --json --verbose)",
+   "args": [
+    "doctor",
+    "--json",
+    "--verbose"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Unknown option --verbose\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (doctor --json=yes)",
+   "args": [
+    "doctor",
+    "--json=yes"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (doctor whatever --verbose)",
+   "args": [
+    "doctor",
+    "whatever",
+    "--verbose"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Environment\n  java: openjdk version \"<java version>\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-amd64/bin/java (not on PATH)\n  java (also): openjdk version \"<java version>\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-amd64/bin/java\n  java (also): openjdk version \"<java version>\" <date> at java\n  java (also): openjdk version \"<java version>\" <date> at /usr/lib/jvm/temurin-11-jdk-amd64/bin/java\n  java (also): openjdk version \"<java version>\" at /usr/lib/jvm/temurin-8-jdk-amd64/bin/java\n  tar: <tar version>\n  data root: <run>/data\n  data format: this data folder was last used by SpawnLoft 9.0.0 (<run>/data/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\".\n  alpha: cleared stale state file\n  alpha: 136 B on disk at <run>/data/instances/alpha\n  beta: 29 B on disk at <run>/data/instances/beta\n  gamma: 10 B on disk at <run>/data/instances/gamma\n  client p: Minecraft 1.21.4 vanilla, not installed yet: spawnloft client install p, stopped\n  accounts file (Microsoft sign-in tokens): made owner-only (its permissions are 644, not 600)\n  alpha: server.properties (RCON password): made owner-only (its permissions are 644, not 600)\n\n5 problem(s):\n  - beta: EULA not accepted (<run>/data/instances/beta/eula.txt)\n  - beta: port 47921 collides with alpha rcon\n  - gamma: jar missing (<run>/data/instances/gamma/server.jar)\n  - ghost: directory missing (<run>/nowhere/ghost)\n  - client p: pinned Java <run>/no/such/java does not exist; spawnloft client set p java=<path>, or java= to let SpawnLoft pick\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (doctor --json)",
+   "args": [
+    "doctor",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"<java version>\\\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-amd64/bin/java (not on PATH)\",\"java (also): openjdk version \\\"<java version>\\\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"<java version>\\\" <date> at java\",\"java (also): openjdk version \\\"<java version>\\\" <date> at /usr/lib/jvm/temurin-11-jdk-amd64/bin/java\",\"java (also): openjdk version \\\"<java version>\\\" at /usr/lib/jvm/temurin-8-jdk-amd64/bin/java\",\"tar: <tar version>\",\"data root: <run>/data\",\"data format: this data folder was last used by SpawnLoft 9.0.0 (<run>/data/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \\\"spawnloft repair\\\".\",\"alpha: 136 B on disk at <run>/data/instances/alpha\",\"beta: 29 B on disk at <run>/data/instances/beta\",\"gamma: 10 B on disk at <run>/data/instances/gamma\",\"client p: Minecraft 1.21.4 vanilla, not installed yet: spawnloft client install p, stopped\"],\"problems\":[\"beta: EULA not accepted (<run>/data/instances/beta/eula.txt)\",\"beta: port 47921 collides with alpha rcon\",\"gamma: jar missing (<run>/data/instances/gamma/server.jar)\",\"ghost: directory missing (<run>/nowhere/ghost)\",\"client p: pinned Java <run>/no/such/java does not exist; spawnloft client set p java=<path>, or java= to let SpawnLoft pick\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"5 environment problem(s) found\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (doctor)",
+   "args": [
+    "doctor"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Environment\n  java: openjdk version \"<java version>\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-amd64/bin/java (not on PATH)\n  java (also): openjdk version \"<java version>\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-amd64/bin/java\n  java (also): openjdk version \"<java version>\" <date> at java\n  java (also): openjdk version \"<java version>\" <date> at /usr/lib/jvm/temurin-11-jdk-amd64/bin/java\n  java (also): openjdk version \"<java version>\" at /usr/lib/jvm/temurin-8-jdk-amd64/bin/java\n  tar: <tar version>\n  data root: <run>/data\n  data format: this data folder was last used by SpawnLoft 9.0.0 (<run>/data/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\".\n  alpha: 136 B on disk at <run>/data/instances/alpha\n  beta: 29 B on disk at <run>/data/instances/beta\n  gamma: 10 B on disk at <run>/data/instances/gamma\n  client p: Minecraft 1.21.4 vanilla, not installed yet: spawnloft client install p, stopped\n\n5 problem(s):\n  - beta: EULA not accepted (<run>/data/instances/beta/eula.txt)\n  - beta: port 47921 collides with alpha rcon\n  - gamma: jar missing (<run>/data/instances/gamma/server.jar)\n  - ghost: directory missing (<run>/nowhere/ghost)\n  - client p: pinned Java <run>/no/such/java does not exist; spawnloft client set p java=<path>, or java= to let SpawnLoft pick\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/accounts.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"accounts\": []\n}\n"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"p\": {\n      \"mc\": \"1.21.4\",\n      \"loader\": \"vanilla\",\n      \"java\": \"<run>/no/such/java\"\n    }\n  }\n}\n"
+  },
+  "data/data-format.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"writtenBy\": \"9.0.0\",\n  \"format\": 1\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "#By changing the setting below to TRUE\r\n eula = TRUE \r\n"
+  },
+  "data/instances/alpha/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/alpha/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=alpha\nserver-port=47911\nenable-rcon=true\nrcon.port=47921\nrcon.password=test\n"
+  },
+  "data/instances/beta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/beta/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=false\n"
+  },
+  "data/instances/beta/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/beta/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=47921\n"
+  },
+  "data/instances/gamma": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/gamma/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"alpha\": {\n      \"dir\": \"<run>/data/instances/alpha\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47911,\n      \"rcon\": {\n        \"port\": 47921,\n        \"password\": \"test\"\n      }\n    },\n    \"beta\": {\n      \"dir\": \"<run>/data/instances/beta\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47921\n    },\n    \"gamma\": {\n      \"dir\": \"<run>/data/instances/gamma\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": \"47931\"\n    },\n    \"ghost\": {\n      \"dir\": \"<run>/nowhere/ghost\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47941\n    },\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"11.4.5\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47951\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

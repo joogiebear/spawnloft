@@ -1,0 +1,701 @@
+{
+ "about": "What the Node core did in scenario c5-plugins on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c5-plugins",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 30 (plugins srv)",
+   "args": [
+    "plugins",
+    "srv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME       VERSION  STATE  SOURCE     FILE               SIZE\nAlpha      1.2.3    on     manual     Alpha.jar          417 B\nbeta       2.0      off    modrinth   beta.jar.disabled  157 B\nEmpty      -        on     manual     Empty.jar          118 B\nFolder     -        on     manual     Folder.jar         4.0 KB\nGamma      1.0      on     manual     Gamma-1.0.jar      186 B\nHangared   -        on     hangar     Hangared.jar       133 B\nMystery    -        on     manual     Mystery.jar        32 B\nOddRecord  -        on     spawnloft  Odd.jar            134 B\nTracked    5        on     modrinth   Tracked.jar        143 B\nzed        0.1      on     manual     Zed.jar            141 B\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (plugins srv --json)",
+   "args": [
+    "plugins",
+    "srv",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"srv\",\"plugins\":[{\"file\":\"Alpha.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Alpha\",\"version\":\"1.2.3\",\"description\":\"Does alpha things\",\"authors\":[\"Ann\",\"Bo\"],\"apiVersion\":\"1.21\",\"website\":\"https://alpha.example\",\"size\":417,\"mtime\":\"<time>\"},{\"file\":\"beta.jar.disabled\",\"enabled\":false,\"managed\":true,\"source\":\"modrinth\",\"project\":\"b1\",\"installedVersion\":\"2.0\",\"gameVersions\":null,\"modId\":null,\"name\":\"beta\",\"version\":\"2.0\",\"description\":null,\"authors\":[\"Solo\"],\"apiVersion\":null,\"website\":null,\"size\":157,\"mtime\":\"<time>\"},{\"file\":\"Empty.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Empty\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":118,\"mtime\":\"<time>\"},{\"file\":\"Folder.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Folder\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":4096,\"mtime\":\"<time>\"},{\"file\":\"Gamma-1.0.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Gamma\",\"version\":\"1.0\",\"description\":\"folded text\",\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":186,\"mtime\":\"<time>\"},{\"file\":\"Hangared.jar\",\"enabled\":true,\"managed\":true,\"source\":\"hangar\",\"project\":\"Hangared\",\"installedVersion\":\"3.1\",\"gameVersions\":null,\"modId\":null,\"name\":\"Hangared\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":133,\"mtime\":\"<time>\"},{\"file\":\"Mystery.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Mystery\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":32,\"mtime\":\"<time>\"},{\"file\":\"Odd.jar\",\"enabled\":true,\"managed\":true,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"OddRecord\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":134,\"mtime\":\"<time>\"},{\"file\":\"Tracked.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modrinth\",\"project\":\"abc123\",\"installedVersion\":\"5.0\",\"gameVersions\":[\"1.21.3\",\"1.21.4\"],\"modId\":null,\"name\":\"Tracked\",\"version\":\"5\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":143,\"mtime\":\"<time>\"},{\"file\":\"Zed.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"zed\",\"version\":\"0.1\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":141,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (plugins srv --json --yes)",
+   "args": [
+    "plugins",
+    "srv",
+    "--json",
+    "--yes"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Unknown option --yes\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (plugins srv extra --json)",
+   "args": [
+    "plugins",
+    "srv",
+    "extra",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft plugins <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (plugins --json)",
+   "args": [
+    "plugins",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft plugins <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (plugins)",
+   "args": [
+    "plugins"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: plugins requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 36 (plugins nope)",
+   "args": [
+    "plugins",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv, modded, odd, odd2, broken, arr, van, bare\n"
+  },
+  {
+   "label": "step 37 (plugins nope --json)",
+   "args": [
+    "plugins",
+    "nope",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"no instance named \\\"nope\\\". Known instances: srv, modded, odd, odd2, broken, arr, van, bare\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (plugins srv frob)",
+   "args": [
+    "plugins",
+    "srv",
+    "frob"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft plugins <name> [enable|disable <plugin>]\n"
+  },
+  {
+   "label": "step 39 (plugins srv enable)",
+   "args": [
+    "plugins",
+    "srv",
+    "enable"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft plugins <name> enable <plugin>\n"
+  },
+  {
+   "label": "step 40 (plugins srv disable )",
+   "args": [
+    "plugins",
+    "srv",
+    "disable",
+    ""
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft plugins <name> disable <plugin>\n"
+  },
+  {
+   "label": "step 41 (plugins srv enable ghost)",
+   "args": [
+    "plugins",
+    "srv",
+    "enable",
+    "ghost"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no plugin \"ghost\" on \"srv\". See: spawnloft plugins srv\n"
+  },
+  {
+   "label": "step 42 (plugins srv disable alpha)",
+   "args": [
+    "plugins",
+    "srv",
+    "disable",
+    "alpha"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Alpha is now disabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (plugins srv disable ALPHA)",
+   "args": [
+    "plugins",
+    "srv",
+    "disable",
+    "ALPHA"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Alpha is now disabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (plugins srv enable beta.jar.disabled)",
+   "args": [
+    "plugins",
+    "srv",
+    "enable",
+    "beta.jar.disabled"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "beta is now enabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (plugins srv disable Tracked.jar)",
+   "args": [
+    "plugins",
+    "srv",
+    "disable",
+    "Tracked.jar"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Tracked is now disabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (plugins srv disable Odd.jar --whatever)",
+   "args": [
+    "plugins",
+    "srv",
+    "disable",
+    "Odd.jar",
+    "--whatever"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "OddRecord is now disabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (plugins srv disable Folder)",
+   "args": [
+    "plugins",
+    "srv",
+    "disable",
+    "Folder"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Folder is now disabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (plugins srv)",
+   "args": [
+    "plugins",
+    "srv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME       VERSION  STATE  SOURCE     FILE                  SIZE\nAlpha      1.2.3    off    manual     Alpha.jar.disabled    417 B\nbeta       2.0      on     modrinth   beta.jar              157 B\nEmpty      -        on     manual     Empty.jar             118 B\nFolder     -        off    manual     Folder.jar.disabled   4.0 KB\nGamma      1.0      on     manual     Gamma-1.0.jar         186 B\nHangared   -        on     hangar     Hangared.jar          133 B\nMystery    -        on     manual     Mystery.jar           32 B\nOddRecord  -        off    spawnloft  Odd.jar.disabled      134 B\nTracked    5        off    modrinth   Tracked.jar.disabled  143 B\nzed        0.1      on     manual     Zed.jar               141 B\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (plugins srv --json)",
+   "args": [
+    "plugins",
+    "srv",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"srv\",\"plugins\":[{\"file\":\"Alpha.jar.disabled\",\"enabled\":false,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Alpha\",\"version\":\"1.2.3\",\"description\":\"Does alpha things\",\"authors\":[\"Ann\",\"Bo\"],\"apiVersion\":\"1.21\",\"website\":\"https://alpha.example\",\"size\":417,\"mtime\":\"<time>\"},{\"file\":\"beta.jar\",\"enabled\":true,\"managed\":true,\"source\":\"modrinth\",\"project\":\"b1\",\"installedVersion\":\"2.0\",\"gameVersions\":null,\"modId\":null,\"name\":\"beta\",\"version\":\"2.0\",\"description\":null,\"authors\":[\"Solo\"],\"apiVersion\":null,\"website\":null,\"size\":157,\"mtime\":\"<time>\"},{\"file\":\"Empty.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Empty\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":118,\"mtime\":\"<time>\"},{\"file\":\"Folder.jar.disabled\",\"enabled\":false,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Folder\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":4096,\"mtime\":\"<time>\"},{\"file\":\"Gamma-1.0.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Gamma\",\"version\":\"1.0\",\"description\":\"folded text\",\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":186,\"mtime\":\"<time>\"},{\"file\":\"Hangared.jar\",\"enabled\":true,\"managed\":true,\"source\":\"hangar\",\"project\":\"Hangared\",\"installedVersion\":\"3.1\",\"gameVersions\":null,\"modId\":null,\"name\":\"Hangared\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":133,\"mtime\":\"<time>\"},{\"file\":\"Mystery.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Mystery\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":32,\"mtime\":\"<time>\"},{\"file\":\"Odd.jar.disabled\",\"enabled\":false,\"managed\":true,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"OddRecord\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":134,\"mtime\":\"<time>\"},{\"file\":\"Tracked.jar.disabled\",\"enabled\":false,\"managed\":true,\"source\":\"modrinth\",\"project\":\"abc123\",\"installedVersion\":\"5.0\",\"gameVersions\":[\"1.21.3\",\"1.21.4\"],\"modId\":null,\"name\":\"Tracked\",\"version\":\"5\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":143,\"mtime\":\"<time>\"},{\"file\":\"Zed.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"zed\",\"version\":\"0.1\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":141,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (plugins modded)",
+   "args": [
+    "plugins",
+    "modded"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME              VERSION  STATE  SOURCE  FILE                SIZE\nbadjson           -        on     manual  badjson.jar         133 B\nCloth Config v15  15.0     on     manual  cloth.jar           268 B\nLegacy Mod        1.0      on     manual  legacy.jar          197 B\nneo               9.9.1    on     manual  neo.jar             423 B\nnul               -        on     manual  nul.jar             132 B\nStray             -        on     manual  plugin-in-mods.jar  130 B\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (plugins modded --json)",
+   "args": [
+    "plugins",
+    "modded",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"modded\",\"plugins\":[{\"file\":\"badjson.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"badjson\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":133,\"mtime\":\"<time>\"},{\"file\":\"cloth.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":\"cloth-config\",\"name\":\"Cloth Config v15\",\"version\":\"15.0\",\"description\":\"Config\",\"authors\":[\"shedaniel\",\"Other\"],\"apiVersion\":null,\"website\":\"https://cloth.example\",\"size\":268,\"mtime\":\"<time>\"},{\"file\":\"legacy.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":\"legacy\",\"name\":\"Legacy Mod\",\"version\":\"1.0\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":197,\"mtime\":\"<time>\"},{\"file\":\"neo.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":\"neo\",\"name\":\"neo\",\"version\":\"9.9.1\",\"description\":\"Multi\\n line\",\"authors\":[\"Neo Team\"],\"apiVersion\":null,\"website\":null,\"size\":423,\"mtime\":\"<time>\"},{\"file\":\"nul.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"nul\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":132,\"mtime\":\"<time>\"},{\"file\":\"plugin-in-mods.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"Stray\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":130,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (plugins modded enable legacy mod)",
+   "args": [
+    "plugins",
+    "modded",
+    "enable",
+    "legacy mod"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Legacy Mod is now enabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (plugins odd)",
+   "args": [
+    "plugins",
+    "odd"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME  VERSION  STATE  SOURCE  FILE      SIZE\n      1        on     manual  List.jar  135 B\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (plugins odd --json)",
+   "args": [
+    "plugins",
+    "odd",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"odd\",\"plugins\":[{\"file\":\"List.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":[],\"version\":\"1\",\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":135,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (plugins odd enable zzz)",
+   "args": [
+    "plugins",
+    "odd",
+    "enable",
+    "zzz"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: p.name.toLowerCase is not a function\n"
+  },
+  {
+   "label": "step 56 (plugins odd2)",
+   "args": [
+    "plugins",
+    "odd2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: a.name.localeCompare is not a function\n"
+  },
+  {
+   "label": "step 57 (plugins odd2 --json)",
+   "args": [
+    "plugins",
+    "odd2",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"a.name.localeCompare is not a function\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (plugins broken)",
+   "args": [
+    "plugins",
+    "broken"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "SyntaxError: <invalid json>\n"
+  },
+  {
+   "label": "step 59 (plugins broken --json)",
+   "args": [
+    "plugins",
+    "broken",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"<invalid json>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (plugins arr --json)",
+   "args": [
+    "plugins",
+    "arr",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"arr\",\"plugins\":[{\"file\":\"A.jar\",\"enabled\":true,\"managed\":false,\"source\":null,\"project\":null,\"installedVersion\":null,\"gameVersions\":null,\"modId\":null,\"name\":\"A\",\"version\":null,\"description\":null,\"authors\":[],\"apiVersion\":null,\"website\":null,\"size\":126,\"mtime\":\"<time>\"}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (plugins arr disable A)",
+   "args": [
+    "plugins",
+    "arr",
+    "disable",
+    "A"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "A is now disabled. Takes effect on the next start.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (plugins van)",
+   "args": [
+    "plugins",
+    "van"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No plugins in <run>/data/instances/van/plugins. The panel's Plugins tab installs from Modrinth.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 63 (plugins bare --json)",
+   "args": [
+    "plugins",
+    "bare",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"bare\",\"plugins\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (plugins bare)",
+   "args": [
+    "plugins",
+    "bare"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No plugins in <run>/data/instances/bare/plugins. The panel's Plugins tab installs from Modrinth.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 65 (plugins srv --json=1)",
+   "args": [
+    "plugins",
+    "srv",
+    "--json=1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 66 (plugins srv )",
+   "args": [
+    "plugins",
+    "srv",
+    ""
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME       VERSION  STATE  SOURCE     FILE                  SIZE\nAlpha      1.2.3    off    manual     Alpha.jar.disabled    417 B\nbeta       2.0      on     modrinth   beta.jar              157 B\nEmpty      -        on     manual     Empty.jar             118 B\nFolder     -        off    manual     Folder.jar.disabled   4.0 KB\nGamma      1.0      on     manual     Gamma-1.0.jar         186 B\nHangared   -        on     hangar     Hangared.jar          133 B\nMystery    -        on     manual     Mystery.jar           32 B\nOddRecord  -        off    spawnloft  Odd.jar.disabled      134 B\nTracked    5        off    modrinth   Tracked.jar.disabled  143 B\nzed        0.1      on     manual     Zed.jar               141 B\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (plugins bare  --json)",
+   "args": [
+    "plugins",
+    "bare",
+    "",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft plugins <instance>\"}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Alpha.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"beta.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Tracked.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Odd.jar\"}\n{\"at\":\"<time>\",\"server\":\"srv\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Folder.jar\"}\n{\"at\":\"<time>\",\"server\":\"arr\",\"action\":\"plugin-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"A.jar\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/arr": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/arr/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/arr/plugins/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"managed\": [1], \"x\": 2}"
+  },
+  "data/instances/arr/plugins/A.jar.disabled": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=8 csize=8 crc=c6560777 attr=0x1800000"
+  },
+  "data/instances/bare": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/broken": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/broken/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/broken/plugins/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{not json"
+  },
+  "data/instances/broken/plugins/A.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=8 csize=8 crc=c6560777 attr=0x1800000"
+  },
+  "data/instances/modded": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/modded/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/modded/mods/badjson.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "fabric.mod.json method=0 flags=0x0 size=5 csize=5 crc=c2b5c6cf attr=0x1800000"
+  },
+  "data/instances/modded/mods/cloth.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "fabric.mod.json method=8 flags=0x0 size=206 csize=140 crc=86d618f2 attr=0x1800000"
+  },
+  "data/instances/modded/mods/legacy.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "META-INF/mods.toml method=0 flags=0x0 size=63 csize=63 crc=0574e2cb attr=0x1800000"
+  },
+  "data/instances/modded/mods/neo.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "META-INF/MANIFEST.MF method=0 flags=0x0 size=30 csize=30 crc=1181170a attr=0x1800000\nMETA-INF/neoforge.mods.toml method=0 flags=0x0 size=125 csize=125 crc=b49c1c7e attr=0x1800000"
+  },
+  "data/instances/modded/mods/nul.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "fabric.mod.json method=0 flags=0x0 size=4 csize=4 crc=25cbfc4f attr=0x1800000"
+  },
+  "data/instances/modded/mods/plugin-in-mods.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=12 csize=12 crc=d2f2d374 attr=0x1800000"
+  },
+  "data/instances/odd": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/odd/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/odd/plugins/List.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=17 csize=17 crc=90561048 attr=0x1800000"
+  },
+  "data/instances/odd2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/odd2/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/odd2/mods/0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "fabric.mod.json method=0 flags=0x0 size=16 csize=16 crc=ec877d55 attr=0x1800000"
+  },
+  "data/instances/odd2/mods/1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "fabric.mod.json method=0 flags=0x0 size=11 csize=11 crc=57cb131f attr=0x1800000"
+  },
+  "data/instances/srv": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv/plugins/.mcctl-plugins.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"Hangared.jar\": {\n      \"source\": \"hangar\",\n      \"project\": \"Hangared\",\n      \"version\": \"3.1\"\n    },\n    \"beta.jar\": {\n      \"source\": \"modrinth\",\n      \"project\": \"b1\",\n      \"version\": \"2.0\"\n    },\n    \"Tracked.jar.disabled\": {\n      \"source\": \"modrinth\",\n      \"project\": \"abc123\",\n      \"version\": \"5.0\",\n      \"installedAt\": \"<time>\",\n      \"gameVersions\": [\n        \"1.21.3\",\n        \"1.21.4\"\n      ]\n    },\n    \"Odd.jar.disabled\": 5\n  }\n}\n"
+  },
+  "data/instances/srv/plugins/Alpha.jar.disabled": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "META-INF/MANIFEST.MF method=0 flags=0x0 size=22 csize=22 crc=205adf7a attr=0x1800000\nplugin.yml method=0 flags=0x0 size=161 csize=161 crc=d6ba72c7 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/Empty.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=0 csize=0 crc=00000000 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/Folder.jar.disabled": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv/plugins/Gamma-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "paper-plugin.yml method=0 flags=0x0 size=56 csize=56 crc=60ffaed9 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/Hangared.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=15 csize=15 crc=68b5f0a2 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/Mystery.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "not a zip, just bytes pretending"
+  },
+  "data/instances/srv/plugins/Odd.jar.disabled": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=16 csize=16 crc=83ce3c07 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/Tracked.jar.disabled": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=25 csize=25 crc=b8cb8915 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/Zed.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=0 flags=0x0 size=23 csize=23 crc=ab11ef66 attr=0x1800000"
+  },
+  "data/instances/srv/plugins/beta.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "plugin.yml method=8 flags=0x0 size=37 csize=39 crc=1d98110c attr=0x1800000"
+  },
+  "data/instances/srv/plugins/notes.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "not a plugin"
+  },
+  "data/instances/srv/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-port=25565\n"
+  },
+  "data/instances/van": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv\": {\n      \"dir\": \"<run>/data/instances/srv\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"port\": 25565,\n      \"memory\": \"2G\",\n      \"loader\": \"paper\"\n    },\n    \"modded\": {\n      \"dir\": \"<run>/data/instances/modded\",\n      \"jar\": \"fabric-server-mc.1.21.4-loader.0.16.9-launcher.1.0.1.jar\",\n      \"port\": 25566,\n      \"memory\": \"2G\",\n      \"loader\": \"fabric\"\n    },\n    \"odd\": {\n      \"dir\": \"<run>/data/instances/odd\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"port\": 25567,\n      \"memory\": \"2G\"\n    },\n    \"odd2\": {\n      \"dir\": \"<run>/data/instances/odd2\",\n      \"jar\": \"server.jar\",\n      \"port\": 25568,\n      \"memory\": \"2G\",\n      \"loader\": \"neoforge\"\n    },\n    \"broken\": {\n      \"dir\": \"<run>/data/instances/broken\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"port\": 25569,\n      \"memory\": \"2G\"\n    },\n    \"arr\": {\n      \"dir\": \"<run>/data/instances/arr\",\n      \"jar\": \"purpur-1.21.4-1.jar\",\n      \"port\": 25570,\n      \"memory\": \"2G\",\n      \"loader\": \"purpur\"\n    },\n    \"van\": {\n      \"dir\": \"<run>/data/instances/van\",\n      \"jar\": \"vanilla-1.21.4.jar\",\n      \"port\": 25571,\n      \"memory\": \"2G\",\n      \"loader\": \"vanilla\"\n    },\n    \"bare\": {\n      \"dir\": \"<run>/data/instances/bare\",\n      \"jar\": \"paper-1.21.4-100.jar\",\n      \"port\": 25572,\n      \"memory\": \"2G\",\n      \"loader\": [\n        \"fabric\"\n      ]\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

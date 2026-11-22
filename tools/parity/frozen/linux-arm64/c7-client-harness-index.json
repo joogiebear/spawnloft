@@ -1,0 +1,196 @@
+{
+ "about": "What the Node core did in scenario c7-client-harness-index on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-harness-index",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (client versions --json)",
+   "args": [
+    "client",
+    "versions",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":null,\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (client versions --json)",
+   "args": [
+    "client",
+    "versions",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":null,\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 6 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type     Fabric  Quilt  Forge  NeoForge  Downloaded\n1.21.11  release  ?       ?      ?      ?\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (client versions --json)",
+   "args": [
+    "client",
+    "versions",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"offline\":null,\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"downloaded\":false,\"loaders\":{\"fabric\":null,\"quilt\":null,\"forge\":null,\"neoforge\":null}}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "TypeError: Cannot read properties of null (reading 'outcome')\n"
+  },
+  {
+   "label": "step 13 (client versions)",
+   "args": [
+    "client",
+    "versions"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Version  Type     Fabric  Quilt  Forge  NeoForge  Downloaded\n1.21.11  release  ?       ?      ?      ?\n? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://github.com",
+   "method": "GET",
+   "url": "/joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://github.com",
+   "method": "GET",
+   "url": "/joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://github.com",
+   "method": "GET",
+   "url": "/joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://github.com",
+   "method": "GET",
+   "url": "/joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json.sig",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://github.com",
+   "method": "GET",
+   "url": "/joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json.sig",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://github.com",
+   "method": "GET",
+   "url": "/joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json.sig",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/cache": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/cache/harness-index.status.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastCheck\": <epoch-ms>,\n  \"outcome\": \"harness-index-signature\",\n  \"reason\": \"the signature file is not one base64 Ed25519 signature\",\n  \"source\": \"built-in\",\n  \"serial\": null,\n  \"generated\": null,\n  \"key\": null\n}\n"
+  },
+  "data/client/cache/version_manifest_v2.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"versions\":[{\"id\":\"1.21.11\",\"type\":\"release\",\"releaseTime\":\"<time>\"}]}"
+  },
+  "data/client/cache/version_manifest_v2.json.fetched-at": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<epoch-ms>"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

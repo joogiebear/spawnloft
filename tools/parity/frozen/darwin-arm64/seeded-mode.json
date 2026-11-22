@@ -1,0 +1,66 @@
+{
+ "about": "What the Node core did in scenario seeded-mode on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "seeded-mode",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 3 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No instances registered in <run>/data.\n\n  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>\n  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "server-port=25565\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

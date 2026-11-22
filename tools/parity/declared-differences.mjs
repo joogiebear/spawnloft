@@ -62,6 +62,16 @@ export const DECLARED = [
       .replace(/"runtime"(\s*):(\s*)"[^"]*"/g, '"runtime"$1:$2"<runtime>"'),
   },
   {
+    // C10: the Node core's folder left with it; what was its path is now the core's own folder
+    id: 'code-folder',
+    where: '`repair --json`\'s `root`, `run/runtime.json`\'s `root`, the first-run wizard\'s `coreDir`',
+    node: 'the Node core\'s folder (`resources/core`, a checkout in the rig)',
+    rust: 'the folder holding spawnloft-core; `root` is written for 1.x and no longer compared',
+    // a data root is the same on both sides and kept: it is always under the rig's scratch folder
+    // (`<tmp>/sl-parity`, `<run>` once neutral), where no code folder is
+    apply: (text) => text.replace(/"(root|coreDir)"(\s*):(\s*)"(?!<run>|[^"]*sl-parity)(?:[^"\\]|\\.)*"/g, '"$1"$2:$3"<code folder>"'),
+  },
+  {
     id: 'collation-outside-ascii',
     where: 'free-text sort order outside ASCII',
     node: 'ICU collation',

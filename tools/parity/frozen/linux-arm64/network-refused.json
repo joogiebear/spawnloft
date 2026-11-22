@@ -1,0 +1,87 @@
+{
+ "about": "What the Node core did in scenario network-refused on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "network-refused",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (update check)",
+   "args": [
+    "update",
+    "check"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "the update feed could not be read: github: could not list releases: SPAWNLOFT_TEST_ORIGINS has no fake for https://api.github.com; the request was not sent\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (paper versions)",
+   "args": [
+    "paper",
+    "versions"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: could not reach the PaperMC API: SPAWNLOFT_TEST_ORIGINS has no fake for https://fill.papermc.io; the request was not sent\n"
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft/update-state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastCheckAt\": \"<time>\",\n  \"lastResult\": \"unreachable: github: could not list releases: SPAWNLOFT_TEST_ORIGINS has no fake for https://api.github.com; the request was not sent\",\n  \"lastAcceptedGeneratedAt\": null,\n  \"pending\": null,\n  \"downloaded\": false,\n  \"staleFeed\": false\n}\n"
+  },
+  "home/.config/spawnloft/update.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<time> check installed=2.0.0-internal.0 channel=beta target=linux-aarch64\n<time> result source=- result=\"unreachable: github: could not list releases: SPAWNLOFT_TEST_ORIGINS has no fake for https://api.github.com; the request was not sent\" stale=no\n"
+  }
+ }
+}

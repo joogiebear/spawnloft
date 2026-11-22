@@ -1,0 +1,354 @@
+{
+ "about": "What the Node core did in scenario downloads-paper on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "downloads-paper",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (paper)",
+   "args": [
+    "paper"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Paper versions (newest first):\n  1.21.4  1.21.3  1.21  1.20.6\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 2 (paper versions --unstable)",
+   "args": [
+    "paper",
+    "versions",
+    "--unstable"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Paper versions (newest first), including pre-releases:\n  1.21.4  1.21.4-rc1  1.21.3  1.21  1.20.6  1.20.6-pre2\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 3 (paper versions --limit 2)",
+   "args": [
+    "paper",
+    "versions",
+    "--limit",
+    "2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Paper versions (newest first):\n  1.21.4  1.21.3\n  ... 2 older (use --limit 4)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 4 (paper builds 1.21.4)",
+   "args": [
+    "paper",
+    "builds",
+    "1.21.4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "BUILD  CHANNEL       DATE        FILE\n16     EXPERIMENTAL  <date>  paper-1.21.4-16.jar\n15     STABLE        <date>  paper-1.21.4-15.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (paper builds 1.19)",
+   "args": [
+    "paper",
+    "builds",
+    "1.19"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: PaperMC API returned 404 for https://fill.papermc.io/v3/projects/paper/versions/1.19/builds\n"
+  },
+  {
+   "label": "step 6 (paper fetch 1.21.4)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.21.4-15.jar — build 15, STABLE, 2.0 KB, checksum verified.\nUse it with: spawnloft new <name> --jar paper-1.21.4-15.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (paper fetch 1.21.4)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Already stored: paper-1.21.4-15.jar (build 15, STABLE). Re-download with --force.\nUse it with: spawnloft new <name> --jar paper-1.21.4-15.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (paper fetch 1.21.4 16)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4",
+    "16"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Downloaded paper-1.21.4-16.jar — build 16, EXPERIMENTAL, 2.9 KB, checksum verified.\nUse it with: spawnloft new <name> --jar paper-1.21.4-16.jar\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (paper fetch 1.21.4 99)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.4",
+    "99"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Paper 1.21.4 has no build 99. Newest is 16.\n"
+  },
+  {
+   "label": "step 10 (paper fetch 1.21.3)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21.3"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: checksum mismatch for paper-1.21.3-80.jar\n  expected 0000000000000000000000000000000000000000000000000000000000000000\n  got      e9e03b88c8dacf5f4b85715cfeb22b5cef7361fad1e7f9cd1056b99e08d5916c\n"
+  },
+  {
+   "label": "step 11 (paper fetch 1.20.6)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.20.6"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: download failed (503) for https://fill-data.papermc.io/v1/objects/151/paper-1.20.6-151.jar\n"
+  },
+  {
+   "label": "step 12 (paper fetch 1.21)",
+   "args": [
+    "paper",
+    "fetch",
+    "1.21"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Paper has no builds for version 1.21.\n"
+  },
+  {
+   "label": "step 13 (paper fetch)",
+   "args": [
+    "paper",
+    "fetch"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft paper fetch <version> [build] [--force]\n"
+  },
+  {
+   "label": "step 14 (jars)",
+   "args": [
+    "jars"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                 SIZE    ADDED\npaper-1.21.4-15.jar  2.0 KB  <date>\npaper-1.21.4-16.jar  2.9 KB  <date>\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/15/paper-1.21.4-15.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/151/paper-1.20.6-151.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/16/paper-1.21.4-16.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill-data.papermc.io",
+   "method": "GET",
+   "url": "/v1/objects/80/paper-1.21.3-80.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.19/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.20.6/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.3/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21.4/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://fill.papermc.io",
+   "method": "GET",
+   "url": "/v3/projects/paper/versions/1.21/builds",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars/paper-1.21.4-15.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 2048,
+   "sha256": "334c86e24bb8814466482b1c2e569e981417f0af4f60083bb2674e4967f89ecb"
+  },
+  "data/jars/paper-1.21.4-16.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 3000,
+   "sha256": "8da3de0adfc617a88937539bb543aad5aaf4445c6dc65eb3f56d08e238a94fbb"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

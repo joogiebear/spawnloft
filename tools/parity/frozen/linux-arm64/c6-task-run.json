@@ -1,0 +1,710 @@
+{
+ "about": "What the Node core did in scenario c6-task-run on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c6-task-run",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 10 (task add idle --do command --line say hi --hourly)",
+   "args": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "command",
+    "--line",
+    "say hi",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"idle-command\" - Run a server command, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (task add idle --do stop --hourly)",
+   "args": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "stop",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"idle-stop\" - Stop the server, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (task add idle --do verify --hourly)",
+   "args": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "verify",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"idle-verify\" - Verify the backups, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (task add idle --do backup --hourly)",
+   "args": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "backup",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"idle-backup\" - Take a backup, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (task run idle-command)",
+   "args": [
+    "task",
+    "run",
+    "idle-command"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-command\tskipped\tcommand\tthe server was not running, so nothing was sent\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (task run idle-stop)",
+   "args": [
+    "task",
+    "run",
+    "idle-stop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-stop\tskipped\tstop\tit was already stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (task run idle-verify)",
+   "args": [
+    "task",
+    "run",
+    "idle-verify"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-verify\tskipped\tverify\tno backups to check yet\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (task run idle-backup)",
+   "args": [
+    "task",
+    "run",
+    "idle-backup"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-backup\tok\tbackup\t<run>/data/backups/idle/scheduled_standard_<stamp>.tar.gz (<size>)\ndone in <n>s\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (task run idle-verify)",
+   "args": [
+    "task",
+    "run",
+    "idle-verify"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-verify\tok\tverify\tall 1 backups read back whole\ndone in <n>s\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (task run idle-verify)",
+   "args": [
+    "task",
+    "run",
+    "idle-verify"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "<time>\tidle-verify\tFAILED\tverify\t1 of 2 backups failed the check: standard_<stamp>.tar.gz: the archive does not read back: gzip: stdin: not in gzip format\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (task add run1 --do start --hourly)",
+   "args": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "start",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"run1-start\" - Start the server, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (task run run1-start)",
+   "args": [
+    "task",
+    "run",
+    "run1-start"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-start\tok\tstart\tstarted\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (task run run1-start)",
+   "args": [
+    "task",
+    "run",
+    "run1-start"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-start\tskipped\tstart\tit was already running\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (task add run1 --do command --line list --hourly)",
+   "args": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "command",
+    "--line",
+    "list",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"run1-command\" - Run a server command, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (task run run1-command)",
+   "args": [
+    "task",
+    "run",
+    "run1-command"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-command\tok\tcommand\tlist\ndone in <n>s\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (task add run1 --do restart --hourly)",
+   "args": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "restart",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"run1-restart\" - Restart the server, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 28 (task run run1-restart)",
+   "args": [
+    "task",
+    "run",
+    "run1-restart"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-restart\tok\trestart\trestarted\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (task add run1 --do stop --hourly)",
+   "args": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "stop",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"run1-stop\" - Stop the server, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (task run run1-stop)",
+   "args": [
+    "task",
+    "run",
+    "run1-stop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-stop\tok\tstop\tstopped\ndone in <n>s\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (task run run1-stop)",
+   "args": [
+    "task",
+    "run",
+    "run1-stop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-stop\tskipped\tstop\tit was already stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (task rm run1-start)",
+   "args": [
+    "task",
+    "rm",
+    "run1-start"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"run1-start\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (task rm run1-command)",
+   "args": [
+    "task",
+    "rm",
+    "run1-command"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"run1-command\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (task rm run1-restart)",
+   "args": [
+    "task",
+    "rm",
+    "run1-restart"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"run1-restart\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (task rm run1-stop)",
+   "args": [
+    "task",
+    "rm",
+    "run1-stop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"run1-stop\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (task rm idle-backup)",
+   "args": [
+    "task",
+    "rm",
+    "idle-backup"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"idle-backup\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (task rm idle-verify)",
+   "args": [
+    "task",
+    "rm",
+    "idle-verify"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"idle-verify\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (task rm idle-command)",
+   "args": [
+    "task",
+    "rm",
+    "idle-command"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"idle-command\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (task rm idle-stop)",
+   "args": [
+    "task",
+    "rm",
+    "idle-stop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"idle-stop\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (task run idle-steps)",
+   "args": [
+    "task",
+    "run",
+    "idle-steps"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-steps\tok\tsteps\tnobody to tell (not running); \"save-all\" not sent (not running); no countdown (not running); already stopped; backed up scheduled_standard_<stamp>.tar.gz (<size>); backed up scheduled_standard_<stamp>.tar.gz (<size>); verified 3 backups\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (task run idle-steps-4)",
+   "args": [
+    "task",
+    "run",
+    "idle-steps-4"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\tidle-steps-4\tskipped\tsteps\tthe server was not running, and this task only runs while it is\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (task run idle-steps-2)",
+   "args": [
+    "task",
+    "run",
+    "idle-steps-2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "<time>\tidle-steps-2\tFAILED\tsteps\tverify the backups FAILED; stopped there, 2 steps not run\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (task run idle-steps-3)",
+   "args": [
+    "task",
+    "run",
+    "idle-steps-3"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "<time>\tidle-steps-3\tFAILED\tsteps\tverify the backups FAILED; already stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (task run run1-steps)",
+   "args": [
+    "task",
+    "run",
+    "run1-steps"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-steps\tok\tsteps\tnobody to tell (not running); \"list\" not sent (not running); backed up scheduled_standard_<stamp>.tar.gz (<size>); started (it was not running); stopped; started; stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (task run run1-backup)",
+   "args": [
+    "task",
+    "run",
+    "run1-backup"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-backup\tok\tbackup\t<run>/data/backups/run1/scheduled_standard_<stamp>.tar.gz (<size>)\ndone in <n>s\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (task run run1-backup)",
+   "args": [
+    "task",
+    "run",
+    "run1-backup"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "<time>\trun1-backup\tok\tbackup\t<run>/data/backups/run1/scheduled_standard_<stamp>.tar.gz (<size>), pruned 1 over the limit of 1\ndone in <n>s\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (task run run1-verify)",
+   "args": [
+    "task",
+    "run",
+    "run1-verify"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "<time>\trun1-verify\tFAILED\tverify\t1 of 3 backups failed the check: standard_<stamp>.tar.gz: the archive does not read back: gzip: stdin: not in gzip format\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (task list)",
+   "args": [
+    "task",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID            INSTANCE  DOES                                                                                                                                                 WHEN         STATE             LAST  NEXT\nidle-steps    idle      tell the players \"hello\", then run \"save-all\", then a 1 minute countdown, then stop, then back up, keeping 1, then back up, then verify the backups  hourly       NOT IN SCHEDULER  -     -\nidle-steps-2  idle      verify the backups, then tell the players \"after\", then stop                                                                                         hourly       NOT IN SCHEDULER  -     -\nidle-steps-3  idle      verify the backups, then stop                                                                                                                        hourly       NOT IN SCHEDULER  -     -\nidle-steps-4  idle      tell the players \"x\"                                                                                                                                 hourly       NOT IN SCHEDULER  -     -\nrun1-steps    run1      tell the players \"hello\", then run \"list\", then back up, keeping 2, then restart, then stop, then start, then stop                                   hourly       NOT IN SCHEDULER  -     -\nrun1-verify   run1      verify                                                                                                                                               daily 03:00  NOT IN SCHEDULER  -     -\nrun1-backup   run1      backup                                                                                                                                               daily 03:00  NOT IN SCHEDULER  -     -\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://discord.com",
+   "method": "POST",
+   "url": "/api/webhooks/1/abc",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 191,
+   "bodySha256": "fc7382b5c9326981eb331cf2ff49bcba0fead4376b85e586d1d0c5d471115609"
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command (runs a command)\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Stop the server (stop)\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Verify the backups (verify)\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"Take a backup\"},\"detail\":\"standard (scheduled), <size>\",\"snapshot\":\"scheduled_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Start the server (start)\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"schedule\",\"name\":\"Start the server\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command (runs a command)\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"command\",\"by\":{\"kind\":\"schedule\",\"name\":\"Run a server command\"},\"detail\":\"list\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Restart the server (restarts the server)\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"schedule\",\"name\":\"Restart the server\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"schedule\",\"name\":\"Restart the server\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Stop the server (stop)\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"schedule\",\"name\":\"Stop the server\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Start the server\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Restart the server\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Stop the server\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Verify the backups\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Stop the server\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"},\"detail\":\"standard (scheduled), <size>\",\"snapshot\":\"scheduled_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"idle\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"},\"detail\":\"standard (scheduled), <size>\",\"snapshot\":\"scheduled_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"},\"detail\":\"standard (scheduled), <size>\",\"snapshot\":\"scheduled_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"start\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"stop\",\"by\":{\"kind\":\"schedule\",\"name\":\"Chain\"}}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"Copy\"},\"detail\":\"standard (scheduled), <size>\",\"snapshot\":\"scheduled_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"Copy\"},\"detail\":\"standard (scheduled), <size>\",\"snapshot\":\"scheduled_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"run1\",\"action\":\"backup-prune\",\"by\":{\"kind\":\"schedule\",\"name\":\"Copy\"},\"detail\":\"1 removed, the newest 1 kept\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/idle": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/idle/scheduled_standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"idle\",\n  \"scope\": \"standard\",\n  \"label\": \"scheduled\",\n  \"changeCopy\": false,\n  \"taskId\": \"idle-backup\",\n  \"members\": [\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/idle\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/idle/scheduled_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326\nserver.properties type=0 mode=644 size=80 sha256=d698abb2952021d5e4354a98706e8bde4643a179a3a402504798ddd2befc02bf\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/idle/scheduled_standard_<stamp>.json#2": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"idle\",\n  \"scope\": \"standard\",\n  \"label\": \"scheduled\",\n  \"changeCopy\": false,\n  \"taskId\": \"idle-steps\",\n  \"members\": [\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/idle\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/idle/scheduled_standard_<stamp>.tar.gz#2": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326\nserver.properties type=0 mode=644 size=80 sha256=d698abb2952021d5e4354a98706e8bde4643a179a3a402504798ddd2befc02bf\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/idle/scheduled_standard_<stamp>.json#3": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"idle\",\n  \"scope\": \"standard\",\n  \"label\": \"scheduled\",\n  \"changeCopy\": false,\n  \"taskId\": \"idle-steps\",\n  \"members\": [\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/idle\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/idle/scheduled_standard_<stamp>.tar.gz#3": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326\nserver.properties type=0 mode=644 size=80 sha256=d698abb2952021d5e4354a98706e8bde4643a179a3a402504798ddd2befc02bf\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/run1/scheduled_standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"standard\",\n  \"label\": \"scheduled\",\n  \"changeCopy\": false,\n  \"taskId\": \"run1-steps\",\n  \"members\": [\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/scheduled_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326\nserver.properties type=0 mode=600 size=107 sha256=86b024d45e59f1d4d84ee1c0c8e6da108e81188c550908ecc82159cb08c1eb75\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/run1/scheduled_standard_<stamp>.json#2": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"run1\",\n  \"scope\": \"standard\",\n  \"label\": \"scheduled\",\n  \"changeCopy\": false,\n  \"taskId\": \"run1-backup\",\n  \"members\": [\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/run1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/run1/scheduled_standard_<stamp>.tar.gz#2": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326\nserver.properties type=0 mode=600 size=107 sha256=86b024d45e59f1d4d84ee1c0c8e6da108e81188c550908ecc82159cb08c1eb75\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/backups/run1/standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": ""
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/idle": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/idle/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/idle/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/idle/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "motd=idle\nserver-port=47862\nenable-rcon=true\nrcon.port=47872\nrcon.password=test\n"
+  },
+  "data/instances/idle/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/idle/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "w"
+  },
+  "data/instances/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/run1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/run1/server.properties": {
+   "kind": "file",
+   "mode": "600",
+   "text": "motd=run1\nserver-port=47861\nenable-rcon=true\nrcon.port=47871\nrcon.password=test\nbroadcast-rcon-to-ops=true\n"
+  },
+  "data/instances/run1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/run1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "w"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"run1\": {\n      \"dir\": \"<run>/data/instances/run1\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47861,\n      \"rcon\": {\n        \"port\": 47871,\n        \"password\": \"test\"\n      },\n      \"webhook\": \"https://discord.com/api/webhooks/1/abc\"\n    },\n    \"idle\": {\n      \"dir\": \"<run>/data/instances/idle\",\n      \"jar\": \"server.jar\",\n      \"java\": \"<repo>/test/fixtures/fake-java.mjs\",\n      \"memory\": \"1G\",\n      \"port\": 47862,\n      \"rcon\": {\n        \"port\": 47872,\n        \"password\": \"test\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/idle": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/idle/tasks.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<time>\tidle-command\tskipped\tcommand\tthe server was not running, so nothing was sent\n<time>\tidle-stop\tskipped\tstop\tit was already stopped\n<time>\tidle-verify\tskipped\tverify\tno backups to check yet\n<time>\tidle-backup\tok\tbackup\t<run>/data/backups/idle/scheduled_standard_<stamp>.tar.gz (<size>)\n<time>\tidle-verify\tok\tverify\tall 1 backups read back whole\n<time>\tidle-verify\tFAILED\tverify\t1 of 2 backups failed the check: standard_<stamp>.tar.gz: the archive does not read back: gzip: stdin: not in gzip format\n<time>\tidle-steps\tok\tsteps\tnobody to tell (not running); \"save-all\" not sent (not running); no countdown (not running); already stopped; backed up scheduled_standard_<stamp>.tar.gz (<size>); backed up scheduled_standard_<stamp>.tar.gz (<size>); verified 3 backups\n<time>\tidle-steps-4\tskipped\tsteps\tthe server was not running, and this task only runs while it is\n<time>\tidle-steps-2\tFAILED\tsteps\tverify the backups FAILED; stopped there, 2 steps not run\n<time>\tidle-steps-3\tFAILED\tsteps\tverify the backups FAILED; already stopped\n"
+  },
+  "data/run/run1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/run1/tasks.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<time>\trun1-start\tok\tstart\tstarted\n<time>\trun1-start\tskipped\tstart\tit was already running\n<time>\trun1-command\tok\tcommand\tlist\n<time>\trun1-restart\tok\trestart\trestarted\n<time>\trun1-stop\tok\tstop\tstopped\n<time>\trun1-stop\tskipped\tstop\tit was already stopped\n<time>\trun1-steps\tok\tsteps\tnobody to tell (not running); \"list\" not sent (not running); backed up scheduled_standard_<stamp>.tar.gz (<size>); started (it was not running); stopped; started; stopped\n<time>\trun1-backup\tok\tbackup\t<run>/data/backups/run1/scheduled_standard_<stamp>.tar.gz (<size>)\n<time>\trun1-backup\tok\tbackup\t<run>/data/backups/run1/scheduled_standard_<stamp>.tar.gz (<size>), pruned 1 over the limit of 1\n<time>\trun1-verify\tFAILED\tverify\t1 of 3 backups failed the check: standard_<stamp>.tar.gz: the archive does not read back: gzip: stdin: not in gzip format\n"
+  },
+  "data/schedules.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"tasks\": {\n    \"idle-steps\": {\n      \"instance\": \"idle\",\n      \"name\": \"Chain\",\n      \"action\": {\n        \"type\": \"steps\",\n        \"steps\": [\n          {\n            \"do\": \"say\",\n            \"text\": \"hello\"\n          },\n          {\n            \"do\": \"command\",\n            \"line\": \"save-all\"\n          },\n          {\n            \"do\": \"countdown\",\n            \"minutes\": 1,\n            \"message\": \"Restart\"\n          },\n          {\n            \"do\": \"stop\"\n          },\n          {\n            \"do\": \"backup\",\n            \"keep\": 1\n          },\n          {\n            \"do\": \"backup\",\n            \"keep\": null\n          },\n          {\n            \"do\": \"verify\"\n          }\n        ],\n        \"onlyWhenRunning\": false,\n        \"keepGoing\": false\n      },\n      \"schedule\": {\n        \"kind\": \"hourly\",\n        \"every\": 1\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    },\n    \"idle-steps-2\": {\n      \"instance\": \"idle\",\n      \"name\": \"Chain\",\n      \"action\": {\n        \"type\": \"steps\",\n        \"steps\": [\n          {\n            \"do\": \"verify\"\n          },\n          {\n            \"do\": \"say\",\n            \"text\": \"after\"\n          },\n          {\n            \"do\": \"stop\"\n          }\n        ],\n        \"onlyWhenRunning\": false,\n        \"keepGoing\": false\n      },\n      \"schedule\": {\n        \"kind\": \"hourly\",\n        \"every\": 1\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    },\n    \"idle-steps-3\": {\n      \"instance\": \"idle\",\n      \"name\": \"Chain\",\n      \"action\": {\n        \"type\": \"steps\",\n        \"steps\": [\n          {\n            \"do\": \"verify\"\n          },\n          {\n            \"do\": \"stop\"\n          }\n        ],\n        \"onlyWhenRunning\": false,\n        \"keepGoing\": true\n      },\n      \"schedule\": {\n        \"kind\": \"hourly\",\n        \"every\": 1\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    },\n    \"idle-steps-4\": {\n      \"instance\": \"idle\",\n      \"name\": \"Chain\",\n      \"action\": {\n        \"type\": \"steps\",\n        \"steps\": [\n          {\n            \"do\": \"say\",\n            \"text\": \"x\"\n          }\n        ],\n        \"onlyWhenRunning\": true,\n        \"keepGoing\": false\n      },\n      \"schedule\": {\n        \"kind\": \"hourly\",\n        \"every\": 1\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    },\n    \"run1-steps\": {\n      \"instance\": \"run1\",\n      \"name\": \"Chain\",\n      \"action\": {\n        \"type\": \"steps\",\n        \"steps\": [\n          {\n            \"do\": \"say\",\n            \"text\": \"hello\"\n          },\n          {\n            \"do\": \"command\",\n            \"line\": \"list\"\n          },\n          {\n            \"do\": \"backup\",\n            \"keep\": 2\n          },\n          {\n            \"do\": \"restart\"\n          },\n          {\n            \"do\": \"stop\"\n          },\n          {\n            \"do\": \"start\"\n          },\n          {\n            \"do\": \"stop\"\n          }\n        ],\n        \"onlyWhenRunning\": false,\n        \"keepGoing\": false\n      },\n      \"schedule\": {\n        \"kind\": \"hourly\",\n        \"every\": 1\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    },\n    \"run1-verify\": {\n      \"instance\": \"run1\",\n      \"name\": \"Check\",\n      \"action\": {\n        \"type\": \"verify\"\n      },\n      \"schedule\": {\n        \"kind\": \"daily\",\n        \"at\": \"03:00\"\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    },\n    \"run1-backup\": {\n      \"instance\": \"run1\",\n      \"name\": \"Copy\",\n      \"action\": {\n        \"type\": \"backup\",\n        \"keep\": 1\n      },\n      \"schedule\": {\n        \"kind\": \"daily\",\n        \"at\": \"03:00\"\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/tasks": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd/user": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "scheduler": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "scheduler/calls.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "systemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-command.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-command.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-idle-command.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-stop.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-stop.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-idle-stop.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-verify.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-verify.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-idle-verify.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-backup.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-idle-backup.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-start.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-start.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-run1-start.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-command.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-command.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-run1-command.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-restart.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-restart.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-run1-restart.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-stop.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-stop.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-0d0ddbc01ae8f437-run1-stop.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-start.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-start.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-run1-start.service spawnloft-0d0ddbc01ae8f437-run1-start.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-command.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-run1-command.service spawnloft-0d0ddbc01ae8f437-run1-command.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-restart.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-restart.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-run1-restart.service spawnloft-0d0ddbc01ae8f437-run1-restart.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-run1-stop.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-run1-stop.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-run1-stop.service spawnloft-0d0ddbc01ae8f437-run1-stop.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-backup.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-idle-backup.service spawnloft-0d0ddbc01ae8f437-idle-backup.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-verify.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-verify.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-idle-verify.service spawnloft-0d0ddbc01ae8f437-idle-verify.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-command.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-idle-command.service spawnloft-0d0ddbc01ae8f437-idle-command.timer\nsystemctl --user disable --now spawnloft-0d0ddbc01ae8f437-idle-stop.timer\nsystemctl --user disable spawnloft-0d0ddbc01ae8f437-idle-stop.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-0d0ddbc01ae8f437-idle-stop.service spawnloft-0d0ddbc01ae8f437-idle-stop.timer\n"
+  },
+  "scheduler/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"systemd\": {}\n}\n"
+  }
+ }
+}

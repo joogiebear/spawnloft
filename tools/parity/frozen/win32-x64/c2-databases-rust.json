@@ -1,0 +1,248 @@
+{
+ "about": "What the Node core did in scenario c2-databases-rust on win32-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c2-databases-rust",
+ "platform": "win32-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 12 (start nodb)",
+   "args": [
+    "start",
+    "nodb"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"nodb\"...\n",
+   "stderr": "error: MariaDB 9.9.9 is not in the engine store (<run>/data/engines/mariadb-9.9.9). Add the database again to fetch it.\n"
+  },
+  {
+   "label": "step 13 (start ext1)",
+   "args": [
+    "start",
+    "ext1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"ext1\"...\n",
+   "stderr": "error: \"ext1\" is a database that runs elsewhere (127.0.0.1:47814); it is not started or stopped from here\n"
+  },
+  {
+   "label": "step 14 (start db1 --timeout 60)",
+   "args": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"db1\"...\nReady - ready for connections\n  database pid <pid>   port 47811\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (start db1)",
+   "args": [
+    "start",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Starting \"db1\"...\n",
+   "stderr": "error: instance \"db1\" is already running (java pid <pid>)\n"
+  },
+  {
+   "label": "step 16 (status db1)",
+   "args": [
+    "status",
+    "db1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "database:     db1\nlabel:        (none)\nstatus:       running\nengine:       MariaDB 0.0.0-fake\ndirectory:    <run>/data/services/db1\nhost:         127.0.0.1\nport:         47811\nattached:     (none)\nengine pid:   <pid>\ndaemon pid:   <pid>\nuptime: <uptime>\nconsole log:  <run>/data/run/db1/console.log\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (cmd db1 x)",
+   "args": [
+    "cmd",
+    "db1",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"db1\" has no RCON port configured\n"
+  },
+  {
+   "label": "step 18 (players db1)",
+   "args": [
+    "players",
+    "db1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: instance \"db1\" has no RCON port configured\n"
+  },
+  {
+   "label": "step 19 (stop db1)",
+   "args": [
+    "stop",
+    "db1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"db1\"...\n\"db1\" stopped (exit code 0).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (restart db1 --timeout 60)",
+   "args": [
+    "restart",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"db1\"...\nReady - ready for connections\n  database pid <pid>   port 47811\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (kill db1)",
+   "args": [
+    "kill",
+    "db1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"db1\" force-killed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (start kv1 --timeout 60)",
+   "args": [
+    "start",
+    "kv1",
+    "--timeout",
+    "60"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Starting \"kv1\"...\nReady - Ready to accept connections\n  database pid <pid>   port 47812\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (stop kv1)",
+   "args": [
+    "stop",
+    "kv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopping \"kv1\"...\n\"kv1\" stopped (exit code 1).\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[],\"databases\":[{\"name\":\"db1\",\"label\":null,\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/db1\",\"jar\":null,\"memory\":null,\"port\":47811,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":1,\"consoleLog\":\"<run>/data/run/db1/console.log\"},{\"name\":\"ext1\",\"label\":null,\"kind\":\"database\",\"status\":\"external\",\"directory\":null,\"jar\":null,\"memory\":null,\"port\":47814,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":true,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/ext1/console.log\"},{\"name\":\"kv1\",\"label\":null,\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/kv1\",\"jar\":null,\"memory\":null,\"port\":47812,\"rconPort\":null,\"engine\":\"garnet\",\"external\":false,\"javaPid\":<pid>,\"daemonPid\":<pid>,\"javaAlive\":false,\"startedAt\":<epoch-ms>,\"uptimeMs\":null,\"exitCode\":1,\"consoleLog\":\"<run>/data/run/kv1/console.log\"},{\"name\":\"nodb\",\"label\":null,\"kind\":\"database\",\"status\":\"stopped\",\"directory\":\"<run>/data/services/nodb\",\"jar\":null,\"memory\":null,\"port\":47813,\"rconPort\":null,\"engine\":\"mariadb\",\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/nodb/console.log\"}]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "text": "{\"at\":\"<time>\",\"server\":\"db1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"db1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"db1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"db1\",\"action\":\"kill\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"kv1\",\"action\":\"start\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"<time>\",\"server\":\"kv1\",\"action\":\"stop\",\"by\":{\"kind\":\"cli\"}}\n"
+  },
+  "data/backups": {
+   "kind": "dir"
+  },
+  "data/engines": {
+   "kind": "dir"
+  },
+  "data/engines/garnet-0.0.0-fake": {
+   "kind": "dir"
+  },
+  "data/engines/garnet-0.0.0-fake/GarnetServer.mjs": {
+   "kind": "file",
+   "text": "/**\r\n * Stands in for GarnetServer: takes the flags the real one takes, listens on loopback, speaks\r\n * enough of the Redis protocol for AUTH, PING, SAVE, SET/GET and SHUTDOWN, and says it is ready\r\n * the way Redis does. FAKE_GARNET_FAIL=start makes it die on the port the way a taken one does.\r\n */\r\nimport fs from 'node:fs'\r\nimport net from 'node:net'\r\nimport path from 'node:path'\r\n\r\nconst argv = process.argv\r\nconst flag = (k) => { const i = argv.indexOf(k); return i === -1 ? null : argv[i + 1] }\r\nconst port = Number(flag('--port'))\r\nconst bind = flag('--bind') ?? '127.0.0.1'\r\nconst password = flag('--password')\r\nconst checkpoints = flag('--checkpointdir')\r\nconst say = (l) => process.stdout.write(`[${new Date().toISOString()}] ${l}\\n`)\r\n\r\nsay(`fake Garnet starting: ${argv.slice(2).join(' ')}`)\r\nif (process.env.FAKE_GARNET_FAIL === 'start') {\r\n  process.stdout.write('Unhandled exception. System.Net.Sockets.SocketException: Address already in use\\n')\r\n  process.exit(1)\r\n}\r\n\r\nconst store = new Map()\r\nfunction parse(buf) {\r\n  if (!buf.startsWith('*')) return null\r\n  const nl = buf.indexOf('\\r\\n')\r\n  if (nl === -1) return null\r\n  const n = Number(buf.slice(1, nl))\r\n  let rest = buf.slice(nl + 2)\r\n  const items = []\r\n  for (let i = 0; i < n; i++) {\r\n    if (!rest.startsWith('$')) return null\r\n    const e = rest.indexOf('\\r\\n')\r\n    if (e === -1) return null\r\n    const len = Number(rest.slice(1, e))\r\n    if (rest.length < e + 2 + len + 2) return null\r\n    items.push(rest.slice(e + 2, e + 2 + len))\r\n    rest = rest.slice(e + 2 + len + 2)\r\n  }\r\n  return { items, rest }\r\n}\r\n\r\nconst server = net.createServer((socket) => {\r\n  let buf = ''\r\n  let authed = !password\r\n  socket.on('data', (c) => {\r\n    buf += c.toString()\r\n    for (;;) {\r\n      const r = parse(buf)\r\n      if (!r) break\r\n      buf = r.rest\r\n      const [cmd, ...args] = r.items\r\n      const op = String(cmd).toUpperCase()\r\n      if (op === 'AUTH') {\r\n        authed = args[args.length - 1] === password\r\n        socket.write(authed ? '+OK\\r\\n' : '-WRONGPASS invalid username-password pair\\r\\n')\r\n      } else if (!authed) {\r\n        socket.write('-NOAUTH Authentication required.\\r\\n')\r\n      } else if (op === 'PING') socket.write('+PONG\\r\\n')\r\n      else if (op === 'SET') { store.set(args[0], args[1]); socket.write('+OK\\r\\n') }\r\n      else if (op === 'GET') { const v = store.get(args[0]); socket.write(v == null ? '$-1\\r\\n' : `$${Buffer.byteLength(v)}\\r\\n${v}\\r\\n`) }\r\n      else if (op === 'SAVE' && checkpoints && fs.existsSync(path.join(checkpoints, 'fail-save'))) socket.write('-ERR checkpoint failed\\r\\n')\r\n      else if (op === 'SAVE') { if (checkpoints) { fs.mkdirSync(checkpoints, { recursive: true }); fs.writeFileSync(path.join(checkpoints, 'checkpoint.txt'), String(Date.now())) } socket.write('+OK\\r\\n') }\r\n      else if (op === 'SHUTDOWN') { say('User requested shutdown...'); socket.end(); setTimeout(() => process.exit(0), 50) }\r\n      else socket.write(`-ERR unknown command '${cmd}'\\r\\n`)\r\n    }\r\n  })\r\n  socket.on('error', () => {})\r\n})\r\nserver.listen(port, bind, () => setTimeout(() => say('Ready to accept connections'), 150))\r\nserver.on('error', (err) => { process.stdout.write(`Unhandled exception: ${err.message}\\n`); process.exit(1) })\r\nsetInterval(() => {}, 1 << 30)\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake": {
+   "kind": "dir"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin": {
+   "kind": "dir"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs": {
+   "kind": "file",
+   "text": "/** Stands in for mariadb-admin: `shutdown` over TCP. Refuses without a password in MYSQL_PWD. */\r\nimport net from 'node:net'\r\n\r\nconst port = Number(process.argv.find((a) => a.startsWith('--port='))?.slice(7))\r\nif (!process.env.MYSQL_PWD) {\r\n  process.stderr.write('fake admin: Access denied (no password)\\n')\r\n  process.exit(1)\r\n}\r\nif (process.argv.at(-1) !== 'shutdown') process.exit(2)\r\nconst s = net.createConnection(port, '127.0.0.1', () => s.write('shutdown\\n'))\r\ns.on('data', () => { s.end(); process.exit(0) })\r\ns.on('error', (e) => { process.stderr.write(`fake admin: ${e.message}\\n`); process.exit(1) })\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs": {
+   "kind": "file",
+   "text": "/** Stands in for mariadb-dump --databases <db>: asks the fake server for a dump and prints it. */\r\nimport net from 'node:net'\r\n\r\nconst argv = process.argv\r\nconst port = Number(argv.find((a) => a.startsWith('--port='))?.slice(7))\r\nconst db = argv[argv.indexOf('--databases') + 1]\r\nif (!process.env.MYSQL_PWD) {\r\n  process.stderr.write(\"fake dump: Access denied for user 'root'@'localhost'\\n\")\r\n  process.exit(1)\r\n}\r\nif (!db) process.exit(2)\r\nconst s = net.createConnection(port, '127.0.0.1', () => s.write(`dump ${Buffer.from(db).toString('base64')}\\n`))\r\nlet buf = ''\r\ns.on('data', (d) => { buf += d })\r\ns.on('end', () => {\r\n  const line = buf.trim()\r\n  if (!line.startsWith('ok ')) { process.stderr.write('fake dump: server refused\\n'); process.exit(1) }\r\n  process.stdout.write(Buffer.from(line.slice(3), 'base64').toString('utf8'))\r\n  process.exit(0)\r\n})\r\ns.on('error', (e) => { process.stderr.write(`fake dump: ${e.message}\\n`); process.exit(1) })\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs": {
+   "kind": "file",
+   "text": "/**\r\n * Stands in for mariadb-install-db: makes the data folder and records the root password in it,\r\n * which is where the other fakes look to check what the real tools check over the wire.\r\n */\r\nimport fs from 'node:fs'\r\nimport path from 'node:path'\r\n\r\nconst arg = (k) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3)\r\nconst datadir = arg('datadir')\r\nif (!datadir) {\r\n  process.stderr.write('fake install-db: --datadir is required\\n')\r\n  process.exit(2)\r\n}\r\nfs.mkdirSync(path.join(datadir, 'mysql'), { recursive: true })\r\nfs.writeFileSync(path.join(datadir, 'root.txt'), arg('password') ?? '')\r\nfs.writeFileSync(path.join(datadir, 'port.txt'), arg('port') ?? '')\r\nprocess.stdout.write('fake install-db: done\\n')\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs": {
+   "kind": "file",
+   "text": "/** Stands in for the mariadb client with --execute: ships the statements to the fake server. */\r\nimport net from 'node:net'\r\n\r\nconst argv = process.argv\r\nconst port = Number(argv.find((a) => a.startsWith('--port='))?.slice(7))\r\nconst at = argv.indexOf('--execute')\r\nif (!process.env.MYSQL_PWD) {\r\n  process.stderr.write(\"fake client: ERROR 1045 (28000): Access denied for user 'root'@'localhost'\\n\")\r\n  process.exit(1)\r\n}\r\n// --execute carries the statements; without it they arrive on stdin, the way an import does.\r\nconst text = at === -1 ? await new Promise((resolve) => { let b = ''; process.stdin.on('data', (c) => { b += c }); process.stdin.on('end', () => resolve(b)) }) : argv[at + 1]\r\nconst s = net.createConnection(port, '127.0.0.1', () => s.write(`sql ${Buffer.from(text).toString('base64')}\\n`))\r\ns.on('data', (d) => { s.end(); process.exit(String(d).startsWith('ok') ? 0 : 1) })\r\ns.on('error', (e) => { process.stderr.write(`fake client: ERROR 2002: Can't connect (${e.message})\\n`); process.exit(1) })\r\n"
+  },
+  "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs": {
+   "kind": "file",
+   "text": "/**\r\n * Stands in for mariadbd --console: reads the port and data folder from the ini, listens on\r\n * loopback, says \"ready for connections\" on stderr the way the real one does, takes no stdin,\r\n * and speaks a one-line protocol the fake admin and client use:\r\n *\r\n *   shutdown          exit 0 after saying so (and a line in <datadir>/fake-shutdowns.log, which\r\n *                     outlives the console log a restart starts again)\r\n *   sql <base64>      append the statements to <datadir>/sql.log, answer \"ok\"\r\n *   dump <base64 db>  answer \"ok <base64 dump text>\" and close, the way a dump streams\r\n *\r\n * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does.\r\n * FAKE_MARIADB_STABLE_DUMP=1 leaves the time out of a dump, so two runs dump the same bytes.\r\n */\r\nimport fs from 'node:fs'\r\nimport net from 'node:net'\r\nimport path from 'node:path'\r\n\r\nconst ini = process.argv.find((a) => a.startsWith('--defaults-file='))?.slice('--defaults-file='.length)\r\nconst text = ini ? fs.readFileSync(ini, 'utf8') : ''\r\nconst port = Number(/^port=(\\d+)/m.exec(text)?.[1])\r\nconst datadir = /^datadir=(.+)$/m.exec(text)?.[1]?.trim()\r\nconst note = (line) => process.stderr.write(`<time> 0 [Note] mariadbd: ${line}\\n`)\r\n\r\nnote(`Starting fake MariaDB ${process.argv.slice(2).join(' ')}`)\r\nif (process.env.FAKE_MARIADB_FAIL === 'start') {\r\n  process.stderr.write(\"<time> 0 [ERROR] Can't start server: Bind on TCP/IP port. Got error: 10048\\n\")\r\n  process.stderr.write('<time> 0 [ERROR] Aborting\\n')\r\n  process.exit(1)\r\n}\r\n\r\nconst server = net.createServer((socket) => {\r\n  let buf = ''\r\n  socket.on('data', (c) => {\r\n    buf += c.toString()\r\n    let nl\r\n    while ((nl = buf.indexOf('\\n')) !== -1) {\r\n      const line = buf.slice(0, nl).trim()\r\n      buf = buf.slice(nl + 1)\r\n      if (line === 'shutdown') {\r\n        note('Normal shutdown')\r\n        try {\r\n          fs.appendFileSync(path.join(datadir, 'fake-shutdowns.log'), JSON.stringify({ pid: process.pid, at: Date.now() }) + '\\n')\r\n        } catch {\r\n          /* the console line is the evidence then */\r\n        }\r\n        socket.end('ok\\n')\r\n        setTimeout(() => process.exit(0), 50)\r\n      } else if (line.startsWith('sql ')) {\r\n        const sql = Buffer.from(line.slice(4), 'base64').toString('utf8')\r\n        fs.appendFileSync(path.join(datadir, 'sql.log'), sql + '\\n')\r\n        socket.write('ok\\n')\r\n      } else if (line.startsWith('dump ')) {\r\n        const db = Buffer.from(line.slice(5), 'base64').toString('utf8')\r\n        const text = `-- MariaDB dump (fake) of ${db}\\nCREATE DATABASE IF NOT EXISTS \\`${db}\\`;\\nUSE \\`${db}\\`;\\n${process.env.FAKE_MARIADB_STABLE_DUMP === '1' ? '' : `-- dumped at ${Date.now()}\\n`}`\r\n        socket.end(`ok ${Buffer.from(text).toString('base64')}\\n`)\r\n      } else {\r\n        socket.write('error unknown\\n')\r\n      }\r\n    }\r\n  })\r\n  socket.on('error', () => {})\r\n})\r\nserver.listen(port, '127.0.0.1', () => setTimeout(() => note('ready for connections.'), 150))\r\nserver.on('error', (err) => {\r\n  process.stderr.write(`<time> 0 [ERROR] Can't start server: ${err.message}\\n`)\r\n  process.exit(1)\r\n})\r\nsetInterval(() => {}, 1 << 30)\r\n"
+  },
+  "data/instances": {
+   "kind": "dir"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"db1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/db1\",\n      \"port\": 47811,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"pw-test\"\n      }\n    },\n    \"kv1\": {\n      \"kind\": \"database\",\n      \"engine\": \"garnet\",\n      \"version\": \"0.0.0-fake\",\n      \"dir\": \"<run>/data/services/kv1\",\n      \"port\": 47812,\n      \"root\": {\n        \"password\": \"pw-kv\"\n      }\n    },\n    \"nodb\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"version\": \"9.9.9\",\n      \"dir\": \"<run>/data/services/nodb\",\n      \"port\": 47813,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"x\"\n      }\n    },\n    \"ext1\": {\n      \"kind\": \"database\",\n      \"engine\": \"mariadb\",\n      \"external\": true,\n      \"host\": \"127.0.0.1\",\n      \"port\": 47814,\n      \"root\": {\n        \"user\": \"root\",\n        \"password\": \"x\"\n      }\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir"
+  },
+  "data/run": {
+   "kind": "dir"
+  },
+  "data/services": {
+   "kind": "dir"
+  },
+  "data/services/db1": {
+   "kind": "dir"
+  },
+  "data/services/db1/data": {
+   "kind": "dir"
+  },
+  "data/services/db1/my.ini": {
+   "kind": "file",
+   "text": "[mysqld]\ndatadir=<run>/data/services/db1/data\nport=47811\nbind-address=127.0.0.1\n"
+  },
+  "data/services/kv1": {
+   "kind": "dir"
+  },
+  "data/services/kv1/data": {
+   "kind": "dir"
+  },
+  "data/services/nodb": {
+   "kind": "dir"
+  },
+  "data/templates": {
+   "kind": "dir"
+  },
+  "home": {
+   "kind": "dir"
+  }
+ }
+}

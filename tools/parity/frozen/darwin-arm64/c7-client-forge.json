@@ -1,0 +1,1165 @@
+{
+ "about": "What the Node core did in scenario c7-client-forge on darwin-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-forge",
+ "platform": "darwin-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 3 (client install neo)",
+   "args": [
+    "client",
+    "install",
+    "neo"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed neoforge-20.1.5: 0 files (0 bytes)\n",
+   "stderr": "Reading the Minecraft version list\nDownloading the version file for Minecraft 1.20.1\nFinding a NeoForge loader for Minecraft 1.20.1\nDownloading the NeoForge 20.1.5 installer\nFinding Java\nclient 1/1 (185 B)\n<progress>\nDownloading NeoForge 20.1.5's libraries\n<progress>\nSetting up NeoForge 20.1.5 (step 1 of 2)\nSetting up NeoForge 20.1.5 (step 2 of 2)\nclient 1/1 (185 B)\n"
+  },
+  {
+   "label": "step 4 (client install neo --json)",
+   "args": [
+    "client",
+    "install",
+    "neo",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"neo\",\"id\":\"neoforge-20.1.5\",\"jar\":\"<run>/data/client/versions/neoforge-20.1.5/neoforge-20.1.5.jar\",\"logConfig\":null,\"assetsLayout\":\"objects\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"file\":\"<run>/data/client/assets/indexes/empty.json\"},\"libraries\":3,\"natives\":0,\"assets\":0,\"downloaded\":0,\"bytes\":0}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 5 (client install neopin --json)",
+   "args": [
+    "client",
+    "install",
+    "neopin",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"neopin\",\"id\":\"neoforge-20.1.5\",\"jar\":\"<run>/data/client/versions/neoforge-20.1.5/neoforge-20.1.5.jar\",\"logConfig\":null,\"assetsLayout\":\"objects\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"file\":\"<run>/data/client/assets/indexes/empty.json\"},\"libraries\":3,\"natives\":0,\"assets\":0,\"downloaded\":0,\"bytes\":0}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (client install neo)",
+   "args": [
+    "client",
+    "install",
+    "neo"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed neoforge-20.1.5: 0 files (0 bytes)\n",
+   "stderr": "Finding Java\nwarning: NeoForge 20.1.5's files were changed or removed since it was set up, so it is set up again\nDownloading NeoForge 20.1.5's libraries\nSetting up NeoForge 20.1.5 (step 1 of 2)\nSetting up NeoForge 20.1.5 (step 2 of 2)\n"
+  },
+  {
+   "label": "step 10 (client install neo)",
+   "args": [
+    "client",
+    "install",
+    "neo"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Finding Java\nDownloading NeoForge 20.1.5's libraries\nSetting up NeoForge 20.1.5 (step 1 of 2)\nerror: Setting up NeoForge stopped at step 1 of 2 (its tool ended with code 3).\ntask MAPPINGS\nworking on MAPPINGS\nstill working\nException in MAPPINGS\nThe whole output is in <run>/data/client/run/neo/loader-install.log\n"
+  },
+  {
+   "label": "step 11 (client install neo --json)",
+   "args": [
+    "client",
+    "install",
+    "neo",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"loader-install-failed\",\"message\":\"Setting up NeoForge stopped at step 1 of 2: mappings-1.0.txt was not made.\\ntask MAPPINGS\\nworking on MAPPINGS\\nstill working\\nThe whole output is in <run>/data/client/run/neo/loader-install.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (client install neo --verify)",
+   "args": [
+    "client",
+    "install",
+    "neo",
+    "--verify"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed neoforge-20.1.5: 0 files (0 bytes)\n",
+   "stderr": "Finding Java\nDownloading NeoForge 20.1.5's libraries\nSetting up NeoForge 20.1.5 (step 1 of 2)\nSetting up NeoForge 20.1.5 (step 2 of 2)\n"
+  },
+  {
+   "label": "step 13 (client install neomc)",
+   "args": [
+    "client",
+    "install",
+    "neomc"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Downloading the NeoForge 20.1.4 installer\nerror: The NeoForge installer is for Minecraft 1.20.2, not 1.20.1; pick another NeoForge build in Advanced.\n"
+  },
+  {
+   "label": "step 14 (client install neospec --json)",
+   "args": [
+    "client",
+    "install",
+    "neospec",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"loader-installer-unknown\",\"message\":\"This NeoForge build needs a newer SpawnLoft (installer format 9). Update SpawnLoft, or pick an older NeoForge build in Advanced.\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (client install neoid)",
+   "args": [
+    "client",
+    "install",
+    "neoid"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Downloading the NeoForge 20.1.2 installer\nerror: The NeoForge installer names its version \"neoforge-other\", not neoforge-20.1.2; pick another NeoForge build in Advanced.\n"
+  },
+  {
+   "label": "step 16 (client install neosum --json)",
+   "args": [
+    "client",
+    "install",
+    "neosum",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"checksum-mismatch\",\"message\":\"could not download the NeoForge 20.1.1 installer from https://maven.neoforged.net/releases/net/neoforged/neoforge/20.1.1/neoforge-20.1.1-installer.jar: checksum mismatch for the NeoForge 20.1.1 installer\\n  expected 0000000000000000000000000000000000000000\\n  got      46cebec2e9a03fe006bd6eff4eacea9493938fb6\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (client install neowrong)",
+   "args": [
+    "client",
+    "install",
+    "neowrong"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: NeoForge 21.1.5 is not a build for Minecraft 1.20.1; pick another in Advanced\n"
+  },
+  {
+   "label": "step 18 (client install neogone --json)",
+   "args": [
+    "client",
+    "install",
+    "neogone",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"download-failed\",\"message\":\"the checksum of neoforge-20.1.9-installer.jar answered 404\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (client install forge)",
+   "args": [
+    "client",
+    "install",
+    "forge"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed 1.20.1-forge-47.1.0: 0 files (0 bytes)\n",
+   "stderr": "Finding a Forge loader for Minecraft 1.20.1\nDownloading the Forge 47.1.0 installer\nFinding Java\nDownloading Forge 47.1.0's libraries\n<progress>\nSetting up Forge 47.1.0 (step 1 of 2)\nSetting up Forge 47.1.0 (step 2 of 2)\nclient 1/1 (185 B)\n"
+  },
+  {
+   "label": "step 20 (client install forgeold --json)",
+   "args": [
+    "client",
+    "install",
+    "forgeold",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"forgeold\",\"id\":\"1.12.2-forge-14.23.5.2847\",\"jar\":\"<run>/data/client/versions/1.12.2-forge-14.23.5.2847/1.12.2-forge-14.23.5.2847.jar\",\"logConfig\":null,\"assetsLayout\":\"objects\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"file\":\"<run>/data/client/assets/indexes/empty.json\"},\"libraries\":5,\"natives\":0,\"assets\":0,\"downloaded\":2,\"bytes\":0}}\n",
+   "stderr": "warning: Minecraft 1.12.2 wants Java 8; using Java 17 at <run>/data/fakejava, which is newer, so the game may not start. Mods often fail on a newer Java.\n"
+  },
+  {
+   "label": "step 21 (client install forgeold)",
+   "args": [
+    "client",
+    "install",
+    "forgeold"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Installed 1.12.2-forge-14.23.5.2847: 0 files (0 bytes)\n",
+   "stderr": "Finding Java\nwarning: Minecraft 1.12.2 wants Java 8; using Java 17 at <run>/data/fakejava, which is newer, so the game may not start. Mods often fail on a newer Java.\n"
+  },
+  {
+   "label": "step 22 (client install forgehost)",
+   "args": [
+    "client",
+    "install",
+    "forgehost"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Downloading the Forge 14.23.5.2860 installer\nerror: The Forge installer names a download at https://evil.example.com/maven/org/evil/lib/1.0/lib-1.0.jar, which is not one of the places SpawnLoft takes mod loader files from; update SpawnLoft, or pick another build\n"
+  },
+  {
+   "label": "step 23 (client install forgebad --json)",
+   "args": [
+    "client",
+    "install",
+    "forgebad",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"loader-not-available\",\"message\":\"Forge 47.0.1-new is not a Forge build; pick another in Advanced\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (client install forgeancient)",
+   "args": [
+    "client",
+    "install",
+    "forgeancient"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Reading the Minecraft version list\nerror: Mojang's version list has no \"1.5.2\"; check the id (releases look like 26.3, snapshots like 26.4-snapshot-6, old versions like b1.7.3). Did you mean 1.20.1, 1.12.2?\n"
+  },
+  {
+   "label": "step 25 (client install forgenone)",
+   "args": [
+    "client",
+    "install",
+    "forgenone"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Downloading the Forge 99.0 installer\nerror: the checksum of forge-1.20.1-99.0-installer.jar answered 404\n"
+  },
+  {
+   "label": "step 26 (client launch neo --as Neo --wait --json)",
+   "args": [
+    "client",
+    "launch",
+    "neo",
+    "--as",
+    "Neo",
+    "--wait",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"neoforge-20.1.5\",\"account\":{\"type\":\"offline\",\"name\":\"Neo\"},\"profile\":{\"name\":\"neo\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.5\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null},\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (client stop neo)",
+   "args": [
+    "client",
+    "stop",
+    "neo"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"neo\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 28 (client launch forgeold --as Old --wait)",
+   "args": [
+    "client",
+    "launch",
+    "forgeold",
+    "--as",
+    "Old",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Launched \"forgeold\" as Old (pid <pid>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (client stop forgeold)",
+   "args": [
+    "client",
+    "stop",
+    "forgeold"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"forgeold\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (client list --json)",
+   "args": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profiles\":[{\"name\":\"forge\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"forge\",\"loaderVersion\":\"47.1.0\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"forgeancient\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.5.2\",\"loader\":\"forge\",\"loaderVersion\":null,\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"forgebad\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"forge\",\"loaderVersion\":\"47.0.1-new\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"forgehost\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.12.2\",\"loader\":\"forge\",\"loaderVersion\":\"14.23.5.2860\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"forgenone\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"forge\",\"loaderVersion\":\"99.0\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"forgeold\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.12.2\",\"loader\":\"forge\",\"loaderVersion\":\"14.23.5.2847\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neo\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.5\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neogone\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.9\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neoid\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.2\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neomc\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.4\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neopin\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.5\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neospec\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.3\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neosum\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"20.1.1\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false},{\"name\":\"neowrong\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.20.1\",\"loader\":\"neoforge\",\"loaderVersion\":\"21.1.5\",\"memory\":\"2G\",\"java\":\"<run>/data/fakejava\",\"server\":null,\"harness\":false,\"account\":null,\"accountName\":null,\"accountType\":null,\"running\":false}]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://files.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/maven-metadata.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://files.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/promotions_slim.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://libraries.minecraft.net",
+   "method": "GET",
+   "url": "/com/example/shared/1.0/shared-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.12.2-14.23.5.2847/forge-1.12.2-14.23.5.2847-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.12.2-14.23.5.2847/forge-1.12.2-14.23.5.2847-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.20.1-47.1.0/forge-1.20.1-47.1.0-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.20.1-47.1.0/forge-1.20.1-47.1.0-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/forge/1.20.1-99.0/forge-1.20.1-99.0-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/net/minecraftforge/installertools/1.4.1/installertools-1.4.1.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/org/example/nosum/1.0/nosum-1.0.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/org/example/nosum/1.0/nosum-1.0.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.minecraftforge.net",
+   "method": "GET",
+   "url": "/org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/api/maven/versions/releases/net/neoforged/neoforge",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/installertools/installertools/2.1.2/installertools-2.1.2.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.1/neoforge-20.1.1-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.1/neoforge-20.1.1-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.2/neoforge-20.1.2-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.2/neoforge-20.1.2-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.3/neoforge-20.1.3-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.3/neoforge-20.1.3-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.4/neoforge-20.1.4-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.4/neoforge-20.1.4-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.5/neoforge-20.1.5-installer.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.5/neoforge-20.1.5-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://maven.neoforged.net",
+   "method": "GET",
+   "url": "/releases/net/neoforged/neoforge/20.1.9/neoforge-20.1.9-installer.jar.sha1",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/octet-stream, */*",
+   "bodyBytes": 0,
+   "unmatched": true
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/a8fa4198cd32206ae555da5daa166ecbf1a35bca/client.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-data.mojang.com",
+   "method": "GET",
+   "url": "/v1/objects/fbd331c211c635838a8df6c069a6f5fc66882b16/client.jar",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/mc/game/version_manifest_v2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "application/json",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/0922230a593c4bdd1ee26f13725f85e3dcd8dad2/1.12.2.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/288a431a4a9645dc57819b68f96f19b7df4e8df9/1.20.1.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://piston-meta.mojang.com",
+   "method": "GET",
+   "url": "/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json",
+   "userAgent": "SpawnLoft (github.com/joogiebear/spawnloft)",
+   "accept": "*/*",
+   "bodyBytes": 0
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/indexes": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/assets/indexes/empty.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"objects\":{}}"
+  },
+  "data/client/cache": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/cache/forge-maven-metadata.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"1.20.1\":[\"1.20.1-47.1.0\",\"1.20.1-47.2.0\",\"1.20.1-47.0.1-new\"],\"1.12.2\":[\"1.12.2-14.23.5.2847\",\"1.12.2-14.23.5.2860\"],\"1.5.2\":[\"1.5.2-7.8.1.738\"]}"
+  },
+  "data/client/cache/forge-maven-metadata.json.fetched-at": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/forge-promotions.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"homepage\":\"https://files.minecraftforge.net\",\"promos\":{\"1.20.1-recommended\":\"47.1.0\",\"1.12.2-latest\":\"14.23.5.2860\"}}"
+  },
+  "data/client/cache/forge-promotions.json.fetched-at": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/installers": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/cache/installers/forge-1.12.2-14.23.5.2847-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=1424 csize=1424 crc=e4c83a5b attr=0x0\nforge-1.12.2-14.23.5.2847-universal.jar method=0 flags=0x0 size=163 csize=163 crc=380ef7ad attr=0x0"
+  },
+  "data/client/cache/installers/forge-1.12.2-14.23.5.2847-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "119dc5783194a0c9a961347faddbc445b1d02f87"
+  },
+  "data/client/cache/installers/forge-1.12.2-14.23.5.2860-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=853 csize=853 crc=3071fd69 attr=0x0\nforge-1.12.2-14.23.5.2860-universal.jar method=0 flags=0x0 size=163 csize=163 crc=380ef7ad attr=0x0"
+  },
+  "data/client/cache/installers/forge-1.12.2-14.23.5.2860-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "b6d98dc5323f11518f6d6ab86b8bb6b7e9bec544"
+  },
+  "data/client/cache/installers/forge-1.20.1-47.1.0-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=1430 csize=1430 crc=e4decea8 attr=0x0\nversion.json method=0 flags=0x0 size=576 csize=576 crc=b16e9742 attr=0x0\ndata/client.lzma method=0 flags=0x0 size=8 csize=8 crc=ff357e98 attr=0x0\nmaven/net/example/inside/1.0/inside-1.0.jar method=8 flags=0x0 size=220 csize=225 crc=d8d5cd3f attr=0x0"
+  },
+  "data/client/cache/installers/forge-1.20.1-47.1.0-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "5f8ff282d7bf7b8eb5d2012a57b9708d7f1bc458"
+  },
+  "data/client/cache/installers/neoforge-20.1.2-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=1513 csize=1513 crc=d694f51e attr=0x0\nversion.json method=0 flags=0x0 size=591 csize=591 crc=0205ec1b attr=0x0\ndata/client.lzma method=0 flags=0x0 size=8 csize=8 crc=ff357e98 attr=0x0\nmaven/net/example/inside/1.0/inside-1.0.jar method=8 flags=0x0 size=220 csize=225 crc=3fc8b8dd attr=0x0"
+  },
+  "data/client/cache/installers/neoforge-20.1.2-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "1782ddbf85483e064a85fcaa0ea23edf6e2da534"
+  },
+  "data/client/cache/installers/neoforge-20.1.3-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=1513 csize=1513 crc=e771c54a attr=0x0\nversion.json method=0 flags=0x0 size=592 csize=592 crc=a40aaa38 attr=0x0\ndata/client.lzma method=0 flags=0x0 size=8 csize=8 crc=ff357e98 attr=0x0\nmaven/net/example/inside/1.0/inside-1.0.jar method=8 flags=0x0 size=220 csize=225 crc=3fc8b8dd attr=0x0"
+  },
+  "data/client/cache/installers/neoforge-20.1.3-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "e50bc277ca431e79eb631f857e85203b93070884"
+  },
+  "data/client/cache/installers/neoforge-20.1.4-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=1513 csize=1513 crc=09a4b814 attr=0x0\nversion.json method=0 flags=0x0 size=592 csize=592 crc=08610dfd attr=0x0\ndata/client.lzma method=0 flags=0x0 size=8 csize=8 crc=ff357e98 attr=0x0\nmaven/net/example/inside/1.0/inside-1.0.jar method=8 flags=0x0 size=220 csize=225 crc=3fc8b8dd attr=0x0"
+  },
+  "data/client/cache/installers/neoforge-20.1.4-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "af8245ac13f69e3419ba65e36da482371f21954c"
+  },
+  "data/client/cache/installers/neoforge-20.1.5-installer.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "install_profile.json method=0 flags=0x0 size=1513 csize=1513 crc=e0fe6c38 attr=0x0\nversion.json method=0 flags=0x0 size=592 csize=592 crc=74d28011 attr=0x0\ndata/client.lzma method=0 flags=0x0 size=8 csize=8 crc=ff357e98 attr=0x0\nmaven/net/example/inside/1.0/inside-1.0.jar method=8 flags=0x0 size=220 csize=225 crc=3fc8b8dd attr=0x0"
+  },
+  "data/client/cache/installers/neoforge-20.1.5-installer.jar.sha1": {
+   "kind": "file",
+   "mode": "644",
+   "text": "4bcd3399c034d8d88b569da08b14a5da3f3f0659"
+  },
+  "data/client/cache/loader-steps": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/cache/loader-steps/1.20.1.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 1,\n  \"steps\": {\n    \"ec32cb3508b8b7d6a21253b05f35dfaf3cee076f\": {\n      \"libraries/net/neoforged/installertools/patched/1.0/patched-1.0.jar\": [\n        4,\n        \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n      ]\n    },\n    \"f7d19d09df1296422fc3d4a2be692940af40dab4\": {\n      \"libraries/net/minecraftforge/patched/1.0/patched-1.0.jar\": [\n        4,\n        \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n      ]\n    }\n  }\n}"
+  },
+  "data/client/cache/neoforge-versions.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"isSnapshot\":false,\"versions\":[\"20.1.1\",\"20.1.5\",\"20.1.6-beta\",\"20.2.3\",\"20.1.2\",\"20.1.3\",\"20.1.4\"]}"
+  },
+  "data/client/cache/neoforge-versions.json.fetched-at": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<epoch-ms>"
+  },
+  "data/client/cache/version_manifest_v2.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"latest\":{\"release\":\"1.20.1\",\"snapshot\":\"1.20.1\"},\"versions\":[{\"id\":\"1.20.1\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/v1/packages/288a431a4a9645dc57819b68f96f19b7df4e8df9/1.20.1.json\",\"sha1\":\"288a431a4a9645dc57819b68f96f19b7df4e8df9\"},{\"id\":\"1.12.2\",\"type\":\"release\",\"url\":\"https://piston-meta.mojang.com/v1/packages/0922230a593c4bdd1ee26f13725f85e3dcd8dad2/1.12.2.json\",\"sha1\":\"0922230a593c4bdd1ee26f13725f85e3dcd8dad2\"}]}"
+  },
+  "data/client/cache/version_manifest_v2.json.fetched-at": {
+   "kind": "file",
+   "mode": "644",
+   "text": "<epoch-ms>"
+  },
+  "data/client/libraries": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/shared": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/shared/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/com/example/shared/1.0/shared-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 300,
+   "sha256": "7ea768c41538bc708c6418402b30a2ec76e507ef7d3e738b08bd6e9a1a814234"
+  },
+  "data/client/libraries/net": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/example": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/example/inside": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/example/inside/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/example/inside/1.0/inside-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 220,
+   "sha256": "c2f3cc5a6bef10afe300ec92cd6211f89882297ce430a1e3448904ae3fa231b2"
+  },
+  "data/client/libraries/net/minecraft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraft/launchwrapper": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraft/launchwrapper/1.12": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 330,
+   "sha256": "359b96ce70a9bfb5c37c09f90d10522bc241f6ec2e514720a961b4e8e795dd24"
+  },
+  "data/client/libraries/net/minecraftforge": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/forge": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/forge/1.12.2-14.23.5.2847": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/forge/1.12.2-14.23.5.2847/forge-1.12.2-14.23.5.2847.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraftforge/Forge.class method=0 flags=0x0 size=5 csize=5 crc=f304462c attr=0x0"
+  },
+  "data/client/libraries/net/minecraftforge/installertools": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/installertools/1.4.1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/installertools/1.4.1/installertools-1.4.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "META-INF/MANIFEST.MF method=0 flags=0x0 size=78 csize=78 crc=204d98d9 attr=0x0\nTool.class method=0 flags=0x0 size=43 csize=43 crc=268f7a9b attr=0x0"
+  },
+  "data/client/libraries/net/minecraftforge/mappings": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/mappings/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/mappings/1.0/mappings-1.0.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "made"
+  },
+  "data/client/libraries/net/minecraftforge/patched": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/patched/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/minecraftforge/patched/1.0/patched-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "made"
+  },
+  "data/client/libraries/net/neoforged": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/installertools": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/installertools/2.1.2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/installertools/2.1.2/installertools-2.1.2.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "META-INF/MANIFEST.MF method=0 flags=0x0 size=78 csize=78 crc=204d98d9 attr=0x0\nTool.class method=0 flags=0x0 size=43 csize=43 crc=268f7a9b attr=0x0"
+  },
+  "data/client/libraries/net/neoforged/installertools/mappings": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/mappings/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/mappings/1.0/mappings-1.0.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "made"
+  },
+  "data/client/libraries/net/neoforged/installertools/patched": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/patched/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/net/neoforged/installertools/patched/1.0/patched-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "made"
+  },
+  "data/client/libraries/org": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/example": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/example/nosum": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/example/nosum/1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/example/nosum/1.0/nosum-1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 120,
+   "sha256": "33eb239a7a0d6012f6416d73d301305af98d6e6ccaf43275ea1e41a63f5dae21"
+  },
+  "data/client/libraries/org/scala-lang": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/scala-lang/scala-library": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/scala-lang/scala-library/2.11.1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/libraries/org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "size": 410,
+   "sha256": "38029bdf592ab68a574ad34dcbb719b9dbe6e08a342d50dffe6b7052547e8457"
+  },
+  "data/client/profiles": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/forgeold": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/neo": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"neo\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.5\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neopin\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.5\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neomc\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.4\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neospec\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.3\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neoid\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.2\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neosum\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.1\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neowrong\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"21.1.5\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"neogone\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"neoforge\",\n      \"loaderVersion\": \"20.1.9\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"forge\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": \"47.1.0\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"forgeold\": {\n      \"mc\": \"1.12.2\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": \"14.23.5.2847\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"forgehost\": {\n      \"mc\": \"1.12.2\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": \"14.23.5.2860\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"forgebad\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": \"47.0.1-new\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"forgeancient\": {\n      \"mc\": \"1.5.2\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": null,\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    },\n    \"forgenone\": {\n      \"mc\": \"1.20.1\",\n      \"loader\": \"forge\",\n      \"loaderVersion\": \"99.0\",\n      \"memory\": \"2G\",\n      \"java\": \"<run>/data/fakejava\",\n      \"server\": null,\n      \"harness\": false,\n      \"account\": null\n    }\n  },\n  \"defaultAccount\": null\n}\n"
+  },
+  "data/client/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/forge": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/forgeold": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/forgeold/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Old\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/forgeold/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 1\n}\n"
+  },
+  "data/client/run/forgeold/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/run/neo": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/neo/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Neo\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/neo/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 1\n}\n"
+  },
+  "data/client/run/neo/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/versions": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.12.2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.12.2/1.12.2.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=15 csize=15 crc=cd0838aa attr=0x0"
+  },
+  "data/client/versions/1.12.2/1.12.2.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"1.12.2\",\"type\":\"release\",\"mainClass\":\"net.minecraft.client.main.Main\",\"javaVersion\":{\"component\":\"jre-legacy\",\"majorVersion\":8},\"minecraftArguments\":\"--username ${auth_player_name}\",\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":0,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"assets\":\"empty\",\"downloads\":{\"client\":{\"sha1\":\"a8fa4198cd32206ae555da5daa166ecbf1a35bca\",\"size\":185,\"url\":\"https://piston-data.mojang.com/v1/objects/a8fa4198cd32206ae555da5daa166ecbf1a35bca/client.jar\"}},\"libraries\":[{\"name\":\"com.example:shared:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/shared/1.0/shared-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/shared/1.0/shared-1.0.jar\",\"sha1\":\"cb8940e606ef52c86da2352aece0781c852bfa91\",\"size\":300}}}]}"
+  },
+  "data/client/versions/1.12.2-forge-14.23.5.2847": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.12.2-forge-14.23.5.2847/.loader-installed.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 1,\n  \"id\": \"1.12.2-forge-14.23.5.2847\",\n  \"installer\": \"119dc5783194a0c9a961347faddbc445b1d02f87\",\n  \"at\": \"<time>\",\n  \"files\": {\n    \"libraries/net/minecraftforge/forge/1.12.2-14.23.5.2847/forge-1.12.2-14.23.5.2847.jar\": [\n      163,\n      \"5ed89a6e3728a2e402bea6051d62ca022f3cfb46\"\n    ]\n  }\n}"
+  },
+  "data/client/versions/1.12.2-forge-14.23.5.2847/1.12.2-forge-14.23.5.2847.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=15 csize=15 crc=cd0838aa attr=0x0"
+  },
+  "data/client/versions/1.12.2-forge-14.23.5.2847/1.12.2-forge-14.23.5.2847.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"id\": \"1.12.2-forge-14.23.5.2847\",\n  \"time\": \"<time>\",\n  \"releaseTime\": \"<time>\",\n  \"type\": \"release\",\n  \"minecraftArguments\": \"--username ${auth_player_name} --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker\",\n  \"mainClass\": \"net.minecraft.launchwrapper.Launch\",\n  \"logging\": {},\n  \"inheritsFrom\": \"1.12.2\",\n  \"libraries\": [\n    {\n      \"name\": \"net.minecraftforge:forge:1.12.2-14.23.5.2847\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"net/minecraftforge/forge/1.12.2-14.23.5.2847/forge-1.12.2-14.23.5.2847.jar\",\n          \"url\": \"\",\n          \"sha1\": \"5ed89a6e3728a2e402bea6051d62ca022f3cfb46\",\n          \"size\": 163\n        }\n      }\n    },\n    {\n      \"name\": \"net.minecraft:launchwrapper:1.12\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar\",\n          \"url\": \"https://maven.minecraftforge.net/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar\",\n          \"sha1\": \"f2d3cee6f960567cf5303098a93b1db1607e607d\"\n        }\n      }\n    },\n    {\n      \"name\": \"org.scala-lang:scala-library:2.11.1\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar\",\n          \"url\": \"https://maven.minecraftforge.net/org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar\",\n          \"sha1\": \"495e0d9279c55677e1c08be43fc08b53ba4f8598\"\n        }\n      }\n    },\n    {\n      \"name\": \"org.example:nosum:1.0\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/example/nosum/1.0/nosum-1.0.jar\",\n          \"url\": \"https://maven.minecraftforge.net/org/example/nosum/1.0/nosum-1.0.jar\",\n          \"sha1\": \"b27dcf2ead6e0516dedda3c1a91938556452d3d7\"\n        }\n      }\n    }\n  ]\n}"
+  },
+  "data/client/versions/1.20.1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.20.1/1.20.1.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=15 csize=15 crc=45301290 attr=0x0"
+  },
+  "data/client/versions/1.20.1/1.20.1.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"id\":\"1.20.1\",\"type\":\"release\",\"mainClass\":\"net.minecraft.client.main.Main\",\"javaVersion\":{\"component\":\"java-runtime-gamma\",\"majorVersion\":17},\"arguments\":{\"game\":[\"--username\",\"${auth_player_name}\"],\"jvm\":[\"-cp\",\"${classpath}\"]},\"assetIndex\":{\"id\":\"empty\",\"sha1\":\"62ea787c1f800c091b98678b050453a5ae59d7bc\",\"size\":14,\"totalSize\":0,\"url\":\"https://piston-meta.mojang.com/v1/packages/62ea787c1f800c091b98678b050453a5ae59d7bc/empty.json\"},\"assets\":\"empty\",\"downloads\":{\"client\":{\"sha1\":\"fbd331c211c635838a8df6c069a6f5fc66882b16\",\"size\":185,\"url\":\"https://piston-data.mojang.com/v1/objects/fbd331c211c635838a8df6c069a6f5fc66882b16/client.jar\"}},\"libraries\":[{\"name\":\"com.example:shared:1.0\",\"downloads\":{\"artifact\":{\"path\":\"com/example/shared/1.0/shared-1.0.jar\",\"url\":\"https://libraries.minecraft.net/com/example/shared/1.0/shared-1.0.jar\",\"sha1\":\"cb8940e606ef52c86da2352aece0781c852bfa91\",\"size\":300}}}]}"
+  },
+  "data/client/versions/1.20.1-forge-47.1.0": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.20.1-forge-47.1.0/.loader-installed.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 1,\n  \"id\": \"1.20.1-forge-47.1.0\",\n  \"installer\": \"5f8ff282d7bf7b8eb5d2012a57b9708d7f1bc458\",\n  \"at\": \"<time>\",\n  \"files\": {\n    \"libraries/net/minecraftforge/mappings/1.0/mappings-1.0.txt\": [\n      4,\n      \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n    ],\n    \"libraries/net/minecraftforge/patched/1.0/patched-1.0.jar\": [\n      4,\n      \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n    ],\n    \"libraries/net/example/inside/1.0/inside-1.0.jar\": [\n      220,\n      \"a78eda3a9cd04440b5b23b010fdb1a24ab05780c\"\n    ]\n  }\n}"
+  },
+  "data/client/versions/1.20.1-forge-47.1.0/1.20.1-forge-47.1.0.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=15 csize=15 crc=45301290 attr=0x0"
+  },
+  "data/client/versions/1.20.1-forge-47.1.0/1.20.1-forge-47.1.0.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"id\": \"1.20.1-forge-47.1.0\",\n  \"inheritsFrom\": \"1.20.1\",\n  \"type\": \"release\",\n  \"mainClass\": \"cpw.mods.bootstraplauncher.BootstrapLauncher\",\n  \"arguments\": {\n    \"game\": [\n      \"--launchTarget\",\n      \"forgeclient\"\n    ],\n    \"jvm\": []\n  },\n  \"libraries\": [\n    {\n      \"name\": \"net.example:inside:1.0\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"net/example/inside/1.0/inside-1.0.jar\",\n          \"url\": \"\",\n          \"sha1\": \"a78eda3a9cd04440b5b23b010fdb1a24ab05780c\",\n          \"size\": 220\n        }\n      }\n    },\n    {\n      \"name\": \"net.minecraftforge:patched:1.0\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"net/minecraftforge/patched/1.0/patched-1.0.jar\",\n          \"url\": \"\",\n          \"sha1\": \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\",\n          \"size\": 4\n        }\n      }\n    }\n  ]\n}"
+  },
+  "data/client/versions/neoforge-20.1.5": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/neoforge-20.1.5/.loader-installed.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 1,\n  \"id\": \"neoforge-20.1.5\",\n  \"installer\": \"4bcd3399c034d8d88b569da08b14a5da3f3f0659\",\n  \"at\": \"<time>\",\n  \"files\": {\n    \"libraries/net/neoforged/installertools/mappings/1.0/mappings-1.0.txt\": [\n      4,\n      \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n    ],\n    \"libraries/net/neoforged/installertools/patched/1.0/patched-1.0.jar\": [\n      4,\n      \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\"\n    ],\n    \"libraries/net/example/inside/1.0/inside-1.0.jar\": [\n      220,\n      \"adc166178fbee41442645c0f5b4ebaf3e1013946\"\n    ]\n  }\n}"
+  },
+  "data/client/versions/neoforge-20.1.5/neoforge-20.1.5.jar": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "net/minecraft/client/main/Main.class method=0 flags=0x0 size=15 csize=15 crc=45301290 attr=0x0"
+  },
+  "data/client/versions/neoforge-20.1.5/neoforge-20.1.5.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"id\": \"neoforge-20.1.5\",\n  \"inheritsFrom\": \"1.20.1\",\n  \"type\": \"release\",\n  \"mainClass\": \"cpw.mods.bootstraplauncher.BootstrapLauncher\",\n  \"arguments\": {\n    \"game\": [\n      \"--launchTarget\",\n      \"forgeclient\"\n    ],\n    \"jvm\": []\n  },\n  \"libraries\": [\n    {\n      \"name\": \"net.example:inside:1.0\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"net/example/inside/1.0/inside-1.0.jar\",\n          \"url\": \"\",\n          \"sha1\": \"adc166178fbee41442645c0f5b4ebaf3e1013946\",\n          \"size\": 220\n        }\n      }\n    },\n    {\n      \"name\": \"net.neoforged.installertools:patched:1.0\",\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"net/neoforged/installertools/patched/1.0/patched-1.0.jar\",\n          \"url\": \"\",\n          \"sha1\": \"e572f95f9d1fad1088e43936931f12bbbbdbbb06\",\n          \"size\": 4\n        }\n      }\n    }\n  ]\n}"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/fakejava": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in -version) echo 'openjdk version \"17.0.9\" <date>' >&2; exit 0;; esac; done\nout=\"\"; task=\"\"; prev=\"\"\nfor a in \"$@\"; do\n  [ \"$prev\" = \"--output\" ] && out=\"$a\"\n  [ \"$prev\" = \"--task\" ] && task=\"$a\"\n  prev=\"$a\"\ndone\necho \"task $task\"\necho \"working on $task\"\necho \"\"\necho \"still working\"\n# stdout and stderr are two pipes, so the order lines from both reach the tail in is a race:\n# the failure line goes to stderr only after a pause\nif [ \"$task\" = \"$FAKE_STEP_FAIL\" ]; then sleep 0.3; echo \"Exception in $task\" >&2; exit 3; fi\nif [ -n \"$out\" ] && [ \"$task\" != \"$FAKE_STEP_SKIP\" ]; then mkdir -p \"$(dirname \"$out\")\"; printf made > \"$out\"; fi\nexit 0\n"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

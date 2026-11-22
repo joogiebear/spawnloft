@@ -1,0 +1,866 @@
+{
+ "about": "What the Node core did in scenario c6-tasks on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c6-tasks",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 6 (task)",
+   "args": [
+    "task"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No scheduled tasks.\n\n  Add one with: spawnloft task add <instance> --do backup --daily 03:00\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (task add alpha --daily 04:00)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "04:00"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Linux scheduler: Failed to enable unit: Access denied\n"
+  },
+  {
+   "label": "step 8 (task list)",
+   "args": [
+    "task",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No scheduled tasks.\n\n  Add one with: spawnloft task add <instance> --do backup --daily 03:00\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (task add alpha --daily 04:00)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "04:00"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"alpha-backup\" - Take a backup, daily 04:00.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (task add alpha --do backup --weekly sun --at 23:59 --name Weekly copy)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "backup",
+    "--weekly",
+    "sun",
+    "--at",
+    "23:59",
+    "--name",
+    "Weekly copy"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"alpha-backup-2\" - Weekly copy, SUN 23:59.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (task add alpha --do command --line  say hello  --hourly 3)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "command",
+    "--line",
+    " say hello ",
+    "--hourly",
+    "3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"alpha-command\" - Run a server command, every 3h.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (task add beta --do restart --minutes 45)",
+   "args": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "restart",
+    "--minutes",
+    "45"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"beta-restart\" - Restart the server, every 45m.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (task add beta --do stop --on-logon)",
+   "args": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "stop",
+    "--on-logon"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"beta-stop\" - Stop the server, at logon.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (task add beta --do start --hourly)",
+   "args": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "start",
+    "--hourly"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"beta-start\" - Start the server, hourly.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (task add beta --do verify --daily)",
+   "args": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "verify",
+    "--daily"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"beta-verify\" - Verify the backups, daily 03:00.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (task add Gamma --do backup --at 05:30)",
+   "args": [
+    "task",
+    "add",
+    "Gamma",
+    "--do",
+    "backup",
+    "--at",
+    "05:30"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"Gamma-backup\" - Take a backup, daily 05:30.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (task add Gamma --do command --line save-all --minutes 1439)",
+   "args": [
+    "task",
+    "add",
+    "Gamma",
+    "--do",
+    "command",
+    "--line",
+    "save-all",
+    "--minutes",
+    "1439"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Created \"Gamma-command\" - Run a server command, every 1439m.\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (task add)",
+   "args": [
+    "task",
+    "add"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft task add <instance> --do <backup|command|restart|stop|start> [when]\n"
+  },
+  {
+   "label": "step 19 (task add nope)",
+   "args": [
+    "task",
+    "add",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: alpha, beta, Gamma\n"
+  },
+  {
+   "label": "step 20 (task add ../x)",
+   "args": [
+    "task",
+    "add",
+    "../x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: invalid instance name \"../x\" - use letters, digits, dash, underscore (max 32 chars)\n"
+  },
+  {
+   "label": "step 21 (task add alpha --do command)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "command"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --do command needs --line \"<what to send>\"\n"
+  },
+  {
+   "label": "step 22 (task add alpha --do command --line    )",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "command",
+    "--line",
+    "   "
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: a command is required\n"
+  },
+  {
+   "label": "step 23 (task add alpha --do dance)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "dance"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: unknown action \"dance\" - expected one of backup, verify, command, restart, stop, start, steps\n"
+  },
+  {
+   "label": "step 24 (task add alpha --do steps)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "steps"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: add at least one step\n"
+  },
+  {
+   "label": "step 25 (task add alpha --daily 24:00)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "24:00"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"24:00\" is not a time - use HH:MM on a 24 hour clock\n"
+  },
+  {
+   "label": "step 26 (task add alpha --daily 4:00)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "4:00"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"4:00\" is not a time - use HH:MM on a 24 hour clock\n"
+  },
+  {
+   "label": "step 27 (task add alpha --weekly funday)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--weekly",
+    "funday"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"funday\" is not a day - use one of MON, TUE, WED, THU, FRI, SAT, SUN\n"
+  },
+  {
+   "label": "step 28 (task add alpha --minutes 1440)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--minutes",
+    "1440"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the largest minutes interval Windows accepts is 1439\n"
+  },
+  {
+   "label": "step 29 (task add alpha --hourly 24)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--hourly",
+    "24"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the largest hourly interval Windows accepts is 23\n"
+  },
+  {
+   "label": "step 30 (task add alpha --hourly 2.5)",
+   "args": [
+    "task",
+    "add",
+    "alpha",
+    "--hourly",
+    "2.5"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the interval must be a whole number of at least 1\n"
+  },
+  {
+   "label": "step 31 (task list)",
+   "args": [
+    "task",
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID              INSTANCE  DOES     WHEN         STATE  LAST     NEXT\nalpha-command   alpha     command  every 3h     Ready  unknown  <time>\nalpha-backup    alpha     backup   daily 04:00  Ready  unknown  <time>\nalpha-backup-2  alpha     backup   SUN 23:59    Ready  unknown  <time>\nbeta-restart    beta      restart  every 45m    Ready  unknown  <time>\nbeta-start      beta      start    hourly       Ready  unknown  <time>\nbeta-stop       beta      stop     at logon     Ready  unknown  -\nbeta-verify     beta      verify   daily 03:00  Ready  unknown  <time>\nGamma-command   Gamma     command  every 1439m  Ready  unknown  <time>\nGamma-backup    Gamma     backup   daily 05:30  Ready  unknown  <time>\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (task disable alpha-backup)",
+   "args": [
+    "task",
+    "disable",
+    "alpha-backup"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Disabled \"alpha-backup\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (task disable beta-start)",
+   "args": [
+    "task",
+    "disable",
+    "beta-start"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Disabled \"beta-start\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (task enable beta-start)",
+   "args": [
+    "task",
+    "enable",
+    "beta-start"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Enabled \"beta-start\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (task disable nope)",
+   "args": [
+    "task",
+    "disable",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no scheduled task \"nope\"\n"
+  },
+  {
+   "label": "step 36 (task enable)",
+   "args": [
+    "task",
+    "enable"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft task enable <id>\n"
+  },
+  {
+   "label": "step 37 (task rm)",
+   "args": [
+    "task",
+    "rm"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft task rm <id>\n"
+  },
+  {
+   "label": "step 38 (task rm nope)",
+   "args": [
+    "task",
+    "rm",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no scheduled task \"nope\"\n"
+  },
+  {
+   "label": "step 39 (task rm beta-stop)",
+   "args": [
+    "task",
+    "rm",
+    "beta-stop"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"beta-stop\".\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (task run)",
+   "args": [
+    "task",
+    "run"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft task run <id>\n"
+  },
+  {
+   "label": "step 41 (task run nope)",
+   "args": [
+    "task",
+    "run",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no scheduled task \"nope\"\n"
+  },
+  {
+   "label": "step 42 (task bogus)",
+   "args": [
+    "task",
+    "bogus"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft task [list|add|run|rm|enable|disable|linger]\n"
+  },
+  {
+   "label": "step 43 (task linger off)",
+   "args": [
+    "task",
+    "linger",
+    "off"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft task linger [on]\n"
+  },
+  {
+   "label": "step 44 (task linger)",
+   "args": [
+    "task",
+    "linger"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "WARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (task)",
+   "args": [
+    "task"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID              INSTANCE  DOES     WHEN         STATE     LAST     NEXT\nalpha-command   alpha     command  every 3h     Ready     unknown  <time>\nalpha-backup    alpha     backup   daily 04:00  disabled  unknown  -\nalpha-backup-2  alpha     backup   SUN 23:59    Ready     unknown  <time>\nbeta-restart    beta      restart  every 45m    Ready     unknown  <time>\nbeta-start      beta      start    hourly       Ready     unknown  <time>\nbeta-verify     beta      verify   daily 03:00  Ready     unknown  <time>\nGamma-command   Gamma     command  every 1439m  Ready     unknown  <time>\nGamma-backup    Gamma     backup   daily 05:30  Ready     unknown  <time>\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (rename)",
+   "args": [
+    "rename"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft rename <old-name> <new-name>\n"
+  },
+  {
+   "label": "step 47 (rename alpha)",
+   "args": [
+    "rename",
+    "alpha"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft rename <old-name> <new-name>\n"
+  },
+  {
+   "label": "step 48 (rename alpha bad name)",
+   "args": [
+    "rename",
+    "alpha",
+    "bad name"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"bad name\" is not a usable name - start with a letter or digit, then letters, digits, dash or underscore, up to 32 characters.\n"
+  },
+  {
+   "label": "step 49 (rename nope x1)",
+   "args": [
+    "rename",
+    "nope",
+    "x1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: alpha, beta, Gamma\n"
+  },
+  {
+   "label": "step 50 (rename alpha beta)",
+   "args": [
+    "rename",
+    "alpha",
+    "beta"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"beta\" already exists\n"
+  },
+  {
+   "label": "step 51 (rename alpha gamma)",
+   "args": [
+    "rename",
+    "alpha",
+    "gamma"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"Gamma\" already exists, and \"gamma\" differs from it only in capitals\n"
+  },
+  {
+   "label": "step 55 (rename alpha delta)",
+   "args": [
+    "rename",
+    "alpha",
+    "delta"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: <run>/data/backups/delta already holds snapshots - from an earlier server called \"delta\".\n  \"alpha\" has not been renamed. Move or delete that folder first, or pick another name.\n"
+  },
+  {
+   "label": "step 58 (rename alpha delta)",
+   "args": [
+    "rename",
+    "alpha",
+    "delta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Renamed \"alpha\" -> \"delta\"\n  directory moved to <run>/data/instances/delta\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (task)",
+   "args": [
+    "task"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID              INSTANCE  DOES     WHEN         STATE     LAST     NEXT\nbeta-restart    beta      restart  every 45m    Ready     unknown  <time>\nbeta-start      beta      start    hourly       Ready     unknown  <time>\nbeta-verify     beta      verify   daily 03:00  Ready     unknown  <time>\ndelta-command   delta     command  every 3h     Ready     unknown  <time>\ndelta-backup    delta     backup   daily 04:00  disabled  unknown  -\ndelta-backup-2  delta     backup   SUN 23:59    Ready     unknown  <time>\nGamma-command   Gamma     command  every 1439m  Ready     unknown  <time>\nGamma-backup    Gamma     backup   daily 05:30  Ready     unknown  <time>\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (rename Gamma gamma)",
+   "args": [
+    "rename",
+    "Gamma",
+    "gamma"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Renamed \"Gamma\" -> \"gamma\"\n  directory moved to <run>/data/instances/gamma\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (task)",
+   "args": [
+    "task"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID              INSTANCE  DOES     WHEN         STATE     LAST     NEXT\nbeta-restart    beta      restart  every 45m    Ready     unknown  <time>\nbeta-start      beta      start    hourly       Ready     unknown  <time>\nbeta-verify     beta      verify   daily 03:00  Ready     unknown  <time>\ndelta-command   delta     command  every 3h     Ready     unknown  <time>\ndelta-backup    delta     backup   daily 04:00  disabled  unknown  -\ndelta-backup-2  delta     backup   SUN 23:59    Ready     unknown  <time>\ngamma-command   gamma     command  every 1439m  Ready     unknown  <time>\ngamma-backup    gamma     backup   daily 05:30  Ready     unknown  <time>\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (list)",
+   "args": [
+    "list"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME   STATUS   PORT   RCON   MEM  UPTIME  DIR\nbeta   stopped  47802  47812  1G   -       <run>/data/instances/beta\ndelta  stopped  47801  47811  1G   -       <run>/data/instances/delta\ngamma  stopped  47803  47813  1G   -       <run>/data/instances/gamma\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 63 (rm)",
+   "args": [
+    "rm"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: rm requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 64 (rm nope)",
+   "args": [
+    "rm",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: beta, delta, gamma\n"
+  },
+  {
+   "label": "step 65 (rm beta --purge)",
+   "args": [
+    "rm",
+    "beta",
+    "--purge"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --purge deletes <run>/data/instances/beta permanently. Re-run with --yes to confirm.\n"
+  },
+  {
+   "label": "step 66 (rm beta)",
+   "args": [
+    "rm",
+    "beta"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Unregistered \"beta\". Files kept at <run>/data/instances/beta\nAlso removed 3 scheduled task(s) that pointed at it.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (remove gamma --purge --yes)",
+   "args": [
+    "remove",
+    "gamma",
+    "--purge",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"gamma\" and deleted <run>/data/instances/gamma\nAlso removed 2 scheduled task(s) that pointed at it.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (task)",
+   "args": [
+    "task"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ID              INSTANCE  DOES     WHEN         STATE     LAST     NEXT\ndelta-command   delta     command  every 3h     Ready     unknown  <time>\ndelta-backup    delta     backup   daily 04:00  disabled  unknown  -\ndelta-backup-2  delta     backup   SUN 23:59    Ready     unknown  <time>\n\nWARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.\nA backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:\n  spawnloft task linger on\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 69 (rm delta --purge --yes)",
+   "args": [
+    "rm",
+    "delta",
+    "--purge",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed \"delta\" and deleted <run>/data/instances/delta\nAlso removed 3 scheduled task(s) that pointed at it.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 70 (task)",
+   "args": [
+    "task"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No scheduled tasks.\n\n  Add one with: spawnloft task add <instance> --do backup --daily 03:00\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Weekly copy (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command (runs a command)\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Restart the server (restarts the server)\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Stop the server (stop)\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Start the server (start)\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Verify the backups (verify)\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup (backs up)\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"schedule-add\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command (runs a command)\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-disable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Start the server\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Start the server\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Stop the server\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Weekly copy\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"rename\",\"by\":{\"kind\":\"cli\"},\"detail\":\"from alpha\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"schedule-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"schedule-enable\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"rename\",\"by\":{\"kind\":\"cli\"},\"detail\":\"from Gamma\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Restart the server\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Start the server\"}\n{\"at\":\"<time>\",\"server\":\"beta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Verify the backups\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"gamma\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Take a backup\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Weekly copy\"}\n{\"at\":\"<time>\",\"server\":\"delta\",\"action\":\"schedule-remove\",\"by\":{\"kind\":\"cli\"},\"detail\":\"Run a server command\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/delta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/delta/standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": ""
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/beta": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/beta/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {}\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/schedules.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"tasks\": {}\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/tasks": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/systemd/user": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "scheduler": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "scheduler/calls.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "systemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-alpha-backup.timer -> 1\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup-2.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup-2.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-alpha-backup-2.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-command.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-alpha-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-restart.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-restart.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-beta-restart.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-stop.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-stop.service\nsystemctl --user daemon-reload\nsystemctl --user enable spawnloft-58041990a3c18fc8-beta-stop.service\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-start.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-verify.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-verify.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-beta-verify.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-Gamma-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-Gamma-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-Gamma-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-Gamma-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-Gamma-command.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-Gamma-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-start.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-start.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-stop.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-stop.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-beta-stop.service spawnloft-58041990a3c18fc8-beta-stop.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-alpha-backup.service spawnloft-58041990a3c18fc8-alpha-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-backup-2.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-backup-2.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-backup-2.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-backup-2.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-alpha-backup-2.service spawnloft-58041990a3c18fc8-alpha-backup-2.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-backup-2.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-backup-2.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-delta-backup-2.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-command.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-alpha-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-alpha-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-alpha-command.service spawnloft-58041990a3c18fc8-alpha-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-command.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-delta-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-Gamma-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-Gamma-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-Gamma-backup.service spawnloft-58041990a3c18fc8-Gamma-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-gamma-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-gamma-backup.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-gamma-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-gamma-backup.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-gamma-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-Gamma-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-Gamma-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-Gamma-command.service spawnloft-58041990a3c18fc8-Gamma-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-gamma-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-gamma-command.service\nsystemctl --user daemon-reload\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-gamma-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-gamma-command.service\nsystemctl --user daemon-reload\nsystemctl --user enable --now spawnloft-58041990a3c18fc8-gamma-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-restart.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-restart.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-beta-restart.service spawnloft-58041990a3c18fc8-beta-restart.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-start.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-beta-start.service spawnloft-58041990a3c18fc8-beta-start.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-beta-verify.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-beta-verify.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-beta-verify.service spawnloft-58041990a3c18fc8-beta-verify.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-gamma-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-gamma-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-gamma-backup.service spawnloft-58041990a3c18fc8-gamma-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-gamma-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-gamma-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-gamma-command.service spawnloft-58041990a3c18fc8-gamma-command.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-backup.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-backup.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-delta-backup.service spawnloft-58041990a3c18fc8-delta-backup.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-backup-2.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-backup-2.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-delta-backup-2.service spawnloft-58041990a3c18fc8-delta-backup-2.timer\nsystemctl --user disable --now spawnloft-58041990a3c18fc8-delta-command.timer\nsystemctl --user disable spawnloft-58041990a3c18fc8-delta-command.service\nsystemctl --user daemon-reload\nsystemctl --user reset-failed spawnloft-58041990a3c18fc8-delta-command.service spawnloft-58041990a3c18fc8-delta-command.timer\n"
+  },
+  "scheduler/state.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"fail\": [\n    {\n      \"tool\": \"schtasks\",\n      \"args\": [\n        \"/Create\"\n      ],\n      \"status\": 1,\n      \"stderr\": \"ERROR: Access is denied.\\n\",\n      \"times\": 1\n    },\n    {\n      \"tool\": \"launchctl\",\n      \"args\": [\n        \"bootstrap\"\n      ],\n      \"status\": 5,\n      \"stderr\": \"Bootstrap failed: 5: Input/output error\\n\",\n      \"times\": 1\n    },\n    {\n      \"tool\": \"systemctl\",\n      \"args\": [\n        \"enable\"\n      ],\n      \"status\": 1,\n      \"stderr\": \"Failed to enable unit: Access denied\\n\",\n      \"times\": 0\n    }\n  ],\n  \"systemd\": {}\n}\n"
+  }
+ }
+}

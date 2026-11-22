@@ -1,0 +1,1339 @@
+{
+ "about": "What the Node core did in scenario c3-backups on linux-x64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c3-backups",
+ "platform": "linux-x64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 25 (backup)",
+   "args": [
+    "backup"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: backup requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 26 (backup nope)",
+   "args": [
+    "backup",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, srv3, gone\n"
+  },
+  {
+   "label": "step 27 (backup srv1 --json --scope bad)",
+   "args": [
+    "backup",
+    "srv1",
+    "--json",
+    "--scope",
+    "bad"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Invalid backup --scope\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 28 (backup srv1 extra --json)",
+   "args": [
+    "backup",
+    "srv1",
+    "extra",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft backup <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (backup srv1 --keep 0)",
+   "args": [
+    "backup",
+    "srv1",
+    "--keep",
+    "0"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --keep must be a positive whole number\n"
+  },
+  {
+   "label": "step 30 (backup srv1 --keep)",
+   "args": [
+    "backup",
+    "srv1",
+    "--keep"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --keep must be a positive whole number\n"
+  },
+  {
+   "label": "step 31 (backup srv1 --json --label)",
+   "args": [
+    "backup",
+    "srv1",
+    "--json",
+    "--label"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--label requires a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (backup srv1 --json --flush=1)",
+   "args": [
+    "backup",
+    "srv1",
+    "--json",
+    "--flush=1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--flush does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (backup srv1 --json --bogus)",
+   "args": [
+    "backup",
+    "srv1",
+    "--json",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Unknown option --bogus\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (backup srv1 --json=1)",
+   "args": [
+    "backup",
+    "srv1",
+    "--json=1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json does not take a value\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (backup srv2)",
+   "args": [
+    "backup",
+    "srv2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Snapshotting \"srv2\" (scope: standard)...\n",
+   "stderr": "error: nothing to back up for scope \"standard\" in <run>/data/instances/srv2\n"
+  },
+  {
+   "label": "step 36 (backup gone)",
+   "args": [
+    "backup",
+    "gone"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Snapshotting \"gone\" (scope: standard)...\n",
+   "stderr": "error: nothing to back up for scope \"standard\" in <run>/data/instances/gone\n"
+  },
+  {
+   "label": "step 37 (backup srv1 --scope bogus)",
+   "args": [
+    "backup",
+    "srv1",
+    "--scope",
+    "bogus"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: bogus)...\n",
+   "stderr": "error: unknown backup scope \"bogus\" - one of: plugins, worlds, config, standard, full\n"
+  },
+  {
+   "label": "step 38 (backup srv1 --scope)",
+   "args": [
+    "backup",
+    "srv1",
+    "--scope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: true)...\n",
+   "stderr": "error: unknown backup scope \"true\" - one of: plugins, worlds, config, standard, full\n"
+  },
+  {
+   "label": "step 39 (backup srv1 --label)",
+   "args": [
+    "backup",
+    "srv1",
+    "--label"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: standard)...\n",
+   "stderr": "TypeError: label.replace is not a function\n"
+  },
+  {
+   "label": "step 40 (snapshots srv1)",
+   "args": [
+    "snapshots",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "No snapshots for \"srv1\". Create one with: spawnloft backup srv1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (snapshots)",
+   "args": [
+    "snapshots"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: snapshots requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 42 (snapshots nope)",
+   "args": [
+    "snapshots",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, srv3, gone\n"
+  },
+  {
+   "label": "step 43 (verify srv1)",
+   "args": [
+    "verify",
+    "srv1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no snapshots exist for \"srv1\"\n"
+  },
+  {
+   "label": "step 44 (restore srv1)",
+   "args": [
+    "restore",
+    "srv1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no snapshots exist for \"srv1\"\n"
+  },
+  {
+   "label": "step 45 (prune srv1)",
+   "args": [
+    "prune",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Nothing to prune.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (backup srv1)",
+   "args": [
+    "backup",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: standard)...\nWrote <run>/data/backups/srv1/standard_<stamp>.tar.gz (<size>)\n  included: plugins, world, world_nether, extra, server.properties, bukkit.yml, ops.json, eula.txt, config\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (backup srv1 --scope plugins --label pre install)",
+   "args": [
+    "backup",
+    "srv1",
+    "--scope",
+    "plugins",
+    "--label",
+    "pre install"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: plugins)...\nWrote <run>/data/backups/srv1/pre-install_plugins_<stamp>.tar.gz (<size>)\n  included: plugins\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (backup srv1 --scope worlds --label w --json)",
+   "args": [
+    "backup",
+    "srv1",
+    "--scope",
+    "worlds",
+    "--label",
+    "w",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"srv1\",\"path\":\"<run>/data/backups/srv1/w_worlds_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"scope\":\"worlds\",\"members\":[\"world\",\"world_nether\",\"extra\"],\"databases\":[],\"databasesSkipped\":[],\"skipped\":[],\"warnings\":[],\"mirrored\":null,\"mirrorError\":null,\"flushed\":false,\"flushWarning\":null,\"saveOnWarning\":null,\"pruned\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (backup srv1 --scope config --label c)",
+   "args": [
+    "backup",
+    "srv1",
+    "--scope",
+    "config",
+    "--label",
+    "c"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: config)...\nWrote <run>/data/backups/srv1/c_config_<stamp>.tar.gz (<size>)\n  included: server.properties, bukkit.yml, ops.json, eula.txt, config\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (backup srv1 --scope full --label f)",
+   "args": [
+    "backup",
+    "srv1",
+    "--scope",
+    "full",
+    "--label",
+    "f"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: full)...\nWrote <run>/data/backups/srv1/f_full_<stamp>.tar.gz (<size>)\n  included: ./-dash, .importing, bukkit.yml, config, eula.txt, extra, ops.json, plugins, server.jar, server.properties, world, world_nether\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (snapshot srv1 --label é😀 x --no-flush)",
+   "args": [
+    "snapshot",
+    "srv1",
+    "--label",
+    "é😀 x",
+    "--no-flush"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: standard)...\nWrote <run>/data/backups/srv1/----x_standard_<stamp>.tar.gz (<size>)\n  included: plugins, world, world_nether, extra, server.properties, bukkit.yml, ops.json, eula.txt, config\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (backup srv1 --no-label --scope plugins)",
+   "args": [
+    "backup",
+    "srv1",
+    "--no-label",
+    "--scope",
+    "plugins"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv1\" (scope: plugins)...\nWrote <run>/data/backups/srv1/plugins_<stamp>.tar.gz (<size>)\n  included: plugins\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (backup srv3 --label s3)",
+   "args": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv3\" (scope: standard)...\nWrote <run>/data/backups/srv3/s3_standard_<stamp>.tar.gz (<size>)\n  included: plugins, mods, world\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (backup srv3 --label s3b --scope full --json)",
+   "args": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3b",
+    "--scope",
+    "full",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"srv3\",\"path\":\"<run>/data/backups/srv3/s3b_full_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"scope\":\"full\",\"members\":[\"mods\",\"notes.log\",\"plugins\",\"world\"],\"databases\":[],\"databasesSkipped\":[],\"skipped\":[],\"warnings\":[],\"mirrored\":null,\"mirrorError\":null,\"flushed\":false,\"flushWarning\":null,\"saveOnWarning\":null,\"pruned\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (snapshots srv1)",
+   "args": [
+    "snapshots",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                          SCOPE     SIZE   CREATED\nplugins_<stamp>.tar.gz              plugins   <size>  <time>\n----x_standard_<stamp>.tar.gz       standard  <size>  <time>\nf_full_<stamp>.tar.gz               full      <size>  <time>\nc_config_<stamp>.tar.gz             config    <size>  <time>\nw_worlds_<stamp>.tar.gz             worlds    <size>  <time>\npre-install_plugins_<stamp>.tar.gz  plugins   <size>  <time>\nstandard_<stamp>.tar.gz             standard  <size>  <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 56 (backups srv1)",
+   "args": [
+    "backups",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                          SCOPE     SIZE   CREATED\nplugins_<stamp>.tar.gz              plugins   <size>  <time>\n----x_standard_<stamp>.tar.gz       standard  <size>  <time>\nf_full_<stamp>.tar.gz               full      <size>  <time>\nc_config_<stamp>.tar.gz             config    <size>  <time>\nw_worlds_<stamp>.tar.gz             worlds    <size>  <time>\npre-install_plugins_<stamp>.tar.gz  plugins   <size>  <time>\nstandard_<stamp>.tar.gz             standard  <size>  <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (snapshots srv1 --json)",
+   "args": [
+    "snapshots",
+    "srv1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"srv1\",\"backups\":[{\"name\":\"plugins_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/plugins_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"plugins\",\"label\":false,\"taskId\":null,\"members\":[\"plugins\"]},{\"name\":\"----x_standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/----x_standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"standard\",\"label\":\"é😀 x\",\"taskId\":null,\"members\":[\"plugins\",\"world\",\"world_nether\",\"extra\",\"server.properties\",\"bukkit.yml\",\"ops.json\",\"eula.txt\",\"config\"]},{\"name\":\"f_full_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/f_full_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"full\",\"label\":\"f\",\"taskId\":null,\"members\":[\"./-dash\",\".importing\",\"bukkit.yml\",\"config\",\"eula.txt\",\"extra\",\"ops.json\",\"plugins\",\"server.jar\",\"server.properties\",\"world\",\"world_nether\"]},{\"name\":\"c_config_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/c_config_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"config\",\"label\":\"c\",\"taskId\":null,\"members\":[\"server.properties\",\"bukkit.yml\",\"ops.json\",\"eula.txt\",\"config\"]},{\"name\":\"w_worlds_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/w_worlds_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"worlds\",\"label\":\"w\",\"taskId\":null,\"members\":[\"world\",\"world_nether\",\"extra\"]},{\"name\":\"pre-install_plugins_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/pre-install_plugins_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"plugins\",\"label\":\"pre install\",\"taskId\":null,\"members\":[\"plugins\"]},{\"name\":\"standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv1/standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"standard\",\"label\":\"\",\"taskId\":null,\"members\":[\"plugins\",\"world\",\"world_nether\",\"extra\",\"server.properties\",\"bukkit.yml\",\"ops.json\",\"eula.txt\",\"config\"]}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (backups srv3 --json)",
+   "args": [
+    "backups",
+    "srv3",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"srv3\",\"backups\":[{\"name\":\"s3b_full_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv3/s3b_full_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"full\",\"label\":\"s3b\",\"taskId\":null,\"members\":[\"mods\",\"notes.log\",\"plugins\",\"world\"]},{\"name\":\"s3_standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv3/s3_standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"modifiedAt\":\"<time>\",\"scope\":\"standard\",\"label\":\"s3\",\"taskId\":null,\"members\":[\"plugins\",\"mods\",\"world\"]}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (snapshots srv1 x --json)",
+   "args": [
+    "snapshots",
+    "srv1",
+    "x",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft backups <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (backups srv1 --json --all)",
+   "args": [
+    "backups",
+    "srv1",
+    "--json",
+    "--all"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Unknown option --all\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (verify srv1)",
+   "args": [
+    "verify",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ok    plugins_<stamp>.tar.gz  (4 entries, <size>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (verify srv1 --all)",
+   "args": [
+    "verify",
+    "srv1",
+    "--all"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ok    plugins_<stamp>.tar.gz  (4 entries, <size>)\nok    ----x_standard_<stamp>.tar.gz  (18 entries, <size>)\nok    f_full_<stamp>.tar.gz  (23 entries, <size>)\nok    c_config_<stamp>.tar.gz  (6 entries, <size>)\nok    w_worlds_<stamp>.tar.gz  (8 entries, <size>)\nok    pre-install_plugins_<stamp>.tar.gz  (4 entries, <size>)\nok    standard_<stamp>.tar.gz  (18 entries, <size>)\n\nAll 7 snapshots read back whole.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 63 (verify srv1 pre-install)",
+   "args": [
+    "verify",
+    "srv1",
+    "pre-install"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ok    pre-install_plugins_<stamp>.tar.gz  (4 entries, <size>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (verify srv1 plugins)",
+   "args": [
+    "verify",
+    "srv1",
+    "plugins"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: snapshot \"plugins\" is ambiguous:\n  plugins_<stamp>.tar.gz\n  pre-install_plugins_<stamp>.tar.gz\n"
+  },
+  {
+   "label": "step 65 (verify srv1 nomatch)",
+   "args": [
+    "verify",
+    "srv1",
+    "nomatch"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no snapshot matching \"nomatch\" for \"srv1\"\n"
+  },
+  {
+   "label": "step 66 (verify srv2)",
+   "args": [
+    "verify",
+    "srv2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no snapshots exist for \"srv2\"\n"
+  },
+  {
+   "label": "step 67 (verify nope)",
+   "args": [
+    "verify",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, srv3, gone\n"
+  },
+  {
+   "label": "step 70 (verify srv1 broken)",
+   "args": [
+    "verify",
+    "srv1",
+    "broken"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "FAIL  broken_standard_<stamp>.tar.gz\n      the archive does not read back: gzip: stdin: not in gzip format\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 71 (restore srv1 broken)",
+   "args": [
+    "restore",
+    "srv1",
+    "broken"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "About to restore into <run>/data/instances/srv1:\n  snapshot: broken_standard_<stamp>.tar.gz (<size>, scope standard)\n  overwrites: world\n  archive:    DOES NOT READ BACK - a restore would be refused\n              the archive does not read back: gzip: stdin: not in gzip format\n\nChoose an older snapshot; \"spawnloft verify srv1 --all\" checks every one.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 72 (restore srv1 broken --yes)",
+   "args": [
+    "restore",
+    "srv1",
+    "broken",
+    "--yes"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: broken_standard_<stamp>.tar.gz would not restore cleanly, so nothing was changed.\n  the archive does not read back: gzip: stdin: not in gzip format\n  Choose an older snapshot; \"spawnloft verify srv1 --all\" checks every one.\n"
+  },
+  {
+   "label": "step 73 (verify srv1 --all)",
+   "args": [
+    "verify",
+    "srv1",
+    "--all"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "FAIL  broken_standard_<stamp>.tar.gz\n      the archive does not read back: gzip: stdin: not in gzip format\nok    plugins_<stamp>.tar.gz  (4 entries, <size>)\nok    ----x_standard_<stamp>.tar.gz  (18 entries, <size>)\nok    f_full_<stamp>.tar.gz  (23 entries, <size>)\nok    c_config_<stamp>.tar.gz  (6 entries, <size>)\nok    w_worlds_<stamp>.tar.gz  (8 entries, <size>)\nok    pre-install_plugins_<stamp>.tar.gz  (4 entries, <size>)\nok    standard_<stamp>.tar.gz  (18 entries, <size>)\n\n1 of 8 snapshots FAILED verification.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 76 (restore srv1 w)",
+   "args": [
+    "restore",
+    "srv1",
+    "w"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "About to restore into <run>/data/instances/srv1:\n  snapshot: w_worlds_<stamp>.tar.gz (<size>, scope worlds)\n  overwrites: world, world_nether, extra\n  archive:    reads back cleanly\n\nThis overwrites existing files in place. Re-run with --yes to proceed.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 79 (restore srv1 w --yes)",
+   "args": [
+    "restore",
+    "srv1",
+    "w",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Restored w_worlds_<stamp>.tar.gz into <run>/data/instances/srv1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 80 (snapshots srv1)",
+   "args": [
+    "snapshots",
+    "srv1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                          SCOPE     SIZE   CREATED\npre-restore_files_<stamp>.tar.gz    files     <size>  <time>\nplugins_<stamp>.tar.gz              plugins   <size>  <time>\n----x_standard_<stamp>.tar.gz       standard  <size>  <time>\nf_full_<stamp>.tar.gz               full      <size>  <time>\nc_config_<stamp>.tar.gz             config    <size>  <time>\nw_worlds_<stamp>.tar.gz             worlds    <size>  <time>\npre-install_plugins_<stamp>.tar.gz  plugins   <size>  <time>\nstandard_<stamp>.tar.gz             standard  <size>  <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 81 (verify srv1 pre-restore)",
+   "args": [
+    "verify",
+    "srv1",
+    "pre-restore"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "ok    pre-restore_files_<stamp>.tar.gz  (9 entries, <size>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 82 (restore srv1 pre-install --yes)",
+   "args": [
+    "restore",
+    "srv1",
+    "pre-install",
+    "--yes"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Restored pre-install_plugins_<stamp>.tar.gz into <run>/data/instances/srv1\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 83 (restore nope)",
+   "args": [
+    "restore",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, srv3, gone\n"
+  },
+  {
+   "label": "step 84 (restore)",
+   "args": [
+    "restore"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: restore requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 85 (prune srv1 --keep abc)",
+   "args": [
+    "prune",
+    "srv1",
+    "--keep",
+    "abc"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --keep must be a positive whole number\n"
+  },
+  {
+   "label": "step 86 (prune srv1 --keep -1)",
+   "args": [
+    "prune",
+    "srv1",
+    "--keep",
+    "-1"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --keep must be a positive whole number\n"
+  },
+  {
+   "label": "step 87 (prune)",
+   "args": [
+    "prune"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: prune requires an instance name. See: spawnloft list\n"
+  },
+  {
+   "label": "step 88 (prune nope)",
+   "args": [
+    "prune",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"nope\". Known instances: srv1, srv2, srv3, gone\n"
+  },
+  {
+   "label": "step 89 (prune srv1 --keep 3)",
+   "args": [
+    "prune",
+    "srv1",
+    "--keep",
+    "3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Removed 6 snapshot(s), keeping the newest 3.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 90 (prune srv1 --keep 3)",
+   "args": [
+    "prune",
+    "srv1",
+    "--keep",
+    "3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Nothing to prune.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 91 (backup srv3 --label s3c --keep 1)",
+   "args": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3c",
+    "--keep",
+    "1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv3\" (scope: standard)...\nWrote <run>/data/backups/srv3/s3c_standard_<stamp>.tar.gz (<size>)\n  included: plugins, mods, world\nPruned 2 old snapshot(s), keeping 1.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 92 (backup srv3 --label s3d --keep 1 --json)",
+   "args": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3d",
+    "--keep",
+    "1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"srv3\",\"path\":\"<run>/data/backups/srv3/s3d_standard_<stamp>.tar.gz\",\"sizeBytes\":<n>,\"scope\":\"standard\",\"members\":[\"plugins\",\"mods\",\"world\"],\"databases\":[],\"databasesSkipped\":[],\"skipped\":[],\"warnings\":[],\"mirrored\":null,\"mirrorError\":null,\"flushed\":false,\"flushWarning\":null,\"saveOnWarning\":null,\"pruned\":[{\"name\":\"s3c_standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/srv3/s3c_standard_<stamp>.tar.gz\",\"size\":<n>,\"sizeHuman\":\"<size>\",\"mtime\":\"<time>\",\"scope\":\"standard\",\"label\":\"s3c\",\"taskId\":null,\"members\":[\"plugins\",\"mods\",\"world\"],\"locked\":false,\"note\":null,\"copy\":false,\"excluded\":[\"*.log\",\"plugins/dynmap/web\"],\"databases\":[],\"problems\":[]}]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 93 (snapshots srv3)",
+   "args": [
+    "snapshots",
+    "srv3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "NAME                                   SCOPE     SIZE   CREATED\ns3d_standard_<stamp>.tar.gz  standard  <size>  <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 94 (config)",
+   "args": [
+    "config"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "settings file:  <run>/home/.config/spawnloft/settings.json\ndata root:      <run>/data\ninstances:      <run>/data/instances\njars:           <run>/data/jars\nbackups:        <run>/data/backups\nbackup mirror:  (none - one disk failure takes servers and snapshots together)\ntemplates:      <run>/data/templates\nrun state:      <run>/data/run\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 95 (config show)",
+   "args": [
+    "config",
+    "show"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "settings file:  <run>/home/.config/spawnloft/settings.json\ndata root:      <run>/data\ninstances:      <run>/data/instances\njars:           <run>/data/jars\nbackups:        <run>/data/backups\nbackup mirror:  (none - one disk failure takes servers and snapshots together)\ntemplates:      <run>/data/templates\nrun state:      <run>/data/run\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 96 (config set-backup-mirror)",
+   "args": [
+    "config",
+    "set-backup-mirror"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft config set-backup-mirror <path>|off\n"
+  },
+  {
+   "label": "step 97 (config set-backup-mirror {run}/mirror)",
+   "args": [
+    "config",
+    "set-backup-mirror",
+    "{run}/mirror"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Every new snapshot, for every server, now also copies to <run>/mirror.\nIdeally that is another drive - the point is that one disk failure cannot take\nthe servers and their backups together. Retention deletions follow the mirror.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 98 (config)",
+   "args": [
+    "config"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "settings file:  <run>/home/.config/spawnloft/settings.json\ndata root:      <run>/data\ninstances:      <run>/data/instances\njars:           <run>/data/jars\nbackups:        <run>/data/backups\nbackup mirror:  <run>/mirror\ntemplates:      <run>/data/templates\nrun state:      <run>/data/run\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 99 (backup srv3 --label m --scope plugins)",
+   "args": [
+    "backup",
+    "srv3",
+    "--label",
+    "m",
+    "--scope",
+    "plugins"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Snapshotting \"srv3\" (scope: plugins)...\nWrote <run>/data/backups/srv3/m_plugins_<stamp>.tar.gz (<size>)\n  included: plugins, mods\n  mirrored: <run>/mirror/srv3/m_plugins_<stamp>.tar.gz\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 100 (config set-backup-mirror OFF)",
+   "args": [
+    "config",
+    "set-backup-mirror",
+    "OFF"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Mirroring turned off. Copies already made stay where they are.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 101 (config set-instances)",
+   "args": [
+    "config",
+    "set-instances"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft config set-instances <path>\n"
+  },
+  {
+   "label": "step 102 (config set-instances {run}/elsewhere)",
+   "args": [
+    "config",
+    "set-instances",
+    "{run}/elsewhere"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Saved. Instances directory: <run>/elsewhere\n\nTakes effect on the next command. Nothing is moved: the registry is inside the data root, so\nthe servers you already have are not listed under the new one, and keep running where they are.\nTo move the data and keep everything working: spawnloft data move <folder>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 103 (config show)",
+   "args": [
+    "config",
+    "show"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "settings file:  <run>/home/.config/spawnloft/settings.json\ndata root:      <run>/data\ninstances:      <run>/elsewhere   (separate location)\njars:           <run>/data/jars\nbackups:        <run>/data/backups\nbackup mirror:  (none - one disk failure takes servers and snapshots together)\ntemplates:      <run>/data/templates\nrun state:      <run>/data/run\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 104 (config same-drive)",
+   "args": [
+    "config",
+    "same-drive"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Servers will be created under the data root again.\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 105 (config bogus)",
+   "args": [
+    "config",
+    "bogus"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft config [show|set-root <path>|set-instances <path>|same-drive]\n"
+  },
+  {
+   "label": "step 106 (config set-root)",
+   "args": [
+    "config",
+    "set-root"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: usage: spawnloft config set-root <path>\n"
+  },
+  {
+   "label": "step 107 (config set-root {run}/root2)",
+   "args": [
+    "config",
+    "set-root",
+    "{run}/root2"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Saved. Data root: <run>/root2\n\nTakes effect on the next command. Nothing is moved: the registry is inside the data root, so\nthe servers you already have are not listed under the new one, and keep running where they are.\nTo move the data and keep everything working: spawnloft data move <folder>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 110 (config set-backup-mirror {run}/mirror2)",
+   "args": [
+    "config",
+    "set-backup-mirror",
+    "{run}/mirror2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>); using the defaults until you fix it or delete it\nerror: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>), so it was not changed; fix it or delete it (a deleted file forgets your data folder: spawnloft config set-root <folder> sets it again), then try again\n"
+  },
+  {
+   "label": "step 111 (config set-root {run}/root3)",
+   "args": [
+    "config",
+    "set-root",
+    "{run}/root3"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "The settings file could not be read, so it was kept as <run>/home/.config/spawnloft/settings.json.unreadable-<time>.\nSaved. Data root: <run>/root3\n\nTakes effect on the next command. Nothing is moved: the registry is inside the data root, so\nthe servers you already have are not listed under the new one, and keep running where they are.\nTo move the data and keep everything working: spawnloft data move <folder>\n",
+   "stderr": "spawnloft: settings file <run>/home/.config/spawnloft/settings.json could not be read (<invalid json>); using the defaults until you fix it or delete it\n"
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard, <size>\",\"snapshot\":\"standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"plugins (pre install), <size>\",\"snapshot\":\"pre-install_plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"worlds (w), <size>\",\"snapshot\":\"w_worlds_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"config (c), <size>\",\"snapshot\":\"c_config_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"full (f), <size>\",\"snapshot\":\"f_full_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (é😀 x), <size>\",\"snapshot\":\"----x_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"plugins, <size>\",\"snapshot\":\"plugins_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (s3), <size>\",\"snapshot\":\"s3_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"full (s3b), <size>\",\"snapshot\":\"s3b_full_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"restore\",\"by\":{\"kind\":\"cli\"},\"detail\":\"w_worlds_<stamp>.tar.gz; how it was is kept as pre-restore_files_<stamp>.tar.gz\",\"snapshot\":\"pre-restore_files_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"restore\",\"by\":{\"kind\":\"cli\"},\"detail\":\"pre-install_plugins_<stamp>.tar.gz; how it was is kept as pre-restore_files_<stamp>.tar.gz\",\"snapshot\":\"pre-restore_files_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv1\",\"action\":\"backup-prune\",\"by\":{\"kind\":\"cli\"},\"detail\":\"6 removed, the newest 3 kept\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (s3c), <size>\",\"snapshot\":\"s3c_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup-prune\",\"by\":{\"kind\":\"cli\"},\"detail\":\"2 removed, the newest 1 kept\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard (s3d), <size>\",\"snapshot\":\"s3d_standard_<stamp>.tar.gz\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup-prune\",\"by\":{\"kind\":\"cli\"},\"detail\":\"1 removed, the newest 1 kept\"}\n{\"at\":\"<time>\",\"server\":\"srv3\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"plugins (m), <size>\",\"snapshot\":\"m_plugins_<stamp>.tar.gz\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/srv1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/srv1/plugins_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv1\",\n  \"scope\": \"plugins\",\n  \"label\": false,\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/srv1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/srv1/plugins_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Essentials/ type=5 mode=755 size=0\nplugins/Essentials/config.yml type=0 mode=644 size=5 sha256=37b128c59f1f5097f73f82691cb519f1f568667faab5ced1b4ab979d36837eae\nplugins/Essentials.jar type=0 mode=644 size=9 sha256=fba6a4ac61e440c7309ae013e5c5c7ac0a9000c8a3bab7def760b499d587b1d0"
+  },
+  "data/backups/srv1/pre-restore_files_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv1\",\n  \"scope\": \"files\",\n  \"label\": \"pre-restore\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"world\",\n    \"world_nether\",\n    \"extra\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/srv1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/srv1/pre-restore_files_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=13 sha256=a12b9561022a47f90cd30a81b6f35b56223bd13f861839b291f5c65c628329d4\nworld/region/ type=5 mode=755 size=0\nworld/region/r.0.0.mca type=0 mode=644 size=6 sha256=c697d2981bf416569a16cfbcdec1542b5398f3cc77d2b905819aa99c46ecf6f6\nworld/new-file.txt type=0 mode=644 size=21 sha256=167961048c7acfb545c08fe990e7ecdeee8ef10d3a15f9a00c95f31cf154fc66\nworld_nether/ type=5 mode=755 size=0\nworld_nether/level.dat type=0 mode=644 size=6 sha256=c26cbbb2ab8a616681899b7d3aa92c5c06aee31aeb99b4042f1bf2e06ecbb5a1\nextra/ type=5 mode=755 size=0\nextra/level.dat type=0 mode=644 size=5 sha256=c8dee78f8c7b466c881847accc196998bad00e2b96c5ef913dfbe454d3807c96"
+  },
+  "data/backups/srv1/pre-restore_files_<stamp>.json#2": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv1\",\n  \"scope\": \"files\",\n  \"label\": \"pre-restore\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/srv1\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/srv1/pre-restore_files_<stamp>.tar.gz#2": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/Essentials/ type=5 mode=755 size=0\nplugins/Essentials/config.yml type=0 mode=644 size=5 sha256=37b128c59f1f5097f73f82691cb519f1f568667faab5ced1b4ab979d36837eae\nplugins/Essentials.jar type=0 mode=644 size=9 sha256=fba6a4ac61e440c7309ae013e5c5c7ac0a9000c8a3bab7def760b499d587b1d0"
+  },
+  "data/backups/srv3": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/srv3/m_plugins_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv3\",\n  \"scope\": \"plugins\",\n  \"label\": \"m\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"mods\"\n  ],\n  \"databases\": [],\n  \"excluded\": [\n    \"*.log\",\n    \"plugins/dynmap/web\"\n  ],\n  \"sourceDir\": \"<run>/data/instances/srv3\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/srv3/m_plugins_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nplugins/dynmap/ type=5 mode=755 size=0\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46"
+  },
+  "data/backups/srv3/s3d_standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv3\",\n  \"scope\": \"standard\",\n  \"label\": \"s3d\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"mods\",\n    \"world\"\n  ],\n  \"databases\": [],\n  \"excluded\": [\n    \"*.log\",\n    \"plugins/dynmap/web\"\n  ],\n  \"sourceDir\": \"<run>/data/instances/srv3\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/srv3/s3d_standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nplugins/dynmap/ type=5 mode=755 size=0\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46\nworld/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=1 sha256=50e721e49c013f00c62cf59f2163542a9d8df02464efeb615d31051b0fddc326"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/-dash": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/-dash/file.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "dash member"
+  },
+  "data/instances/srv1/.importing": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/.importing/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "hidden"
+  },
+  "data/instances/srv1/bukkit.yml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "settings: {}\n"
+  },
+  "data/instances/srv1/cache": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/cache/x.bin": {
+   "kind": "file",
+   "mode": "644",
+   "text": "cache"
+  },
+  "data/instances/srv1/config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/config/paper-world-defaults.yml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "x: 1\n"
+  },
+  "data/instances/srv1/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/srv1/extra": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/extra/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "extra"
+  },
+  "data/instances/srv1/logs": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/logs/latest.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "log line\n"
+  },
+  "data/instances/srv1/ops.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[]\n"
+  },
+  "data/instances/srv1/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/plugins/Essentials": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/plugins/Essentials/config.yml": {
+   "kind": "file",
+   "mode": "644",
+   "text": "a: 1\n"
+  },
+  "data/instances/srv1/plugins/Essentials.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "jar bytes"
+  },
+  "data/instances/srv1/server.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": ""
+  },
+  "data/instances/srv1/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "#Minecraft server properties\nlevel-name=world\nmotd=Hi\n"
+  },
+  "data/instances/srv1/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "level"
+  },
+  "data/instances/srv1/world/new-file.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "made after the backup"
+  },
+  "data/instances/srv1/world/region": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world/region/r.0.0.mca": {
+   "kind": "file",
+   "mode": "644",
+   "text": "region"
+  },
+  "data/instances/srv1/world/session.lock": {
+   "kind": "file",
+   "mode": "644",
+   "text": "lock"
+  },
+  "data/instances/srv1/world_nether": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv1/world_nether/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "nether"
+  },
+  "data/instances/srv2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3/mods": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3/mods/fabric-api.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "mod"
+  },
+  "data/instances/srv3/notes.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "leave me out"
+  },
+  "data/instances/srv3/plugins": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3/plugins/dynmap": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3/plugins/dynmap/web": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3/plugins/dynmap/web/index.html": {
+   "kind": "file",
+   "mode": "644",
+   "text": "web"
+  },
+  "data/instances/srv3/plugins/dynmap.jar": {
+   "kind": "file",
+   "mode": "644",
+   "text": "dyn"
+  },
+  "data/instances/srv3/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/srv3/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "text": "w"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv1\": {\n      \"dir\": \"<run>/data/instances/srv1\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47961\n    },\n    \"srv2\": {\n      \"dir\": \"<run>/data/instances/srv2\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47962\n    },\n    \"srv3\": {\n      \"dir\": \"<run>/data/instances/srv3\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47963,\n      \"backupExclude\": [\n        \"*.log\",\n        \"plugins/dynmap/web\"\n      ]\n    },\n    \"gone\": {\n      \"dir\": \"<run>/data/instances/gone\",\n      \"jar\": \"server.jar\",\n      \"memory\": \"1G\",\n      \"port\": 47964\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/srv1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "elsewhere": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/.config/spawnloft/settings.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"dataRoot\": \"<run>/root3\"\n}\n"
+  },
+  "home/.config/spawnloft/settings.json.unreadable-<time>": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{ not json"
+  },
+  "home/AppData": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Roaming": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Roaming/spawnloft": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home/AppData/Roaming/spawnloft/settings.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{ not json"
+  },
+  "mirror": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mirror/srv3": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "mirror/srv3/m_plugins_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"srv3\",\n  \"scope\": \"plugins\",\n  \"label\": \"m\",\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"mods\"\n  ],\n  \"databases\": [],\n  \"excluded\": [\n    \"*.log\",\n    \"plugins/dynmap/web\"\n  ],\n  \"sourceDir\": \"<run>/data/instances/srv3\",\n  \"createdAt\": \"<time>\",\n  \"size\": <n>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "mirror/srv3/m_plugins_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "plugins/ type=5 mode=755 size=0\nplugins/dynmap.jar type=0 mode=644 size=3 sha256=d17b771fc7fa8a5ed0e7ba39d18ed0e853599c3390f588765fb6cfe15e619009\nplugins/dynmap/ type=5 mode=755 size=0\nmods/ type=5 mode=755 size=0\nmods/fabric-api.jar type=0 mode=644 size=3 sha256=e55cffc81a5ad8cfe85239d944a3ae9513645a9eed79bc884f51b80b2760fc46"
+  },
+  "mirror2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "root2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "root3": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

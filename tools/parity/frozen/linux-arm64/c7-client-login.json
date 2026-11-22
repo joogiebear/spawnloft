@@ -1,0 +1,1214 @@
+{
+ "about": "What the Node core did in scenario c7-client-login on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-login",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 1 (client login extra)",
+   "args": [
+    "client",
+    "login",
+    "extra"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 2 (client login --bogus)",
+   "args": [
+    "client",
+    "login",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 3 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Microsoft did not start the sign-in (HTTP 500); try again in a minute\n"
+  },
+  {
+   "label": "step 4 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Microsoft did not start the sign-in; try again in a minute\n"
+  },
+  {
+   "label": "step 5 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: the sign-in was declined on Microsoft's page\n"
+  },
+  {
+   "label": "step 6 (client login --json)",
+   "args": [
+    "client",
+    "login",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"the code expired before it was entered; run spawnloft client login again\"}}\n",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\n"
+  },
+  {
+   "label": "step 7 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Microsoft refused the sign-in: AADSTS7000218: bad client\n"
+  },
+  {
+   "label": "step 8 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Microsoft's sign-in server stopped answering (HTTP 503); run spawnloft client login again in a few minutes\n"
+  },
+  {
+   "label": "step 9 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Xbox Live sign-in failed (HTTP 503)\n"
+  },
+  {
+   "label": "step 10 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: this is a child account; an adult in the Microsoft family must allow it to play before it can sign in\n"
+  },
+  {
+   "label": "step 11 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Xbox Live answered without a token; try again in a minute\n"
+  },
+  {
+   "label": "step 13 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Xbox Live refused the sign-in (XErr 123)\n"
+  },
+  {
+   "label": "step 14 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Xbox Live sign-in failed (HTTP 400)\n"
+  },
+  {
+   "label": "step 15 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Minecraft refused the sign-in (HTTP 403) for client id test-client-id (\"Invalid app registration, see https://aka.ms/AppRegInfo for more information\"). Either Mojang has not approved that id for Minecraft sign-in, or its Azure app registration does not allow public client flows (Authentication > Allow public client flows). Offline profiles still work\n"
+  },
+  {
+   "label": "step 16 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Minecraft refused the sign-in (HTTP 403) for client id 946097b5-241d-4f83-9981-c6d0778e5507. Either Mojang has not approved that id for Minecraft sign-in, or its Azure app registration does not allow public client flows (Authentication > Allow public client flows). Offline profiles still work\n"
+  },
+  {
+   "label": "step 17 (client login --json)",
+   "args": [
+    "client",
+    "login",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"sign-in-unreachable\",\"message\":\"Minecraft sign-in failed (HTTP 429)\"}}\n",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\n"
+  },
+  {
+   "label": "step 18 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: this Microsoft account owns no Minecraft: Java Edition; buy it at https://www.minecraft.net or sign in with another account\n"
+  },
+  {
+   "label": "step 19 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: Minecraft answered without a profile; try again in a minute\n"
+  },
+  {
+   "label": "step 20 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nerror: could not read the Minecraft profile (HTTP 500)\n"
+  },
+  {
+   "label": "step 22 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Signed in as Steve. Use it: spawnloft client launch <profile> --account Steve, or spawnloft client set <profile> account=Steve\n",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\n"
+  },
+  {
+   "label": "step 23 (client accounts --json)",
+   "args": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"accounts\":[{\"name\":\"Alex\",\"uuid\":\"bbbbbbbb-1111-2222-3333-444444444444\",\"type\":\"offline\",\"expiresAt\":null,\"refreshFailedAt\":null},{\"name\":\"Steve\",\"uuid\":\"AAAAAAAA-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":null}],\"defaultAccount\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (client login --json)",
+   "args": [
+    "client",
+    "login",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"account\":{\"type\":\"microsoft\",\"name\":\"Steve\",\"uuid\":\"AAAAAAAA-1111-2222-3333-444444444444\"}}}\n",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\n"
+  },
+  {
+   "label": "step 25 (client accounts)",
+   "args": [
+    "client",
+    "accounts"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Alex  bbbbbbbb-1111-2222-3333-444444444444  offline (offline-mode servers only)\nSteve  AAAAAAAA-1111-2222-3333-444444444444  token until <time>\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nTypeError: list is not iterable\n"
+  },
+  {
+   "label": "step 29 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\nTypeError: Cannot read properties of undefined (reading 'toLowerCase')\n"
+  },
+  {
+   "label": "step 31 (client login)",
+   "args": [
+    "client",
+    "login"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Signed in as Steve. Use it: spawnloft client launch <profile> --account Steve, or spawnloft client set <profile> account=Steve\n",
+   "stderr": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting...\n"
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "GET",
+   "url": "/minecraft/profile",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 0
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://api.minecraftservices.com",
+   "method": "POST",
+   "url": "/authentication/login_with_xbox",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 44,
+   "bodySha256": "6fc8856386894c2fb9fb9a6c23d1d4a89ecc9f9c50ea776d94a49b73d1e26e3d"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 61,
+   "bodySha256": "4ef76382d7e60c4503f203f13171dce7919fe8d597cf33dbe8ae446dc39d02db"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/devicecode",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 83,
+   "bodySha256": "a93bcaebd03b55152dc466df8dc02492cd3ced1bf7f9ed00678f234c57db9f87"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 109,
+   "bodySha256": "1fd22c26c6ac272664e18346e39676286485d2561c7ecb1d001c3a06fe59c03c"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 131,
+   "bodySha256": "a4d352a07eb8deea76aff1fac2e6f02be2a4d9e5e9384ded554705fd75e7d0a6"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://user.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/user/authenticate",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 157,
+   "bodySha256": "a57838c14f54ca30a0d332455595353b7e6b148e1f122bb2e4d9f194aff1f052"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  },
+  {
+   "origin": "https://xsts.auth.xboxlive.com",
+   "method": "POST",
+   "url": "/xsts/authorize",
+   "userAgent": "node",
+   "accept": "application/json",
+   "bodyBytes": 131,
+   "bodySha256": "d4941ce8ae2d3f8208805a16595c942cd056ed9c774ec037538d37d203472f30"
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/accounts.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"accounts\": [\n    {\n      \"type\": \"microsoft\",\n      \"name\": \"Steve\",\n      \"uuid\": \"AAAAAAAA-1111-2222-3333-444444444444\",\n      \"accessToken\": \"mc-access\",\n      \"expiresAt\": \"<time>\",\n      \"refreshToken\": \"ms-refresh\",\n      \"xuid\": \"2535\",\n      \"userType\": \"msa\",\n      \"clientId\": \"946097b5-241d-4f83-9981-c6d0778e5507\"\n    }\n  ]\n}\n"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

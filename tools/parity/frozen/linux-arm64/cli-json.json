@@ -1,0 +1,971 @@
+{
+ "about": "What the Node core did in scenario cli-json on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "cli-json",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 5 (--json)",
+   "args": [
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown command \"--json\". Run \"spawnloft help\" for usage.\n"
+  },
+  {
+   "label": "step 6 (list --json)",
+   "args": [
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 7 (ls --json)",
+   "args": [
+    "ls",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"list\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 8 (status --json)",
+   "args": [
+    "status",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"instances\":[{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"}],\"databases\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 9 (start --json)",
+   "args": [
+    "start",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"start\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for start; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 10 (stop --json)",
+   "args": [
+    "stop",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"stop\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for stop; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 11 (restart --json)",
+   "args": [
+    "restart",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"restart\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for restart; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 12 (kill --json)",
+   "args": [
+    "kill",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"kill\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for kill; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 13 (logs --json)",
+   "args": [
+    "logs",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"logs\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for logs; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 14 (log --json)",
+   "args": [
+    "log",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"log\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for log; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 15 (cmd --json)",
+   "args": [
+    "cmd",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"cmd\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for cmd; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 16 (rcon --json)",
+   "args": [
+    "rcon",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"rcon\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for rcon; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 17 (send --json)",
+   "args": [
+    "send",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"send\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for send; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 18 (console --json)",
+   "args": [
+    "console",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"console\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for console; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 19 (attach --json)",
+   "args": [
+    "attach",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"attach\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for attach; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 20 (players --json)",
+   "args": [
+    "players",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"players\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for players; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 21 (new --json)",
+   "args": [
+    "new",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"new\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for new; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 22 (clone --json)",
+   "args": [
+    "clone",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"clone\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for clone; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 23 (adopt --json)",
+   "args": [
+    "adopt",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"adopt\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for adopt; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 24 (rm --json)",
+   "args": [
+    "rm",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"rm\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for rm; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 25 (remove --json)",
+   "args": [
+    "remove",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"remove\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for remove; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 26 (set --json)",
+   "args": [
+    "set",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"set\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for set; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (props --json)",
+   "args": [
+    "props",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"props\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for props; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 28 (backup --json)",
+   "args": [
+    "backup",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft backup <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 29 (snapshot --json)",
+   "args": [
+    "snapshot",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft backup <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 30 (snapshots --json)",
+   "args": [
+    "snapshots",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft backups <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 31 (backups --json)",
+   "args": [
+    "backups",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft backups <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (restore --json)",
+   "args": [
+    "restore",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"restore\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for restore; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 33 (prune --json)",
+   "args": [
+    "prune",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"prune\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for prune; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 34 (verify --json)",
+   "args": [
+    "verify",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"verify\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for verify; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 35 (templates --json)",
+   "args": [
+    "templates",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"templates\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for templates; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 36 (template --json)",
+   "args": [
+    "template",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"template\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for template; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (jars --json)",
+   "args": [
+    "jars",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"jars\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for jars; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (paper --json)",
+   "args": [
+    "paper",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"paper\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for paper; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (config --json)",
+   "args": [
+    "config",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"config\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for config; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 40 (data --json)",
+   "args": [
+    "data",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft data move <folder> [--yes] [--thorough] [--set-aside-private-copies] | status | finish [--yes] | rollback\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (rename --json)",
+   "args": [
+    "rename",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"rename\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for rename; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (rebuild --json)",
+   "args": [
+    "rebuild",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"rebuild\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for rebuild; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (reveal --json)",
+   "args": [
+    "reveal",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"reveal\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for reveal; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (open --json)",
+   "args": [
+    "open",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"open\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for open; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (plugins --json)",
+   "args": [
+    "plugins",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft plugins <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (upgrade --json)",
+   "args": [
+    "upgrade",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"upgrade\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for upgrade; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (pack --json)",
+   "args": [
+    "pack",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"pack\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for pack; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 48 (worlds --json)",
+   "args": [
+    "worlds",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"worlds\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for worlds; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (why --json)",
+   "args": [
+    "why",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft diagnostics <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (diagnostics --json)",
+   "args": [
+    "diagnostics",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft diagnostics <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (diag --json)",
+   "args": [
+    "diag",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diag\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft diag <server> [--client <profile>] [--lines N] [--out <dir>]\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 52 (metrics --json)",
+   "args": [
+    "metrics",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft metrics <instance>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (launchers --json)",
+   "args": [
+    "launchers",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"launchers\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for launchers; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (ui --json)",
+   "args": [
+    "ui",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"ui\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for ui; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (panel --json)",
+   "args": [
+    "panel",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"panel\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for panel; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 56 (task --json)",
+   "args": [
+    "task",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"task\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for task; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (doctor --json)",
+   "args": [
+    "doctor",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"25.0.5\\\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-arm64/bin/java (not on PATH)\",\"java (also): openjdk version \\\"21.0.13\\\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-arm64/bin/java\",\"java (also): openjdk version \\\"17.0.21\\\" <date> at java\",\"java (also): openjdk version \\\"11.0.33\\\" <date> at /usr/lib/jvm/temurin-11-jdk-arm64/bin/java\",\"java (also): openjdk version \\\"1.8.0_512\\\" at /usr/lib/jvm/temurin-8-jdk-arm64/bin/java\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 64 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (repair --json)",
+   "args": [
+    "repair",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<code folder>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 59 (db --json)",
+   "args": [
+    "db",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"db\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for db; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 60 (mcp --json)",
+   "args": [
+    "mcp",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"mcp\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for mcp; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 61 (bot --json)",
+   "args": [
+    "bot",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"bot\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 62 (client --json)",
+   "args": [
+    "client",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 63 (uninstall --json)",
+   "args": [
+    "uninstall",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"uninstall\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for uninstall; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 64 (help --json)",
+   "args": [
+    "help",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"help\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"--json is not supported for help; no action was performed\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 65 (--help --json)",
+   "args": [
+    "--help",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"--help\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Use help without --json\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 66 (-h --json)",
+   "args": [
+    "-h",
+    "--json"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"-h\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"INVALID_USAGE\",\"message\":\"Use help without --json\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 67 (status alpha --json)",
+   "args": [
+    "status",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"status\",\"ok\":true,\"data\":{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 68 (plugins alpha --json)",
+   "args": [
+    "plugins",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"plugins\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"plugins\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 69 (snapshots alpha --json)",
+   "args": [
+    "snapshots",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"backups\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 70 (backups alpha --json)",
+   "args": [
+    "backups",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"backups\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 71 (why alpha --json)",
+   "args": [
+    "why",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"status\":{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"},\"findings\":[],\"crashes\":{\"dir\":\"<run>/data/instances/alpha/crash-reports\",\"reports\":[]},\"scope\":\"recent-console-and-crash-reports\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 72 (diagnostics alpha --json)",
+   "args": [
+    "diagnostics",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diagnostics\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"status\":{\"name\":\"alpha\",\"label\":null,\"kind\":\"server\",\"status\":\"stopped\",\"directory\":\"<run>/data/instances/alpha\",\"jar\":\"paper-1.21.4-15.jar\",\"memory\":\"2G\",\"port\":25565,\"rconPort\":25575,\"engine\":null,\"external\":false,\"javaPid\":null,\"daemonPid\":null,\"javaAlive\":false,\"startedAt\":null,\"uptimeMs\":null,\"exitCode\":null,\"consoleLog\":\"<run>/data/run/alpha/console.log\"},\"findings\":[],\"crashes\":{\"dir\":\"<run>/data/instances/alpha/crash-reports\",\"reports\":[]},\"scope\":\"recent-console-and-crash-reports\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 73 (metrics alpha --json)",
+   "args": [
+    "metrics",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"metrics\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"runId\":null,\"startedAt\":null,\"running\":false,\"samplingAvailable\":true,\"sampleSeconds\":10,\"cores\":4,\"cpuScale\":\"whole-machine\",\"samples\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 74 (data status --json)",
+   "args": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"data\",\"ok\":true,\"data\":{\"action\":\"status\",\"root\":\"<run>/data\",\"isLink\":false,\"target\":null,\"dangling\":false,\"move\":null,\"leftovers\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 75 (client list --json)",
+   "args": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"profiles\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 76 (doctor --json)",
+   "args": [
+    "doctor",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"25.0.5\\\" <date> LTS at /usr/lib/jvm/temurin-25-jdk-arm64/bin/java (not on PATH)\",\"java (also): openjdk version \\\"21.0.13\\\" <date> LTS at /usr/lib/jvm/temurin-21-jdk-arm64/bin/java\",\"java (also): openjdk version \\\"17.0.21\\\" <date> at java\",\"java (also): openjdk version \\\"11.0.33\\\" <date> at /usr/lib/jvm/temurin-11-jdk-arm64/bin/java\",\"java (also): openjdk version \\\"1.8.0_512\\\" at /usr/lib/jvm/temurin-8-jdk-arm64/bin/java\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 506 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 77 (repair --json)",
+   "args": [
+    "repair",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<code folder>\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 78 (diag alpha --json)",
+   "args": [
+    "diag",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"diag\",\"ok\":true,\"data\":{\"facts\":{\"spawnloft\":\"<version>\",\"os\":\"linux\",\"arch\":\"arm64\",\"server\":{\"name\":\"alpha\",\"software\":\"paper\",\"version\":\"1.21.4\",\"status\":\"never started\",\"startedAt\":null,\"memory\":\"2G\",\"java\":{\"major\":25,\"version\":\"openjdk version \\\"25.0.5\\\" <date> LTS\",\"path\":\"/usr/lib/jvm/temurin-25-jdk-arm64/bin/java\"},\"plugins\":[]},\"client\":null},\"findings\":{\"server\":[],\"client\":[]},\"files\":[{\"name\":\"server-console.log\",\"bytes\":0},{\"name\":\"server-daemon.log\",\"bytes\":0},{\"name\":\"server.properties\",\"bytes\":29}],\"file\":\"<run>/data/backups/alpha/exports/alpha_diag_<stamp>.zip\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 79 (backup alpha --json)",
+   "args": [
+    "backup",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backup\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"path\":\"<run>/data/backups/alpha/standard_<stamp>.tar.gz\",\"sizeBytes\":<archive-size>,\"scope\":\"standard\",\"members\":[\"world\",\"server.properties\",\"eula.txt\"],\"databases\":[],\"databasesSkipped\":[],\"skipped\":[],\"warnings\":[],\"mirrored\":null,\"mirrorError\":null,\"flushed\":false,\"flushWarning\":null,\"saveOnWarning\":null,\"pruned\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 80 (snapshots alpha --json)",
+   "args": [
+    "snapshots",
+    "alpha",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"backups\",\"ok\":true,\"data\":{\"instance\":\"alpha\",\"backups\":[{\"name\":\"standard_<stamp>.tar.gz\",\"path\":\"<run>/data/backups/alpha/standard_<stamp>.tar.gz\",\"sizeBytes\":<archive-size>,\"modifiedAt\":\"<time>\",\"scope\":\"standard\",\"label\":\"\",\"taskId\":null,\"members\":[\"world\",\"server.properties\",\"eula.txt\"]}]}}\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/activity.jsonl": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\"at\":\"<time>\",\"server\":\"alpha\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"},\"detail\":\"standard, <archive-size>\",\"snapshot\":\"standard_<stamp>.tar.gz\"}\n"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/alpha/exports": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups/alpha/exports/alpha_diag_<stamp>.zip": {
+   "kind": "file",
+   "mode": "644",
+   "zip": "summary.json method=8 flags=0x800 size=<n> csize=<n> crc=<crc> attr=0x81a40000\ntimeline.txt method=0 flags=0x800 size=<n> csize=<n> crc=<crc> attr=0x81a40000\nserver-console.log method=0 flags=0x800 size=<n> csize=<n> crc=<crc> attr=0x81a40000\nserver-daemon.log method=0 flags=0x800 size=<n> csize=<n> crc=<crc> attr=0x81a40000\nserver.properties method=8 flags=0x800 size=<n> csize=<n> crc=<crc> attr=0x81a40000"
+  },
+  "data/backups/alpha/standard_<stamp>.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"instance\": \"alpha\",\n  \"scope\": \"standard\",\n  \"label\": null,\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<run>/data/instances/alpha\",\n  \"createdAt\": \"<time>\",\n  \"size\": <archive-size>,\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n"
+  },
+  "data/backups/alpha/standard_<stamp>.tar.gz": {
+   "kind": "file",
+   "mode": "644",
+   "tar": "world/ type=5 mode=755 size=0\nworld/level.dat type=0 mode=644 size=25 sha256=d3acef1a77fa2fcddc0f653dbc272a6d4a684c4245ac092732109f2e360861d7\nserver.properties type=0 mode=644 size=29 sha256=54c0d1b4fbdedf887d4de2109cd3501dc258c8d0db666626878d85692a32ac8f\neula.txt type=0 mode=644 size=10 sha256=ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha/console.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' console 'alpha'\n"
+  },
+  "data/instances/alpha/eula.txt": {
+   "kind": "file",
+   "mode": "644",
+   "text": "eula=true\n"
+  },
+  "data/instances/alpha/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-port=25565\nmotd=Alpha\n"
+  },
+  "data/instances/alpha/start.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\n'<core>' start 'alpha' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<core>' console 'alpha'\n"
+  },
+  "data/instances/alpha/stop.sh": {
+   "kind": "file",
+   "mode": "755",
+   "text": "#!/bin/sh\nexec '<core>' stop 'alpha'\n"
+  },
+  "data/instances/alpha/world": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/alpha/world/level.dat": {
+   "kind": "file",
+   "mode": "644",
+   "size": 25,
+   "sha256": "d3acef1a77fa2fcddc0f653dbc272a6d4a684c4245ac092732109f2e360861d7"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"alpha\": {\n      \"dir\": \"<run>/data/instances/alpha\",\n      \"jar\": \"paper-1.21.4-15.jar\",\n      \"java\": \"java\",\n      \"memory\": \"2G\",\n      \"loader\": \"paper\",\n      \"mcVersion\": \"1.21.4\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"rcon-secret-alpha\"\n      },\n      \"createdAt\": \"<time>\"\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run/runtime.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"format\": 2,\n  \"exe\": \"<core>\",\n  \"root\": \"<code folder>\"\n}\n"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}

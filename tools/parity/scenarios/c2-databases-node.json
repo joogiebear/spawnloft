@@ -1,4 +1,5 @@
 {
+ "frozen": false,
  "about": "C2's lifecycle for databases with the node daemon (SPAWNLOFT_DAEMON=node): MariaDB and Garnet stand-ins in the engine store, a missing engine, an external database, start, stop, restart, kill and a start that fails.",
  "env": {
   "SPAWNLOFT_DAEMON": "node"

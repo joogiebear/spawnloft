@@ -150,6 +150,8 @@ export function snapshot(root, { ignore = [], normalize = (t) => t, normalizePat
       for (let n = 2; out.has(key); n++) key = `${normalizePath(rel)}#${n}`
       if (st.isSymbolicLink()) out.set(key, { kind: 'link', target: fs.readlinkSync(abs), ...mode })
       else if (st.isDirectory()) { out.set(key, { kind: 'dir', ...mode }); walk(abs) }
+      // the Rust daemon's control socket (a server still running): there is nothing to read
+      else if (st.isSocket() || st.isFIFO()) out.set(key, { kind: st.isSocket() ? 'socket' : 'fifo', ...mode })
       else out.set(key, { kind: 'file', ...mode, ...describeFile(abs, rel, normalize) })
     }
   }

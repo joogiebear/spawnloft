@@ -1,0 +1,900 @@
+{
+ "about": "What the Node core did in scenario c7-client-launch on linux-arm64, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.",
+ "scenario": "c7-client-launch",
+ "platform": "linux-arm64",
+ "from": "node",
+ "steps": [
+  {
+   "label": "step 16 (client launch)",
+   "args": [
+    "client",
+    "launch"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 17 (client launch a b)",
+   "args": [
+    "client",
+    "launch",
+    "a",
+    "b"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts\n"
+  },
+  {
+   "label": "step 18 (client launch p1 --as)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--as"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --as needs a player name\n"
+  },
+  {
+   "label": "step 19 (client launch p1 --account)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--account"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --account needs \"offline:<player name>\" or a signed-in account name\n"
+  },
+  {
+   "label": "step 20 (client launch p1 --server)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: --server needs a server name\n"
+  },
+  {
+   "label": "step 21 (client launch p1 --bogus)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--bogus"
+   ],
+   "code": 2,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: Unknown option --bogus\n"
+  },
+  {
+   "label": "step 22 (client launch nope)",
+   "args": [
+    "client",
+    "launch",
+    "nope"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no profile named \"nope\". Known profiles: p1, ms, old, srv, fab\n"
+  },
+  {
+   "label": "step 23 (client launch p1 --as x)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--as",
+    "x"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: player name \"x\" must be 3 to 16 letters, digits or underscores\n"
+  },
+  {
+   "label": "step 24 (client launch p1 --as Steve --account Mia)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--as",
+    "Steve",
+    "--account",
+    "Mia"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: use either --as <player name> or --account <account>, not both\n"
+  },
+  {
+   "label": "step 25 (client launch p1 --account Nobody)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--account",
+    "Nobody"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no Microsoft account named \"Nobody\" is signed in; spawnloft client login, or use offline:<player name>\n"
+  },
+  {
+   "label": "step 26 (client launch p1 --account cccccccc-1111-2222-3333-444444444444 --json)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--account",
+    "cccccccc-1111-2222-3333-444444444444",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"the account this profile names (uuid cccccccc-1111-2222-3333-444444444444) is no longer in the list; sign in again, or set account= on the profile\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 27 (client launch ms --as Steve)",
+   "args": [
+    "client",
+    "launch",
+    "ms",
+    "--as",
+    "Steve"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: use either --as <player name> or --account <account>, not both\n"
+  },
+  {
+   "label": "step 28 (client launch p1 --server zz)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server",
+    "zz"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: no instance named \"zz\". Known instances: s1, s2, s3, s4, s5, s6, d1\n"
+  },
+  {
+   "label": "step 29 (client launch p1 --server d1)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server",
+    "d1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: \"d1\" is a database, not a Minecraft server; point the profile at a server\n"
+  },
+  {
+   "label": "step 30 (client launch p1 --server s2)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server",
+    "s2"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: server \"s2\" runs in online mode and p1_ is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server\n"
+  },
+  {
+   "label": "step 31 (client launch p1 --server s3 --json)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server",
+    "s3",
+    "--json"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":false,\"type\":\"error\",\"error\":{\"code\":\"COMMAND_FAILED\",\"message\":\"server \\\"s3\\\" runs in online mode and p1_ is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server\"}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 32 (client launch p1 --server s4)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server",
+    "s4"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "warning: server \"s4\" is not running, so the game will show \"Connection refused\"; start it first: spawnloft start s4\nerror: server \"s4\" cannot be reached: this machine cannot find nowhere.invalid (ENOTFOUND), so the game would stop at \"Unknown host\"; check the spelling, or that this machine is online\n"
+  },
+  {
+   "label": "step 33 (client launch p1 --server s5)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--server",
+    "s5"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: server \"s5\" runs in online mode and p1_ is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server\n"
+  },
+  {
+   "label": "step 34 (client launch fab)",
+   "args": [
+    "client",
+    "launch",
+    "fab"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: profile \"fab\" uses the fabric loader but has no loaderVersion; set one with spawnloft client set\n"
+  },
+  {
+   "label": "step 35 (client launch old)",
+   "args": [
+    "client",
+    "launch",
+    "old"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the saved sign-in for Old no longer works; run spawnloft client login again\n"
+  },
+  {
+   "label": "step 36 (client accounts --json)",
+   "args": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"accounts\":[{\"name\":\"Mia\",\"uuid\":\"aaaaaaaa-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":null},{\"name\":\"Old\",\"uuid\":\"bbbbbbbb-1111-2222-3333-444444444444\",\"type\":\"microsoft\",\"expiresAt\":\"<time>\",\"refreshFailedAt\":\"<t>\"}],\"defaultAccount\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 37 (client launch p1 --as Steve_2 --wait)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--as",
+    "Steve_2",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Launched \"p1\" as Steve_2 (pid <pid>)\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 38 (client status p1 --json)",
+   "args": [
+    "client",
+    "status",
+    "p1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"p1\",\"running\":true,\"pid\":<pid>,\"startedAt\":\"<time>\",\"uptimeMs\":<ms>,\"account\":{\"type\":\"offline\",\"name\":\"Steve_2\"},\"launchedBy\":\"cli\",\"server\":null,\"address\":null,\"harness\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 39 (client launch p1)",
+   "args": [
+    "client",
+    "launch",
+    "p1"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: profile \"p1\" is already running (pid <pid>); stop it first\n"
+  },
+  {
+   "label": "step 40 (client stop p1)",
+   "args": [
+    "client",
+    "stop",
+    "p1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"p1\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 41 (client launch p1 --account offline:Alex --json --wait)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--account",
+    "offline:Alex",
+    "--json",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"1.21.11\",\"account\":{\"type\":\"offline\",\"name\":\"Alex\"},\"profile\":{\"name\":\"p1\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"vanilla\",\"memory\":\"1G\"},\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 42 (client stop p1 --json)",
+   "args": [
+    "client",
+    "stop",
+    "p1",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"stopped\":true,\"wasRunning\":true}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 43 (client launch ms --json --wait)",
+   "args": [
+    "client",
+    "launch",
+    "ms",
+    "--json",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"1.21.11\",\"account\":{\"type\":\"microsoft\",\"name\":\"Mia\"},\"profile\":{\"name\":\"ms\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"memory\":\"2G\",\"account\":\"Mia\"},\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 44 (client stop ms)",
+   "args": [
+    "client",
+    "stop",
+    "ms"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"ms\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 45 (client launch old --json --wait)",
+   "args": [
+    "client",
+    "launch",
+    "old",
+    "--json",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"1.21.11\",\"account\":{\"type\":\"microsoft\",\"name\":\"Old\"},\"profile\":{\"name\":\"old\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"account\":\"Old\"},\"warnings\":[\"could not reach Microsoft to renew the sign-in for Old, so the game starts with the saved one; servers that check accounts will refuse it until this computer is online again\"]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 46 (client stop old)",
+   "args": [
+    "client",
+    "stop",
+    "old"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"old\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 47 (client launch srv --as Joiner --wait)",
+   "args": [
+    "client",
+    "launch",
+    "srv",
+    "--as",
+    "Joiner",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Launched \"srv\" as Joiner (pid <pid>)\n",
+   "stderr": "warning: server \"s1\" is not running, so the game will show \"Connection refused\"; start it first: spawnloft start s1\nwarning: server \"s1\" runs Minecraft 1.21.10 and this profile is 1.21.11, so the server will refuse the join unless it accepts other versions\n"
+  },
+  {
+   "label": "step 48 (client status srv --json)",
+   "args": [
+    "client",
+    "status",
+    "srv",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"name\":\"srv\",\"running\":true,\"pid\":<pid>,\"startedAt\":\"<time>\",\"uptimeMs\":<ms>,\"account\":{\"type\":\"offline\",\"name\":\"Joiner\"},\"launchedBy\":\"cli\",\"server\":\"s1\",\"address\":null,\"harness\":null}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 49 (client stop srv)",
+   "args": [
+    "client",
+    "stop",
+    "srv"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"srv\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 50 (client launch p1 --as Joiner --server s6 --json --wait)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--as",
+    "Joiner",
+    "--server",
+    "s6",
+    "--json",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"1.21.11\",\"account\":{\"type\":\"offline\",\"name\":\"Joiner\"},\"profile\":{\"name\":\"p1\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"vanilla\",\"memory\":\"1G\"},\"warnings\":[\"server \\\"s6\\\" is not running, so the game will show \\\"Connection refused\\\"; start it first: spawnloft start s6\"]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 51 (client stop p1)",
+   "args": [
+    "client",
+    "stop",
+    "p1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"p1\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 53 (client launch p1 --json --wait)",
+   "args": [
+    "client",
+    "launch",
+    "p1",
+    "--json",
+    "--wait"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"1.21.11\",\"account\":{\"type\":\"microsoft\",\"name\":\"Mia\"},\"profile\":{\"name\":\"p1\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\",\"loader\":\"vanilla\",\"memory\":\"1G\"},\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 54 (client stop p1)",
+   "args": [
+    "client",
+    "stop",
+    "p1"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"p1\"\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 55 (client launch short --as Kid --wait)",
+   "args": [
+    "client",
+    "launch",
+    "short",
+    "--as",
+    "Kid",
+    "--wait"
+   ],
+   "code": 1,
+   "signal": null,
+   "stdout": "",
+   "stderr": "error: the client exited within 5 s; see spawnloft client logs short\n"
+  },
+  {
+   "label": "step 56 (client status short)",
+   "args": [
+    "client",
+    "status",
+    "short"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "\"short\" is stopped\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 57 (client launch short --as Kid --wait --json)",
+   "args": [
+    "client",
+    "launch",
+    "short",
+    "--as",
+    "Kid",
+    "--wait",
+    "--json"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "{\"schemaVersion\":1,\"command\":\"client\",\"ok\":true,\"data\":{\"pid\":<pid>,\"version\":\"1.21.11\",\"account\":{\"type\":\"offline\",\"name\":\"Kid\"},\"profile\":{\"name\":\"short\",\"assistantAccount\":false,\"serverList\":true,\"mc\":\"1.21.11\"},\"warnings\":[]}}\n",
+   "stderr": ""
+  },
+  {
+   "label": "step 58 (client stop short)",
+   "args": [
+    "client",
+    "stop",
+    "short"
+   ],
+   "code": 0,
+   "signal": null,
+   "stdout": "Stopped \"short\"\n",
+   "stderr": ""
+  }
+ ],
+ "requests": [
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 134,
+   "bodySha256": "4b7dd843f7c858d2a3a51dd6752861d8bc3a7d8dca10332b2f0936fbdcb126da"
+  },
+  {
+   "origin": "https://login.microsoftonline.com",
+   "method": "POST",
+   "url": "/consumers/oauth2/v2.0/token",
+   "userAgent": "node",
+   "accept": "*/*",
+   "bodyBytes": 134,
+   "bodySha256": "4b7dd843f7c858d2a3a51dd6752861d8bc3a7d8dca10332b2f0936fbdcb126da"
+  }
+ ],
+ "tree": {
+  "data": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/backups": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/accounts.json": {
+   "kind": "file",
+   "mode": "600",
+   "text": "{\n  \"version\": 1,\n  \"accounts\": [\n    {\n      \"type\": \"microsoft\",\n      \"name\": \"Mia\",\n      \"uuid\": \"aaaaaaaa-1111-2222-3333-444444444444\",\n      \"accessToken\": \"mia-token\",\n      \"refreshToken\": \"mia-refresh\",\n      \"expiresAt\": \"<time>\",\n      \"xuid\": \"123\",\n      \"clientId\": \"cid\",\n      \"userType\": \"msa\"\n    },\n    {\n      \"type\": \"microsoft\",\n      \"name\": \"Old\",\n      \"uuid\": \"bbbbbbbb-1111-2222-3333-444444444444\",\n      \"accessToken\": \"old-token\",\n      \"refreshToken\": \"old-refresh\",\n      \"expiresAt\": \"<time>\",\n      \"refreshFailedAt\": \"<time>\"\n    }\n  ]\n}\n"
+  },
+  "data/client/profiles": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/ms": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/ms/servers.dat": {
+   "kind": "file",
+   "mode": "644",
+   "size": 130,
+   "sha256": "08970d6715ba856398c4b9b9fb762f10bee7592eafd2f9e29b9e24947f414922"
+  },
+  "data/client/profiles/old": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/old/servers.dat": {
+   "kind": "file",
+   "mode": "644",
+   "size": 130,
+   "sha256": "08970d6715ba856398c4b9b9fb762f10bee7592eafd2f9e29b9e24947f414922"
+  },
+  "data/client/profiles/p1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/p1/servers.dat": {
+   "kind": "file",
+   "mode": "644",
+   "size": 130,
+   "sha256": "08970d6715ba856398c4b9b9fb762f10bee7592eafd2f9e29b9e24947f414922"
+  },
+  "data/client/profiles/short": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/short/servers.dat": {
+   "kind": "file",
+   "mode": "644",
+   "size": 130,
+   "sha256": "08970d6715ba856398c4b9b9fb762f10bee7592eafd2f9e29b9e24947f414922"
+  },
+  "data/client/profiles/srv": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/profiles/srv/servers.dat": {
+   "kind": "file",
+   "mode": "644",
+   "size": 130,
+   "sha256": "08970d6715ba856398c4b9b9fb762f10bee7592eafd2f9e29b9e24947f414922"
+  },
+  "data/client/profiles.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"defaultAccount\": \"aaaaaaaa-1111-2222-3333-444444444444\",\n  \"profiles\": {\n    \"p1\": {\n      \"mc\": \"1.21.11\",\n      \"loader\": \"vanilla\",\n      \"memory\": \"1G\"\n    },\n    \"short\": {\n      \"mc\": \"1.21.11\"\n    }\n  }\n}\n"
+  },
+  "data/client/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/fab": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/ms": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/ms/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Mia\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/ms/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 1\n}\n"
+  },
+  "data/client/run/ms/server-list.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"entries\": {\n    \"s2\": {\n      \"ip\": \"127.0.0.1:25571\",\n      \"name\": \"s2\",\n      \"state\": \"ours\"\n    },\n    \"s4\": {\n      \"ip\": \"nowhere.invalid:25573\",\n      \"name\": \"s4\",\n      \"state\": \"ours\"\n    },\n    \"s6\": {\n      \"ip\": \"[::1]:25575\",\n      \"name\": \"Local six\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+  },
+  "data/client/run/ms/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/run/old": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/old/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Old\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/old/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 1\n}\n"
+  },
+  "data/client/run/old/server-list.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"entries\": {\n    \"s2\": {\n      \"ip\": \"127.0.0.1:25571\",\n      \"name\": \"s2\",\n      \"state\": \"ours\"\n    },\n    \"s4\": {\n      \"ip\": \"nowhere.invalid:25573\",\n      \"name\": \"s4\",\n      \"state\": \"ours\"\n    },\n    \"s6\": {\n      \"ip\": \"[::1]:25575\",\n      \"name\": \"Local six\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+  },
+  "data/client/run/old/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/run/p1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/p1/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Mia\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/p1/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 4\n}\n"
+  },
+  "data/client/run/p1/server-list.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"entries\": {\n    \"s2\": {\n      \"ip\": \"127.0.0.1:25571\",\n      \"name\": \"s2\",\n      \"state\": \"ours\"\n    },\n    \"s4\": {\n      \"ip\": \"nowhere.invalid:25573\",\n      \"name\": \"s4\",\n      \"state\": \"ours\"\n    },\n    \"s6\": {\n      \"ip\": \"[::1]:25575\",\n      \"name\": \"Local six\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+  },
+  "data/client/run/p1/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/run/short": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/short/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Kid\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/short/last-exit.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"code\": 1,\n  \"signal\": null,\n  \"startedAt\": \"<time>\",\n  \"endedAt\": \"<time>\",\n  \"stopped\": false\n}\n"
+  },
+  "data/client/run/short/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 2\n}\n"
+  },
+  "data/client/run/short/server-list.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"entries\": {\n    \"s2\": {\n      \"ip\": \"127.0.0.1:25571\",\n      \"name\": \"s2\",\n      \"state\": \"ours\"\n    },\n    \"s4\": {\n      \"ip\": \"nowhere.invalid:25573\",\n      \"name\": \"s4\",\n      \"state\": \"ours\"\n    },\n    \"s6\": {\n      \"ip\": \"[::1]:25575\",\n      \"name\": \"Local six\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+  },
+  "data/client/run/short/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/run/srv": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/run/srv/client.log": {
+   "kind": "file",
+   "mode": "644",
+   "text": "[00:00:00] [Render thread/INFO]: Setting user: Joiner\n[00:00:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3\n"
+  },
+  "data/client/run/srv/played.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"lastPlayedAt\": \"<time>\",\n  \"totalMs\": <ms>,\n  \"launches\": 1\n}\n"
+  },
+  "data/client/run/srv/server-list.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"entries\": {\n    \"s2\": {\n      \"ip\": \"127.0.0.1:25571\",\n      \"name\": \"s2\",\n      \"state\": \"ours\"\n    },\n    \"s4\": {\n      \"ip\": \"nowhere.invalid:25573\",\n      \"name\": \"s4\",\n      \"state\": \"ours\"\n    },\n    \"s6\": {\n      \"ip\": \"[::1]:25575\",\n      \"name\": \"Local six\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+  },
+  "data/client/run/srv/stop-asked.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"pid\": <pid>,\n  \"at\": \"<time>\"\n}\n"
+  },
+  "data/client/versions": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.21.11": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/client/versions/1.21.11/1.21.11.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"arguments\": {\n    \"game\": [\n      \"--username\",\n      \"${auth_player_name}\",\n      \"--version\",\n      \"${version_name}\",\n      \"--gameDir\",\n      \"${game_directory}\",\n      \"--assetsDir\",\n      \"${assets_root}\",\n      \"--assetIndex\",\n      \"${assets_index_name}\",\n      \"--uuid\",\n      \"${auth_uuid}\",\n      \"--accessToken\",\n      \"${auth_access_token}\",\n      \"--clientId\",\n      \"${clientid}\",\n      \"--xuid\",\n      \"${auth_xuid}\",\n      \"--versionType\",\n      \"${version_type}\",\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_demo_user\": true\n            }\n          }\n        ],\n        \"value\": \"--demo\"\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"has_custom_resolution\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--width\",\n          \"${resolution_width}\",\n          \"--height\",\n          \"${resolution_height}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"has_quick_plays_support\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlayPath\",\n          \"${quickPlayPath}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_quick_play_singleplayer\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlaySingleplayer\",\n          \"${quickPlaySingleplayer}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_quick_play_multiplayer\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlayMultiplayer\",\n          \"${quickPlayMultiplayer}\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"features\": {\n              \"is_quick_play_realms\": true\n            }\n          }\n        ],\n        \"value\": [\n          \"--quickPlayRealms\",\n          \"${quickPlayRealms}\"\n        ]\n      }\n    ],\n    \"jvm\": [\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"os\": {\n              \"name\": \"osx\"\n            }\n          }\n        ],\n        \"value\": [\n          \"-XstartOnFirstThread\"\n        ]\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"os\": {\n              \"name\": \"windows\"\n            }\n          }\n        ],\n        \"value\": \"-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\"\n      },\n      {\n        \"rules\": [\n          {\n            \"action\": \"allow\",\n            \"os\": {\n              \"arch\": \"x86\"\n            }\n          }\n        ],\n        \"value\": \"-Xss1M\"\n      },\n      \"-Djava.library.path=${natives_directory}\",\n      \"-Djna.tmpdir=${natives_directory}\",\n      \"-Dorg.lwjgl.system.SharedLibraryExtractPath=${natives_directory}\",\n      \"-Dio.netty.native.workdir=${natives_directory}\",\n      \"-Dminecraft.launcher.brand=${launcher_name}\",\n      \"-Dminecraft.launcher.version=${launcher_version}\",\n      \"-cp\",\n      \"${classpath}\"\n    ]\n  },\n  \"assetIndex\": {\n    \"id\": \"29\",\n    \"sha1\": \"a2f0558bd140ae4f8f6a48d0ea6f1dbc16a84baa\",\n    \"size\": 529966,\n    \"totalSize\": 452742718,\n    \"url\": \"https://piston-meta.mojang.com/v1/packages/a2f0558bd140ae4f8f6a48d0ea6f1dbc16a84baa/29.json\"\n  },\n  \"assets\": \"29\",\n  \"complianceLevel\": 1,\n  \"downloads\": {\n    \"client\": {\n      \"sha1\": \"ba2df812c2d12e0219c489c4cd9a5e1f0760f5bd\",\n      \"size\": 31152600,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/ba2df812c2d12e0219c489c4cd9a5e1f0760f5bd/client.jar\"\n    },\n    \"client_mappings\": {\n      \"sha1\": \"031a68bebf55d824f66d6573d8c752f0e1bf232a\",\n      \"size\": 11779287,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/031a68bebf55d824f66d6573d8c752f0e1bf232a/client.txt\"\n    },\n    \"server\": {\n      \"sha1\": \"64bb6d763bed0a9f1d632ec347938594144943ed\",\n      \"size\": 56327581,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/64bb6d763bed0a9f1d632ec347938594144943ed/server.jar\"\n    },\n    \"server_mappings\": {\n      \"sha1\": \"5621e9253f05fd57872bbe7f8ddf5f9a7d525955\",\n      \"size\": 8678606,\n      \"url\": \"https://piston-data.mojang.com/v1/objects/5621e9253f05fd57872bbe7f8ddf5f9a7d525955/server.txt\"\n    }\n  },\n  \"id\": \"1.21.11\",\n  \"javaVersion\": {\n    \"component\": \"java-runtime-delta\",\n    \"majorVersion\": 21\n  },\n  \"libraries\": [\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar\",\n          \"sha1\": \"1227f9e0666314f9de41477e3ec277e542ed7f7b\",\n          \"size\": 1330045,\n          \"url\": \"https://libraries.minecraft.net/ca/weblite/java-objc-bridge/1.1/java-objc-bridge-1.1.jar\"\n        }\n      },\n      \"name\": \"ca.weblite:java-objc-bridge:1.1\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"osx\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\",\n          \"sha1\": \"6ff6d710fd4ffd470f2799653fab57e27fed0c9d\",\n          \"size\": 46763,\n          \"url\": \"https://libraries.minecraft.net/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\"\n        }\n      },\n      \"name\": \"com.mojang:jtracy:1.0.37:natives-windows\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"windows\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar\",\n          \"sha1\": \"908ce8e5e196e52061dc11290723d19e2c574bfd\",\n          \"size\": 100000,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-linux\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"linux\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar\",\n          \"sha1\": \"9c2086997079f664149bd1a6ff5aedd313e0c772\",\n          \"size\": 100001,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-macos\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"osx\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar\",\n          \"sha1\": \"8be5e9f608e7d6b78c56d047982b5ea0d6cc7033\",\n          \"size\": 100002,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-macos-arm64.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-macos-arm64\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"osx\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-arm64.jar\",\n          \"sha1\": \"b8eae2308625740adfb9c4d62e20ad7c28984005\",\n          \"size\": 100003,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-arm64.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-windows-arm64\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"windows\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-x86.jar\",\n          \"sha1\": \"e553dd7836f2decb46d66c8e34e410032c6e8a8d\",\n          \"size\": 100004,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows-x86.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3:natives-windows-x86\",\n      \"rules\": [\n        {\n          \"action\": \"allow\",\n          \"os\": {\n            \"name\": \"windows\"\n          }\n        }\n      ]\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\",\n          \"sha1\": \"29589b5f87ed335a6c7e7ee6a5775f81f97ecb84\",\n          \"size\": 785029,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\"\n        },\n        \"classifiers\": {\n          \"natives-windows\": {\n            \"path\": \"com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\",\n            \"sha1\": \"6ff6d710fd4ffd470f2799653fab57e27fed0c9d\",\n            \"size\": 46763,\n            \"url\": \"https://libraries.minecraft.net/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar\"\n          }\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3\",\n      \"natives\": {\n        \"windows\": \"natives-windows\"\n      },\n      \"extract\": {\n        \"exclude\": [\n          \"META-INF/\"\n        ]\n      }\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\",\n          \"sha1\": \"29589b5f87ed335a6c7e7ee6a5775f81f97ecb84\",\n          \"size\": 785029,\n          \"url\": \"https://libraries.minecraft.net/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar\"\n        }\n      },\n      \"name\": \"org.lwjgl:lwjgl:3.3.3\"\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar\",\n          \"sha1\": \"1f30a180ee04ccd53339a716aec13cae60a013b5\",\n          \"size\": 683071,\n          \"url\": \"https://libraries.minecraft.net/at/yawk/lz4/lz4-java/1.8.1/lz4-java-1.8.1.jar\"\n        }\n      },\n      \"name\": \"at.yawk.lz4:lz4-java:1.8.1\"\n    },\n    {\n      \"downloads\": {\n        \"artifact\": {\n          \"path\": \"com/azure/azure-json/1.4.0/azure-json-1.4.0.jar\",\n          \"sha1\": \"fcc1d354dbc3e0300e5276b1bf124d0247799cd8\",\n          \"size\": 325945,\n          \"url\": \"https://libraries.minecraft.net/com/azure/azure-json/1.4.0/azure-json-1.4.0.jar\"\n        }\n      },\n      \"name\": \"com.azure:azure-json:1.4.0\"\n    }\n  ],\n  \"logging\": {\n    \"client\": {\n      \"argument\": \"-Dlog4j.configurationFile=${path}\",\n      \"file\": {\n        \"id\": \"client-1.21.2.xml\",\n        \"sha1\": \"39384bd14c0606d812afec88d8aff595b2587dd9\",\n        \"size\": 1073,\n        \"url\": \"https://piston-data.mojang.com/v1/objects/39384bd14c0606d812afec88d8aff595b2587dd9/client-1.21.2.xml\"\n      },\n      \"type\": \"log4j2-xml\"\n    }\n  },\n  \"mainClass\": \"net.minecraft.client.main.Main\",\n  \"minimumLauncherVersion\": 21,\n  \"releaseTime\": \"<time>\",\n  \"time\": \"<time>\",\n  \"type\": \"release\"\n}"
+  },
+  "data/engines": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s1": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s1/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "online-mode=false\nserver-port=25570\n"
+  },
+  "data/instances/s2": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s2/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "online-mode=true\n"
+  },
+  "data/instances/s3": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s4": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s4/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-ip=nowhere.invalid\nonline-mode=false\n"
+  },
+  "data/instances/s5": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s5/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "server-ip=bad_host\n"
+  },
+  "data/instances/s6": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/instances/s6/server.properties": {
+   "kind": "file",
+   "mode": "644",
+   "text": "online-mode=false\nserver-ip=[::1]\n"
+  },
+  "data/instances.json": {
+   "kind": "file",
+   "mode": "644",
+   "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"s1\": {\n      \"dir\": \"<run>/data/instances/s1\",\n      \"port\": 25570,\n      \"mcVersion\": \"1.21.10\",\n      \"label\": \"Survival\"\n    },\n    \"s2\": {\n      \"dir\": \"<run>/data/instances/s2\",\n      \"port\": 25571,\n      \"mcVersion\": \"1.21.11\"\n    },\n    \"s3\": {\n      \"dir\": \"<run>/data/instances/s3\",\n      \"port\": \"abc\",\n      \"mcVersion\": \"1.21.11\"\n    },\n    \"s4\": {\n      \"dir\": \"<run>/data/instances/s4\",\n      \"port\": 25573,\n      \"mcVersion\": \"1.21.11\"\n    },\n    \"s5\": {\n      \"dir\": \"<run>/data/instances/s5\",\n      \"port\": 25574,\n      \"mcVersion\": \"1.21.11\"\n    },\n    \"s6\": {\n      \"dir\": \"<run>/data/instances/s6\",\n      \"port\": 25575,\n      \"mcVersion\": \"1.21.11\",\n      \"label\": \"Local six\"\n    },\n    \"d1\": {\n      \"dir\": \"<run>/data/instances/d1\",\n      \"kind\": \"database\",\n      \"port\": 3306\n    }\n  }\n}\n"
+  },
+  "data/jars": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/run": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/services": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "data/templates": {
+   "kind": "dir",
+   "mode": "755"
+  },
+  "home": {
+   "kind": "dir",
+   "mode": "755"
+  }
+ }
+}
