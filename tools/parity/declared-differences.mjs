@@ -27,7 +27,7 @@ export const DECLARED = [
       // /api/feedback inside a JSON string and inside the bug link's query
       .replace(/^SpawnLoft: \d.*$/gm, 'SpawnLoft: <version>')
       .replace(/SpawnLoft: \d[^\\"]*\\n(?:node: v|core: spawnloft-core )[^\\"]*\\n/g, 'SpawnLoft: <version>\\n')
-      .replace(/SpawnLoft%3A\+\d[^%]*%0A(?:node%3A\+v[^%]*|core%3A\+spawnloft-core\+[^%]*%28[^%]*%29)%0A/g, 'SpawnLoft%3A+<version>%0A'),
+      .replace(/SpawnLoft%3A\+\d[^%]*%0A(?:node%3A\+v[^%]*|core%3A\+spawnloft-core\+(?:(?!%0A).)*)%0A/g, 'SpawnLoft%3A+<version>%0A'),
   },
   {
     // found by C6b's Windows parity run: on a file whose entries all come from its folder (SDDL
