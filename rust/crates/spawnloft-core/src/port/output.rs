@@ -168,23 +168,7 @@ pub fn record_of(row: &Instance) -> Value {
 
 /// The `diagnose()` context of a server, as `why` builds it.
 pub fn diagnose_context(inst: &Instance) -> diagnose::Context {
-    let text = |key: &str| match inst.get(key) {
-        None | Some(Value::Null) => None,
-        v => Some(spawnloft_lib::js::string(v)),
-    };
-    let dir = inst.get("dir").map(|d| spawnloft_lib::js::string(Some(d)));
-    diagnose::Context {
-        port: text("port"),
-        memory: text("memory"),
-        crash_dir: dir
-            .as_deref()
-            .map(|d| spawnloft_lib::jspath::join(&[d, "crash-reports"])),
-        dir: inst
-            .get("dir")
-            .filter(|v| spawnloft_lib::js::truthy(Some(v)))
-            .map(|d| spawnloft_lib::js::string(Some(d))),
-        panel: false,
-    }
+    diagnose::Context::of(inst)
 }
 
 /// `inst.dir` where Node passes it to `path.join`, which refuses anything but a string.

@@ -1,0 +1,183 @@
+{
+  "about": "C6b's `doctor`: text and --json, its usage checks (only --json checks flags and arguments), servers with a missing folder, a missing jar, an EULA not accepted (and one accepted over CRLF), a port that collides with another server's RCON port, a stale state file reported by --json and cleared by the text form, a data-format marker from a newer release, a world-readable server.properties and accounts file reported by --json and made owner-only by the text form, and a client profile pinned to a Java that does not exist. Java's and tar's lines come from the machine, the same on both sides.",
+  "steps": [
+    {
+      "write": "data/instances/alpha/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/alpha/eula.txt",
+      "text": "#By changing the setting below to TRUE\r\n eula = TRUE \r\n"
+    },
+    {
+      "write": "data/instances/alpha/server.properties",
+      "text": "motd=alpha\nserver-port=47911\nenable-rcon=true\nrcon.port=47921\nrcon.password=test\n",
+      "mode": "644"
+    },
+    {
+      "write": "data/instances/beta/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/beta/eula.txt",
+      "text": "eula=false\n"
+    },
+    {
+      "write": "data/instances/beta/server.properties",
+      "text": "server-port=47921\n",
+      "mode": "600"
+    },
+    {
+      "write": "data/instances/gamma/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "server.jar",
+            "memory": "1G",
+            "port": 47911,
+            "rcon": {
+              "port": 47921,
+              "password": "test"
+            }
+          },
+          "beta": {
+            "dir": "{data}/instances/beta",
+            "jar": "server.jar",
+            "memory": "1G",
+            "port": 47921
+          },
+          "gamma": {
+            "dir": "{data}/instances/gamma",
+            "jar": "server.jar",
+            "memory": "1G",
+            "port": "47931"
+          },
+          "ghost": {
+            "dir": "{run}/nowhere/ghost",
+            "jar": "server.jar",
+            "memory": "1G",
+            "port": 47941
+          },
+          "db1": {
+            "kind": "database",
+            "engine": "mariadb",
+            "version": "11.4.5",
+            "dir": "{data}/services/db1",
+            "port": 47951
+          }
+        }
+      },
+      "mode": "600"
+    },
+    {
+      "write": "data/run/alpha/state.json",
+      "json": {
+        "running": true,
+        "daemonPid": 999999999,
+        "javaPid": 999999998,
+        "startedAt": "2026-11-01T10:00:00.000Z"
+      }
+    },
+    {
+      "write": "data/data-format.json",
+      "json": {
+        "writtenBy": "9.0.0",
+        "format": 1
+      }
+    },
+    {
+      "write": "data/client/profiles.json",
+      "json": {
+        "version": 1,
+        "profiles": {
+          "p": {
+            "mc": "1.21.4",
+            "loader": "vanilla",
+            "java": "{run}/no/such/java"
+          }
+        }
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "json": {
+        "version": 1,
+        "accounts": []
+      },
+      "mode": "644"
+    },
+    {
+      "run": [
+        "doctor",
+        "--json"
+      ],
+      "expect": {
+        "code": 1,
+        "stdoutIncludes": "\"healthy\":false"
+      }
+    },
+    {
+      "run": [
+        "doctor",
+        "extra",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "doctor",
+        "--json",
+        "--verbose"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "doctor",
+        "--json=yes"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "doctor",
+        "whatever",
+        "--verbose"
+      ],
+      "expect": {
+        "code": 1,
+        "stdoutIncludes": "problem(s):"
+      }
+    },
+    {
+      "run": [
+        "doctor",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "doctor"
+      ],
+      "expect": {
+        "code": 1
+      }
+    }
+  ]
+}

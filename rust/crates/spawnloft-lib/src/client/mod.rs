@@ -6,6 +6,7 @@
 
 pub mod accounts;
 pub mod auth;
+pub mod diagnose;
 pub mod doctor;
 pub mod fabric;
 pub mod forge;

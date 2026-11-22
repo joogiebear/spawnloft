@@ -222,6 +222,10 @@ test('the declared differences are the plan\'s six rows, the locale row, C1\'s e
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'
   assert.equal(applyDeclared(doctor, 'doctor'), '{"notes":["java: 21","data root: /d"]}')
   assert.equal(applyDeclared(doctor, 'list'), doctor, 'a row applies only to its commands')
+  // the Rust core's line in their place, and the bundle's facts
+  assert.equal(applyDeclared('{"notes":["java: 21","core: spawnloft-core 2.0.0 (x86_64-unknown-linux-gnu)","data root: /d"]}', 'doctor'), '{"notes":["java: 21","data root: /d"]}')
+  assert.equal(applyDeclared('{"facts":{"spawnloft":"1.6.0","os":"linux","arch":"x64","node":"v22.1.0","server":null}}', 'diag'), '{"facts":{"spawnloft":"<version>","os":"linux","arch":"x64","server":null}}')
+  assert.equal(applyDeclared('spawnloft: 2.0.0\nos: linux\nnode: v22.1.0\narch: x64', 'diag'), 'spawnloft: <version>\nos: linux\narch: x64')
   assert.equal(applyDeclared('{"runtime":"/usr/bin/node"}', 'repair'), '{"runtime":"<runtime>"}')
   assert.match(declaredTable(), /^\| Where \| Node \| Rust \|/)
   // a stack goes, the error line stays

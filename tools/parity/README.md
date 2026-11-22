@@ -107,7 +107,7 @@ Not isolated: the Windows user PATH.
 - `acl`: on Windows, also compare each entry's `icacls` listing. POSIX modes are always compared.
 
 The data tree records each file's mode and, by kind: a zip's entries in order with their method,
-flags, sizes, CRC and attributes; a tar's (or `.tar.gz`'s) members with name, type, mode, size
+flags, sizes, CRC and attributes (evened out by the scenario's `normalize` like text); a tar's (or `.tar.gz`'s) members with name, type, mode, size
 and sha256, from the rig's own reader; text, evened out; anything else by size and sha256. A
 file name with a stamp is evened out like text, and two names that come out the same are kept
 apart as `name` and `name#2`.
@@ -169,6 +169,8 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c7-client-install` | `client install` over faked Mojang hosts, made by `make-c7-install-scenario.mjs`: a modern version with natives for every OS and arch, the checked-files list, a damaged library, natives extracted again, `--verify`, the virtual and resources asset layouts, old-style natives with excludes, the refusals (unknown layout, an index path leaving its folder, a missing library, a checksum mismatch, a loader-made library, an unlisted version), and a Fabric profile with no Fabric host faked. Not on Linux arm64, where the client is refused |
 | `c7-client-launch` | `client launch` with the fake game over Mojang's version file on disk: offline players by `--as`, by the profile and by default, a Microsoft account as saved and as the default, a sign-in renewed (refused as over, then Microsoft unreachable and the saved one used with a warning), every refusal before the game starts, a stopped server joined by quick play with its warnings and the Multiplayer list filled, `--wait` over a game that exits at once, and a Fabric profile with no build pinned |
 | `c7-client-loaders` | Fabric and Quilt profiles over faked Mojang, Fabric and Quilt hosts, made by `make-c7-loader-scenario.mjs`: the stable Fabric build picked and pinned, a pinned build, a meta answering for another build or game version, a library checksum mismatch, a build the meta lacks, a snapshot and an old release with no loader; Quilt's newest non-beta from a list out of order, checksums from the `.sha1` beside each library, and its refusals (another host, an unknown shape, a checksum file with none, a wrong id); version files damaged and made again; and the fake game launched on loader profiles. Not on Linux arm64 |
+| `c6b-doctor` | C6b's `doctor`, text and `--json`, and its usage checks (only `--json` checks flags and arguments): a missing folder, a missing jar, an EULA not accepted (and one accepted over CRLF), a port that collides with another server's RCON port, a port given as text, a stale state file reported by `--json` and cleared by the text form, a data-format marker from a newer release, world-readable secrets files made owner-only by the text form, and a client profile pinned to a missing Java |
+| `c6b-diag` | `diag`: its usage and refusals, and bundles for a server, a client profile and both, text and `--json`, with every cleaning (secrets, player IPs, the account folder, the Microsoft account, harness, access, session and panel tokens). Zips are compared by entry names and order; sizes and checksums are evened out (summary.json's version, the deflate) |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).
@@ -180,7 +182,7 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 
 | Where | Node | Rust | How the rig holds it |
 | --- | --- | --- | --- |
-| `doctor`, the diagnostics bundle, the panel's diagnostics | a `node: <version>` line and the code `root` | the core's version; no `root` | evened out (`doctor-node-line`) |
+| `doctor`, the diagnostics bundle, the panel's diagnostics | a `node: <version>` line and the code `root`; the bundle's `node` fact, and `spawnloft` from package.json | a `core: spawnloft-core <version> (<target>)` line, no `root`; no `node` fact, and `spawnloft` is the core's own version | evened out (`doctor-node-line`) |
 | `repair` text and `--json` | `runtime: <node path>` | the core's own path | evened out (`repair-runtime`) |
 | free-text sort order outside ASCII | ICU collation | the port's comparison function (spawnloft-lib collate.rs) | scenarios sort ASCII names only; test/fixtures/contracts/ordering.json pins the ASCII order on both sides |
 | sort order on a machine whose locale tailors ASCII letters (da, nb, lt, et, ...) | that locale's order | the root order (what an en-US machine shows) | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 |

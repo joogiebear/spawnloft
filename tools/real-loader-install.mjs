@@ -5,7 +5,13 @@
 // Run by .github/workflows/loader-install.yml (the loaders' hosts cannot be reached from where
 // SpawnLoft is written); it runs anywhere with network access, in a data folder of its own:
 //
-//   node tools/real-loader-install.mjs --loader neoforge --mc 26.3 --build 26.3.0.103 [--and <build>]
+//   node tools/real-loader-install.mjs --loader neoforge --mc 26.3 --build 26.3.0.103 [--and <build>] [--core <bin>]
+//
+// --core <bin> makes and sets the profiles up through that spawnloft-core (`client new`, `client
+// set`, `client install`), the Rust core's client (rust/PLAN-CORE-PORT.md, C7b). The checks after
+// (the stamps, the launch command and every file it names) read what it left on disk with the
+// Node core's readers, so the two cores are held to the same files. Without it the Node core's
+// modules do the setting up themselves.
 //
 // --and sets a second build for the same version up after the first, in a setup of its own, and
 // checks that the first build's files still hold (the two share the build steps' middle files).
@@ -14,6 +20,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 
 const arg = (name, fallback = null) => {
   const i = process.argv.indexOf(`--${name}`)
@@ -23,9 +30,10 @@ const loader = arg('loader')
 const mc = arg('mc')
 const build = arg('build')
 const also = arg('and')
+const core = arg('core')
 const keep = process.argv.includes('--keep')
 if (!loader || !mc || !build) {
-  console.error('usage: node tools/real-loader-install.mjs --loader <id> --mc <version> --build <build> [--keep]')
+  console.error('usage: node tools/real-loader-install.mjs --loader <id> --mc <version> --build <build> [--and <build>] [--core <bin>] [--keep]')
   process.exit(2)
 }
 
@@ -45,11 +53,49 @@ const began = Date.now()
 const secs = () => `${((Date.now() - began) / 1000).toFixed(0)}s`
 let lastProgress = 0
 
-async function main() {
+// One spawnloft-core command line in this data folder. Its stderr (the stages and progress) is
+// shown as it comes, with the time, and handed to `onLine`; stdout is returned.
+function runCore(args, { onLine = () => {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(core, args, { env: { ...process.env, SPAWNLOFT_DATA_ROOT: root }, stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let carry = ''
+    let failure = null
+    child.stdout.setEncoding('utf8').on('data', (d) => { stdout += d })
+    child.stderr.setEncoding('utf8').on('data', (d) => {
+      const lines = (carry + d).split('\n')
+      carry = lines.pop()
+      for (const line of lines) {
+        console.log(`[${secs()}] ${line}`)
+        try { onLine(line) } catch (err) { failure ??= err; child.kill() }
+      }
+    })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (carry) console.log(`[${secs()}] ${carry}`)
+      if (failure) reject(failure)
+      else if (code !== 0) reject(new Error(`spawnloft-core ${args.join(' ')} exited ${code}`))
+      else resolve(stdout)
+    })
+  })
+}
+
+// A profile made and set up as a first Play does; the version id it was set up as.
+async function setUp(profile, loaderVersion, { onStage = ({ stage, message }) => console.log(`[${secs()}] ${stage}: ${message}`) } = {}) {
+  if (core) {
+    await runCore(['client', 'new', profile, '--mc', mc, '--loader', loader, '--memory', '4G'])
+    await runCore(['client', 'set', profile, `loaderVersion=${loaderVersion}`])
+    // not --json, which keeps the stages quiet: the second setup is checked by them
+    const out = await runCore(['client', 'install', profile], { onLine: (message) => onStage({ stage: 'core', message }) })
+    console.log(out.trim())
+    const m = /^Installed (\S+): /m.exec(out)
+    if (!m) throw new Error(`client install printed no "Installed <id>:" line:\n${out}`)
+    return m[1]
+  }
   const checkedMc = await client.checkProfileVersion({ mc, loader })
-  client.createProfile(name, { mc: checkedMc, loader, loaderVersion: build, memory: '4G' })
-  const result = await client.installProfile(name, {
-    onStage: ({ stage, message }) => console.log(`[${secs()}] ${stage}: ${message}`),
+  client.createProfile(profile, { mc: checkedMc, loader, loaderVersion, memory: '4G' })
+  const result = await client.installProfile(profile, {
+    onStage,
     onProgress: (p) => {
       if (Date.now() - lastProgress < 5000) return
       lastProgress = Date.now()
@@ -57,9 +103,15 @@ async function main() {
     },
     onNote: (n) => console.log(`[${secs()}] note: ${n}`),
   })
+  return result.id
+}
+
+async function main() {
+  if (core) console.log(`setting up through ${core}`)
+  const installed = await setUp(name, build)
   const mod = loaderFor(loader)
   const id = mod.versionId(mc, build)
-  if (result.id !== id) throw new Error(`installed ${result.id}, expected ${id}`)
+  if (installed !== id) throw new Error(`installed ${installed}, expected ${id}`)
   if (!mod.isInstalled(mc, build)) throw new Error('the loader does not count as set up')
   if (mod.finishInstall) {
     if (!isStamped(id) || !(await stampHolds(id))) throw new Error('the stamp is missing or does not hold')
@@ -67,14 +119,12 @@ async function main() {
     console.log(`stamp: ${Object.keys(stamp.files).length} files`)
   }
   // a second setup up on the same build builds nothing
-  client.createProfile(`${name}-2`, { mc: checkedMc, loader, loaderVersion: build, memory: '4G' })
   const t = Date.now()
-  await client.installProfile(`${name}-2`, { onStage: ({ message }) => { if (/step \d+ of/.test(message)) throw new Error(`a second setup ran a build step: ${message}`) } })
+  await setUp(`${name}-2`, build, { onStage: ({ message }) => { if (/step \d+ of/.test(message)) throw new Error(`a second setup ran a build step: ${message}`) } })
   console.log(`second setup: ${((Date.now() - t) / 1000).toFixed(1)}s, no build steps`)
 
   if (also) {
-    client.createProfile(`${name}-and`, { mc: checkedMc, loader, loaderVersion: also, memory: '4G' })
-    await client.installProfile(`${name}-and`, { onStage: ({ stage, message }) => console.log(`[${secs()}] ${stage}: ${message}`) })
+    await setUp(`${name}-and`, also)
     const id2 = mod.versionId(mc, also)
     if (mod.finishInstall && !(await stampHolds(id2))) throw new Error(`${also}'s stamp does not hold`)
     if (mod.finishInstall && !(await stampHolds(id))) throw new Error(`setting ${also} up changed ${build}'s files`)

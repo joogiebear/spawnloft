@@ -1,0 +1,351 @@
+{
+  "about": "C6b's `diag`: its usage and refusals (no target, two names, --lines 0, bare --lines, --client and --out with no value, an unknown server, a database, an unknown profile), and bundles for a server, a client profile and both, in text and --json: the console, daemon log, server.properties with its secrets out, crash reports, plugins, the client's latest.log, its process capture back from log4j XML with what latest.log already has dropped, mods, options.txt, the timeline, the failure shapes of both, and every cleaning (MCP secrets, player IPs, the account folder in paths, the Microsoft account's name and uuid, harness, access, session and panel tokens). The zips are compared by their entry names and order; their sizes and checksums differ by summary.json's version and by the deflate (declared), and their contents are what --json and the text form print.",
+  "normalize": [
+    {
+      "pattern": "size=\\d+ csize=\\d+ crc=[0-9a-f]+",
+      "replace": "size=<n> csize=<n> crc=<crc>"
+    },
+    {
+      "pattern": "^\\d{2}:\\d{2}:\\d{2}\\.\\d{3}( client-process +)$",
+      "flags": "gm",
+      "replace": "<now>$1"
+    },
+    {
+      "pattern": "\"at\":\"<time>\",\"source\":\"client-process\"",
+      "replace": "\"at\":\"<now>\",\"source\":\"client-process\""
+    }
+  ],
+  "steps": [
+    {
+      "write": "data/instances/alpha/paper-1.21.4-100.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/alpha/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances/alpha/server.properties",
+      "text": "motd=alpha\r\nserver-port=47961\r\nenable-rcon=true\r\nrcon.port=47971\r\nrcon.password=hunter22\r\nresource-pack-sha1=\r\n"
+    },
+    {
+      "write": "data/instances/alpha/plugins/Foo.jar",
+      "text": "not a zip"
+    },
+    {
+      "write": "data/instances/alpha/crash-reports/crash-2026-11-01_12.00.05-server.txt",
+      "text": "---- Minecraft Crash Report ----\n// Uh oh\n\nTime: 2026-11-01 12:00:05\nDescription: Ticking entity\n\nJVM Flags: 3 total; -Xmx1G -Dspawnloft.harness.token=deadbeef --accessToken tok123\n",
+      "mtime": "2026-11-01T12:00:05Z"
+    },
+    {
+      "write": "data/instances/beta/fabric-server-launch.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "paper-1.21.4-100.jar",
+            "memory": "2G",
+            "port": 47961,
+            "rcon": {
+              "port": 47971,
+              "password": "hunter22"
+            }
+          },
+          "beta": {
+            "dir": "{data}/instances/beta",
+            "jar": "fabric-server-launch.jar",
+            "mcVersion": "1.21.1",
+            "memory": "1G",
+            "port": 47962
+          },
+          "db1": {
+            "kind": "database",
+            "engine": "mariadb",
+            "version": "11.4.5",
+            "dir": "{data}/services/db1",
+            "port": 47981
+          }
+        }
+      },
+      "mode": "600"
+    },
+    {
+      "write": "data/run/alpha/console.log",
+      "text": "[12:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[12:00:01] [Server thread/INFO]: UUID of player Wunga_ is 0123abcd-0000-1111-2222-333344445555\n[12:00:02] [Server thread/INFO]: Wunga_[/203.0.113.5:51234] logged in\n[12:00:03] [Server thread/INFO]: loaded from /home/bob/servers/alpha and C:\\Users\\bob\\x\n[12:00:04] [Server thread/INFO]: panel v1.api.1.2.abc.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA and -Dspawnloft.harness.token=abc123 --accessToken xyz token:sess:u\n[12:00:05] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\njava.net.BindException: Address already in use\n\tat sun.nio.ch.Net.bind(Native Method)\n[12:00:06] [Server thread/INFO]: Stopping server\n",
+      "mtime": "2026-11-01T12:00:06Z"
+    },
+    {
+      "write": "data/run/alpha/daemon.log",
+      "text": "[2026-11-01T12:00:00.500Z] starting java\n[2026-11-01T12:00:07.000Z] java exited with code 1\n"
+    },
+    {
+      "write": "data/client/profiles.json",
+      "json": {
+        "version": 1,
+        "profiles": {
+          "p": {
+            "mc": "1.21.4",
+            "loader": "fabric",
+            "loaderVersion": "0.16.9",
+            "memory": "3G"
+          },
+          "q": {
+            "mc": "1.20.1"
+          }
+        }
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "json": {
+        "version": 1,
+        "accounts": [
+          {
+            "type": "microsoft",
+            "name": "Wunga_",
+            "uuid": "0123abcd-0000-1111-2222-333344445555",
+            "refreshToken": "rtok-secret-1"
+          }
+        ]
+      },
+      "mode": "600"
+    },
+    {
+      "write": "data/client/profiles/p/logs/latest.log",
+      "text": "[12:10:00] [Render thread/INFO]: Setting user: Wunga_\n[12:10:01] [Render thread/INFO]: Connecting to localhost, 47961\n[12:10:02] [Render thread/ERROR]: Failed to connect to the server\n[12:10:03] [Render thread/INFO]: Stopping!\n",
+      "mtime": "2026-11-01T12:10:03Z"
+    },
+    {
+      "write": "data/client/run/p/client.log",
+      "text": "Picked up JAVA_TOOL_OPTIONS: -Xss1M\n<log4j:Event logger=\"x\" timestamp=\"1793534000000\" level=\"INFO\" thread=\"Render thread\">\n  <log4j:Message><![CDATA[Setting user: Wunga_]]></log4j:Message>\n</log4j:Event>\nException in thread \"main\" java.lang.OutOfMemoryError: Java heap space\n",
+      "mtime": "2026-11-01T12:10:04Z"
+    },
+    {
+      "write": "data/client/profiles/p/mods/b.jar",
+      "text": "b"
+    },
+    {
+      "write": "data/client/profiles/p/mods/a.jar",
+      "text": "a"
+    },
+    {
+      "write": "data/client/profiles/p/mods/notes.txt",
+      "text": "n"
+    },
+    {
+      "write": "data/client/profiles/p/options.txt",
+      "text": "lang:en_us\nfov:0.0\n"
+    },
+    {
+      "write": "data/client/profiles/p/crash-reports/crash-2026-11-01_12.10.05-client.txt",
+      "text": "---- Minecraft Crash Report ----\nDescription: Rendering overlay\n-Dspawnloft.harness.token=cafe\n",
+      "mtime": "2026-11-01T12:10:05Z"
+    },
+    {
+      "run": [
+        "diag"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "beta"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--lines",
+        "0"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--lines",
+        "2.5"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--lines"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--client"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--out"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--bogus"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "ghost"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "db1",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "--client",
+        "nope"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--out",
+        "{run}/reports"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Written: "
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--json",
+        "--lines",
+        "3"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "\"ok\":true"
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "beta",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "--client",
+        "p",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "--client",
+        "q"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--client",
+        "p",
+        "--out",
+        "{run}/both"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--client",
+        "p",
+        "--json",
+        "--lines",
+        "0x10"
+      ],
+      "expect": {
+        "code": 0
+      }
+    }
+  ]
+}

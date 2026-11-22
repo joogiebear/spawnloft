@@ -430,6 +430,87 @@ pub fn java_for(needs: u32) -> Option<Found> {
         .find(|j| j.probe.major.is_some_and(|m| m >= needs))
 }
 
+/// What `health()` answers: the probe of the Java SpawnLoft would use (or, when there is none,
+/// of the one on PATH), where it is, whether PATH has it, every Java found, and one sentence.
+#[derive(Debug, Clone)]
+pub struct Health {
+    pub ok: bool,
+    pub found: bool,
+    pub major: Option<u32>,
+    pub version: Option<String>,
+    /// `None` when no usable Java was found.
+    pub path: Option<String>,
+    pub on_path: bool,
+    pub others: Vec<Found>,
+    pub message: String,
+}
+
+/// `health()`: the same probe the panel and the first-run wizard show, so they agree on what a
+/// usable Java is.
+pub fn health() -> Health {
+    let Discovered { best, on_path, all } = discover();
+    let Some(best) = best else {
+        let message = match all.first() {
+            Some(first) => format!(
+                "Java {} was found at {}, but a Minecraft server needs {MINIMUM_MAJOR} or newer.",
+                first.probe.major.map_or("null".into(), |m| m.to_string()),
+                first.path
+            ),
+            None => "Java is not installed, or is somewhere SpawnLoft did not look.".into(),
+        };
+        return Health {
+            ok: false,
+            found: !all.is_empty(),
+            major: on_path.major,
+            version: on_path.version,
+            path: None,
+            on_path: false,
+            others: all,
+            message,
+        };
+    };
+    let via_path = best.path == "java";
+    let state = probe(&best.path);
+    let at = if via_path {
+        String::new()
+    } else {
+        format!(" at {}", best.path)
+    };
+    let note = if via_path {
+        String::new()
+    } else if on_path.found {
+        format!(
+            " PATH points at Java {}; SpawnLoft will use this one instead.",
+            on_path.major.map_or("null".into(), |m| m.to_string())
+        )
+    } else {
+        " It is not on PATH; SpawnLoft will use it anyway.".into()
+    };
+    let message = if state.reason == "ok" {
+        format!(
+            "Java {} is installed{at}.{note}",
+            state.major.map_or("null".into(), |m| m.to_string())
+        )
+    } else {
+        let found = if at.is_empty() {
+            String::new()
+        } else {
+            format!(" Found{at}.")
+        };
+        format!("{}{found}{note}", state.message)
+    };
+    Health {
+        ok: state.ok,
+        found: state.found,
+        major: state.major,
+        version: state.version,
+        path: Some(best.path),
+        on_path: via_path,
+        others: all,
+        message,
+    }
+}
+
 /// `requiredMajor(mc)`: Mojang's floor for a release version; `None` (no check) for anything
 /// else, snapshots included.
 pub fn required_major(mc: Option<&str>) -> Option<u32> {

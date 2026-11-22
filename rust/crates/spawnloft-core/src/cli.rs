@@ -285,6 +285,15 @@ pub const PORTED: &[Row] = &[
         names: &["client"],
         when: When::Always,
     },
+    // C6b: the diagnostics, once both tracks have met
+    Row {
+        names: &["doctor"],
+        when: When::Always,
+    },
+    Row {
+        names: &["diag"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -759,6 +768,19 @@ mod tests {
             &["client"],
             &["client", "doctor"],
             &["client", "--json"],
+        ] {
+            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
+            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
+        }
+    }
+
+    #[test]
+    fn doctor_and_diag_are_ported() {
+        for line in [
+            &["doctor"][..],
+            &["doctor", "--json"],
+            &["diag", "alpha"],
+            &["diag", "--client", "p", "--json"],
         ] {
             assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
             assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
