@@ -520,7 +520,9 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream, panel: &Pa
                 br#"{"error":"this panel only answers requests addressed to localhost"}"#,
             );
         }
-        Verdict::Login { session, to } => {
+        Verdict::Login { session, to, nonce } => {
+            // the page that carried this link (`spawnloft ui`) has done its job
+            crate::panel_open::remove_open_file(&nonce);
             let cookie = panel_auth::session_cookie(auth.port(), &session);
             return respond_with(
                 &mut conn,
