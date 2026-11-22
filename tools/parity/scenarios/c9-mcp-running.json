@@ -1,0 +1,157 @@
+{
+  "about": "C9: the MCP tools over stdio on a stopped and then a running server (the JVM stand-in answering RCON): the read tools (list_servers, server_status, get_logs with level and grep, diagnostics, players, performance, list_snapshots, get_activity, verify_snapshot, list_plugins, list_config_files, read_config_file, bot_check, doctor, the client read tools with no client), the actions (start with progress, run_command and its refusals, backup, write_config_file by old_text and by content, stop, restart), the destructive previews (kill, restore, upgrade_minecraft without confirm) and their absence without --allow-destructive, the tools that need a download host with every host refused, the client and bot tools with no client or bots to drive, refusals on an unknown server and a path outside the server folder, the RCON password scrubbed from what a tool sends back, and the activity each call leaves under the client's name.",
+  "env": {
+    "FAKE_JAVA_RCON": "1",
+    "SPAWNLOFT_RCON_TIMEOUT_MS": "3000"
+  },
+  "normalize": [
+    {
+      "pattern": "(\"name\":\"spawnloft\",\"title\":\"SpawnLoft\",\"version\":)\"[^\"]*\"",
+      "replace": "$1\"<version>\""
+    },
+    {
+      "pattern": "\\(build [^)]*\\)",
+      "replace": "(build)"
+    },
+    {
+      "pattern": "size=\\d+ csize=\\d+ crc=[0-9a-f]+",
+      "replace": "size=<n> csize=<n> crc=<crc>"
+    },
+    {
+      "pattern": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z",
+      "replace": "<time>"
+    },
+    {
+      "pattern": "\\b\\d+(?:\\.\\d+)? (?:B|KB|KiB|MiB)\\b",
+      "replace": "<size>"
+    },
+    {
+      "pattern": "\"(size|sizeBytes|bytes)\"(\\s*):(\\s*)\\d+",
+      "replace": "\"$1\"$2:$3<n>"
+    },
+    {
+      "pattern": "\"(?:uptimeMs)\":\\d+",
+      "replace": "\"uptimeMs\":<ms>"
+    },
+    {
+      "pattern": "\"(javaPid|pid|daemonPid)\":\\d+",
+      "replace": "\"$1\":<pid>"
+    },
+    {
+      "pattern": "\"runId\":\"run1:\\d+\"",
+      "replace": "\"runId\":\"run1:<epoch-ms>\""
+    },
+    {
+      "pattern": "\"samples\":\\[[^\\]]*\\]",
+      "replace": "\"samples\":<samples>"
+    },
+    {
+      "pattern": "\\b\\d+s\\b *",
+      "replace": "<secs> "
+    }
+  ],
+  "ignore": [
+    "data/run/**",
+    "data/instances/run1/logs/**",
+    "data/backups/run1/before-edit_config_*"
+  ],
+  "steps": [
+    {
+      "write": "data/instances/run1/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/run1/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances/run1/server.properties",
+      "text": "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\nserver-ip=127.0.0.1\nmax-players=20\n"
+    },
+    {
+      "write": "data/instances/run1/plugins/Greeter/config.yml",
+      "text": "greeting: hello\nlimit: 3\n"
+    },
+    {
+      "write": "data/instances/run1/plugins/Greeter/messages.properties",
+      "text": "welcome=Welcome!\n"
+    },
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "run1": {
+            "dir": "{data}/instances/run1",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47861,
+            "rcon": {
+              "port": 47871,
+              "password": "hunter22secret"
+            },
+            "type": "paper",
+            "mcVersion": "1.21.4"
+          }
+        },
+        "databases": {}
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_servers\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"nope\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"diagnostics\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"players\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"performance\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"list_snapshots\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"tools/call\",\"params\":{\"name\":\"get_activity\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"tools/call\",\"params\":{\"name\":\"verify_snapshot\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"tools/call\",\"params\":{\"name\":\"verify_snapshot\",\"arguments\":{\"name\":\"run1\",\"snapshot\":\"missing.tar.gz\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"tools/call\",\"params\":{\"name\":\"list_plugins\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":14,\"method\":\"tools/call\",\"params\":{\"name\":\"list_config_files\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":15,\"method\":\"tools/call\",\"params\":{\"name\":\"list_config_files\",\"arguments\":{\"name\":\"run1\",\"folder\":\"plugins/Greeter\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":16,\"method\":\"tools/call\",\"params\":{\"name\":\"list_config_files\",\"arguments\":{\"name\":\"run1\",\"folder\":\"../..\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":17,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"server.properties\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":19,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"../instances.json\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":20,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/none.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":21,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_check\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":22,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_check\",\"arguments\":{\"name\":\"nope\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":23,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"list\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":24,\"method\":\"tools/call\",\"params\":{\"name\":\"stop\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\",\"params\":{\"name\":\"client_profiles\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":26,\"method\":\"tools/call\",\"params\":{\"name\":\"client_status\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":27,\"method\":\"tools/call\",\"params\":{\"name\":\"client_messages\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":28,\"method\":\"tools/call\",\"params\":{\"name\":\"client_logs\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":29,\"method\":\"tools/call\",\"params\":{\"name\":\"client_quit\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":30,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"old_text\":\"limit: 3\",\"new_text\":\"limit: 5\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":31,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"old_text\":\"absent text\",\"new_text\":\"x\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":32,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":33,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/messages.properties\",\"content\":\"welcome=Hi!\\n\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":34,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":35,\"method\":\"tools/call\",\"params\":{\"name\":\"get_activity\",\"arguments\":{\"name\":\"run1\",\"limit\":5}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":36,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":37,\"method\":\"tools/call\",\"params\":{\"name\":\"start\",\"arguments\":{\"name\":\"run1\"},\"_meta\":{\"progressToken\":\"start-1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":38,\"method\":\"tools/call\",\"params\":{\"name\":\"start\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":39,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":40,\"method\":\"tools/call\",\"params\":{\"name\":\"players\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":41,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"list\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"/say hunter22secret\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":43,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"stop\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":44,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"restart now\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":45,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"   \"}}}\n{\"jsonrpc\":\"2.0\",\"id\":46,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"run1\",\"lines\":5}}}\n{\"jsonrpc\":\"2.0\",\"id\":47,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"run1\",\"level\":\"warn\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":48,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"run1\",\"grep\":\"done|Done\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":49,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"run1\",\"grep\":\"(\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":50,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_check\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":51,\"method\":\"tools/call\",\"params\":{\"name\":\"backup\",\"arguments\":{\"name\":\"run1\",\"scope\":\"config\",\"label\":\"mcp test\"},\"_meta\":{\"progressToken\":7}}}\n{\"jsonrpc\":\"2.0\",\"id\":52,\"method\":\"tools/call\",\"params\":{\"name\":\"list_snapshots\",\"arguments\":{\"name\":\"run1\"}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "mcp",
+        "--allow-destructive"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":53,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":54,\"method\":\"tools/call\",\"params\":{\"name\":\"kill\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":55,\"method\":\"tools/call\",\"params\":{\"name\":\"restore\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":56,\"method\":\"tools/call\",\"params\":{\"name\":\"upgrade_minecraft\",\"arguments\":{\"name\":\"run1\",\"version\":\"1.21.5\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":57,\"method\":\"tools/call\",\"params\":{\"name\":\"kill\",\"arguments\":{\"name\":\"nope\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":58,\"method\":\"tools/call\",\"params\":{\"name\":\"stop\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":59,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":60,\"method\":\"tools/call\",\"params\":{\"name\":\"get_activity\",\"arguments\":{\"name\":\"run1\"}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":61,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":62,\"method\":\"tools/call\",\"params\":{\"name\":\"check_server_update\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":63,\"method\":\"tools/call\",\"params\":{\"name\":\"upgrade_build\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":64,\"method\":\"tools/call\",\"params\":{\"name\":\"search_plugins\",\"arguments\":{\"name\":\"run1\",\"query\":\"greeter\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":65,\"method\":\"tools/call\",\"params\":{\"name\":\"check_plugin_updates\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":66,\"method\":\"tools/call\",\"params\":{\"name\":\"install_plugin\",\"arguments\":{\"name\":\"run1\",\"project_id\":\"greeter\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":67,\"method\":\"tools/call\",\"params\":{\"name\":\"install_plugin\",\"arguments\":{\"name\":\"run1\",\"project_id\":\"greeter\",\"source\":\"hangar\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":68,\"method\":\"tools/call\",\"params\":{\"name\":\"update_plugin\",\"arguments\":{\"name\":\"run1\",\"file\":\"Greeter.jar\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":69,\"method\":\"tools/call\",\"params\":{\"name\":\"restart\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":70,\"method\":\"tools/call\",\"params\":{\"name\":\"stop\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":71,\"method\":\"tools/call\",\"params\":{\"name\":\"client_launch\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":72,\"method\":\"tools/call\",\"params\":{\"name\":\"client_join\",\"arguments\":{\"profile\":\"nobody\",\"server\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":73,\"method\":\"tools/call\",\"params\":{\"name\":\"client_chat\",\"arguments\":{\"profile\":\"nobody\",\"text\":\"hi\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":74,\"method\":\"tools/call\",\"params\":{\"name\":\"client_screenshot\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":75,\"method\":\"tools/call\",\"params\":{\"name\":\"diagnostics\",\"arguments\":{\"name\":\"run1\",\"client\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":76,\"method\":\"tools/call\",\"params\":{\"name\":\"diagnostics\",\"arguments\":{\"name\":\"run1\",\"bundle\":true}}}\n{\"jsonrpc\":\"2.0\",\"id\":77,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_run_scenario\",\"arguments\":{\"scenario\":{\"bots\":[]}}}}\n{\"jsonrpc\":\"2.0\",\"id\":78,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_run_scenario\",\"arguments\":{\"scenario\":{\"bots\":[\"alice\"],\"steps\":[{\"bot\":\"alice\",\"chat\":\"hi\"}]},\"name\":\"nope\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":79,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_run_scenario\",\"arguments\":{\"scenario\":{\"instance\":\"run1\",\"bots\":[\"alice\"],\"steps\":[{\"bot\":\"alice\",\"chat\":\"hi\"}]}}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":80,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":81,\"method\":\"tools/call\",\"params\":{\"name\":\"kill\",\"arguments\":{\"name\":\"run1\",\"confirm\":true}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    }
+  ],
+  "platforms": [
+    "linux",
+    "darwin"
+  ]
+}

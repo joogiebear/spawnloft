@@ -103,7 +103,8 @@ const run1 = {
   port: 47861, rcon: { port: 47871, password: 'hunter22secret' }, type: 'paper', mcVersion: '1.21.4',
 }
 const props = '#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\nserver-ip=127.0.0.1\nmax-players=20\n'
-write('c9-mcp-tools.json', {
+// The whole run: a stopped server, then running (the JVM stand-in answering RCON)
+const tools = {
   about: 'C9: the MCP tools over stdio on a stopped and then a running server (the JVM stand-in answering RCON): the read tools (list_servers, server_status, get_logs with level and grep, diagnostics, players, performance, list_snapshots, get_activity, verify_snapshot, list_plugins, list_config_files, read_config_file, bot_check, doctor, the client read tools with no client), the actions (start with progress, run_command and its refusals, backup, write_config_file by old_text and by content, stop, restart), the destructive previews (kill, restore, upgrade_minecraft without confirm) and their absence without --allow-destructive, the tools that need a download host with every host refused, the client and bot tools with no client or bots to drive, refusals on an unknown server and a path outside the server folder, the RCON password scrubbed from what a tool sends back, and the activity each call leaves under the client\'s name.',
   env: { FAKE_JAVA_RCON: '1', SPAWNLOFT_RCON_TIMEOUT_MS: '3000' },
   normalize: [
@@ -226,4 +227,12 @@ write('c9-mcp-tools.json', {
       call('kill', { name: 'run1', confirm: true }),
     ]),
   ],
-})
+}
+// The stopped-server part runs everywhere. The running part is Linux and macOS only: on Windows
+// the Node core's MCP server leaves the daemon it started holding its stdout, so the rig sees the
+// pipe held after it exits (the Rust core's does not; the Node core leaves in C10).
+const setup = tools.steps.findIndex((st) => st.run)
+write('c9-mcp-tools.json', { ...tools,
+  about: 'C9: the MCP tools over stdio on a stopped server, the first session of c9-mcp-running (which see), on every platform.',
+  steps: tools.steps.slice(0, setup + 1) })
+write('c9-mcp-running.json', { ...tools, platforms: ['linux', 'darwin'] })
