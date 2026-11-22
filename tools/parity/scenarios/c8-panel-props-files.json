@@ -567,8 +567,7 @@
     {
      "get": "/api/instances/beta/icon"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -1111,8 +1110,7 @@
     {
      "get": "/api/instances/alpha/files"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [
@@ -1229,7 +1227,6 @@
      }
     }
    ],
-   "own": true,
    "expect": {
     "includes": "is in use by the running server"
    }
@@ -1255,8 +1252,7 @@
       "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
      }
     }
-   ],
-   "own": true
+   ]
   }
  ]
 }

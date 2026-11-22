@@ -1,13 +1,12 @@
 //! Which route a request is: `route()` of `ui.mjs`, branch for branch and in its order, because a
 //! path that fits two branches goes to the first.
 //!
-//! While the port is under way (rust/PLAN-CORE-PORT.md C8) a branch that has not moved yet is
-//! [`Routed::NotPorted`], decided on the method and the path alone: the body has not been read,
-//! so the listener can still send the request on to the Node panel whole.
+//! `None` is a panel that could not work out where its data is: the listener says so.
 
 use serde_json::json;
 
 use crate::failure::Failure;
+use crate::settings::Layout;
 use crate::{services, software};
 
 use super::Panel;
@@ -17,28 +16,22 @@ use super::{
     servers, worlds,
 };
 
-/// Whether the routes that start a job are answered here; see `chain`.
-const JOBS_MOVED: bool = true;
-
+/// What a handler answers with: kept as a type of its own so a family's `route` reads as it
+/// did while the families moved one at a time.
 pub enum Routed {
     Reply(Reply),
-    /// A route the Node panel still answers.
-    NotPorted,
 }
 
 /// Routes `req`. A failure is answered as `serve()` answers a throw.
-pub fn route(panel: &Panel, req: &mut Request) -> Routed {
-    match chain(panel, req) {
-        Ok(routed) => routed,
-        Err(f) => Routed::Reply(failure_reply(&f)),
-    }
+pub fn route(panel: &Panel, req: &mut Request) -> Option<Reply> {
+    let layout = panel.layout.as_ref()?;
+    Some(match chain(panel, layout, req) {
+        Ok(Routed::Reply(reply)) => reply,
+        Err(f) => failure_reply(&f),
+    })
 }
 
-fn chain(panel: &Panel, req: &mut Request) -> Result<Routed, Failure> {
-    // where the data is could not be read: the Node panel says why, as it did before
-    let Some(layout) = &panel.layout else {
-        return Ok(Routed::NotPorted);
-    };
+fn chain(panel: &Panel, layout: &Layout, req: &mut Request) -> Result<Routed, Failure> {
     let reply = |r: Reply| Ok(Routed::Reply(r));
     let get = req.method == "GET";
     let post = req.method == "POST";
@@ -99,12 +92,6 @@ fn chain(panel: &Panel, req: &mut Request) -> Result<Routed, Failure> {
         return servers::linger(panel, layout);
     }
     let s3 = req.seg(3).unwrap_or("").to_string();
-    // A job's progress is kept by the process that runs the job. Until every route that starts
-    // one has moved (creates, plugin and modpack installs, a database for a server, a game
-    // launch), the jobs are the Node panel's and so are these two.
-    if s1 == "jobs" && !JOBS_MOVED {
-        return Ok(Routed::NotPorted);
-    }
     if s1 == "jobs" && s3 == "cancel" && n == 4 && post {
         return reply(Reply::ok(json!({ "cancelling": panel.jobs.cancel(&s2) })));
     }

@@ -1826,8 +1826,7 @@
      "method": "DELETE",
      "path": "/api/instances/b1/pack"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -1968,8 +1967,7 @@
     {
      "get": "/api/instances/srv/plugins"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -2214,8 +2212,7 @@
      "post": "/api/instances/srv/plugins/updates",
      "json": {}
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -2275,8 +2272,7 @@
     {
      "post": "/api/jobs/p1/cancel"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "panel": [
@@ -2326,8 +2322,7 @@
     {
      "get": "/api/instances/srv/plugins"
     }
-   ],
-   "own": true
+   ]
   },
   {
    "run": [

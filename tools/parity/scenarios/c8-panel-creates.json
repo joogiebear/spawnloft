@@ -1755,7 +1755,6 @@
      "get": "/api/activity"
     }
    ],
-   "own": true,
    "timeoutMs": 600000
   },
   {

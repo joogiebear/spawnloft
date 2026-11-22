@@ -42,17 +42,7 @@ pub fn route(panel: &Panel, layout: &Layout, req: &mut Request) -> Result<Routed
     handle_client(panel, layout, &paths, req).map(Routed::Reply)
 }
 
-/// `panelLog(msg)`: a line in panel.log; losing one is fine.
-fn panel_log(run_dir: &str, msg: &str) {
-    let _ = crate::fsx::mkdir_all(Path::new(run_dir));
-    if let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(jspath::join(&[run_dir, "panel.log"]))
-    {
-        let _ = std::io::Write::write_all(&mut f, format!("[{}] {msg}\n", crate::time::iso_now()).as_bytes());
-    }
-}
+use super::panel_log;
 
 /// `['1', 'true'].includes(url.searchParams.get(key) ?? '')`.
 fn asked(req: &Request, key: &str) -> bool {

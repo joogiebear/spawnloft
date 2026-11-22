@@ -154,8 +154,8 @@ fn tree(root: &std::path::Path) -> std::collections::BTreeMap<std::path::PathBuf
 }
 
 /// No GET writes (rust/PANEL-AUTH-DESIGN.md 3.4): a signed-in browser's cookie goes with any GET
-/// another loopback page makes, and without `Sec-Fetch-Site` the panel cannot tell. The routes the
-/// proxy answers itself are checked here; the Node panel's in test/panel-get-writes.test.mjs.
+/// another loopback page makes, and without `Sec-Fetch-Site` the panel cannot tell. The updater's and
+/// the handover's routes are checked here; the Node panel's were in test/panel-get-writes.test.mjs.
 /// `GET /api/update/rollbacks` reads the release list from the internet and is left out; it
 /// only reads. The list below must name every route in the route tables at the top of
 /// `update/api.rs` and `handover/api.rs`, which this test reads, so a new route is not missed.
@@ -176,8 +176,7 @@ fn the_proxys_own_get_routes_write_nothing() {
         }
     }
     let mut child = std::process::Command::new(BIN)
-        // nothing listens upstream: these routes never reach it
-        .args(["ui", "--port", "0", "--upstream", "http://127.0.0.1:1/"])
+        .args(["ui", "--port", "0", "--exit-with-stdin"])
         .env("HOME", home.path())
         .env("USERPROFILE", home.path())
         .env("XDG_CONFIG_HOME", &config)
@@ -185,7 +184,8 @@ fn the_proxys_own_get_routes_write_nothing() {
         .env("APPDATA", &config)
         .env("LOCALAPPDATA", &data)
         .env("SPAWNLOFT_DATA_ROOT", &data)
-        .stdin(std::process::Stdio::null())
+        // the pipe stays open as long as the test holds the child
+        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()

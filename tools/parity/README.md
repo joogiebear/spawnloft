@@ -119,10 +119,7 @@ Not isolated: the Windows user PATH.
   with `"body": "sha256"`, and `"body": "skip"` leaves it out. The panel's port reads
   `<panel-port>` wherever it shows. `"waitMs"` waits before a request. `"window": true` on the
   step runs both panels as the desktop window does (`SPAWNLOFT_SHELL=tauri`). `expect.includes`
-  is text the answers must hold on both sides. `"own": true` says the Rust panel answers every
-  request of the step itself: while some routes are still handed to the Node panel behind it,
-  such a request would agree with the Node side by being it, so on an `own` step the Rust side
-  answers 502 instead of handing on (`SPAWNLOFT_TEST_PANEL_OWN`, a `test-hooks` build only). The install's key is made by each side, so a
+  is text the answers must hold on both sides. The install's key is made by each side, so a
   scenario with a panel step ignores `home/**/panel.key`.
 - `golden`: the Node side's steps, with this machine's paths replaced by `<run>` and `<repo>`,
   must equal the file. A step with `"golden": false` is compared between the sides but kept out
@@ -143,7 +140,7 @@ apart as `name` and `name#2`.
 marked `"side": "rust"`, and names the difference in `expectDifferences`. The rig passes such a
 scenario only when it reports that exact difference. They cover stdout, the exit code and stderr,
 an extra and a changed file in the tree, a file mode, a tar member's bytes, the fake-host
-request list, a panel's answer, and a request an `own` step would have handed on. A
+request list and a panel's answer. A
 `side`-only step anywhere else is refused, so a real scenario can never run different steps on
 the two sides. `test/parity-rig.test.mjs` tests the rig's parts with no binary, and runs the
 self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
@@ -198,13 +195,13 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c6b-diag` | `diag`: its usage and refusals, and bundles for a server, a client profile and both, text and `--json`, with every cleaning (secrets, player IPs, the account folder, the Microsoft account, harness, access, session and panel tokens). Zips are compared by entry names and order; sizes and checksums are evened out (summary.json's version, the deflate) |
 | `c8-panel-basics` | the panel over HTTP, the routes the Rust panel answers itself (C8 group a): the three pages and their headers, with `/setup` only behind the window; who may call (no credential, another Host or Origin, a token for another port, a probe and its proof); the first-run wizard's calls and every refusal of a save; appearance, jars, the MCP command, health, the Java list and what versions need, the software list and version lists over faked hosts (one of them down), diagnostics and the feedback links for a server, a database and nothing, and each thing a settings save can be asked. Those steps are `own`; a last one sends longer paths and other methods, which fit no moved route and still reach the Node panel on both sides |
 | `c8-panel-servers` | the panel's server routes that start no job, all in `own` steps: the list, history, the overview, linger, join, diagnose, metrics, attached databases without passwords, console export, the diagnostics download's refusals, settings and each refusal, a running server over the JVM stand-in (start, command, console stream, restart, stop), rebuild, rename and delete |
-| `c8-panel-players` | a server's players over HTTP (`own`): the list, the whitelist switch, add by name with Mojang faked, op, ban, whitelist and forget against a stopped server's files and a running server's console |
-| `c8-panel-props-files` | a server's settings page, raw properties, icon and file manager over HTTP (`own`): every value check, odd bodies, downloads and their header names, uploads, archives, and a running server's held files |
-| `c8-panel-backups-schedules-worlds` | a server's backups, scheduled tasks and worlds over HTTP (`own`): every branch with odd bodies, download names past ASCII, a restore in progress and a running server |
-| `c8-panel-databases` | the database routes over HTTP (`own`): the list with external databases probed, creates as jobs, credentials, SQL backups taken, downloaded, restored and deleted, attach and detach, and a server's own database |
-| `c8-panel-creates` | making a server over HTTP (`own`): `POST /api/instances` for each kind of server against faked hosts with each job's last word read from its stream, and `POST /api/instances/adopt` |
-| `c8-panel-plugins` | a server's plugins, modpack and upgrade over HTTP (`own`) with Modrinth, Hangar, Paper, Purpur and Fabric faked: the plugin list, search and install plan with their refusals, toggle, remove and install (with `also`, a bad id, a file name or checksum that is refused, a wrong loader), update checks, one update and `update-all` as a job read back from its stream, the pack check and update as a job, the upgrade check and apply (a build, a cross-version upgrade with its snapshot, a version that does not exist), and the modpack search |
-| `c8-panel-client` | the launcher's routes over HTTP (`own`) with Mojang and the loader hosts faked: the version picker and one version described, loader builds, Java found and checked, profiles made, changed, renamed, duplicated and removed with their refusals, the log and its redaction, offline accounts, the default and sign-out, the Microsoft sign-in (its stream, a cancel, Microsoft's refusal, a missing code, a replayed or wrong `state`), and the fake game launched as a request and as a job, with a crash that leaves its exit record |
+| `c8-panel-players` | a server's players over HTTP: the list, the whitelist switch, add by name with Mojang faked, op, ban, whitelist and forget against a stopped server's files and a running server's console |
+| `c8-panel-props-files` | a server's settings page, raw properties, icon and file manager over HTTP: every value check, odd bodies, downloads and their header names, uploads, archives, and a running server's held files |
+| `c8-panel-backups-schedules-worlds` | a server's backups, scheduled tasks and worlds over HTTP: every branch with odd bodies, download names past ASCII, a restore in progress and a running server |
+| `c8-panel-databases` | the database routes over HTTP: the list with external databases probed, creates as jobs, credentials, SQL backups taken, downloaded, restored and deleted, attach and detach, and a server's own database |
+| `c8-panel-creates` | making a server over HTTP: `POST /api/instances` for each kind of server against faked hosts with each job's last word read from its stream, and `POST /api/instances/adopt` |
+| `c8-panel-plugins` | a server's plugins, modpack and upgrade over HTTP with Modrinth, Hangar, Paper, Purpur and Fabric faked: the plugin list, search and install plan with their refusals, toggle, remove and install (with `also`, a bad id, a file name or checksum that is refused, a wrong loader), update checks, one update and `update-all` as a job read back from its stream, the pack check and update as a job, the upgrade check and apply (a build, a cross-version upgrade with its snapshot, a version that does not exist), and the modpack search |
+| `c8-panel-client` | the launcher's routes over HTTP with Mojang and the loader hosts faked: the version picker and one version described, loader builds, Java found and checked, profiles made, changed, renamed, duplicated and removed with their refusals, the log and its redaction, offline accounts, the default and sign-out, the Microsoft sign-in (its stream, a cancel, Microsoft's refusal, a missing code, a replayed or wrong `state`), and the fake game launched as a request and as a job, with a crash that leaves its exit record |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

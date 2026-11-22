@@ -260,9 +260,6 @@ pub struct Request<'c> {
     pub seg: Vec<String>,
     /// `url.searchParams`, in order.
     pub query: Vec<(String, String)>,
-    // read by the routes that move next (C8 groups b and c)
-    #[allow(dead_code)]
-    pub headers: Vec<(String, String)>,
     pub body: Body<'c>,
 }
 
@@ -287,15 +284,6 @@ impl Request<'_> {
     /// `url.searchParams.get(key)`.
     pub fn q(&self, key: &str) -> Option<&str> {
         self.query.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
-    }
-
-    // read by the routes that move next (C8 groups b and c)
-    #[allow(dead_code)]
-    pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers
-            .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(name))
-            .map(|(_, v)| v.as_str())
     }
 
     /// `readBody(req)`: the body parsed as JSON. No body, or one that is not JSON, is `{}`.
@@ -377,8 +365,6 @@ pub enum Reply {
         body: Vec<u8>,
     },
     /// A file sent as it is read: `len` bytes of it and no more, as the headers promised.
-    // read by the routes that move next (C8 groups b and c)
-    #[allow(dead_code)]
     File {
         headers: Vec<(String, String)>,
         file: std::path::PathBuf,
@@ -387,14 +373,10 @@ pub enum Reply {
         done: Option<Box<dyn FnOnce() + Send>>,
     },
     /// The route writes the response itself (an event stream), headers included.
-    // read by the routes that move next (C8 groups b and c)
-    #[allow(dead_code)]
     Stream(Writer),
 }
 
 impl Reply {
-    // read by the routes that move next (C8 groups b and c)
-    #[allow(dead_code)]
     pub fn json(status: u16, body: Value) -> Reply {
         Reply::Json(status, body)
     }

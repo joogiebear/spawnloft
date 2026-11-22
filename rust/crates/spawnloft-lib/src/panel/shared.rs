@@ -1,9 +1,6 @@
 //! What several route families say the same way: a server or a database as the page gets it
 //! (`safeInstance`, `safeDatabase`, `labelled` of `ui.mjs`).
 
-// used by the route families as they move (C8); the allow goes with the last of them
-#![allow(dead_code)]
-
 use std::path::Path;
 
 use serde_json::{Map, Value, json};
