@@ -209,7 +209,23 @@ function applySetup(step, ctx, baseDir) {
   }
 }
 
+// `{ "daemonGone": "<name>" }`: waits until the daemon named in data/run/<name>/state.json has
+// exited, so a step that follows a kill does not race the daemon's own exit (and the socket it
+// removes on the way out).
+async function daemonGone(ctx, name, timeoutMs) {
+  let pid
+  try { pid = JSON.parse(fs.readFileSync(path.join(ctx.data, 'run', name, 'state.json'), 'utf8')).daemonPid } catch { return null }
+  if (!Number.isInteger(pid)) return null
+  const until = Date.now() + timeoutMs
+  for (;;) {
+    try { process.kill(pid, 0) } catch (e) { if (e.code === 'ESRCH') return null }
+    if (Date.now() > until) return `the daemon of "${name}" (pid ${pid}) was still running after ${timeoutMs} ms`
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+}
+
 function stepLabel(i, step) {
+  if (step.daemonGone !== undefined) return `step ${i + 1} (wait for the daemon of ${step.daemonGone} to exit)`
   if (step.panel) return `step ${i + 1} (panel, ${step.panel.length} requests)`
   return `step ${i + 1} (${step.run.join(' ')})`
 }
@@ -260,6 +276,11 @@ async function runSide(scenario, side, o) {
       }
       const text = applyDeclared(normalizeText(res.text.replace(/\r\n/g, '\n'), extra), 'ui')
       steps.push({ index: i, label, args: ['ui', 'replay'], golden: false, frozen: raw.frozen !== false, code: 0, signal: null, stdout: text, stderr: '', raw: { stdout: res.text, stderr: '' } })
+      continue
+    }
+    if (raw.daemonGone !== undefined) {
+      const problem = await daemonGone(ctx, raw.daemonGone, raw.timeoutMs ?? 20000)
+      if (problem) problems.push(`${side}: ${stepLabel(i, raw)}: ${problem}`)
       continue
     }
     if (!raw.run) { applySetup(raw, ctx, o.baseDir); continue }

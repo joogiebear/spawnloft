@@ -535,7 +535,15 @@
     },
     {
      "get": "/api/instances/run1/join"
-    },
+    }
+   ],
+   "timeoutMs": 400000
+  },
+  {
+   "daemonGone": "run1"
+  },
+  {
+   "panel": [
     {
      "post": "/api/instances/run1/rename",
      "json": {
