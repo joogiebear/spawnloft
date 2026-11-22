@@ -1,0 +1,3255 @@
+{
+  "about": "C9's `bot`: its usage errors; `bot check` on a missing server, a bad name, a database, a record with no folder, an online-mode server, stopped servers bound to loopback, a LAN address and every interface, and a running one before and after a stand-in mineflayer is in the host folder, text and --json; `bot run` on a missing file, a folder, bad JSON and every refusal of validateScenario, a scenario naming no server, a refused or stopped one, no mineflayer; then end to end over the JVM stand-in answering RCON and the real bot-host.cjs driving a stand-in mineflayer: a passing run, setup over RCON (one that fails and aborts the host), a failing step, and a mineflayer that cannot load. `bot setup` is c9-bot-setup. Patterns are checked by V8 itself (the Node the host runs on): refusals after a lookaround, Unicode-mode refusals, a surrogate-pair range without u, and lookaround, backreferences and u and v classes accepted.",
+  "env": {
+    "FAKE_JAVA_RCON": "1",
+    "FAKE_JAVA_RCON_OPTS": "{\"replies\":{\"op alice\":\"Made alice a server operator\",\"gamemode creative bob_2\":\"§eSet bob_2's game mode to §aCreative\",\"gamemode creative nobody\":\"No player was found\"}}"
+  },
+  "normalize": [
+    {
+      "pattern": "\\(build [^)]*\\)",
+      "replace": "(build)"
+    },
+    {
+      "pattern": "Started \"run1\" in [^\\n]*",
+      "replace": "Started \"run1\" <took>"
+    },
+    {
+      "pattern": "\\(\\d+ ms\\)",
+      "replace": "(<ms> ms)"
+    },
+    {
+      "pattern": "steps passed in \\d+ ms",
+      "replace": "steps passed in <ms> ms"
+    }
+  ],
+  "ignore": [
+    "data/run/run1/**",
+    "data/instances/run1/logs/**",
+    "data/bot-host/bot-host.cjs"
+  ],
+  "steps": [
+    {
+      "write": "data/instances/online/server.properties",
+      "text": "online-mode=true\nserver-ip=\n"
+    },
+    {
+      "write": "data/instances/offline/server.properties",
+      "text": "online-mode=false\nserver-ip=127.0.0.1\n"
+    },
+    {
+      "write": "data/instances/lan/server.properties",
+      "text": "online-mode=false\nserver-ip=192.168.1.5\n"
+    },
+    {
+      "write": "data/instances/wide/server.properties",
+      "text": "online-mode=false\nserver-ip=0.0.0.0\n"
+    },
+    {
+      "write": "data/instances/run1/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/run1/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances/run1/server.properties",
+      "text": "online-mode=false\nserver-ip=127.0.0.1\nenable-rcon=true\nrcon.port=47972\nrcon.password=test\n"
+    },
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "online": {
+            "dir": "{data}/instances/online",
+            "jar": "paper-1.21.4-100.jar",
+            "memory": "1G",
+            "port": 47961,
+            "rcon": {
+              "port": 47971,
+              "password": "x"
+            }
+          },
+          "offline": {
+            "dir": "{data}/instances/offline",
+            "jar": "paper-1.21.4-100.jar",
+            "memory": "1G",
+            "port": 47963
+          },
+          "lan": {
+            "dir": "{data}/instances/lan",
+            "jar": "paper-1.21.4-100.jar",
+            "memory": "1G",
+            "port": 47964,
+            "mcVersion": "1.20.6"
+          },
+          "wide": {
+            "dir": "{data}/instances/wide",
+            "jar": "server.jar",
+            "memory": "1G",
+            "port": 47965
+          },
+          "nodir": {
+            "jar": "paper-1.21.4-100.jar",
+            "memory": "1G",
+            "port": 47966
+          },
+          "run1": {
+            "dir": "{data}/instances/run1",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47962,
+            "mcVersion": "1.21.4",
+            "rcon": {
+              "port": 47972,
+              "password": "test"
+            }
+          },
+          "db1": {
+            "kind": "database",
+            "engine": "mariadb",
+            "version": "11.4.5",
+            "dir": "{data}/services/db1",
+            "port": 47981
+          }
+        }
+      }
+    },
+    {
+      "run": [
+        "bot"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "dance"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "a",
+        "b"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "online",
+        "--bogus"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "online",
+        "--json=1"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "setup",
+        "extra"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "setup",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "setup",
+        "--bogus"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "a.json",
+        "b.json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "a.json",
+        "--force"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "nope"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "nope",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "bad name!"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "bad name!",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "db1"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "db1",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "online"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "online",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "offline"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "offline",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "lan"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "lan",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "wide"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "wide",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "nodir"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "nodir",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/missing.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/missing.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{data}/instances"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/broken.json",
+      "text": "{ not json"
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/broken.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/broken.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bom.json",
+      "text": "﻿{}"
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bom.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-1.json",
+      "json": []
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-1.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-2.json",
+      "text": "null"
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-2.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-3.json",
+      "text": "\"text\""
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-3.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-4.json",
+      "json": 42
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-4.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-5.json",
+      "json": {
+        "bots": [],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-5.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-6.json",
+      "json": {
+        "bots": "alice",
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-6.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-7.json",
+      "json": {
+        "bots": [
+          "bota1",
+          "botb2",
+          "botc3",
+          "botd4",
+          "bote5",
+          "botf6"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-7.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-8.json",
+      "json": {
+        "bots": [
+          "al"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-8.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-9.json",
+      "json": {
+        "bots": [
+          7
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-9.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-10.json",
+      "json": {
+        "bots": [
+          {
+            "name": "alice"
+          }
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-10.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-11.json",
+      "json": {
+        "bots": [
+          "alice",
+          "this_name_is_too_long"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-11.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-12.json",
+      "json": {
+        "bots": [
+          "Alice",
+          "alice"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-12.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-13.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": "op alice",
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-13.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-14.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice",
+          3
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-14.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-15.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "stop"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-15.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-16.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "/minecraft:reload confirm"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-16.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-17.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "  /RL"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-17.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-18.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": []
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-18.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-19.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-19.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-20.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          null
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-20.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-21.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          "chat"
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-21.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-22.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          []
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-22.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-23.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-23.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-24.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi",
+            "command": "/x"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-24.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-25.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "2": "x",
+            "bot": "alice",
+            "chat": "hi",
+            "timeuot": 100
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-25.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-26.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "carol",
+            "chat": "hi"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-26.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-27.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "chat": "hi"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-27.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-28.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": {
+              "name": "alice"
+            },
+            "chat": "hi"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-28.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-29.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi",
+            "timeout": 0
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-29.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-30.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi",
+            "timeout": 1.5
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-30.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-31.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi",
+            "timeout": 300001
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-31.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-32.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi",
+            "timeout": null
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-32.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-33.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi",
+            "timeout": "100"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-33.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-34.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": ""
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-34.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-35.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "   "
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-35.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-36.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": 5
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-36.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-37.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/stop"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-37.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-38.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "minecraft:reload confirm"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-38.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-39.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "  /rl"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-39.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-40.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "command": "restart now"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-40.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-41.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(unclosed/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-41.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-42.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/hello/g"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-42.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-43.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/hello/iy"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-43.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-44.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/hello/q"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-44.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-45.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/hello/ii"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-45.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-46.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/hello/uv"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-46.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-47.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": 42
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-47.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-48.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": ""
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-48.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-49.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "expectLog": {
+              "present": "/[/"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-49.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-50.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "expectLog": {
+              "absent": "/a{2,1}/"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-50.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/v8-0.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?=a)(/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-0.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-1.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(a)\\1**/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-1.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-2.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?<=x)*/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-2.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-3.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?<a>x)\\k<b>/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-3.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-4.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?!x)x)/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-4.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-5.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/\\a/u"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-5.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-6.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/[😀-🙏]/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-6.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-7.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/a(?=b)/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-7.json"
+      ]
+    },
+    {
+      "write": "scenarios/v8-8.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(a)\\1/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-8.json"
+      ]
+    },
+    {
+      "write": "scenarios/v8-9.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/[\\u{1F600}-\\u{1F64F}]/u"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-9.json"
+      ]
+    },
+    {
+      "write": "scenarios/v8-10.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/[\\p{L}--\\p{N}]/v"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-10.json"
+      ]
+    },
+    {
+      "write": "scenarios/bad-51.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "waitWindow": ""
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-51.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-52.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "expectLog": {
+              "present": "a",
+              "absent": "b"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-52.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-53.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "expectLog": {}
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-53.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-54.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "expectLog": "Exception"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-54.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-55.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "expectLog": {
+              "present": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-55.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-56.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "click": "eleven"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-56.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-57.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "click": 1.5
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-57.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-58.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectItem": {
+              "count": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-58.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-59.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectItem": {
+              "name": "diamond",
+              "count": "two"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-59.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-60.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectItem": ""
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-60.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-61.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectState": "creative"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-61.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-62.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectState": []
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-62.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-63.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectState": null
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-63.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-64.json",
+      "json": {
+        "bots": [
+          "alice",
+          "bob"
+        ],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-64.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/bad-65.json",
+      "json": {
+        "bots": [],
+        "setup": [
+          "op alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "command": "/tp bob"
+          },
+          {
+            "bot": "bob",
+            "expectMessage": "teleported",
+            "timeout": 2000
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/bad-65.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/noinstance.json",
+      "json": {
+        "name": "smoke",
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "/^<alice> HI$/i",
+            "timeout": 2000
+          },
+          {
+            "bot": "alice",
+            "command": "say done"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "say done"
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          },
+          {
+            "bot": "alice",
+            "closeWindow": true,
+            "timeout": 100
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--instance="
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--no-instance"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--instance",
+        "nope"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--instance",
+        "db1"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--instance",
+        "online"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--instance",
+        "online",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/noinstance.json",
+        "--instance",
+        "offline"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/lan.json",
+      "json": {
+        "name": "smoke",
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "/^<alice> HI$/i",
+            "timeout": 2000
+          },
+          {
+            "bot": "alice",
+            "command": "say done"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "say done"
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          },
+          {
+            "bot": "alice",
+            "closeWindow": true,
+            "timeout": 100
+          }
+        ],
+        "instance": "lan"
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/lan.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "start",
+        "run1",
+        "--timeout",
+        "60"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false,
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/run1.json",
+      "json": {
+        "name": "smoke",
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "/^<alice> HI$/i",
+            "timeout": 2000
+          },
+          {
+            "bot": "alice",
+            "command": "say done"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "say done"
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          },
+          {
+            "bot": "alice",
+            "closeWindow": true,
+            "timeout": 100
+          }
+        ],
+        "instance": "run1"
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "data/bot-host/node_modules/mineflayer/package.json",
+      "json": {
+        "name": "mineflayer",
+        "version": "4.39.0",
+        "main": "index.js"
+      }
+    },
+    {
+      "write": "data/bot-host/node_modules/mineflayer/index.js",
+      "text": "'use strict'\n// A stand-in for mineflayer: every bot spawns at once and hears its own chat back.\nconst { EventEmitter } = require('node:events')\nexports.createBot = (opts) => {\n  const bot = new EventEmitter()\n  bot.username = opts.username\n  bot.chat = (text) => setImmediate(() => bot.emit('messagestr', `<${opts.username}> ${text}`, 'chat'))\n  bot.quit = () => {}\n  setImmediate(() => bot.emit('spawn'))\n  return bot\n}\n"
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "wide"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1.json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "write": "scenarios/run1-setup.json",
+      "json": {
+        "name": "smoke",
+        "bots": [
+          "alice",
+          "bob_2"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "/^<alice> HI$/i",
+            "timeout": 2000
+          },
+          {
+            "bot": "alice",
+            "command": "say done"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "say done"
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          },
+          {
+            "bot": "alice",
+            "closeWindow": true,
+            "timeout": 100
+          }
+        ],
+        "instance": "run1",
+        "setup": [
+          "op alice",
+          "/gamemode creative bob_2"
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-setup.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-setup.json",
+        "--instance",
+        "run1",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "write": "scenarios/run1-badsetup.json",
+      "json": {
+        "name": "smoke",
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "/^<alice> HI$/i",
+            "timeout": 2000
+          },
+          {
+            "bot": "alice",
+            "command": "say done"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "say done"
+          },
+          {
+            "expectLog": {
+              "absent": "Exception"
+            }
+          },
+          {
+            "bot": "alice",
+            "closeWindow": true,
+            "timeout": 100
+          }
+        ],
+        "instance": "run1",
+        "setup": [
+          "op alice",
+          "gamemode creative nobody"
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-badsetup.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "scenarios/run1-fails.json",
+      "json": {
+        "name": "fails",
+        "instance": "run1",
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "chat": "hi"
+          },
+          {
+            "bot": "alice",
+            "expectMessage": "nothing like it",
+            "timeout": 300
+          },
+          {
+            "bot": "alice",
+            "chat": "never sent"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-fails.json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-fails.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "remove": "data/bot-host/node_modules/mineflayer/index.js"
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-fails.json",
+        "--json"
+      ],
+      "expect": {
+        "code": 1,
+        "stdoutIncludes": "mineflayer could not be loaded"
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/run1-fails.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stdoutIncludes": "mineflayer could not be loaded"
+      }
+    },
+    {
+      "write": "data/bot-host/node_modules/mineflayer/package.json",
+      "text": "{ half"
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "stop",
+        "run1"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false,
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "bot",
+        "check",
+        "run1"
+      ],
+      "expect": {
+        "code": 1
+      }
+    }
+  ]
+}

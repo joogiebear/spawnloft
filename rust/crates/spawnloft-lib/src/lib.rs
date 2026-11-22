@@ -5,6 +5,7 @@
 pub mod activity;
 pub mod appearance;
 pub mod backup;
+pub mod bots;
 pub mod build;
 pub mod cancel;
 pub mod client;

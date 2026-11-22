@@ -92,7 +92,7 @@ export const DECLARED = [
     id: 'runtime-pattern-syntax',
     // C1 added the last three: a lone surrogate escape cannot be a Rust char, a count beyond
     // 2^32 cannot be a Rust repetition, and the crate caps a pattern's compiled size and nesting
-    where: 'a run-time pattern using lookaround, a backreference, a lone surrogate escape (`\\uD83D`), a repetition count beyond 2^32, or more than the matcher\'s size or nesting allows (`logs --grep`, MCP `get_logs`, bot scenarios)',
+    where: 'a run-time pattern using lookaround, a backreference, a lone surrogate escape (`\\uD83D`), a repetition count beyond 2^32, or more than the matcher\'s size or nesting allows (`logs --grep`, MCP `get_logs`; not bot scenarios, whose patterns the host matches in JavaScript)',
     node: 'accepted',
     rust: 'refused with a clear message',
     apply: null,
@@ -240,6 +240,16 @@ export const DECLARED = [
     rust: 'the per-user data folder; the code folder is never a data root',
     apply: null,
     held: 'no installed build can be in that state (C0-CHECKS.md section 2); the rig\'s code folder is the checkout, which has no instances.json',
+  },
+  {
+    // C9 (plan section 5.4): the Rust core has no code folder to run the host from after C10, so
+    // it carries bot-host.cjs inside itself and writes it beside mineflayer before each run
+    id: 'bot-host-script',
+    where: '`bot run` once mineflayer is installed: where the Mineflayer host script lives and which Node runs it',
+    node: 'runs `src/bot-host.cjs` from the code folder on its own Node',
+    rust: 'writes its embedded copy to `bot-host/bot-host.cjs` in the data folder and runs it there, on the bundled runtime\'s Node, else `node` on PATH, with `NODE_OPTIONS` and `NODE_PATH` removed',
+    apply: null,
+    held: 'c9-bot ignores data/bot-host/bot-host.cjs; nothing but the host run reads it, and both sides run the same script on the same Node in the rig',
   },
 ]
 

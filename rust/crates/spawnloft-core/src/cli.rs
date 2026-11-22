@@ -303,6 +303,11 @@ pub const PORTED: &[Row] = &[
         names: &["ui", "panel"],
         when: When::Always,
     },
+    // C9: the bot harness (the Mineflayer host it drives stays JavaScript)
+    Row {
+        names: &["bot"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -799,6 +804,20 @@ mod tests {
     }
 
     #[test]
+    fn bot_is_ported() {
+        for line in [
+            &["bot"][..],
+            &["bot", "check"],
+            &["bot", "check", "alpha", "--json"],
+            &["bot", "setup", "--force"],
+            &["bot", "run", "s.json", "--instance", "alpha"],
+        ] {
+            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
+            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
+        }
+    }
+
+    #[test]
     fn no_command_is_both_the_cores_own_and_ported() {
         for row in PORTED {
             for name in row.names {
@@ -812,7 +831,7 @@ mod tests {
 
     #[test]
     fn what_is_forwarded_to_the_node_core() {
-        for line in [&["mcp"][..], &["bot", "check"], &["frobnicate"]] {
+        for line in [&["mcp"][..], &["frobnicate"]] {
             assert!(
                 forwards_with(&os(line), false, PORTED),
                 "{line:?} should be forwarded"
