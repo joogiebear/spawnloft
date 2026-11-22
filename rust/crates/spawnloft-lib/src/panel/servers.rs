@@ -513,7 +513,7 @@ fn metrics_route(layout: &Layout, req: &Request, name: &str) -> Result<Reply, Fa
             "oldest": all.first().map_or(Value::Null, |r| jsjson::num(at(r))),
             "newest": newest.map_or(Value::Null, jsjson::num),
             // how far back a range must reach to catch anything
-            "staleSeconds": newest.map_or(Value::Null, |n| jsjson::num((now_s - n).floor().max(0.0))),
+            "staleSeconds": newest.map_or(Value::Null, |n| jsjson::num((now_s.floor() - n).max(0.0))),
         },
         "everySeconds": metrics::INTERVAL_SEC,
         "cores": platform::cpu_count().max(1),

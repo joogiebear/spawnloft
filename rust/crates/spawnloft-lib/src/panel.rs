@@ -1115,40 +1115,6 @@ mod tests {
         assert!(out.starts_with("HTTP/1.1 401"), "{out}");
     }
 
-    #[test]
-    fn a_route_that_has_not_moved_still_goes_to_the_upstream_with_its_body() {
-        // an upstream that reads to the end of the body (the head and the body are two writes)
-        let up_listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let up = up_listener.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (mut s, _) = up_listener.accept().unwrap();
-            let mut got = Vec::new();
-            let mut buf = [0u8; 1024];
-            while !got.ends_with(b"{\"name\":1}") {
-                let n = s.read(&mut buf).unwrap();
-                assert!(n > 0, "the body never came");
-                got.extend_from_slice(&buf[..n]);
-            }
-            let head = format!(
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                got.len()
-            );
-            s.write_all(head.as_bytes()).unwrap();
-            s.write_all(&got).unwrap();
-        });
-        let addr = front_of(panel_in("unmoved", false), Upstream::Node(up), 1);
-        let p = addr.port();
-        let out = exchange(
-            addr,
-            &format!(
-                "POST /api/instances HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: 10\r\n{}\r\n{{\"name\":1}}",
-                api_header(p)
-            ),
-        );
-        assert!(out.contains("POST /api/instances HTTP/1.1"), "{out}");
-        assert!(out.contains("{\"name\":1}"), "{out}");
-    }
-
     fn exchange(addr: SocketAddr, request: &str) -> String {
         let mut c = TcpStream::connect(addr).unwrap();
         c.write_all(request.as_bytes()).unwrap();

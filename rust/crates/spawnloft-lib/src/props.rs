@@ -47,6 +47,10 @@ pub fn get<'a>(props: &'a Props, key: &str) -> Option<&'a str> {
 /// trailing blank lines dropped and one newline at the end. Written owner-only (it holds
 /// `rcon.password`) through `<file>.tmp-<pid>` and a rename, so a crash never leaves half a file.
 pub fn write(file: &Path, updates: &[(String, String)]) -> Result<(), Failure> {
+    // Read, change and write back as one step, as Node's one synchronous turn was: the panel's
+    // routes are threads, and two of them would otherwise lose a change or share the tmp file.
+    static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _writing = WRITING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let lines = match std::fs::read(file) {
         Ok(b) => crate::supervisor::split_lines(&String::from_utf8_lossy(&b)),
         Err(e) if crate::jspath::is_enoent(&e) => Vec::new(),

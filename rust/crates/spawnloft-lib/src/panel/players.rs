@@ -30,7 +30,7 @@ fn took(out: &Value) -> bool {
 
 fn reply(layout: &Layout, req: &mut Request, name: &str) -> Result<Reply, Failure> {
     let inst = registry::lookup(Path::new(&layout.registry_file), name)?;
-    let dir_text = js::string(inst.get("dir"));
+    let dir_text = registry::dir_text(&inst)?;
     let dir = Path::new(&dir_text);
     let verb = req.seg(4).map(str::to_string);
     let running = supervisor::is_running(layout, name)?;

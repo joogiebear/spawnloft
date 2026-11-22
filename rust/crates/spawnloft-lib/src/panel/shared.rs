@@ -27,10 +27,10 @@ pub fn safe_instance(row: &Instance) -> Result<Value, Failure> {
     let mut online_mode = Value::Null;
     let mut level_name = Value::Null;
     // a missing folder is already reported through status
-    if let Ok(p) = props::read(Path::new(&jspath::join(&[
-        &js::string(row.get("dir")),
-        "server.properties",
-    ]))) {
+    // (a record whose `dir` is not text: `path.join` throws, and that is caught the same way)
+    if let Some(Value::String(dir)) = row.get("dir")
+        && let Ok(p) = props::read(Path::new(&jspath::join(&[dir, "server.properties"])))
+    {
         online_mode = json!(props::get(&p, "online-mode") != Some("false"));
         level_name = json!(
             props::get(&p, "level-name")
