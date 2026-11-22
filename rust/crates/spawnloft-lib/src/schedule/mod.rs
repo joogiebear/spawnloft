@@ -524,7 +524,27 @@ impl Sched {
         self.locked(|| self.update_locked(id, patch))
     }
 
+    /// `update(id, patch)` where the patch names `keys`, some of them undefined (left out of
+    /// `patch`): the panel's edit names all four fields, so it is never only a toggle.
+    pub fn update_naming(
+        &self,
+        id: &str,
+        patch: &Map<String, Value>,
+        keys: &[&str],
+    ) -> Result<Value, Failure> {
+        self.locked(|| self.update_locked_naming(id, patch, Some(keys)))
+    }
+
     fn update_locked(&self, id: &str, patch: &Map<String, Value>) -> Result<Value, Failure> {
+        self.update_locked_naming(id, patch, None)
+    }
+
+    fn update_locked_naming(
+        &self,
+        id: &str,
+        patch: &Map<String, Value>,
+        keys: Option<&[&str]>,
+    ) -> Result<Value, Failure> {
         let mut data = self.load()?;
         let Some(current) = Self::tasks(&data).get(id).cloned() else {
             return fail(format!("no scheduled task \"{id}\""));
@@ -584,7 +604,11 @@ impl Sched {
         }
         Self::tasks_mut(&mut data).insert(id.to_string(), task.clone());
         self.save(&data)?;
-        let only_toggled = patch.keys().all(|k| k == "enabled" || k == "owner");
+        let toggle = |k: &str| k == "enabled" || k == "owner";
+        let only_toggled = match keys {
+            Some(keys) => keys.iter().all(|k| toggle(k)),
+            None => patch.keys().all(|k| toggle(k)),
+        };
         let action = if !only_toggled {
             "schedule-change"
         } else if js::truthy(task.get("enabled")) {

@@ -1,0 +1,1286 @@
+{
+ "about": "C8's backups, scheduled tasks and worlds of a server over the panel (handleBackups, handleSchedules, handleWorlds), answered by the Rust panel itself (own steps) and compared with the Node panel: the history and automatic halves of the Backups tab, a download by name, part of a name, a latin1 name and one no header can carry, backups made with every odd scope and label, lock, note, the leave-out list, delete and delete-many with their refusals, the clean-up of small copies, restores (plain, clean, refused), the automatic-backup switch made, edited and removed through the fake scheduler, scheduled tasks made, edited, toggled, run and deleted (another server's task id refused, the reserved name refused), worlds listed, switched, imported, exported and deleted with and without a copy, the same routes while a restore is in progress, and while a server runs (the JVM stand-in answering RCON). Odd bodies (null, a string, not JSON) and unknown servers, actions and methods throughout.",
+ "ignore": [
+  "home/**/panel.key",
+  "data/run/run1/**",
+  "data/instances/run1/logs/**"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  },
+  {
+   "pattern": "(pre-restore_files_<stamp>)_\\d+",
+   "replace": "$1"
+  },
+  {
+   "pattern": "x-spawnloft-proof: [A-Za-z0-9_-]{43}$",
+   "flags": "gm",
+   "replace": "x-spawnloft-proof: <proof>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/srv1/server.properties",
+   "text": "#Minecraft server properties\nlevel-name=world\nmotd=Hi\n"
+  },
+  {
+   "write": "data/instances/srv1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/srv1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/srv1/plugins/a.jar",
+   "text": "jar"
+  },
+  {
+   "write": "data/instances/srv1/plugins/old.txt",
+   "text": "now\n"
+  },
+  {
+   "write": "data/instances/srv1/world/level.dat",
+   "text": "level"
+  },
+  {
+   "write": "data/instances/srv1/world/region/r.0.0.mca",
+   "text": "region"
+  },
+  {
+   "write": "data/instances/srv1/world_nether/level.dat",
+   "text": "nether"
+  },
+  {
+   "write": "data/instances/srv1/old/level.dat",
+   "text": "old"
+  },
+  {
+   "write": "data/instances/srv1/old_the_end/level.dat",
+   "text": "old end"
+  },
+  {
+   "write": "data/instances/srv1/logs/latest.log",
+   "text": "log\n"
+  },
+  {
+   "write": "data/instances/srv2/server.jar",
+   "text": ""
+  },
+  {
+   "write": "importme/wrapped/level.dat",
+   "text": "imported"
+  },
+  {
+   "write": "importme/wrapped/region/r.0.0.mca",
+   "text": "r"
+  },
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "#Minecraft server properties\nenable-rcon=true\nrcon.port=47881\nrcon.password=test\nlevel-name=world\n"
+  },
+  {
+   "write": "data/instances/run1/world/level.dat",
+   "text": "level"
+  },
+  {
+   "write": "data/instances/run1/other/level.dat",
+   "text": "other"
+  },
+  {
+   "write": "data/instances/run1/plugins/a.jar",
+   "text": "jar"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv1": {
+      "dir": "{data}/instances/srv1",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47861,
+      "rcon": {
+       "port": 47871,
+       "password": "hunter22"
+      }
+     },
+     "srv2": {
+      "dir": "{data}/instances/srv2",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47862
+     },
+     "ghost": null,
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47880,
+      "rcon": {
+       "port": 47881,
+       "password": "test"
+      }
+     }
+    }
+   }
+  },
+  {
+   "write": "data/backups/srv1/old-copy_plugins_2025-01-01_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-01-01T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/old-copy_plugins_2025-01-01_00-00-00.json",
+   "json": {
+    "scope": "plugins",
+    "label": "pre-install",
+    "members": [
+     "plugins"
+    ]
+   },
+   "mtime": "2025-01-01T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/old-noted_plugins_2025-01-02_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-01-02T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/old-noted_plugins_2025-01-02_00-00-00.json",
+   "json": {
+    "scope": "plugins",
+    "label": "pre-update",
+    "members": [
+     "plugins"
+    ],
+    "note": "keep"
+   },
+   "mtime": "2025-01-02T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/keepme_standard_2025-02-01_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-02-01T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/keepme_standard_2025-02-01_00-00-00.json",
+   "json": {
+    "scope": "standard",
+    "label": "keepme",
+    "members": [
+     "plugins"
+    ],
+    "locked": true,
+    "warnings": [
+     "could not flush the world before the snapshot: x",
+     "database shop on db1 not included: it was stopped."
+    ]
+   },
+   "mtime": "2025-02-01T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/café_standard_2025-03-01_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-03-01T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/café_standard_2025-03-01_00-00-00.json",
+   "json": {
+    "scope": "standard",
+    "label": "café",
+    "members": [
+     "plugins"
+    ]
+   },
+   "mtime": "2025-03-01T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/euro€_standard_2025-03-02_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-03-02T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/euro€_standard_2025-03-02_00-00-00.json",
+   "json": {
+    "scope": "standard",
+    "label": "euro",
+    "members": [
+     "plugins"
+    ]
+   },
+   "mtime": "2025-03-02T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/mojibake-Ã©_standard_2025-03-04_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-03-04T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/mojibake-Ã©_standard_2025-03-04_00-00-00.json",
+   "json": {
+    "scope": "standard",
+    "label": "m",
+    "members": [
+     "plugins"
+    ]
+   },
+   "mtime": "2025-03-04T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/stroke-ł_standard_2025-03-05_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-03-05T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/stroke-ł_standard_2025-03-05_00-00-00.json",
+   "json": {
+    "scope": "standard",
+    "label": "s",
+    "members": [
+     "plugins"
+    ]
+   },
+   "mtime": "2025-03-05T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/empty-é_standard_2025-03-06_00-00-00.tar.gz",
+   "text": "",
+   "mtime": "2025-03-06T00:00:00Z"
+  },
+  {
+   "write": "data/backups/srv1/bare_standard_2025-03-03_00-00-00.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3SQQrCQBAEwDn7irxAd3U17xEEEYIGswGf75qjdwWx6tLQp4aZcZjPl+u0uQ2ndX3U+ITUHEpZsnnPlPIuctlvS9+n8upzbl10Kb5gnurx3qbEf2p378blB1YBAAAAAAAAAADA73gCjHjVDQAoAAA=",
+   "mtime": "2025-03-03T00:00:00Z"
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/srv1/backups"
+    },
+    {
+     "get": "/api/instances/srv1/backups/history"
+    },
+    {
+     "get": "/api/instances/srv1/backups/auto"
+    },
+    {
+     "get": "/api/instances/srv1/backups/other/x"
+    },
+    {
+     "get": "/api/instances/ghost/backups"
+    },
+    {
+     "get": "/api/instances/nobody/backups"
+    },
+    {
+     "method": "PUT",
+     "path": "/api/instances/srv1/backups"
+    },
+    {
+     "method": "DELETE",
+     "path": "/api/instances/srv1/backups/delete"
+    },
+    {
+     "method": "HEAD",
+     "path": "/api/instances/srv1/backups/history"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=old-copy",
+     "body": "sha256"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=caf%C3%A9"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=caf%C3%A9",
+     "headers": {
+      "x-spawnloft-probe": "abcdefghijklmnopqrstuv"
+     },
+     "body": "sha256"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=euro"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=euro",
+     "headers": {
+      "x-spawnloft-probe": "abcdefghijklmnopqrstuv"
+     }
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=mojibake",
+     "body": "sha256"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=mojibake",
+     "headers": {
+      "x-spawnloft-probe": "abcdefghijklmnopqrstuv"
+     },
+     "body": "sha256"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=stroke",
+     "body": "sha256"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=stroke",
+     "headers": {
+      "x-spawnloft-probe": "abcdefghijklmnopqrstuv"
+     }
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=empty",
+     "body": "sha256"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=nothing-like-it"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download?snapshot=_standard_"
+    },
+    {
+     "get": "/api/instances/srv1/backups/download",
+     "body": "sha256"
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "json": {
+      "scope": "plugins",
+      "label": "first one"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "json": {
+      "scope": "nope",
+      "label": "a label that is longer than forty characters, by far"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "json": {
+      "scope": "config",
+      "label": 0
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "text": "\"just text\"",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "text": "not json"
+    },
+    {
+     "post": "/api/instances/srv1/backups/nothing",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "json": {
+      "snapshot": "zzz"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "json": {
+      "snapshot": "_standard_"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "json": {
+      "snapshot": "old-copy"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "json": {
+      "snapshot": "old-copy",
+      "locked": false
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/lock",
+     "json": {
+      "snapshot": "bare",
+      "locked": 0
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/note",
+     "json": {
+      "snapshot": "bare",
+      "note": "  before\r\n\tthe upgrade  "
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/note",
+     "json": {
+      "snapshot": "bare",
+      "note": 42
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/note",
+     "json": {
+      "snapshot": "bare"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/note",
+     "json": {
+      "note": "x"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {
+      "patterns": "logs\r\n# a comment\n./cache/\nlogs\n"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {
+      "patterns": [
+       "a",
+       "a",
+       7,
+       null
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {
+      "patterns": "/etc"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {
+      "patterns": "*"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {
+      "patterns": "../up"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {
+      "patterns": {
+       "x": 1
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/exclude",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete",
+     "json": {
+      "snapshot": "keepme"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete",
+     "json": {
+      "snapshot": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete",
+     "json": {
+      "snapshot": "bare"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete-many",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete-many",
+     "json": {
+      "snapshots": []
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete-many",
+     "json": {
+      "snapshots": "old-copy"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete-many",
+     "json": {
+      "snapshots": [
+       "x",
+       1
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete-many",
+     "json": {
+      "snapshots": [
+       "missing.tar.gz",
+       "keepme_standard_2025-02-01_00-00-00.tar.gz",
+       "euro€_standard_2025-03-02_00-00-00.tar.gz",
+       "missing.tar.gz"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {
+      "on": "yes"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {
+      "on": true,
+      "remove": [
+       "old-copy_plugins_2025-01-01_00-00-00.tar.gz",
+       "old-noted_plugins_2025-01-02_00-00-00.tar.gz",
+       5,
+       "keepme_standard_2025-02-01_00-00-00.tar.gz"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {
+      "on": true
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {
+      "on": false,
+      "remove": [
+       "x"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {
+      "snapshot": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {
+      "snapshot": "first-one"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {
+      "snapshot": "first-one",
+      "clean": true
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {
+      "snapshot": "caf",
+      "clean": true
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {
+      "snapshot": "bare",
+      "clean": "yes",
+      "withoutCopy": true
+     }
+    },
+    {
+     "get": "/api/instances/srv1/backups/history"
+    }
+   ],
+   "own": true,
+   "expect": {
+    "includes": [
+     "\"created\": \"first-one_plugins_"
+    ]
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/srv1/backups/auto"
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {}
+    },
+    {
+     "get": "/api/instances/srv1/backups/auto"
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {
+      "keep": "5",
+      "schedule": {
+       "kind": "weekly",
+       "day": "SUN",
+       "at": "04:00"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {
+      "keep": 2.5,
+      "schedule": null
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {
+      "schedule": {
+       "kind": "bogus"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {
+      "enabled": "false"
+     }
+    },
+    {
+     "get": "/api/instances/srv1/backups"
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {
+      "enabled": false
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/auto",
+     "json": {
+      "enabled": false
+     }
+    },
+    {
+     "get": "/api/instances/srv1/backups/auto"
+    }
+   ],
+   "own": true
+  },
+  {
+   "write": "data/run/srv1/tasks.log",
+   "text": "2026-11-01T03:00:00.000Z\tsrv1-backup\tok\tbackup\tstandard, 1.2 KB\n2026-11-01T04:00:00.000Z\tfailed\trestart\tthe server would not stop\nnot a line\n\n2026-11-02T03:00:00.000Z\tsrv1-steps\tskipped\tsteps\tnot running\n"
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/srv1/schedules"
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {
+      "name": "  Automatic BACKUP ",
+      "action": {
+       "type": "backup"
+      },
+      "schedule": {
+       "kind": "daily",
+       "at": "05:00"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {
+      "action": {
+       "type": "backup",
+       "keep": 3
+      },
+      "schedule": {
+       "kind": "daily",
+       "at": "05:00"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {
+      "name": "Say hi",
+      "action": {
+       "type": "command",
+       "line": " say hi "
+      },
+      "schedule": {
+       "kind": "minutes",
+       "every": 30
+      },
+      "enabled": false
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {
+      "name": "Chain",
+      "action": {
+       "type": "steps",
+       "steps": [
+        {
+         "do": "command",
+         "line": "say bye"
+        },
+        {
+         "do": "backup"
+        }
+       ]
+      },
+      "schedule": {
+       "kind": "onlogon"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {
+      "name": "Automatic backup",
+      "action": {
+       "type": "backup"
+      },
+      "schedule": {
+       "kind": "hourly",
+       "every": 2
+      },
+      "enabled": 0
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "text": "\"str\"",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/schedules",
+     "json": {
+      "action": {
+       "type": "restart",
+       "warnMinutes": 5
+      },
+      "schedule": {
+       "kind": "minutes",
+       "every": 0
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv2/schedules",
+     "json": {
+      "action": {
+       "type": "start"
+      },
+      "schedule": {
+       "kind": "daily",
+       "at": "06:00"
+      }
+     }
+    },
+    {
+     "get": "/api/instances/srv1/schedules"
+    },
+    {
+     "get": "/api/instances/srv1/schedules/srv1-backup/anything"
+    },
+    {
+     "get": "/api/instances/srv1/backups/auto"
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup",
+     "json": {
+      "name": "Renamed"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup",
+     "json": {
+      "enabled": false
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup",
+     "json": {
+      "enabled": true,
+      "name": ""
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup",
+     "json": {
+      "action": {
+       "type": "nope"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup",
+     "json": {
+      "schedule": {
+       "kind": "weekly",
+       "day": "FRI",
+       "at": "22:15"
+      },
+      "action": {
+       "type": "verify"
+      }
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup/enable",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup/enable",
+     "json": {
+      "enabled": false
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup/enable",
+     "json": {
+      "enabled": null
+     }
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup/run",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-backup/bogus",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/nope",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv2-start",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv2-start/delete",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-command/delete",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/schedules/srv1-command/delete",
+     "json": {}
+    },
+    {
+     "method": "PUT",
+     "path": "/api/instances/srv1/schedules"
+    },
+    {
+     "get": "/api/instances/ghost/schedules"
+    },
+    {
+     "get": "/api/instances/srv1/schedules"
+    }
+   ],
+   "own": true
+  },
+  {
+   "run": [
+    "task",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/srv1/worlds"
+    },
+    {
+     "get": "/api/instances/srv1/worlds/x"
+    },
+    {
+     "method": "PATCH",
+     "path": "/api/instances/srv1/worlds"
+    },
+    {
+     "post": "/api/instances/srv1/worlds",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/worlds/bogus",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "json": {
+      "name": "old"
+     }
+    },
+    {
+     "get": "/api/instances/srv1/worlds"
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "json": {
+      "name": "world"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "json": {
+      "name": "../x"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "json": {
+      "name": "logs"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/srv1/worlds/import",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/worlds/import",
+     "json": {
+      "source": "{run}/importme"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/import",
+     "json": {
+      "source": "{run}/importme",
+      "name": "imported"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/import",
+     "json": {
+      "source": "{run}/importme",
+      "name": "imported"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/import",
+     "json": {
+      "source": "{run}/nowhere",
+      "name": "x2"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/import",
+     "json": {
+      "source": "{run}/importme",
+      "name": "bad name!"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/export",
+     "json": {
+      "name": "old"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/export",
+     "json": {
+      "name": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/export",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/worlds/delete",
+     "json": {
+      "name": "world"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/delete",
+     "json": {
+      "name": "imported"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/delete",
+     "json": {
+      "name": "old",
+      "withoutCopy": true
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/delete",
+     "json": {
+      "name": "old"
+     }
+    },
+    {
+     "get": "/api/instances/srv1/worlds"
+    },
+    {
+     "get": "/api/instances/ghost/worlds"
+    }
+   ],
+   "own": true
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data/run/srv1/restoring.json",
+   "json": {
+    "pid": 1
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/srv1/backups/restore",
+     "json": {
+      "snapshot": "first-one"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {
+      "on": true
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/clean-copies",
+     "json": {
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete",
+     "json": {
+      "snapshot": "first-one"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups/delete-many",
+     "json": {
+      "snapshots": [
+       "x"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/srv1/backups",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/srv1/worlds/activate",
+     "json": {
+      "name": "world"
+     }
+    },
+    {
+     "post": "/api/instances/srv1/worlds/delete",
+     "json": {
+      "name": "world_nether"
+     }
+    },
+    {
+     "get": "/api/instances/srv1/backups/history"
+    }
+   ],
+   "own": true,
+   "expect": {
+    "includes": [
+     "A backup is being put back"
+    ]
+   }
+  },
+  {
+   "remove": "data/run/srv1/restoring.json"
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/run1/backups",
+     "json": {
+      "scope": "worlds",
+      "label": "live"
+     }
+    },
+    {
+     "get": "/api/instances/run1/backups/history"
+    },
+    {
+     "post": "/api/instances/run1/backups/restore",
+     "json": {
+      "snapshot": "live"
+     }
+    },
+    {
+     "get": "/api/instances/run1/worlds"
+    },
+    {
+     "post": "/api/instances/run1/worlds/activate",
+     "json": {
+      "name": "other"
+     }
+    },
+    {
+     "post": "/api/instances/run1/worlds/export",
+     "json": {
+      "name": "world"
+     }
+    },
+    {
+     "post": "/api/instances/run1/worlds/delete",
+     "json": {
+      "name": "other"
+     }
+    },
+    {
+     "get": "/api/instances/run1/schedules"
+    }
+   ],
+   "own": true,
+   "expect": {
+    "includes": [
+     "\"running\": true",
+     "is running - stop it before restoring"
+    ]
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  }
+ ],
+ "env": {
+  "FAKE_JAVA_RCON": "1",
+  "SPAWNLOFT_RCON_TIMEOUT_MS": "3000"
+ }
+}
