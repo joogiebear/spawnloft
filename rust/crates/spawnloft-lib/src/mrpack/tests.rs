@@ -1023,3 +1023,13 @@ fn a_record_that_is_null_zero_false_or_empty_is_no_record() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_percent_a_progress_message_carries() {
+    assert_eq!(percent_of("Downloading sodium.jar (1 of 40)"), Some(0.0));
+    assert_eq!(percent_of("Downloading sodium.jar (3 of 40)"), Some(5.0));
+    assert_eq!(percent_of("Downloading a (b).jar (40 of 40)"), Some(98.0));
+    assert_eq!(percent_of("Downloading pack-1.2.mrpack"), None);
+    assert_eq!(percent_of("Downloading x (a of 3)"), None);
+    assert_eq!(percent_of("Creating the server"), None);
+}

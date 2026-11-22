@@ -964,6 +964,39 @@ pub fn create_from_modpack(
     })
 }
 
+/// The `percent` Node's `onProgress` carries with a message: how far through the pack's files
+/// a "Downloading x (3 of 40)" is, and nothing for every other message.
+pub fn percent_of(message: &str) -> Option<f64> {
+    let counter = message.strip_prefix("Downloading ")?.strip_suffix(')')?;
+    let (_, counter) = counter.rsplit_once(" (")?;
+    let (at, total) = counter.split_once(" of ")?;
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    if !digits(at) || !digits(total) {
+        return None;
+    }
+    let (at, total) = (at.parse::<f64>().ok()?, total.parse::<f64>().ok()?);
+    // `Math.round((i / Math.max(1, files)) * 100)`, `i` counted from 0
+    Some(((at - 1.0) / total.max(1.0) * 100.0 + 0.5).floor())
+}
+
+impl Created {
+    /// What `createFromModpack` answers, as JSON.
+    pub fn to_json(&self) -> Value {
+        let mut out = Map::new();
+        out.insert("name".into(), json!(self.name));
+        out.insert("pack".into(), self.pack.clone());
+        if let Some(v) = &self.pack_version {
+            out.insert("packVersion".into(), v.clone());
+        }
+        out.insert("mc".into(), self.mc.clone());
+        out.insert("loader".into(), self.loader.to_json());
+        out.insert("files".into(), json!(self.files));
+        out.insert("skippedClientOnly".into(), json!(self.skipped));
+        out.insert("port".into(), crate::jsjson::num(self.port));
+        Value::Object(out)
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // A pack server's pack
 
