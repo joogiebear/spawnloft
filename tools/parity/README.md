@@ -17,7 +17,7 @@ same way.
 and arm64, Windows x64, macOS arm64), every step's output and exit code, the fake-host requests
 and the whole data tree of the Node core's run, with the machine's paths (`<run>`, `<repo>`,
 `<node>`, `<core>`), the fake hosts' loopback ports (`<fake https://...>`) and the rig's pid
-(`<rig-pid>`) named. A scenario with no record for the platform it runs on fails, and
+(`<rig-pid>`) named. (On this branch only `linux-x64` has its records so far; the other three are recorded on their own platforms.) A scenario with no record for the platform it runs on fails, and
 `test/parity-frozen.test.mjs` checks that every scenario has one for each platform.
 
 A record is the CLI's behaviour. A change to it is a change to what a person sees, made on
@@ -57,24 +57,28 @@ the core for `--version --json` first and refuses one that is not a `test-hooks`
 
 ## What each side gets
 
+Since C10 there is one side, the Rust core; the text below says "both sides" where the rig used to run
+the Node core as well, and the frozen records were made under these same rules.
+
 Each side runs in `<scratch>/run` with the data root at `run/data` and `HOME`, `USERPROFILE`,
 `APPDATA`, `LOCALAPPDATA` and the XDG folders under `run/home`, so a file written anywhere a
 core might write lands in the compared tree. Both sides use the same path, one after the other,
 so absolute paths in shims and records compare exactly. The machine's own `SPAWNLOFT_*`,
 `MCCTL_*` and `NODE_OPTIONS` never reach a side. Each side also gets `NODE_ENV=test`,
-`TZ=UTC`, `LANG=LC_ALL=en_US.UTF-8` and the bundled-runtime stand-ins `SPAWNLOFT_NODE` and
-`SPAWNLOFT_CORE_DIR`. `SPAWNLOFT_TEST_ORIGINS` is always set: it holds the scenario's fake
+`TZ=UTC`, `LANG=LC_ALL=en_US.UTF-8`, `SPAWNLOFT_NODE` (the Node that runs the tests' `.mjs`
+stand-ins, in a `test-hooks` build) and `SPAWNLOFT_CORE_DIR` (a `test-hooks` or debug build reads the
+panel's pages from this checkout's `src/`). `SPAWNLOFT_DAEMON=rust` is still set but means nothing: there
+is one daemon. `SPAWNLOFT_TEST_ORIGINS` is always set: it holds the scenario's fake
 hosts, and with none it is `{}`. That refuses every host that is not on this machine, so no
-scenario ever downloads anything real. A scenario may not set `SPAWNLOFT_CORE_IMPL`,
+scenario ever downloads anything real. `SPAWNLOFT_CORE_IMPL` means nothing now. A scenario may not set it,
 `SPAWNLOFT_TEST_ORIGINS`, `SPAWNLOFT_TEST_SCHEDULER` or `FAKE_SCHEDULER_DIR` itself, in its own `env` or a
 step's: the rig refuses it.
 
 The system's scheduler is played by `fake-scheduler` (spawnloft-fakes, built beside the core,
 or `SPAWNLOFT_FAKE_SCHEDULER`): each side gets `SPAWNLOFT_TEST_SCHEDULER` naming it and
 `FAKE_SCHEDULER_DIR=run/scheduler`, so every run of `schtasks`, `powershell`, `launchctl`,
-`systemctl` or `loginctl` runs `fake-scheduler <tool> <args...>` instead (the Node core with
-NODE_ENV=test, `installScheduler` in `src/test-origins.mjs`; the Rust core in a `test-hooks`
-build, `test_origins::scheduler_command`). Without the fake the variable names a file that is not
+`systemctl` or `loginctl` runs `fake-scheduler <tool> <args...>` instead (the Rust core in a
+`test-hooks` build, `test_origins::scheduler_command`; the Node core did the same with `NODE_ENV=test`). Without the fake the variable names a file that is not
 there, so a side fails to start the tool rather than reaching the machine's own scheduler. The fake
 keeps its state in `run/scheduler/state.json` and appends every call that changes something to
 `run/scheduler/calls.log`, so the two sides' calls are compared in order. A scenario can seed
@@ -189,7 +193,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c1-running` | the same commands against a running server (the fake JVM), text and `--json` |
 | `c1-review` | what the C1 review found: half an emoji or a record's own `name` in the registry, pids as `process.kill` coerces them, crash reports with equal times, `/i` patterns beyond ASCII and Annex B escapes, a large console with a count that is not whole, a sample past the year 9999 |
 | `c2-lifecycle` | C2's lifecycle over the JVM stand-in answering RCON (`FAKE_JAVA_RCON=1`): `start`, `stop`, `restart`, `kill`, `cmd`/`rcon`, `players`, `send`, `console` fed from a pipe, `set` with every key and `props`, their refusals and usage errors |
-| `c2-rust-daemon` | the same lifecycle with `SPAWNLOFT_DAEMON=rust`, so both supervisors start `spawnloft-core daemon` |
+| `c2-rust-daemon` | the same lifecycle with `SPAWNLOFT_DAEMON=rust` (now the only daemon), so the supervisor starts `spawnloft-core daemon` |
 | `c2-databases-node`, `c2-databases-rust` | databases under each daemon: the MariaDB and Garnet stand-ins in the engine store (copied in by `write` with `copy`), a missing engine, an external database, start, stop, restart and kill |
 | `c2-failed-start` | a start that fails, for a server and a database under each daemon (the activity log left out: two processes write it in either order) |
 | `c2-db` | the `db` command: list, versions, add (Garnet from the stand-in store, MySQL against a faked download whose bytes are wrong), attach and detach with and without `--drop`, creds, connect and address for an external database, root, create for a server (one that starts, one that fails) and remove, with the usage errors; random passwords evened out |
@@ -242,7 +246,7 @@ rule 5).
 
 ## Declared differences
 
-The only ways a ported command may differ from its Node twin (plan section 6.1). The table is
+The only ways a ported command may differ from its Node twin (plan section 6.1). Since C10 the "Node" column is what the frozen records hold, and the table is kept so a re-recorded scenario does not drop a difference by accident. The table is
 `declared-differences.mjs`, and adding a row needs a reason in the pull request.
 
 | Where | Node | Rust | How the rig holds it |
@@ -273,16 +277,15 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 
 ## The download-host override
 
-`SPAWNLOFT_TEST_ORIGINS` is a JSON map from an origin to a loopback origin. Node honours it only
-with `NODE_ENV=test` (`src/test-origins.mjs`, which wraps `fetch` before any module runs). This
-is the one named exception to the Node freeze. Rust honours it only in a build with the
+`SPAWNLOFT_TEST_ORIGINS` is a JSON map from an origin to a loopback origin. The Node core honoured it only
+with `NODE_ENV=test` (`src/test-origins.mjs`, which wrapped `fetch` before any module ran; the file
+left with the Node core in C10). Rust honours it only in a build with the
 `test-hooks` feature (`spawnloft-lib/src/test_origins.rs`, `test_origins::rewrite`). Every Rust
 client that reaches the network calls it: the updater's fetch and the webhook post today, every
 download from C1 on. Node follows redirects one hop at a time, so a redirect cannot lead past
 the map. Such a build adds `"testHooks":"spawnloft-test-hooks:on"` to `--version --json`;
 `desktop/release-gate.mjs` refuses a core that reports it, and `desktop/build-trust.mjs` refuses
-a binary that contains the marker. Not covered: the Node daemon's own webhook post
-(`src/daemon.mjs`), since the Node daemon is not the default and is frozen. The rules are
+a binary that contains the marker. The rules are
 `test/fixtures/contracts/test-origins.json`, which the Node module's generator wrote before the
 Node core left (C10) and `test_origins.rs`'s tests still hold the Rust side to. To change the
 rules, change the fixture and those tests together.

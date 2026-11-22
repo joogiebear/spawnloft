@@ -6,8 +6,9 @@ application identity, and the Windows updater have not been renamed.
 
 ## Run the installed command
 
-Desktop packages contain both launchers and use their bundled runtime. No separate Node
-installation is needed. On Mac, after dragging SpawnLoft into Applications:
+Desktop packages contain both launchers, which run `spawnloft-core`, the program that is the
+whole command line. No Node is needed, and none is shipped: only test players (`spawnloft bot`,
+see [BOTS.md](BOTS.md)) use a Node.js, 22 or later. On Mac, after dragging SpawnLoft into Applications:
 
 ```sh
 "/Applications/SpawnLoft.app/Contents/Resources/bin/spawnloft" status royalplugins --json
@@ -19,7 +20,7 @@ spawnloft status royalplugins --json
 
 To make that PATH addition permanent, add the export line to your shell configuration.
 The app does not edit it automatically. If you move the app, update that PATH entry.
-Avoid symlinking the launcher alone: it resolves the runtime relative to its own directory.
+Avoid symlinking the launcher alone: it finds `spawnloft-core` relative to its own directory.
 An installer/settings option for PATH setup is a separate follow-up.
 
 On Windows, SpawnLoft 2.0 puts `resources\bin` inside the installed SpawnLoft directory
@@ -27,8 +28,19 @@ On Windows, SpawnLoft 2.0 puts `resources\bin` inside the installed SpawnLoft di
 takes it off again when it is uninstalled; an update leaves it alone. Open a new terminal after
 installing and run `spawnloft` (or `mcctl`). With 1.x, run `resources\bin\spawnloft.cmd` there
 or add the folder to your user PATH yourself. On Linux the packages install `/usr/bin/spawnloft`.
-From a source checkout, use `node spawnloft.mjs ...` or the root Windows `.cmd` launchers;
-source usage requires Node 20 or later.
+From a source checkout, build the core (`cd rust && cargo build --release -p spawnloft-core`) and
+run `rust/target/release/spawnloft-core ...`; there is no `spawnloft.mjs` or `mcctl.mjs` any more.
+
+Scripts, scheduled-task shims and MCP configs written by 1.x call `... mcctl.mjs <command>` or
+`... spawnloft.mjs <command>`. They still work: when the first argument is one of those names,
+`spawnloft-core` drops it and never runs it, so the file does not need to exist. `repair` and the Windows installer also remove an older 2.0
+build's `resources\runtime` and `resources\core` folders (only when they hold SpawnLoft's
+`runtime.json` or `mcctl.mjs`), and leave them where a `node.exe` from them is still running, to be
+removed by the next install or `repair`.
+
+`SPAWNLOFT_DAEMON`, `SPAWNLOFT_CORE_IMPL` and the `daemon` setting no longer mean anything: every
+server runs on `spawnloft-core daemon`. `doctor` notes a leftover `"daemon": "node"` setting and
+says it is ignored.
 
 ## JSON contract, version 1
 

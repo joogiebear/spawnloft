@@ -4,6 +4,16 @@ What the per-server daemon and the files around it promise, written down once so
 implementation (the Rust daemon on `v2`) can be held to exactly what the Node code does. Plan:
 PLAN-RUST-TAURI.md section 3 item 2 and section 12 (P0-A).
 
+**C10 status.** The Node core these fixtures were written from is gone (2.0 has no Node: commit
+`fe21ece` deleted `src/*.mjs` and `mcctl.mjs`; `git show fe21ece^:src/<file>` shows what a "Written
+by" column names). The fixtures stay, and the Rust core is now the only thing held to them: the
+`cargo test` suites of `spawnloft-lib` and `spawnloft-core` read these files, and the parity rig
+holds the CLI to the records in `tools/parity/frozen/`. The Node tests described under "The tests"
+and "How the C0 fixtures are checked" (`test/contracts*.test.mjs`, `test/panel-auth.test.mjs`) left
+with the Node core, and `SPAWNLOFT_DAEMON` no longer picks a daemon: `spawnloft-core daemon` is the only
+one. A Node-side column below is history. The generators that still run on Node are
+`tools/make-ordering-fixture.mjs` and `tools/make-panel-auth-fixture.mjs`.
+
 | File | Contract | Written by | Read by |
 | --- | --- | --- | --- |
 | `control-protocol.json` | the control channel: transport, the four ops, every reply | `src/daemon.mjs` | `src/control.mjs`, `src/supervisor.mjs` |

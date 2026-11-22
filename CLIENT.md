@@ -415,7 +415,7 @@ and the path has to match exactly. The chain after the Microsoft token (Xbox Liv
 Minecraft, profile) is the one the device code runs, so Mojang's approval of the app id applies
 to both.
 
-How it runs, in the panel process (`src/client-login.mjs`):
+How it runs, in the panel process (`spawnloft-core`; in 1.x this was `src/client-login.mjs`):
 
 1. The page asks `POST /api/client/accounts/login`. The panel makes an in-memory record (a
    random `state`, a PKCE verifier, the time) and answers `{ loginId, authorizeUrl }`. The

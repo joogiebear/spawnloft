@@ -451,6 +451,38 @@ Rust as a list, so none is lost by accident:
 | `SPAWNLOFT_HARNESS_INDEX_FETCH=off` | the only network switch today | Kept |
 | Download hosts | hard-coded `https://` constants in about a dozen modules | The override of 6.2 |
 
+### 5.7 C10 status (2026-11-22)
+
+Written after the Node core was deleted (branch `v2-port-c10-remove-node`). The sections above
+are the plan as it was written, and are left as they were. Done-when items of the C10 row in
+section 11:
+
+| Item | Status |
+| --- | --- |
+| No Node binary and no core `.mjs` in any package | Code done. `src/*.mjs`, `mcctl.mjs`, `spawnloft.mjs`, the runtime staging scripts and the Node pin are deleted; the release and payload gates read `spawnloft-core --version` and refuse a `node`, a `node.exe` or a `.mjs` (the CLI package's `bin/node` link to the core aside). Not yet confirmed on a built package of each platform: CI |
+| Old forms keep working | Done in code: a first argument `mcctl.mjs` or `spawnloft.mjs` is dropped and never run (`cli.rs` `is_old_entry`). `SPAWNLOFT_DAEMON`, `SPAWNLOFT_CORE_IMPL` and the `daemon` setting mean nothing; `doctor` notes a leftover `"daemon": "node"`. `SPAWNLOFT_CORE_DIR` is still read, but only by a debug or `test-hooks` build, for the panel's pages |
+| Golden files frozen | The rig runs the Rust core against `tools/parity/frozen/<platform>-<arch>/`. This branch holds the `linux-x64` records; `linux-arm64`, `win32-x64` and `darwin-arm64` are recorded on those platforms (`--record`), and `test/parity-frozen.test.mjs` fails until each is present |
+| The removal step tested with a held `node.exe` | Code and installer harness done (`s12` updates over a held `node.exe`; the installer and `repair` remove `resources\runtime` and `resources\core` only when they hold SpawnLoft's `runtime.json` or `mcctl.mjs`, and leave both while a `node.exe` runs). To be seen green in CI, and checked by hand at G3 |
+| Node for test players | Done: Node.js 22 or later, from the `bot.node` setting (a full path), else `SPAWNLOFT_NODE`, else `node` on PATH (a Mac also looks in Homebrew, `/usr/local/bin`, Volta and nvm); `bot setup` uses the npm beside it; `doctor` notes a missing or old Node |
+| Sizes and timings measured | Linux x64 below; Windows and macOS numbers come from CI (the installer size, the binary's size and the same three timings) and are to be filled in |
+| Docs updated | Done in this change: README, CLI, CLIENT, CONTRIBUTING, MCP, BOTS, ROADMAP, `rust/README.md`, the contracts and parity READMEs, and the two commands in `desktop/STABLE.md` and `UPDATER-KEYS.md` that named deleted files. Dated records are unchanged |
+| G3 can start | Yes, once the CI numbers and the other platforms' records are in |
+
+Measured on Linux x64 (container: Ubuntu 24.04, 4 CPUs), 2026-11-22, `cargo build --release --locked -p spawnloft-core`
+(profile: thin LTO, one codegen unit, `panic = "abort"`, `strip = "symbols"`):
+
+| What | Result |
+| --- | --- |
+| `target/release/spawnloft-core`, stripped by the profile | 11,849,720 bytes (11.3 MiB); `strip` on a copy changes nothing (11,849,712 bytes) |
+| `spawnloft-core --version`, median of 10 runs | 1.7 ms |
+| `spawnloft-core help`, median of 10 runs | 1.5 ms |
+| `spawnloft-core list --json`, empty data root (`SPAWNLOFT_DATA_ROOT=<empty temp dir>`), median of 10 runs | 1.7 ms |
+
+Each time is the wall clock of one process from start to exit, output discarded, the first run
+included, on a build that had just been written to disk. The Node core's figures this replaces
+("hundreds of milliseconds", section 5.1) were not re-measured here. Windows and macOS numbers come
+from CI, not from this container.
+
 ## 6. What proves parity
 
 The existing Node suite cannot be pointed at Rust as it is: 123 of the 138 test files import
@@ -652,7 +684,7 @@ per Victor's routing: Opus builds, Fable 5.2 reviews the phases marked below, So
 | **C6b** diagnostics | Opus, Opus review | C6, C7b | `doctor` and `diag` flipped |
 | **C8** panel API | Opus, **Fable review** | C5, C6b | Every route family answered in Rust; route replay green; browser and window smokes green; proxy removed |
 | **C9** MCP and bots | Opus, **Fable review** | C5, C6b | `mcp` and `bot` flipped; JSON-RPC replay green; tool list equal to the fixture |
-| **C10** Node leaves | Opus, **Fable review of `v2` as a whole** | C8, C9 | No Node binary and no core `.mjs` in any package; golden files frozen; the removal step tested with a held `node.exe`; sizes and timings measured; docs updated (Sonnet); G3 can start |
+| **C10** Node leaves | Opus, **Fable review of `v2` as a whole** | C8, C9 | No Node binary and no core `.mjs` in any package; golden files frozen; the removal step tested with a held `node.exe`; sizes and timings measured; docs updated (Sonnet); G3 can start. **Status 2026-11-22: code done; sizes and timings measured on Linux x64, the other platforms' numbers to be filled from CI; G3 can start (section 5.7)** |
 
 Start now: **C0**. Then C1, then C2. After C2, two tracks at once: the server chain (C3, C4,
 then C5 and C6 side by side) and the client (C7a, C7b). C8 and C9 run side by side at the end.

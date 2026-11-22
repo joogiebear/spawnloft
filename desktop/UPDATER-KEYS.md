@@ -54,7 +54,7 @@ To move to the "next" key:
 2. Two releases later, drop the retired key from the list.
 
 A client always carries the full current list, so no revocation feed is needed — a key is retired
-simply by shipping a build without it (the model `src/client-harness-index.mjs` already uses).
+simply by shipping a build without it (the model the harness list in `rust/crates/spawnloft-lib/src/client/harness_index.rs` already uses).
 
 ## What signs what, and when
 

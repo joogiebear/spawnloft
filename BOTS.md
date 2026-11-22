@@ -9,7 +9,15 @@ offline-mode players, so they have a name and nothing else: no account, no login
 
 ## Setup
 
-Mineflayer is not part of SpawnLoft. It is installed once, with npm, into the data folder:
+Mineflayer is not part of SpawnLoft, and neither is the Node.js it runs on: SpawnLoft itself
+(the CLI, the panel, the daemons, MCP) is the Rust binary `spawnloft-core` and ships no Node. Test
+players need **Node.js 22 or later** on the machine, with its npm. SpawnLoft finds it in this order:
+the `bot.node` setting (a full path to the `node` program: `{"bot": {"node": "/opt/node22/bin/node"}}`,
+or the flat key `"bot.node"`, in the settings file), else the `SPAWNLOFT_NODE` environment variable,
+else `node` on PATH (on a Mac also Homebrew, `/usr/local/bin`, Volta and nvm folders, since an app
+started from the Dock does not see your shell's PATH). `spawnloft doctor` notes a missing or older
+Node under bots, and `bot setup` uses the npm beside the Node it found. Mineflayer is installed
+once, with that npm, into the data folder:
 
 ```sh
 spawnloft bot setup        # about 500 MB into <data>/bot-host; needs npm (comes with Node.js)
@@ -20,8 +28,8 @@ Setup installs one exact mineflayer and the exact tree of packages under it, fro
 scripts. Nothing newer than what SpawnLoft was tested with arrives on the day you run it, and an
 install from an older SpawnLoft is replaced the next time `bot setup` runs.
 
-The desktop app's bundled runtime has no npm. On a machine with the app and no Node.js, install
-Node.js from nodejs.org first, then run the command above from a terminal.
+The desktop app carries no Node.js, and so no npm. On a machine with the app and no Node.js,
+install Node.js 22 or later from nodejs.org first, then run the command above from a terminal.
 
 The server needs two things, both one line in its `server.properties`:
 
