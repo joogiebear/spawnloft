@@ -1,0 +1,202 @@
+{
+ "about": "C7 part 4b: launches of harness profiles with the fake game: the token on the command line and in state.json, a stale harness file removed before the game starts, the game stopped through the harness, and the refusal for a version with no harness build, with and without a failed read of the published list.",
+ "env": {
+  "NODE_ENV": "test"
+ },
+ "normalize": [
+  {
+   "pattern": "\"token\": ?\"[0-9a-f]{32}\"",
+   "replace": "\"token\":\"<token>\""
+  },
+  {
+   "pattern": "\"procStart\":( ?)\"\\d+\"",
+   "replace": "\"procStart\":$1\"<t>\""
+  },
+  {
+   "pattern": "\"harness\":\\{\"port\":\\d+\\}",
+   "replace": "\"harness\":{\"port\":<port>}"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/client/versions/1.21.11/1.21.11.json",
+   "copy": "../../../test/fixtures/client/1.21.11.json"
+  },
+  {
+   "write": "data/client/versions/fabric-loader-0.16.0-1.21.11/fabric-loader-0.16.0-1.21.11.json",
+   "json": {
+    "id": "fabric-loader-0.16.0-1.21.11",
+    "inheritsFrom": "1.21.11",
+    "type": "release",
+    "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+    "arguments": {
+     "game": [],
+     "jvm": [
+      "-DFabricMcEmu= net.minecraft.client.main.Main "
+     ]
+    },
+    "libraries": []
+   }
+  },
+  {
+   "write": "data/client/profiles.json",
+   "json": {
+    "version": 1,
+    "profiles": {
+     "h1": {
+      "mc": "1.21.11",
+      "loader": "fabric",
+      "loaderVersion": "0.16.0",
+      "memory": "1G",
+      "harness": true
+     },
+     "h2": {
+      "mc": "1.20.1",
+      "loader": "fabric",
+      "loaderVersion": "0.16.0",
+      "memory": "1G",
+      "harness": true
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "h2"
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   },
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "h2",
+    "--json"
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   },
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "write": "data/client/cache/harness-index.status.json",
+   "json": {
+    "lastCheck": 1763700000000,
+    "outcome": "harness-index-fetch",
+    "reason": "github.com did not answer"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "h2"
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   },
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "could not be read: github.com did not answer"
+   }
+  },
+  {
+   "write": "data/client/cache/harness-index.status.json",
+   "json": {
+    "lastCheck": 1763700000000,
+    "outcome": "unchanged",
+    "reason": null
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "h2",
+    "--json"
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   },
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "write": "data/client/profiles/h1/spawnloft-harness.json",
+   "json": {
+    "port": 1,
+    "pid": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "h1",
+    "--as",
+    "Hana",
+    "--wait",
+    "--json"
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   },
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "status",
+    "h1",
+    "--json"
+   ]
+  },
+  {
+   "run": [
+    "client",
+    "stop",
+    "h1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "launch",
+    "h1",
+    "--wait"
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   },
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
+    "stop",
+    "h1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

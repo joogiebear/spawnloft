@@ -2,9 +2,9 @@
 //! and game start, and `pickClientJava` from java.mjs. The game runs detached with its output in
 //! the profile's log and its record in state.json, which the Node core reads as its own.
 //!
-//! A mod loader's profile (and one with the harness, which needs Fabric) is still launched by the
-//! Node core until the loaders move (part 4): the command line hands those over before anything
-//! is printed, and `launch` refuses them as a guard.
+//! A Forge or NeoForge profile is still launched by the Node core until their installers move
+//! (part 4b): the command line hands those over before anything is printed, and `launch` refuses
+//! them as a guard.
 
 use std::path::Path;
 use std::sync::LazyLock;
@@ -689,6 +689,7 @@ pub fn build_command(
     account: &Value,
     java: &str,
     os: &Os,
+    harness_token: Option<&str>,
     join: Option<&Address>,
     assets_dir: Option<&str>,
 ) -> Result<Command, Failure> {
@@ -812,6 +813,9 @@ pub fn build_command(
     }
     let mut args = jvm;
     args.push(format!("-Xmx{}", js::string(profile.get("memory"))));
+    if let Some(t) = harness_token.filter(|t| !t.is_empty()) {
+        args.push(format!("-Dspawnloft.harness.token={t}"));
+    }
     args.push(js::string(prop(Some(version), "mainClass")));
     args.extend(game);
     Ok(Command {
@@ -832,6 +836,8 @@ pub struct StateFacts {
     pub server: Option<String>,
     pub address: Option<String>,
     pub launched_by: &'static str,
+    /// `{ token, port: null }` for a game started with the harness
+    pub harness: Option<Value>,
     pub launch: Value,
 }
 
@@ -916,7 +922,7 @@ pub fn spawn_client(
         "account": facts.account,
         "javaPid": pid,
         "procStart": state::proc_start_ticks(Some(&json!(pid))),
-        "harness": null,
+        "harness": facts.harness.clone().unwrap_or(Value::Null),
         "server": facts.server,
         "address": facts.address,
         "launchedBy": facts.launched_by,
@@ -1006,10 +1012,9 @@ pub fn fake_client_java() -> Option<String> {
     crate::paths::env_var("FAKE_CLIENT")
 }
 
-/// Whether a profile is one the Node core still launches: a mod loader's, or one with the
-/// harness (which needs Fabric).
+/// Whether a profile is one the Node core still launches: one whose loader it still sets up.
 pub fn node_launches(profile: &Profile) -> bool {
-    node_installs(profile) || js::truthy(profile.get("harness"))
+    node_installs(profile)
 }
 
 /// Whether a profile's loader is one the Node core still sets up (Forge and NeoForge, whose
@@ -1292,9 +1297,7 @@ fn launch_locked(
     if node_launches(&profile) {
         return Err(Failure::Internal {
             head: "Error".into(),
-            message: format!(
-                "profile \"{name}\" uses a mod loader or the harness, which the Node core launches"
-            ),
+            message: format!("profile \"{name}\" uses a mod loader the Node core launches"),
             code: None,
         });
     }
@@ -1325,6 +1328,18 @@ fn launch_locked(
         return Err(user(format!(
             "\"{t}\" is a database, not a Minecraft server; point the profile at a server"
         )));
+    }
+    let mc_id = js::string(profile.get("mc"));
+    if js::truthy(profile.get("harness")) && super::harness::harness_for(paths, &mc_id).is_none() {
+        // a build published since the signed list was last read is found before refusing (no
+        // wait when it was read within the day)
+        super::harness_index::refresh_default(paths, false)?;
+        if super::harness::harness_for(paths, &mc_id).is_none() {
+            return Err(coded(
+                super::harness::not_published(paths, &mc_id),
+                "harness-not-published",
+            ));
+        }
     }
 
     // --as names an offline player; a signed-in account brings its own name
@@ -1545,6 +1560,15 @@ fn launch_locked(
             &install::default_fetch,
         )?;
     }
+    if fake.is_none() && js::truthy(profile.get("harness")) {
+        super::harness::ensure_harness_jar(
+            paths,
+            name,
+            &mc,
+            opts.on_progress,
+            &super::harness::default_download,
+        )?;
+    }
 
     let account = match &selector {
         None => offline_account(&match opts.player_name.as_deref().filter(|p| !p.is_empty()) {
@@ -1581,6 +1605,20 @@ fn launch_locked(
             format!("the game's Multiplayer list was not brought up to date: {skipped}"),
         );
     }
+    let harness_token = if js::truthy(profile.get("harness")) {
+        let mut b = [0u8; 16];
+        getrandom::fill(&mut b).map_err(|e| Failure::Internal {
+            head: "Error".into(),
+            message: format!("the system gave no random bytes: {e}"),
+            code: None,
+        })?;
+        // a file from a crashed run would otherwise be read as this run's, before the mod
+        // replaces it
+        super::harness::remove_file(paths, name)?;
+        Some(b.iter().map(|x| format!("{x:02x}")).collect::<String>())
+    } else {
+        None
+    };
     let command = build_command(
         paths,
         &version_json,
@@ -1589,6 +1627,7 @@ fn launch_locked(
         &account,
         &picked.path,
         &run_os,
+        harness_token.as_deref(),
         join.as_ref(),
         assets_dir.as_deref(),
     )?;
@@ -1606,6 +1645,9 @@ fn launch_locked(
             server: target.clone(),
             address: None,
             launched_by: "cli",
+            harness: harness_token
+                .as_ref()
+                .map(|t| json!({ "token": t, "port": null })),
             launch: launch_facts(&resolved, &picked, installed.as_ref(), assets_dir.as_deref()),
         },
     )?;

@@ -65,8 +65,8 @@ fn uses_loader(profile: &profiles::Profile) -> bool {
 }
 
 /// Whether this `client` line is one the Node core still answers although its subcommand is
-/// ported: `install` of a Forge or NeoForge profile and `launch` of one (or of a harness profile),
-/// set up by the Node core until their installers move (part 4b). Decided before the Rust side prints anything, so a settings warning is not printed
+/// ported: `install` and `launch` of a Forge or NeoForge profile, set up by the Node core until
+/// their installers move (part 4b). Decided before the Rust side prints anything, so a settings warning is not printed
 /// twice. Anything that fails here is left to the Rust side, which reports it as Node would.
 pub fn hands_to_node(args: &super::args::Parsed, layout: &spawnloft_lib::settings::Layout) -> bool {
     let pos = &args.positional;
@@ -75,7 +75,6 @@ pub fn hands_to_node(args: &super::args::Parsed, layout: &spawnloft_lib::setting
     }
     let (allowed, hands): (&[&str], fn(&profiles::Profile) -> bool) = match pos[0].as_str() {
         "install" => (&["json", "verify"], uses_loader),
-        // a launch also hands over a harness profile, whose mod the Node core sets up
         "launch" => (
             &["as", "account", "server", "wait", "json"],
             launch::node_launches,
