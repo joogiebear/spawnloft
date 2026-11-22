@@ -223,6 +223,7 @@ pub fn versions() -> Result<Vec<crate::services::Release>, Failure> {
     assert_supported()?;
     Ok(vec![crate::services::Release {
         version: VERSION.into(),
+        series: Some("8.4".into()),
         status: "Stable".into(),
         support: Some("Long Term Support".into()),
         date: None,
@@ -243,7 +244,7 @@ pub fn fetch_engine(layout: &Layout, version: &str, progress: OnProgress) -> Res
     let (archive, url) = archive_for(&v)?;
     let dir = engine_dir(layout, &v)?;
     if has_engine(layout, &v) {
-        progress(&Progress::say(format!("MySQL {version} is already here")));
+        progress(&Progress::cached(format!("MySQL {version} is already here")));
         return Ok(());
     }
     let store = Path::new(&layout.engines_dir);

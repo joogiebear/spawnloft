@@ -84,8 +84,9 @@ pub fn safe_database(row: &Instance) -> Value {
     let attachments = safe.shift_remove("attachments");
     safe.shift_remove("tools");
     let mut shown = Map::new();
-    if let Some(Value::Object(all)) = &attachments {
-        for (server, a) in all {
+    // `Object.entries(attachments ?? {})`: a list or a text has entries too
+    if let Some(all) = attachments.as_ref().filter(|a| !a.is_null()) {
+        for (server, a) in registry::entries_of(all) {
             let of = |k: &str| a.get(k).cloned().unwrap_or(Value::Null);
             // a field that is not there is left out of the JSON, as `undefined` is
             let mut one = Map::new();
@@ -95,7 +96,7 @@ pub fn safe_database(row: &Instance) -> Value {
                 }
             }
             one.insert("createdAt".into(), of("createdAt"));
-            shown.insert(server.clone(), Value::Object(one));
+            shown.insert(server, Value::Object(one));
         }
     }
     let engine = row.get("engine");
