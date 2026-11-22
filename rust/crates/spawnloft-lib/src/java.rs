@@ -443,6 +443,75 @@ pub struct Health {
     pub on_path: bool,
     pub others: Vec<Found>,
     pub message: String,
+    /// The probe this answer is shaped like (`...state` or `...onPath`): its `arch` and
+    /// `reason` are part of what the panel sends.
+    pub base: Probe,
+}
+
+impl Probe {
+    /// The object `probe()` answers, in its key order. A Java that could not be run has no
+    /// `arch` key at all; one that ran has it, `null` when it printed none.
+    pub fn to_json(&self) -> serde_json::Map<String, serde_json::Value> {
+        use serde_json::json;
+        let mut m = serde_json::Map::new();
+        m.insert("ok".into(), json!(self.ok));
+        m.insert("found".into(), json!(self.found));
+        m.insert("major".into(), json!(self.major));
+        m.insert("version".into(), json!(self.version));
+        if self.found {
+            m.insert("arch".into(), json!(self.arch));
+        }
+        m.insert("reason".into(), json!(self.reason));
+        m.insert("message".into(), json!(self.message));
+        m
+    }
+}
+
+impl Found {
+    /// One row of `discover().all`: `{ path, source, ...probe }`.
+    pub fn to_json(&self) -> serde_json::Value {
+        let mut m = serde_json::Map::new();
+        m.insert("path".into(), serde_json::json!(self.path));
+        m.insert("source".into(), serde_json::json!(self.source));
+        m.extend(self.probe.to_json());
+        serde_json::Value::Object(m)
+    }
+}
+
+impl Health {
+    /// The object `health()` answers: the probe's keys in their places with `ok`, `found` and
+    /// `message` as this answer has them, then `path`, `onPath` and `others`.
+    pub fn to_json(&self) -> serde_json::Map<String, serde_json::Value> {
+        use serde_json::json;
+        let mut m = self.base.to_json();
+        m.insert("ok".into(), json!(self.ok));
+        m.insert("found".into(), json!(self.found));
+        m.insert("message".into(), json!(self.message));
+        m.insert("path".into(), json!(self.path));
+        m.insert("onPath".into(), json!(self.on_path));
+        m.insert(
+            "others".into(),
+            serde_json::Value::Array(self.others.iter().map(Found::to_json).collect()),
+        );
+        m
+    }
+}
+
+/// `downloadUrlFor()`: Adoptium's page for this machine's system and processor, so the person
+/// lands on one download and not a table; [`DOWNLOAD_URL`] where the page has no such filter.
+pub fn download_url_for() -> String {
+    let os = match crate::platform::node_platform() {
+        "win32" => "windows",
+        "darwin" => "mac",
+        "linux" => "linux",
+        _ => return DOWNLOAD_URL.to_string(),
+    };
+    let cpu = match crate::platform::node_arch() {
+        "x64" => "x64",
+        "arm64" => "aarch64",
+        _ => return DOWNLOAD_URL.to_string(),
+    };
+    format!("{DOWNLOAD_URL}&os={os}&arch={cpu}&package=jdk")
 }
 
 /// `health()`: the same probe the panel and the first-run wizard show, so they agree on what a
@@ -462,11 +531,12 @@ pub fn health() -> Health {
             ok: false,
             found: !all.is_empty(),
             major: on_path.major,
-            version: on_path.version,
+            version: on_path.version.clone(),
             path: None,
             on_path: false,
             others: all,
             message,
+            base: on_path,
         };
     };
     let via_path = best.path == "java";
@@ -503,11 +573,12 @@ pub fn health() -> Health {
         ok: state.ok,
         found: state.found,
         major: state.major,
-        version: state.version,
+        version: state.version.clone(),
         path: Some(best.path),
         on_path: via_path,
         others: all,
         message,
+        base: state,
     }
 }
 

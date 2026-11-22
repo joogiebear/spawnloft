@@ -12,9 +12,9 @@ export const DECLARED = [
   {
     id: 'doctor-node-line',
     where: '`doctor`, the diagnostics bundle, the panel\'s diagnostics',
-    node: 'a `node: <version>` line and the code `root`; the bundle\'s facts name Node\'s version and `spawnloft` is package.json\'s',
-    rust: 'a `core: spawnloft-core <version> (<target>)` line, no `root`; no `node` fact, and `spawnloft` is the core\'s own version',
-    commands: ['doctor', 'diag'],
+    node: 'a `node: <version>` line and the code `root`; the bundle\'s facts name Node\'s version and `spawnloft` is package.json\'s, as is the panel\'s `SpawnLoft:` line',
+    rust: 'a `core: spawnloft-core <version> (<target>)` line, no `root`; no `node` fact, and `spawnloft` (the panel\'s `SpawnLoft:` line too) is the core\'s own version',
+    commands: ['doctor', 'diag', 'ui'],
     // text lines and JSON notes alike: "node: v22.1.0", "root: /path", "core: spawnloft-core 2.0.0 (...)";
     // diag's facts: "node":"v22.1.0" and "spawnloft":"<version>", and the text form's "spawnloft: <version>"
     apply: (text) => dropLines(/^\s*"?(?:node: v\d|root: |core: spawnloft-core )/)(text)
@@ -22,7 +22,12 @@ export const DECLARED = [
       .replace(/"node":\s*"v[^"]*",?\s*/g, '')
       .replace(/^spawnloft: .*$/gm, 'spawnloft: <version>')
       .replace(/"spawnloft"(\s*):(\s*)"[^"]*"/g, '"spawnloft"$1:$2"<version>"')
-      .replace(/,\]/g, ']'),
+      .replace(/,\]/g, ']')
+      // the panel's diagnostics: as text (the node or core line is gone by now), and in
+      // /api/feedback inside a JSON string and inside the bug link's query
+      .replace(/^SpawnLoft: \d.*$/gm, 'SpawnLoft: <version>')
+      .replace(/SpawnLoft: \d[^\\"]*\\n(?:node: v|core: spawnloft-core )[^\\"]*\\n/g, 'SpawnLoft: <version>\\n')
+      .replace(/SpawnLoft%3A\+\d[^%]*%0A(?:node%3A\+v[^%]*|core%3A\+spawnloft-core\+[^%]*%28[^%]*%29)%0A/g, 'SpawnLoft%3A+<version>%0A'),
   },
   {
     // found by C6b's Windows parity run: on a file whose entries all come from its folder (SDDL

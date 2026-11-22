@@ -285,6 +285,45 @@ pub fn make_token(key: &Key, purpose: Purpose, port: u16, issued: u64, nonce: &s
     format!("{body}.{mac}")
 }
 
+/// The header a caller with the key asks "is this my own panel?" in, and the one the answer
+/// comes back in (`PROBE_HEADER`, `PROOF_HEADER` in panel-auth.mjs). A token alone proves the
+/// caller to the panel, not the panel to the caller.
+pub const PROBE_HEADER: &str = "x-spawnloft-probe";
+pub const PROOF_HEADER: &str = "x-spawnloft-proof";
+
+/// `probeProof(key, nonce)`: `None` unless `nonce` is one well-formed nonce. The text signed
+/// cannot be a token's.
+pub fn probe_proof(key: &Key, nonce: &str) -> Option<String> {
+    if nonce.len() != 22
+        || !nonce
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return None;
+    }
+    Some(b64url_encode(
+        &signer(key, &format!("probe.v1.{nonce}")).finalize().into_bytes(),
+    ))
+}
+
+/// A fresh nonce for a probe (`probeNonce`).
+pub fn probe_nonce() -> Result<String, String> {
+    Ok(b64url_encode(&random::<16>()?))
+}
+
+/// `proofMatches(key, nonce, proof)`, compared without telling where the first difference is.
+pub fn proof_matches(key: &Key, nonce: &str, proof: &str) -> bool {
+    let Some(want) = probe_proof(key, nonce) else {
+        return false;
+    };
+    want.len() == proof.len()
+        && want
+            .bytes()
+            .zip(proof.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
+}
+
 /// A fresh `api` token for the panel on `port`.
 pub fn api_token(key: &Key, port: u16) -> String {
     make_token(key, Purpose::Api, port, now_ms(), "")
@@ -446,6 +485,24 @@ impl PanelAuth {
 
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// The answer to a caller's probe on an allowed request: `Some` only when the request has
+    /// exactly one probe header and it holds a well-formed nonce.
+    pub fn proof_for(&self, headers: &[(String, String)]) -> Option<String> {
+        let mut probes = headers
+            .iter()
+            .filter(|(k, _)| k.eq_ignore_ascii_case(PROBE_HEADER));
+        let (_, nonce) = probes.next()?;
+        if probes.next().is_some() {
+            return None;
+        }
+        probe_proof(&self.key, nonce.trim())
+    }
+
+    /// This listener's key, for a caller in this process that signs a request to it.
+    pub fn key(&self) -> &Key {
+        &self.key
     }
 
     /// `Authorization` for the panel this listener forwards to, on `port`.

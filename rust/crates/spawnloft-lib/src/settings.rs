@@ -67,6 +67,17 @@ pub fn read(file: &Path) -> Read {
     }
 }
 
+/// `inspect()`: whether the settings file is usable, for the first-run wizard (nobody sees
+/// stderr in the desktop app): `{ ok: true, exists }` or `{ ok: false, file, error }`.
+pub fn inspect() -> Value {
+    let file = paths::settings_file();
+    let found = read(&file);
+    match found.error {
+        Some(error) => serde_json::json!({ "ok": false, "file": settings_file_text(), "error": error }),
+        None => serde_json::json!({ "ok": true, "exists": found.exists }),
+    }
+}
+
 /// `load()`: the settings, with the warning line the Node core writes to stderr when the file is
 /// unusable (returned, so the caller prints it where the Node core would).
 pub fn load() -> (Map<String, Value>, Option<String>) {
@@ -288,6 +299,25 @@ impl Layout {
             services_dir: jspath::join(&[&data_root, "services"]),
             settings_file: settings_file_text(),
             data_root,
+        })
+    }
+
+    /// What `resolveRoots()` answers, in its key order. `usingLegacyLayout` is the Node core's
+    /// rule for running from a checkout, which this core does not have.
+    pub fn to_json(&self) -> Value {
+        serde_json::json!({
+            "dataRoot": self.data_root,
+            "instancesDir": self.instances_dir,
+            "separateInstances": self.separate_instances,
+            "registryFile": self.registry_file,
+            "templatesDir": self.templates_dir,
+            "jarsDir": self.jars_dir,
+            "backupsDir": self.backups_dir,
+            "runDir": self.run_dir,
+            "enginesDir": self.engines_dir,
+            "servicesDir": self.services_dir,
+            "usingLegacyLayout": false,
+            "settingsFile": self.settings_file,
         })
     }
 

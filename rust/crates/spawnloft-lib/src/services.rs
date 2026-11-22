@@ -179,6 +179,21 @@ pub fn assert_new_engine(engine: &str) -> Result<Engine, Failure> {
 
 pub const DEFAULT_ENGINE: &str = "mysql";
 
+/// `canManage(engine)`: whether SpawnLoft can install and run this engine here. Windows and
+/// macOS always can; elsewhere only where the engine has a verified build.
+pub fn can_manage(engine: &str) -> bool {
+    if !NEW_ENGINES.contains(&engine) {
+        return false;
+    }
+    if cfg!(any(windows, target_os = "macos")) {
+        return true;
+    }
+    match engine {
+        mysql::ENGINE => mysql::supports(),
+        _ => garnet::supports(),
+    }
+}
+
 fn registry_file(layout: &Layout) -> &Path {
     Path::new(&layout.registry_file)
 }

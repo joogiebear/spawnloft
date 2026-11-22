@@ -1494,6 +1494,29 @@ pub const JAR_IDS: [&str; 8] = [
     "fabric",
 ];
 
+/// `isJarSource(id)`.
+pub fn is_jar_source(id: &str) -> bool {
+    JAR_IDS.contains(&id)
+}
+
+/// `sources.versionsFor(id)`: the versions a kind of server can be made for, newest first.
+pub fn versions_for(id: &str) -> Result<Vec<String>, Failure> {
+    match id {
+        "neoforge" => neo_versions(),
+        "paper" | "folia" => paper_versions(id, false),
+        "purpur" => purpur_versions(),
+        "asp" => Ok(asp_versions_of(&asp_builds()?)),
+        "vanilla" => vanilla_versions(false),
+        "spigot" | "craftbukkit" => spigot_versions(),
+        "fabric" => fabric_versions(),
+        other => Err(Failure::Internal {
+            head: "Error".into(),
+            message: format!("no version list for \"{other}\""),
+            code: None,
+        }),
+    }
+}
+
 /// `sources.fetchJar(id, version, { build, java, onProgress })`.
 pub fn fetch_jar(
     jars_dir: &str,
