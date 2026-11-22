@@ -1015,6 +1015,7 @@ pub fn fake_client_java() -> Option<String> {
 /// Whether a profile is one the Node core still launches: none now (kept for the command line's
 /// hand-over until the whole `client` command moves).
 pub fn node_launches(profile: &Profile) -> bool {
+<<<<<<< HEAD
     node_installs(profile)
 }
 
@@ -1023,6 +1024,16 @@ pub fn node_launches(profile: &Profile) -> bool {
 pub fn node_installs(profile: &Profile) -> bool {
     let _ = profile;
     false
+=======
+    node_installs(profile) || js::truthy(profile.get("harness"))
+}
+
+/// Whether a profile's loader is one the Node core still sets up (Forge and NeoForge, whose
+/// installers part 4b ports).
+pub fn node_installs(profile: &Profile) -> bool {
+    !matches!(profile.get("loader"), None | Some(Value::Null))
+        && !matches!(profile.text("loader"), Some("vanilla" | "fabric" | "quilt"))
+>>>>>>> origin/v2
 }
 
 /// The profile's loader, `None` for vanilla.
@@ -1669,6 +1680,13 @@ fn launch_locked(
             (p, Some(r))
         }
     };
+    let mut picked = picked;
+    if loader.is_some()
+        && fake.is_none()
+        && let Some(w) = &picked.warning
+    {
+        picked.warning = Some(format!("{w} Mods often fail on a newer Java."));
+    }
     if let Some(w) = &picked.warning {
         warn(&mut warnings, w.clone());
     }
@@ -1746,6 +1764,7 @@ fn launch_locked(
             &install::default_fetch,
         )?;
     }
+<<<<<<< HEAD
     if fake.is_none() && js::truthy(profile.get("harness")) {
         super::harness::ensure_harness_jar(
             paths,
@@ -1755,6 +1774,8 @@ fn launch_locked(
             &super::harness::default_download,
         )?;
     }
+=======
+>>>>>>> origin/v2
 
     let account = match &selector {
         None => offline_account(&match opts.player_name.as_deref().filter(|p| !p.is_empty()) {
