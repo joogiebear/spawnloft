@@ -70,6 +70,9 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
     SPAWNLOFT_NODE: process.execPath,
     SPAWNLOFT_CORE_DIR: ctx.repo,
     SPAWNLOFT_HARNESS_INDEX_FETCH: 'off',
+    // the daemon every 2.0 package runs (and the only one once the Node core is gone); a
+    // scenario about the Node daemon says so in its own env
+    SPAWNLOFT_DAEMON: 'rust',
     // an empty map still refuses every host that is not on this machine: no scenario downloads
     // anything real, whether or not it fakes a host
     SPAWNLOFT_TEST_ORIGINS: origins ?? '{}',
@@ -473,7 +476,10 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   const neutral = neutralizer({ paths, hostMap, rigPid: JSON.stringify(scenario).includes('{rig-pid}') ? process.pid : null })
   const recordPath = frozenFile(repo, scenario.name)
   let frozenDiffs = []
-  if (frozen === 'record') {
+  // a scenario about what leaves with the Node core (its daemon) is not frozen
+  if (scenario.frozen === false) {
+    if (!results.node) problems.push('this scenario is about the Node core and cannot run without it')
+  } else if (frozen === 'record') {
     if (!results[recordFrom]) {
       problems.push(`cannot record: the ${recordFrom} side did not run`)
     } else if (!problems.length && (expect === 'differ' || !diffs.length)) {

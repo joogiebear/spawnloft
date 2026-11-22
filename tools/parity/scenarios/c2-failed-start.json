@@ -107,6 +107,7 @@
     "FAKE_JAVA_FAIL": "start",
     "SPAWNLOFT_DAEMON": "node"
    },
+   "frozen": false,
    "expect": {
     "code": 1,
     "stdoutIncludes": "did not reach ready state"
@@ -141,6 +142,7 @@
     "FAKE_MARIADB_FAIL": "start",
     "SPAWNLOFT_DAEMON": "node"
    },
+   "frozen": false,
    "expect": {
     "code": 1,
     "stdoutIncludes": "did not reach ready state"
