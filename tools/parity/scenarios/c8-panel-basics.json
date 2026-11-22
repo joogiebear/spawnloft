@@ -44,7 +44,8 @@
   "home/**/panel.key"
  ],
  "normalize": [
-  {"pattern": "^os: .*$", "flags": "gm", "replace": "os: <machine>"},
+  {"pattern": "(^|\\\\n)os: [^\\n\"\\\\]*", "flags": "gm", "replace": "$1os: <machine>"},
+  {"pattern": "%0Aos%3A\\+.*?%0A", "replace": "%0Aos%3A+<machine>%0A"},
   {
    "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
    "replace": ""
