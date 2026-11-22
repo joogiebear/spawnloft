@@ -715,6 +715,53 @@ pub fn last_outcome(paths: &Paths) -> (Value, Value) {
     )
 }
 
+/// `harnessIndexStatus()`: where the harness builds come from (the verified copy in use or the
+/// built-in rows) and how the last refresh went. Reads only the cache folder.
+pub fn status(paths: &Paths) -> Value {
+    let dir = paths.cache_dir();
+    let s = read_json_file(&file(&dir, STATUS_FILE));
+    let fetched_at = read_json_file(&file(&dir, "harness-index.json.fetched-at"))
+        .map_or(f64::NAN, |v| js::number(Some(&v)));
+    index_rows(Opts::new(&dir));
+    let copy = loaded_get(&dir).flatten();
+    let mut m = serde_json::Map::new();
+    m.insert(
+        "source".into(),
+        json!(if copy.is_some() { "index" } else { "built-in" }),
+    );
+    m.insert(
+        "serial".into(),
+        copy.as_ref()
+            .map_or(Value::Null, |c| crate::jsjson::num(c.serial)),
+    );
+    m.insert(
+        "generated".into(),
+        copy.as_ref()
+            .and_then(|c| c.generated.clone())
+            .map_or(Value::Null, Value::String),
+    );
+    m.insert("key".into(), copy.as_ref().map_or(Value::Null, |c| json!(c.key)));
+    m.insert(
+        "ids".into(),
+        json!(copy.as_ref().map_or(Vec::new(), |c| {
+            c.rows
+                .iter()
+                .flat_map(|r| r.minecraft.clone())
+                .collect::<Vec<_>>()
+        })),
+    );
+    m.insert(
+        "fetchedAt".into(),
+        if fetched_at.is_finite() {
+            crate::jsjson::num(fetched_at)
+        } else {
+            Value::Null
+        },
+    );
+    m.extend(status_fields(s.as_ref()));
+    Value::Object(m)
+}
+
 /// `refreshHarnessIndex()` for the profile store's cache folder, on the clock.
 pub fn refresh_default(paths: &Paths, force: bool) -> Result<&'static str, Failure> {
     let dir = paths.cache_dir();
