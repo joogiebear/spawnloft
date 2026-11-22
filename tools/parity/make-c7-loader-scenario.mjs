@@ -190,8 +190,12 @@ const scenario = {
     run(['install', 'fab', '--json'], 0),
     run(['install', 'qui', '--json'], 0),
     launch(['lnull'], 1),
+    // each game stopped before the next step: one still running holds its folder (on Windows the
+    // rig cannot remove it)
     launch(['fab', '--as', 'Fabby', '--wait', '--json'], 0),
+    run(['stop', 'fab'], 0),
     launch(['lpin', '--as', 'Quilty', '--wait'], 0),
+    run(['stop', 'lpin'], 0),
     { run: ['client', 'list', '--json'] },
   ],
 }

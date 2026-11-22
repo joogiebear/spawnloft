@@ -940,6 +940,16 @@
   {
    "run": [
     "client",
+    "stop",
+    "fab"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "client",
     "launch",
     "lpin",
     "--as",
@@ -951,6 +961,16 @@
    },
    "env": {
     "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "stop",
+    "lpin"
+   ],
+   "expect": {
+    "code": 0
    }
   },
   {
