@@ -137,6 +137,8 @@ export function snapshot(root, { ignore = [], normalize = (t) => t, normalizePat
     for (const name of names.sort()) {
       const abs = path.join(dir, name)
       const rel = path.relative(root, abs).split(path.sep).join('/')
+      // Finder leaves these where a folder was opened, on one side or the other as it pleases
+      if (name === '.DS_Store') continue
       if (skip.some(re => re.test(rel))) continue
       const st = fs.lstatSync(abs)
       const mode = process.platform === 'win32'
