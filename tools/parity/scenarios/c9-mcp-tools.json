@@ -48,12 +48,15 @@
     {
       "pattern": "\\b\\d+s\\b *",
       "replace": "<secs> "
+    },
+    {
+      "pattern": "<stamp>_\\d+\\b",
+      "replace": "<stamp>"
     }
   ],
   "ignore": [
     "data/run/**",
-    "data/instances/run1/logs/**",
-    "data/backups/run1/before-edit_config_*"
+    "data/instances/run1/logs/**"
   ],
   "steps": [
     {

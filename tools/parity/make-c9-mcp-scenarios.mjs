@@ -121,11 +121,11 @@ const tools = {
     { pattern: '"runId":"run1:\\d+"', replace: '"runId":"run1:<epoch-ms>"' },
     { pattern: '"samples":\\[[^\\]]*\\]', replace: '"samples":<samples>' },
     { pattern: '\\b\\d+s\\b *', replace: '<secs> ' },
+    // two snapshots in one second are <stamp> and <stamp>_2 (backup.mjs), and whether the clock
+    // ticks between them is chance: in names and paths alike they are one stamp
+    { pattern: '<stamp>_\\d+\\b', replace: '<stamp>' },
   ],
-  // the two config edits snapshot within one second or not as the clock falls, and a second one
-  // in the same second is named <stamp>_2 (backup.mjs), so the tree leaves their files out; the
-  // tools' own answers (list_snapshots, the edit's reply) still name them on both sides
-  ignore: ['data/run/**', 'data/instances/run1/logs/**', 'data/backups/run1/before-edit_config_*'],
+  ignore: ['data/run/**', 'data/instances/run1/logs/**'],
   steps: [
     { write: 'data/instances/run1/server.jar', text: '' },
     { write: 'data/instances/run1/eula.txt', text: 'eula=true\n' },
