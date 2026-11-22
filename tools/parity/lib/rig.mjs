@@ -212,7 +212,11 @@ function applySetup(step, ctx, baseDir) {
 // `{ "daemonGone": "<name>" }`: waits until the daemon named in data/run/<name>/state.json has
 // exited, so a step that follows a kill does not race the daemon's own exit (and the socket it
 // removes on the way out).
+// On Windows the control channel is a named pipe that goes with the daemon's handles, so there
+// is no socket file to race, and a daemon there outlives a kill by more than the wait (seen on
+// the CI runner): the step does nothing.
 async function daemonGone(ctx, name, timeoutMs) {
+  if (process.platform === 'win32') return null
   let pid
   try { pid = JSON.parse(fs.readFileSync(path.join(ctx.data, 'run', name, 'state.json'), 'utf8')).daemonPid } catch { return null }
   if (!Number.isInteger(pid)) return null
