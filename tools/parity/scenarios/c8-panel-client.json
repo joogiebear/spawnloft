@@ -1,0 +1,1368 @@
+{
+ "about": "C8's launcher routes (handleClient and handleAccounts), answered by the Rust panel itself: the version picker and one version described over faked Mojang and loader lists, one loader's builds, the launcher's poll, a Java checked by its path, every profile route with its refusals (create, change, remove, status, the log with its redaction, stop, exit-seen, copy and rename), the accounts (offline, the default, sign-out) and the Microsoft sign-in: its refusals, its stream, a cancel, and the callback page for a refusal on Microsoft's page, a missing code, a replay and a wrong, longer or non-ASCII state (an exchange with a code is left to the unit tests: the fake hosts' request log would hold each side's own random PKCE verifier); and launches with the fake game, as a request and as a job on the job stream, with their refusals, an address and the title screen, and a game that exits at once and leaves its exit record.",
+ "env": {
+  "NODE_ENV": "test"
+ },
+ "hosts": {
+  "https://piston-meta.mojang.com": {
+   "routes": {
+    "GET /mc/game/version_manifest_v2.json": {
+     "json": {
+      "latest": {
+       "release": "1.21.11",
+       "snapshot": "26.1-snapshot-1"
+      },
+      "versions": [
+       {
+        "id": "26.1-snapshot-1",
+        "type": "snapshot",
+        "releaseTime": "2026-11-18T10:00:00+00:00"
+       },
+       {
+        "id": "1.21.11",
+        "type": "release",
+        "releaseTime": "2026-10-01T10:00:00+00:00"
+       },
+       {
+        "id": "1.21.11-rc1",
+        "type": "snapshot",
+        "releaseTime": "2026-09-25T10:00:00+00:00"
+       },
+       {
+        "id": "1.21.11-pre2",
+        "type": "snapshot",
+        "releaseTime": "2026-09-20T10:00:00+00:00"
+       },
+       {
+        "id": "1.21.10",
+        "type": "release",
+        "releaseTime": "2026-08-01T10:00:00+00:00"
+       },
+       {
+        "id": "1.20.1",
+        "type": "release",
+        "releaseTime": "2023-06-12T10:00:00+00:00"
+       },
+       {
+        "id": "1.12.2",
+        "type": "release",
+        "releaseTime": "2017-09-18T10:00:00+00:00"
+       },
+       {
+        "id": "1.5.2",
+        "type": "release",
+        "releaseTime": "2013-04-25T10:00:00+00:00"
+       },
+       {
+        "id": "b1.7.3",
+        "type": "old_beta",
+        "releaseTime": "2011-07-07T22:00:00+00:00"
+       },
+       {
+        "id": "bad/id",
+        "type": "release",
+        "releaseTime": "2026-11-20T10:00:00+00:00"
+       },
+       {
+        "id": "no-time",
+        "type": "snapshot"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "https://meta.fabricmc.net": {
+   "routes": {
+    "GET /v2/versions/game": {
+     "json": [
+      {
+       "version": "26.1-snapshot-1",
+       "stable": false
+      },
+      {
+       "version": "1.21.11",
+       "stable": true
+      },
+      {
+       "version": "1.21.10",
+       "stable": true
+      },
+      {
+       "version": "1.20.1",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/loader/1.21.11": {
+     "json": [
+      {
+       "loader": {
+        "version": "0.17.0-beta.1",
+        "stable": false
+       }
+      },
+      {
+       "loader": {
+        "version": "0.16.9",
+        "stable": true
+       }
+      },
+      {
+       "loader": {
+        "version": "0.16.8",
+        "stable": true
+       }
+      }
+     ]
+    }
+   }
+  },
+  "https://meta.quiltmc.org": {
+   "routes": {
+    "GET /v3/versions/game": {
+     "json": [
+      {
+       "version": "1.21.11",
+       "stable": true
+      },
+      {
+       "version": "1.20.1",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v3/versions/loader/1.21.11": {
+     "json": [
+      {
+       "loader": {
+        "version": "0.26.0"
+       }
+      },
+      {
+       "loader": {
+        "version": "0.27.0-beta.1"
+       }
+      }
+     ]
+    }
+   }
+  },
+  "https://files.minecraftforge.net": {
+   "routes": {
+    "GET /net/minecraftforge/forge/maven-metadata.json": {
+     "json": {
+      "1.12.2": [
+       "1.12.2-14.23.5.2860"
+      ],
+      "1.20.1": [
+       "1.20.1-47.4.28",
+       "1.20.1-47.4.0"
+      ],
+      "1.5.2": [
+       "1.5.2-7.8.1.738"
+      ]
+     }
+    },
+    "GET /net/minecraftforge/forge/promotions_slim.json": {
+     "json": {
+      "promos": {
+       "1.20.1-recommended": "47.4.0"
+      }
+     }
+    }
+   }
+  },
+  "https://maven.neoforged.net": {
+   "routes": {
+    "GET /api/maven/versions/releases/net/neoforged/neoforge": {
+     "json": {
+      "versions": [
+       "20.1.5-beta",
+       "21.10.3",
+       "21.11.1-beta",
+       "21.11.2"
+      ]
+     }
+    }
+   }
+  }
+ },
+ "ignore": [
+  "home/**/panel.key",
+  "data/client/cache/verified.json",
+  "data/client/logs/**",
+  "data/run/panel.log"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
+   "pattern": "^1[5-9]\\d{11}$",
+   "replace": "<epoch-ms>"
+  },
+  {
+   "pattern": "\"loginId\": \"[0-9a-f]{32}\"",
+   "replace": "\"loginId\": \"<id>\""
+  },
+  {
+   "pattern": "code_challenge=[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])",
+   "replace": "code_challenge=<x>"
+  },
+  {
+   "pattern": "state=[A-Za-z0-9_-]{22}(?![A-Za-z0-9_-])",
+   "replace": "state=<x>"
+  },
+  {
+   "pattern": "localhost%3A\\d+",
+   "replace": "localhost%3A<panel-port>"
+  },
+  {
+   "pattern": "size=\\d+ csize=\\d+ crc=[0-9a-f]+",
+   "replace": "size=<n> csize=<n> crc=<crc>"
+  },
+  {
+   "pattern": "\"size\": \\d+,(\n +\"sizeHuman\")",
+   "replace": "\"size\": <n>,$1"
+  },
+  {
+   "pattern": "pid \\d+",
+   "replace": "pid <pid>"
+  },
+  {
+   "pattern": "\"(totalMemory|freeMemory)\": \\d+",
+   "replace": "\"$1\": <n>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/client/versions/1.21.11/1.21.11.json",
+   "copy": "../../../test/fixtures/client/1.21.11.json"
+  },
+  {
+   "mkdir": "data/instances/s1"
+  },
+  {
+   "write": "data/instances/s1/server.properties",
+   "text": "online-mode=false\nserver-port=25570\n"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "s1": {
+      "dir": "{data}/instances/s1",
+      "port": 25570,
+      "mcVersion": "1.21.11",
+      "label": "Survival",
+      "loader": "fabric"
+     },
+     "d1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "11.4.5",
+      "dir": "{data}/services/d1",
+      "port": 47981
+     }
+    }
+   }
+  },
+  {
+   "write": "data/client/accounts.json",
+   "mode": "600",
+   "json": {
+    "version": 1,
+    "accounts": [
+     {
+      "type": "microsoft",
+      "name": "Mia",
+      "uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+      "accessToken": "mia-token",
+      "refreshToken": "mia-refresh",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "xuid": "123",
+      "clientId": "cid"
+     },
+     {
+      "type": "offline",
+      "name": "Alex",
+      "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+     }
+    ]
+   }
+  },
+  {
+   "write": "data/client/profiles.json",
+   "json": {
+    "version": 1,
+    "defaultAccount": "aaaaaaaa-1111-2222-3333-444444444444",
+    "profiles": {
+     "p1": {
+      "mc": "1.21.11",
+      "loader": "vanilla",
+      "loaderVersion": null,
+      "java": null,
+      "memory": "1G",
+      "harness": false,
+      "server": null,
+      "account": null
+     },
+     "ms": {
+      "mc": "1.21.11",
+      "memory": "2G",
+      "account": "Mia",
+      "server": "s1"
+     },
+     "old": {
+      "mc": "1.21.11",
+      "account": "offline:Zed"
+     }
+    }
+   }
+  },
+  {
+   "write": "data/client/run/p1/client.log",
+   "text": "line one\n-Dspawnloft.harness.token=abc --accessToken secret123 x\nSession ID is token:abc:def\nlast\n"
+  },
+  {
+   "write": "data/client/run/p1/last-exit.json",
+   "json": {
+    "pid": 4242,
+    "code": 1,
+    "signal": null,
+    "startedAt": "2026-11-01T10:00:00.000Z",
+    "endedAt": "2026-11-01T10:05:00.000Z",
+    "stopped": false
+   }
+  },
+  {
+   "write": "data/client/run/p1/played.json",
+   "json": {
+    "lastPlayedAt": "2026-11-01T10:00:00.000Z",
+    "totalMs": 300000,
+    "launches": 3
+   }
+  },
+  {
+   "write": "data/client/profiles/p1/mods/a.JAR",
+   "text": "jar"
+  },
+  {
+   "write": "data/client/profiles/p1/options.txt",
+   "text": "fov:1\n"
+  },
+  {
+   "write": "data/client/profiles/p1/config/x.json",
+   "text": "{}"
+  },
+  {
+   "write": "data/client/profiles/p1/saves/w/level.dat",
+   "text": "world"
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/client/versions"
+    },
+    {
+     "get": "/api/client/versions?loaders=1"
+    },
+    {
+     "get": "/api/client/versions?fabric=true"
+    },
+    {
+     "post": "/api/client/versions/refresh"
+    },
+    {
+     "get": "/api/client/versions/refresh"
+    },
+    {
+     "get": "/api/client/versions/1.21.11"
+    },
+    {
+     "get": "/api/client/versions/1.21.%31%31"
+    },
+    {
+     "get": "/api/client/versions/%E0%A4%A"
+    },
+    {
+     "get": "/api/client/versions/%FF"
+    },
+    {
+     "get": "/api/client/versions/9.9.9"
+    },
+    {
+     "get": "/api/client/versions/bad%2Fid"
+    },
+    {
+     "post": "/api/client/versions"
+    },
+    {
+     "get": "/api/client/versions/a/b"
+    },
+    {
+     "get": "/api/client/loaders/fabric/1.21.11/builds"
+    },
+    {
+     "get": "/api/client/loaders/quilt/1.21.11/builds"
+    },
+    {
+     "get": "/api/client/loaders/forge/1.20.1/builds"
+    },
+    {
+     "get": "/api/client/loaders/neoforge/1.21.11/builds"
+    },
+    {
+     "get": "/api/client/loaders/vanilla/1.21.11/builds"
+    },
+    {
+     "get": "/api/client/loaders/x/1.21.11/builds"
+    },
+    {
+     "get": "/api/client/loaders/fabric/bad%2Fid/builds"
+    },
+    {
+     "get": "/api/client/loaders/fabric/%ZZ/builds"
+    },
+    {
+     "post": "/api/client/loaders/fabric/1.21.11/builds"
+    },
+    {
+     "get": "/api/client/launcher"
+    },
+    {
+     "post": "/api/client/launcher"
+    },
+    {
+     "post": "/api/client/javas/check",
+     "json": {
+      "path": "bin/java"
+     }
+    },
+    {
+     "post": "/api/client/javas/check",
+     "json": {}
+    },
+    {
+     "post": "/api/client/javas/check",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/client/javas/check",
+     "json": {
+      "path": "{run}"
+     }
+    },
+    {
+     "post": "/api/client/javas/check",
+     "json": {
+      "path": "{run}/nothing-here"
+     }
+    },
+    {
+     "post": "/api/client/javas/check",
+     "json": {
+      "path": "  "
+     }
+    },
+    {
+     "post": "/api/client/javas/check",
+     "json": {
+      "path": 5
+     }
+    },
+    {
+     "get": "/api/client/javas"
+    },
+    {
+     "get": "/api/client/javas?fresh=1"
+    },
+    {
+     "get": "/api/client/other"
+    },
+    {
+     "get": "/api/client"
+    },
+    {
+     "get": "/api/client/javas/x"
+    }
+   ]
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/client/profiles"
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "n1"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/client/profiles",
+     "text": "\"str\"",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "n1",
+      "mc": " 1.21.11 ",
+      "memory": "3G",
+      "assistantAccount": true,
+      "account": "Alex"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "N1",
+      "mc": "1.21.11"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "n2",
+      "mc": "9.9"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "n3",
+      "mc": "1.21.11",
+      "serverList": "x"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "n3",
+      "mc": "1.21.11",
+      "serverList": false,
+      "loader": "fabric"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "bad name",
+      "mc": "1.21.11"
+     }
+    },
+    {
+     "post": "/api/client/profiles",
+     "json": {
+      "name": "n4",
+      "mc": "1.21.11",
+      "memory": "1.5G"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/client/profiles"
+    },
+    {
+     "patch": "/api/client/profiles/n1",
+     "json": {
+      "memory": "4G"
+     }
+    },
+    {
+     "patch": "/api/client/profiles/n1",
+     "json": []
+    },
+    {
+     "patch": "/api/client/profiles/n1",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "patch": "/api/client/profiles/n1",
+     "json": {
+      "bogus": 1
+     }
+    },
+    {
+     "patch": "/api/client/profiles/nope",
+     "json": {}
+    },
+    {
+     "patch": "/api/client/profiles/p1",
+     "json": {
+      "mc": "1.21.10"
+     }
+    },
+    {
+     "patch": "/api/client/profiles/p1",
+     "json": {
+      "mc": "1.21.11 ",
+      "loader": "fabric"
+     }
+    },
+    {
+     "patch": "/api/client/profiles/n1",
+     "json": {
+      "mc": "9.9"
+     }
+    },
+    {
+     "method": "PUT",
+     "path": "/api/client/profiles/n1"
+    },
+    {
+     "get": "/api/client/profiles/p1/status"
+    },
+    {
+     "get": "/api/client/profiles/nope/status"
+    },
+    {
+     "get": "/api/client/profiles/bad%20name/status"
+    },
+    {
+     "get": "/api/client/profiles/p1/log"
+    },
+    {
+     "get": "/api/client/profiles/p1/log?lines=2"
+    },
+    {
+     "get": "/api/client/profiles/p1/log?lines=abc"
+    },
+    {
+     "get": "/api/client/profiles/p1/log?lines=99999"
+    },
+    {
+     "get": "/api/client/profiles/p1/log?lines=-1"
+    },
+    {
+     "get": "/api/client/profiles/p1/log?lines="
+    },
+    {
+     "get": "/api/client/profiles/n1/log"
+    },
+    {
+     "get": "/api/client/profiles/nope/log"
+    },
+    {
+     "post": "/api/client/profiles/p1/diag"
+    },
+    {
+     "post": "/api/client/profiles/nope/diag"
+    },
+    {
+     "post": "/api/client/profiles/p1/stop"
+    },
+    {
+     "post": "/api/client/profiles/nope/stop"
+    },
+    {
+     "post": "/api/client/profiles/p1/reveal",
+     "json": {
+      "what": "logs"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/exit-seen",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/p1/exit-seen",
+     "json": {
+      "endedAt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/exit-seen",
+     "json": {
+      "endedAt": "2026-11-01T10:00:00.000Z"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/exit-seen",
+     "json": {
+      "endedAt": "2026-11-01T10:05:00.000Z"
+     }
+    },
+    {
+     "post": "/api/client/profiles/n1/exit-seen",
+     "json": {
+      "endedAt": "x"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/duplicate",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/p1/duplicate",
+     "json": {
+      "name": "p1-copy"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/duplicate",
+     "json": {
+      "name": "twin"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/duplicate",
+     "json": {
+      "name": "bad name"
+     }
+    },
+    {
+     "post": "/api/client/profiles/n1/rename",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/n1/rename",
+     "json": {
+      "name": "n1"
+     }
+    },
+    {
+     "post": "/api/client/profiles/n1/rename",
+     "json": {
+      "name": "P1"
+     }
+    },
+    {
+     "post": "/api/client/profiles/n1/rename",
+     "json": {
+      "name": "renamed"
+     }
+    },
+    {
+     "post": "/api/client/profiles/renamed/rename",
+     "json": {
+      "name": "Renamed"
+     }
+    },
+    {
+     "get": "/api/client/profiles/p1/rename"
+    },
+    {
+     "post": "/api/client/profiles/p1/nothing"
+    },
+    {
+     "get": "/api/client/profiles/p1/a/b"
+    },
+    {
+     "delete": "/api/client/profiles/twin"
+    },
+    {
+     "delete": "/api/client/profiles/p1-copy?purge=1"
+    },
+    {
+     "delete": "/api/client/profiles/nope"
+    },
+    {
+     "get": "/api/client/profiles"
+    }
+   ]
+  },
+  {
+   "run": [
+    "client",
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/client/accounts"
+    },
+    {
+     "post": "/api/client/accounts"
+    },
+    {
+     "post": "/api/client/accounts/offline",
+     "json": {
+      "name": "Steve"
+     }
+    },
+    {
+     "post": "/api/client/accounts/offline",
+     "json": {
+      "name": "steve"
+     }
+    },
+    {
+     "post": "/api/client/accounts/offline",
+     "json": {
+      "name": "mia"
+     }
+    },
+    {
+     "post": "/api/client/accounts/offline",
+     "json": {
+      "name": "x"
+     }
+    },
+    {
+     "post": "/api/client/accounts/offline",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/client/accounts/offline",
+     "json": {
+      "name": 12345
+     }
+    },
+    {
+     "get": "/api/client/accounts/offline"
+    },
+    {
+     "post": "/api/client/accounts/default",
+     "json": {
+      "uuid": "zz"
+     }
+    },
+    {
+     "post": "/api/client/accounts/default",
+     "json": {
+      "uuid": "cccccccc-1111-2222-3333-444444444444"
+     }
+    },
+    {
+     "post": "/api/client/accounts/default",
+     "json": {
+      "uuid": "BBBBBBBB-1111-2222-3333-444444444444"
+     }
+    },
+    {
+     "get": "/api/client/accounts"
+    },
+    {
+     "post": "/api/client/accounts/default",
+     "json": {
+      "uuid": ""
+     }
+    },
+    {
+     "get": "/api/client/accounts"
+    },
+    {
+     "post": "/api/client/accounts/default",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/client/accounts/default",
+     "json": {
+      "uuid": "aaaaaaaa-1111-2222-3333-444444444444"
+     }
+    },
+    {
+     "get": "/api/client/accounts/default"
+    },
+    {
+     "delete": "/api/client/accounts/aaaaaaaa-1111-2222-3333-444444444444"
+    },
+    {
+     "delete": "/api/client/accounts/aaaaaaaa-1111-2222-3333-444444444444"
+    },
+    {
+     "get": "/api/client/accounts"
+    },
+    {
+     "post": "/api/client/accounts/x"
+    },
+    {
+     "get": "/api/client/accounts/a/b"
+    },
+    {
+     "get": "/api/client/launcher"
+    },
+    {
+     "get": "/api/client/accounts/login"
+    },
+    {
+     "delete": "/api/client/accounts/login/nothex"
+    },
+    {
+     "delete": "/api/client/accounts/login/00000000000000000000000000000000"
+    },
+    {
+     "get": "/api/client/accounts/login/00000000000000000000000000000000/stream"
+    },
+    {
+     "post": "/api/client/accounts/login/00000000000000000000000000000000/stream"
+    },
+    {
+     "get": "/api/client/accounts/login/00000000000000000000000000000000/x/y"
+    },
+    {
+     "get": "/api/client/accounts/login/callback",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state=abc&code=x",
+     "anonymous": true
+    },
+    {
+     "post": "/api/client/accounts/login/callback"
+    },
+    {
+     "get": "/api/client/accounts/login/callback/x",
+     "anonymous": true
+    },
+    {
+     "post": "/api/client/accounts/login"
+    },
+    {
+     "post": "/api/client/accounts/login"
+    }
+   ]
+  },
+  {
+   "write": "data/client/accounts.json",
+   "mode": "600",
+   "json": {
+    "version": 1,
+    "accounts": [
+     {
+      "type": "microsoft",
+      "name": "Mia",
+      "uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+      "accessToken": "mia-token",
+      "refreshToken": "mia-refresh",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "xuid": "123",
+      "clientId": "cid"
+     },
+     {
+      "type": "offline",
+      "name": "Alex",
+      "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+     }
+    ]
+   }
+  },
+  {
+   "write": "data/client/profiles.json",
+   "json": {
+    "version": 1,
+    "defaultAccount": "aaaaaaaa-1111-2222-3333-444444444444",
+    "profiles": {
+     "p1": {
+      "mc": "1.21.11",
+      "loader": "vanilla",
+      "loaderVersion": null,
+      "java": null,
+      "memory": "1G",
+      "harness": false,
+      "server": null,
+      "account": null
+     },
+     "ms": {
+      "mc": "1.21.11",
+      "memory": "2G",
+      "account": "Mia",
+      "server": "s1"
+     },
+     "old": {
+      "mc": "1.21.11",
+      "account": "offline:Zed"
+     }
+    }
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {}
+    },
+    {
+     "get": "/api/client/profiles/p1/status"
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "jx"
+     }
+    },
+    {
+     "get": "/api/jobs/jx/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/stop"
+    },
+    {
+     "get": "/api/client/profiles",
+     "waitMs": 800
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "bad id"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    },
+    {
+     "post": "/api/client/profiles/nope/launch",
+     "json": {
+      "jobId": "j0"
+     }
+    },
+    {
+     "post": "/api/client/profiles/nope/launch",
+     "json": {}
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "address": "example.net",
+      "server": "s1"
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j1",
+      "server": "s1"
+     }
+    },
+    {
+     "get": "/api/jobs/j1/stream",
+     "waitMs": 2000,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/profiles/p1/status"
+    },
+    {
+     "post": "/api/client/profiles/p1/stop"
+    },
+    {
+     "post": "/api/client/profiles/ms/launch",
+     "json": {
+      "jobId": 5
+     }
+    },
+    {
+     "get": "/api/jobs/5/stream",
+     "waitMs": 2000,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/launcher"
+    },
+    {
+     "post": "/api/client/profiles/ms/stop"
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j3",
+      "address": "nowhere.invalid"
+     }
+    },
+    {
+     "get": "/api/jobs/j3/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j4",
+      "account": "Nobody"
+     }
+    },
+    {
+     "get": "/api/jobs/j4/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "j5",
+      "address": "bad_host:1"
+     }
+    },
+    {
+     "get": "/api/jobs/j5/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "post": "/api/client/profiles/old/launch",
+     "json": {
+      "server": false,
+      "account": "offline:Kid"
+     }
+    },
+    {
+     "get": "/api/client/profiles/old/status"
+    },
+    {
+     "post": "/api/client/profiles/old/stop"
+    },
+    {
+     "post": "/api/client/profiles/old/launch",
+     "json": {
+      "address": "127.0.0.1:25599",
+      "jobId": "j6"
+     }
+    },
+    {
+     "get": "/api/jobs/j6/stream",
+     "waitMs": 2000,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/profiles/old/status"
+    },
+    {
+     "post": "/api/client/profiles/old/stop"
+    },
+    {
+     "post": "/api/jobs/j6/cancel"
+    },
+    {
+     "post": "/api/jobs/zz/cancel"
+    },
+    {
+     "get": "/api/client/profiles",
+     "waitMs": 800
+    }
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs"
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/client/profiles/p1/launch",
+     "json": {
+      "jobId": "c1"
+     }
+    },
+    {
+     "get": "/api/jobs/c1/stream",
+     "waitMs": 1500,
+     "stream": {
+      "events": 1
+     }
+    },
+    {
+     "get": "/api/client/profiles/p1/status",
+     "waitMs": 1000
+    },
+    {
+     "get": "/api/client/profiles"
+    },
+    {
+     "post": "/api/client/profiles/p1/log"
+    },
+    {
+     "get": "/api/client/profiles/p1/log"
+    }
+   ],
+   "env": {
+    "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs",
+    "FAKE_CLIENT_FAIL": "window"
+   }
+  },
+  {
+   "run": [
+    "client",
+    "status",
+    "p1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data/client/accounts.json",
+   "mode": "600",
+   "json": {
+    "version": 1,
+    "accounts": [
+     {
+      "type": "microsoft",
+      "name": "Mia",
+      "uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+      "accessToken": "mia-token",
+      "refreshToken": "mia-refresh",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "xuid": "123",
+      "clientId": "cid"
+     },
+     {
+      "type": "offline",
+      "name": "Alex",
+      "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+     }
+    ]
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "aid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "astate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/{aid}/stream",
+     "stream": {
+      "events": 1,
+      "ms": 3000
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?error=access_denied&state={astate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?error=access_denied&state={astate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/{aid}/stream"
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "bid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "bstate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={bstate}&error=invalid_scope&error_description=AADSTS70011%3A+bad+scope%0Amore",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/{bid}/stream"
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "cid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "cstate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={cstate}x",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state=%C3%A9{cstate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/{cid}/stream",
+     "stream": {
+      "events": 1,
+      "ms": 3000
+     }
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "did": "\"loginId\":\"([0-9a-f]{32})\"",
+      "dstate": "[?&]state=([A-Za-z0-9_-]+)"
+     },
+     "waitMs": 1500
+    },
+    {
+     "delete": "/api/client/accounts/login/{did}"
+    },
+    {
+     "delete": "/api/client/accounts/login/{did}"
+    },
+    {
+     "get": "/api/client/accounts/login/{did}/stream"
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={dstate}&code=x",
+     "anonymous": true
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "eid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "estate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={estate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={estate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts",
+     "waitMs": 1500
+    }
+   ]
+  },
+  {
+   "run": [
+    "client",
+    "accounts",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

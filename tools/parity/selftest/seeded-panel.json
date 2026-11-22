@@ -1,0 +1,22 @@
+{
+  "about": "Self-test: the Rust side has one more jar in the store, so its panel answers GET /api/jars differently. The rig must report the answer, not only the file.",
+  "expect": "differ",
+  "expectDifferences": [
+    "step 2 (panel, 2 requests): stdout",
+    "data tree: data/jars/extra-1.0.jar"
+  ],
+  "ignore": ["home/**/panel.key"],
+  "steps": [
+    {
+      "side": "rust",
+      "write": "data/jars/extra-1.0.jar",
+      "text": "a jar only one side has\n"
+    },
+    {
+      "panel": [
+        { "get": "/api/appearance" },
+        { "get": "/api/jars" }
+      ]
+    }
+  ]
+}

@@ -50,6 +50,46 @@ pub struct Software {
     pub hangar: bool,
 }
 
+impl Software {
+    /// `family`: what kind of add-ons it loads, and so what a player's game needs to join.
+    pub fn family(&self) -> &'static str {
+        match self.id {
+            "vanilla" => "vanilla",
+            "fabric" => "fabric",
+            "neoforge" => "neoforge",
+            _ => "bukkit",
+        }
+    }
+
+    /// `slow`: made by a build on this machine, so the page warns before a ten-minute create.
+    pub fn slow(&self) -> bool {
+        matches!(self.id, "spigot" | "craftbukkit")
+    }
+
+    /// `blurb`: the line under the software's name on the create page.
+    pub fn blurb(&self) -> &'static str {
+        match self.id {
+            "paper" => "Downloads the newest stable Paper build.",
+            "purpur" => "A Paper fork with more configuration. Downloads the newest Purpur build.",
+            "folia" => "Paper with regionised multithreading. Only plugins built for Folia will load.",
+            "asp" => {
+                "Paper with Slime World Manager built in, from InfernalSuite. Downloads the newest build."
+            }
+            "spigot" | "craftbukkit" => {
+                "Compiled on this machine by SpigotMC\u{2019}s BuildTools. Needs a JDK and takes five to ten minutes the first time."
+            }
+            "vanilla" => "Mojang\u{2019}s own server, unmodified. No plugins and no mods.",
+            "fabric" => "Downloads the Fabric server launcher, which fetches the rest on first start.",
+            _ => "Runs the NeoForge installer, which downloads its libraries. Takes a few minutes.",
+        }
+    }
+}
+
+/// `isSoftware(id)`.
+pub fn is_software(id: &str) -> bool {
+    SOFTWARE.iter().any(|s| s.id == id)
+}
+
 const fn sw(
     id: &'static str,
     label: &'static str,

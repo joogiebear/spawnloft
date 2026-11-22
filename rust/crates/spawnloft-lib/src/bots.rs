@@ -1650,7 +1650,7 @@ mod tests {
 
     fn stub() -> Option<(PathBuf, PathBuf)> {
         let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../test/fixtures/bot-host-stub.cjs");
-        Some((crate::panel::path_node()?, script))
+        Some((crate::runtime::node().ok()?, script))
     }
 
     struct Job {

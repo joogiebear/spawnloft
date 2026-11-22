@@ -226,6 +226,16 @@ test('the declared differences are the plan\'s six rows, the locale row, C1\'s e
   assert.equal(applyDeclared('{"notes":["java: 21","core: spawnloft-core 2.0.0 (x86_64-unknown-linux-gnu)","data root: /d"]}', 'doctor'), '{"notes":["java: 21","data root: /d"]}')
   assert.equal(applyDeclared('{"facts":{"spawnloft":"1.6.0","os":"linux","arch":"x64","node":"v22.1.0","server":null}}', 'diag'), '{"facts":{"spawnloft":"<version>","os":"linux","arch":"x64","server":null}}')
   assert.equal(applyDeclared('spawnloft: 2.0.0\nos: linux\nnode: v22.1.0\narch: x64', 'diag'), 'spawnloft: <version>\nos: linux\narch: x64')
+  // the panel's diagnostics, in each of the three forms it is served in
+  for (const [node, rust] of [
+    ['SpawnLoft: 1.6.0\nnode: v22.1.0\nos: linux', 'SpawnLoft: 2.0.0-beta.1\ncore: spawnloft-core 2.0.0-beta.1 (x86_64-unknown-linux-gnu)\nos: linux'],
+    ['{"full": "== d ==\\nSpawnLoft: 1.6.0\\nnode: v22.1.0\\nos: linux\\n"}', '{"full": "== d ==\\nSpawnLoft: 2.0.0\\ncore: spawnloft-core 2.0.0 (aarch64-apple-darwin)\\nos: linux\\n"}'],
+    ['body=%3D%3D%0ASpawnLoft%3A+1.6.0%0Anode%3A+v22.1.0%0Aos%3A+linux', 'body=%3D%3D%0ASpawnLoft%3A+2.0.0%0Acore%3A+spawnloft-core+2.0.0+%28x86_64-pc-windows-msvc%29%0Aos%3A+linux'],
+  ]) {
+    assert.equal(applyDeclared(node, 'ui'), applyDeclared(rust, 'ui'), node)
+    assert.match(applyDeclared(node, 'ui'), /<version>/)
+    assert.match(applyDeclared(node, 'ui'), /os(: |%3A\+)linux/)
+  }
   assert.equal(applyDeclared('{"runtime":"/usr/bin/node"}', 'repair'), '{"runtime":"<runtime>"}')
   // a Windows secrets file the core sees inheriting its folder's entries and Node's icacls does not
   assert.equal(applyDeclared('{"problems":["a: x","registry (y): other users on this computer can read C:\\\\d\\\\r.json (it inherits its folder\'s permissions (BUILTIN\\\\Users)); run doctor"]}', 'doctor'), '{"problems":["a: x"]}')
@@ -251,7 +261,7 @@ test('every scenario file loads and keeps to the rules', () => {
   const all = loadScenarios([path.join(parity, 'scenarios'), path.join(parity, 'selftest')])
   assert.ok(all.length >= 10)
   for (const s of all) {
-    assert.ok(Array.isArray(s.steps) && s.steps.some(x => x.run), `${s.name} runs something`)
+    assert.ok(Array.isArray(s.steps) && s.steps.some(x => x.run || x.panel), `${s.name} runs something`)
     assert.ok(s.about, `${s.name} says what it is for`)
     if (s.expect === 'differ') assert.ok(s.expectDifferences?.length, `${s.name} names the differences it seeds`)
     else assert.equal(s.steps.some(x => x.side), false, `${s.name} runs the same steps on both sides`)

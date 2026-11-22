@@ -1,0 +1,638 @@
+{
+ "about": "C8's first routes, answered by the Rust panel itself and compared with the Node panel's answers over HTTP: the three pages with their headers (and /setup only behind the window), who may call (no credential, another Host, another Origin, a token for another port, a probe and its proof), the first-run wizard's calls with every refusal of a save, appearance, jars, the MCP command, health, the Java list and what versions need, the software list and three version lists (one of them down), diagnostics and the feedback links for a server, a database and nothing, and settings with each thing a save can be asked. Those steps are marked own: the Rust side answers 502 rather than hand a request on, so each is proven to be answered by the Rust panel. A last step sends paths that fit no moved route (a longer path, another method), which still reach the Node panel on both sides.",
+ "hosts": {
+  "https://fill.papermc.io": {
+   "routes": {
+    "GET /v3/projects/paper": {
+     "json": {
+      "project": {
+       "id": "paper"
+      },
+      "versions": {
+       "1.21": [
+        "1.21.5",
+        "1.21.4",
+        "1.21.4-rc1"
+       ],
+       "1.20": [
+        "1.20.6"
+       ]
+      }
+     }
+    },
+    "GET /v3/projects/folia": {
+     "status": 500,
+     "text": "down"
+    }
+   }
+  },
+  "https://api.purpurmc.org": {
+   "routes": {
+    "GET /v2/purpur": {
+     "json": {
+      "project": "purpur",
+      "versions": [
+       "1.21.3",
+       "1.21.4"
+      ]
+     }
+    }
+   }
+  }
+ },
+ "ignore": [
+  "home/**/panel.key"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
+   "pattern": "\\d{4}-\\d\\d-\\d\\dT\\d\\d%3A\\d\\d%3A\\d\\d\\.\\d{3}Z",
+   "replace": "<time>"
+  },
+  {
+   "pattern": "x-spawnloft-proof: [A-Za-z0-9_-]{43}$",
+   "flags": "gm",
+   "replace": "x-spawnloft-proof: <proof>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/alpha/paper-1.21.4-100.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/alpha/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/alpha/server.properties",
+   "text": "motd=alpha\nserver-port=47961\nenable-rcon=true\nrcon.port=47971\nrcon.password=hunter22\n"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "alpha": {
+      "dir": "{data}/instances/alpha",
+      "jar": "paper-1.21.4-100.jar",
+      "memory": "2G",
+      "port": 47961,
+      "rcon": {
+       "port": 47971,
+       "password": "hunter22"
+      }
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "11.4.5",
+      "dir": "{data}/services/db1",
+      "port": 47981
+     }
+    }
+   },
+   "mode": "600"
+  },
+  {
+   "write": "data/run/alpha/console.log",
+   "text": "[12:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[12:00:02] [Server thread/INFO]: Wunga_[/203.0.113.5:51234] logged in\n[12:00:05] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\n"
+  },
+  {
+   "write": "data/jars/paper-1.21.4-100.jar",
+   "text": "a jar that is three kilobytes would be a small jar; this one is smaller still"
+  },
+  {
+   "write": "data/jars/notes.txt",
+   "text": "not a jar"
+  },
+  {
+   "panel": [
+    {
+     "get": "/",
+     "body": "sha256"
+    },
+    {
+     "method": "HEAD",
+     "path": "/"
+    },
+    {
+     "post": "/",
+     "body": "sha256"
+    },
+    {
+     "get": "/?x=1",
+     "body": "sha256"
+    },
+    {
+     "get": "/launcher",
+     "body": "sha256"
+    },
+    {
+     "get": "/launcher/"
+    },
+    {
+     "get": "/setup"
+    },
+    {
+     "get": "/nope"
+    },
+    {
+     "get": "/index.html"
+    },
+    {
+     "get": "//api/health"
+    },
+    {
+     "get": "/./api/../api/appearance"
+    },
+    {
+     "get": "/api/appearance?x=1#y"
+    },
+    {
+     "get": "/api/health",
+     "anonymous": true
+    },
+    {
+     "get": "/",
+     "anonymous": true
+    },
+    {
+     "get": "/api/appearance",
+     "host": "evil.example"
+    },
+    {
+     "get": "/api/appearance",
+     "headers": {
+      "origin": "http://evil.example"
+     }
+    },
+    {
+     "get": "/api/appearance",
+     "headers": {
+      "origin": "http://127.0.0.1:{port}"
+     }
+    },
+    {
+     "post": "/api/appearance",
+     "json": {
+      "theme": "classic"
+     },
+     "headers": {
+      "sec-fetch-site": "cross-site"
+     }
+    },
+    {
+     "get": "/api/appearance",
+     "anonymous": true,
+     "headers": {
+      "authorization": "SpawnLoft v1.api.1.1.aaaaaaaaaaaaaaaaaaaaaa.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+     }
+    },
+    {
+     "get": "/api/appearance",
+     "headers": {
+      "x-spawnloft-probe": "abcdefghijklmnopqrstuv"
+     }
+    },
+    {
+     "get": "/api/appearance",
+     "headers": {
+      "x-spawnloft-probe": "short"
+     }
+    },
+    {
+     "get": "/api/appearance",
+     "anonymous": true,
+     "headers": {
+      "x-spawnloft-probe": "abcdefghijklmnopqrstuv"
+     }
+    },
+    {
+     "get": "/api/setup"
+    },
+    {
+     "get": "/api/setup/java"
+    },
+    {
+     "get": "/api/setup/other"
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{run}/elsewhere"
+     }
+    },
+    {
+     "delete": "/api/setup"
+    },
+    {
+     "get": "/api/appearance"
+    },
+    {
+     "post": "/api/appearance",
+     "json": {
+      "theme": "spawnloft"
+     }
+    },
+    {
+     "get": "/api/appearance"
+    },
+    {
+     "post": "/api/appearance",
+     "json": {
+      "theme": "nope"
+     }
+    },
+    {
+     "post": "/api/appearance",
+     "json": {
+      "theme": 5
+     }
+    },
+    {
+     "post": "/api/appearance",
+     "json": {}
+    },
+    {
+     "post": "/api/appearance"
+    },
+    {
+     "post": "/api/appearance",
+     "text": "not json"
+    },
+    {
+     "post": "/api/appearance",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/appearance",
+     "text": "\"classic\"",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/appearance",
+     "json": [
+      "classic"
+     ]
+    },
+    {
+     "method": "PUT",
+     "path": "/api/appearance",
+     "json": {
+      "theme": "classic"
+     }
+    },
+    {
+     "post": "/api/appearance",
+     "json": {
+      "theme": "classic"
+     }
+    },
+    {
+     "get": "/api/jars"
+    },
+    {
+     "get": "/api/jars/more"
+    },
+    {
+     "get": "/api/mcp"
+    },
+    {
+     "get": "/api/health"
+    },
+    {
+     "get": "/api/health/more"
+    },
+    {
+     "get": "/api/java"
+    },
+    {
+     "get": "/api/java/needs"
+    },
+    {
+     "get": "/api/java/needs?versions=1.21.4,1.8,26.1,x,,5,1.21.4,1.16.5,1.17,1.20.5,25w14a"
+    },
+    {
+     "get": "/api/java/needs/more?versions=1.12"
+    },
+    {
+     "get": "/api/software"
+    },
+    {
+     "get": "/api/paper/versions"
+    },
+    {
+     "get": "/api/purpur/versions"
+    },
+    {
+     "get": "/api/folia/versions"
+    },
+    {
+     "get": "/api/diagnostics"
+    },
+    {
+     "get": "/api/diagnostics?instance=alpha"
+    },
+    {
+     "get": "/api/diagnostics?instance=nope"
+    },
+    {
+     "get": "/api/diagnostics?instance=db1"
+    },
+    {
+     "get": "/api/diagnostics?instance="
+    },
+    {
+     "get": "/api/feedback"
+    },
+    {
+     "get": "/api/feedback?instance=alpha&title=It%20broke%20%F0%9F%98%80%26more"
+    },
+    {
+     "get": "/api/feedback?title=tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+    },
+    {
+     "get": "/api/feedback?instance=nope"
+    },
+    {
+     "get": "/api/settings"
+    },
+    {
+     "post": "/api/settings",
+     "json": {}
+    },
+    {
+     "post": "/api/settings"
+    },
+    {
+     "post": "/api/settings",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/settings",
+     "text": "\"text\"",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/settings",
+     "json": [
+      1
+     ]
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "dataRoot": "{run}/elsewhere"
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": "  {data}/kept  "
+     }
+    },
+    {
+     "get": "/api/settings"
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": "{data}/backups"
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": ""
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": null
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": 5
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": "relative/kept"
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsDir": "{data}/instances.json/under-a-file"
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsMirrorDir": "{data}/mirror",
+      "backupsDir": "{data}/ignored"
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsMirrorDir": " "
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsMirrorDir": null
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsMirrorDir": "{data}/instances.json/under-a-file"
+     }
+    },
+    {
+     "post": "/api/settings",
+     "json": {
+      "backupsMirrorDir": "{data}/mirror"
+     }
+    },
+    {
+     "get": "/api/settings/more"
+    }
+   ],
+   "expect": {
+    "includes": [
+     "x-spawnloft-proof: ",
+     "\"theme\": \"spawnloft\""
+    ]
+   }
+  },
+  {
+   "panel": [
+    {
+     "get": "/api"
+    },
+    {
+     "get": "/api/"
+    },
+    {
+     "get": "/api/%61ppearance"
+    },
+    {
+     "get": "/api/appearance/more"
+    },
+    {
+     "post": "/api/jars"
+    },
+    {
+     "get": "/api/mcp/more"
+    },
+    {
+     "post": "/api/health"
+    },
+    {
+     "get": "/api/java/more"
+    },
+    {
+     "get": "/api/software/more"
+    },
+    {
+     "get": "/api/nope/versions"
+    },
+    {
+     "get": "/api/paper/versions/more"
+    },
+    {
+     "post": "/api/paper/versions"
+    },
+    {
+     "delete": "/api/settings"
+    }
+   ]
+  },
+  {
+   "panel": [
+    {
+     "get": "/setup",
+     "body": "sha256"
+    },
+    {
+     "get": "/setup?theme=x",
+     "body": "sha256"
+    },
+    {
+     "get": "/api/setup"
+    },
+    {
+     "post": "/api/setup",
+     "json": {}
+    },
+    {
+     "post": "/api/setup"
+    },
+    {
+     "post": "/api/setup",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "relative"
+     }
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": 5
+     }
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{run}/moved",
+      "separate": true
+     }
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{run}/moved",
+      "separate": true,
+      "instancesDir": "servers"
+     }
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{data}/instances.json/under-a-file"
+     }
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{run}/moved",
+      "separate": "yes",
+      "instancesDir": "{run}/ignored"
+     }
+    },
+    {
+     "get": "/api/setup"
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{run}/moved",
+      "separate": true,
+      "instancesDir": "{run}/servers"
+     }
+    },
+    {
+     "get": "/api/setup"
+    },
+    {
+     "get": "/api/settings"
+    },
+    {
+     "post": "/api/setup",
+     "json": {
+      "dataRoot": "{data}"
+     }
+    },
+    {
+     "get": "/api/setup"
+    }
+   ],
+   "window": true,
+   "expect": {
+    "includes": [
+     "\"ok\": true"
+    ]
+   }
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/setup"
+    },
+    {
+     "get": "/api/settings"
+    },
+    {
+     "get": "/setup"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1258 @@
+{
+ "about": "C8's settings page, icon and files routes, answered by the Rust panel itself and compared with the Node panel's: server.properties as a form (rows by version, game rules ignored, every refusal of a value and of an odd body, the whitelist told to a running server), as raw text (the password hidden and put back, port and RCON refused, a copy taken first), the server icon (shown, refused as not a PNG or not 64 by 64, saved, removed), and the Files tool: list, read, tail (plain and packed), image, search, download (a file, a name outside ASCII, a zipped folder), write with its version check and format refusal, mkdir, move, archive, extract (zip and tar.gz), upload (new, existing, replaced, nested, refused) and delete, then the same against a running server (the JVM stand-in answering RCON) where held files are refused and changes apply on restart. Unknown servers, wrong methods and unknown verbs too. Every panel step is own.",
+ "env": {
+  "FAKE_JAVA_RCON": "1",
+  "SPAWNLOFT_RCON_TIMEOUT_MS": "3000"
+ },
+ "normalize": [
+  {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
+   "pattern": "(file-delete_files_<stamp>)_\\d+",
+   "replace": "$1"
+  },
+  {
+   "pattern": "csize=\\d+ crc=",
+   "replace": "csize=<n> crc="
+  },
+  {
+   "pattern": "\"size\": \\d+,(\\n\\s*)\"serverWasRunning\"",
+   "flags": "g",
+   "replace": "\"size\": <n>,$1\"serverWasRunning\""
+  },
+  {
+   "pattern": "(notes\\.txt\\.zip|both\\.zip)\"(,?)\\n(\\s*)\"size\": \\d+",
+   "flags": "g",
+   "replace": "$1\"$2\n$3\"size\": <n>"
+  }
+ ],
+ "ignore": [
+  "home/**/panel.key",
+  "data/run/**",
+  "data/instances/run1/logs/**"
+ ],
+ "steps": [
+  {
+   "write": "data/instances/alpha/paper-1.21.4-100.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/alpha/server.properties",
+   "text": "motd=alpha\nserver-port=47961\nenable-rcon=true\nrcon.port=47971\nrcon.password=hunter22\nresource-pack=https\\://x/p.zip?v\\=2\nlevel-seed=se\\:ed\nwhite-list=false\nmax-players=8\n"
+  },
+  {
+   "write": "data/instances/alpha/server-icon.png",
+   "base64": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+  },
+  {
+   "write": "data/instances/alpha/pic.png",
+   "base64": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+  },
+  {
+   "write": "data/instances/alpha/world/playerdata/12345678-1234-4234-8234-123456789abc.dat",
+   "text": "p"
+  },
+  {
+   "write": "data/instances/alpha/world/playerdata/12345678-1234-3234-8234-123456789abd.dat",
+   "text": "p"
+  },
+  {
+   "write": "data/instances/alpha/notes.txt",
+   "text": "hello\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/odd/é ü 😀.txt",
+   "text": "odd name\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/bin.dat",
+   "base64": "AAECAwQF",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/config/a.yml",
+   "text": "a: 1\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/config/b.yml",
+   "text": "b: 1\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/config/file10.yml",
+   "text": "n: 10\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/config/File2.yml",
+   "text": "n: 2\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/logs/latest.log",
+   "text": "[12:00:00] one\n[12:00:01] two\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/logs/old.log.gz",
+   "base64": "H4sIAAAAAAAAA8vJzEtVyM9L5coBMUrK87kAi9f0dRIAAAA=",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/logs/fake.gz",
+   "text": "not gzip",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/sub/inner.txt",
+   "text": "inner\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/pack.zip",
+   "base64": "UEsDBBQAAAAAAAAAIVysADrHBwAAAAcAAAAQAAAAaW5uZXIvcmVhZG1lLnR4dHppcHBlZApQSwECFAMUAAAAAAAAACFcrAA6xwcAAAAHAAAAEAAAAAAAAAAAAAAAgAEAAAAAaW5uZXIvcmVhZG1lLnR4dFBLBQYAAAAAAQABAD4AAAA1AAAAAAA=",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/fake.zip",
+   "text": "not a zip",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/alpha/t.tgz",
+   "base64": "H4sIACuAAmsC/+3PsQ3CMAAEQNdMwQRgxw6ZJ1JcpjFGYnwMJT1IiLvmpa/++7nVddvrqd97+JA4XEp55fCewxLSnKY551KefYpTXsIxhi+4XfvaxpTwn8b5VrdDAAAAAAAAAAAA4Lc8AMwh9LAAKAAA",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/beta/server.properties",
+   "text": "motd=beta\npvp=true\n"
+  },
+  {
+   "write": "data/instances/old/server.properties",
+   "text": "motd=old\n"
+  },
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "motd=run\nserver-port=47830\nenable-rcon=true\nrcon.port=47831\nrcon.password=test\nwhite-list=false\n"
+  },
+  {
+   "write": "data/instances/run1/notes.txt",
+   "text": "hello\n",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/run1/world/level.dat",
+   "text": "w",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/run1/plugins/x.jar",
+   "text": "j",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances/run1/pack.zip",
+   "base64": "UEsDBBQAAAAAAAAAIVysADrHBwAAAAcAAAAQAAAAaW5uZXIvcmVhZG1lLnR4dHppcHBlZApQSwECFAMUAAAAAAAAACFcrAA6xwcAAAAHAAAAEAAAAAAAAAAAAAAAgAEAAAAAaW5uZXIvcmVhZG1lLnR4dFBLBQYAAAAAAQABAD4AAAA1AAAAAAA=",
+   "mtime": "2026-11-01T10:00:00Z"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "alpha": {
+      "dir": "{data}/instances/alpha",
+      "jar": "paper-1.21.4-100.jar",
+      "memory": "2G",
+      "port": 47961,
+      "rcon": {
+       "port": 47971,
+       "password": "hunter22"
+      }
+     },
+     "beta": {
+      "dir": "{data}/instances/beta",
+      "jar": "server.jar",
+      "mcVersion": "1.21.10",
+      "memory": "1G",
+      "port": 47962
+     },
+     "old": {
+      "dir": "{data}/instances/old",
+      "jar": "paper-1.12.2-1.jar",
+      "memory": "1G",
+      "port": 47963
+     },
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47830,
+      "rcon": {
+       "port": 47831,
+       "password": "test"
+      }
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "11.4.5",
+      "dir": "{data}/services/db1",
+      "port": 47981
+     }
+    }
+   },
+   "mode": "600"
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/alpha/props"
+    },
+    {
+     "get": "/api/instances/alpha/props/anything"
+    },
+    {
+     "get": "/api/instances/beta/props"
+    },
+    {
+     "get": "/api/instances/old/props"
+    },
+    {
+     "get": "/api/instances/db1/props"
+    },
+    {
+     "get": "/api/instances/nope/props"
+    },
+    {
+     "get": "/api/instances/nope/files"
+    },
+    {
+     "delete": "/api/instances/alpha/props"
+    },
+    {
+     "method": "PUT",
+     "path": "/api/instances/alpha/props"
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": "text"
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": ""
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": []
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": [
+      1
+     ]
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": 5
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": true
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "text": "not json"
+    },
+    {
+     "post": "/api/instances/alpha/props"
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "server-port": "1"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "motd": "fine",
+      "rcon.password": "x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "text": "{\"motd\":\"y\",\"5\":\"x\",\"2\":\"z\"}",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "__proto__x": 1
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "text": "{\"__proto__\": \"x\"}",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "motd": "a\nb"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "motd": "ends\\"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "motd": "bad \\uZZ12"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "max-players": "abc"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "max-players": "1.5"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "max-players": 0
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "max-players": null
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "difficulty": "HARD"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "white-list": "yes"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "resource-pack": "ftp://x/p.zip"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "resource-pack": "https:///p.zip"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "resource-pack": "https://a b/p.zip"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props",
+     "json": {
+      "motd": "  Hello \\u00A7a there  ",
+      "max-players": " 1e1 ",
+      "player-idle-timeout": "",
+      "spawn-protection": "0x10",
+      "resource-pack": "HTTPS://x/q.zip?v=3",
+      "difficulty": "hard",
+      "white-list": true,
+      "online-mode": false,
+      "level-seed": "",
+      "view-distance": 12,
+      "gamemode": [
+       "creative"
+      ]
+     }
+    },
+    {
+     "get": "/api/instances/alpha/props"
+    },
+    {
+     "post": "/api/instances/beta/props",
+     "json": {
+      "pvp": "false"
+     }
+    },
+    {
+     "post": "/api/instances/beta/props",
+     "json": {
+      "pvp": "nonsense",
+      "allow-nether": "false",
+      "motd": "beta now"
+     }
+    },
+    {
+     "post": "/api/instances/old/props",
+     "json": {
+      "simulation-distance": "5"
+     }
+    },
+    {
+     "post": "/api/instances/old/props",
+     "json": {
+      "max-players": "30"
+     }
+    },
+    {
+     "get": "/api/instances/alpha/props/raw"
+    },
+    {
+     "get": "/api/instances/alpha/props/raw/more"
+    },
+    {
+     "get": "/api/instances/beta/props/raw"
+    },
+    {
+     "get": "/api/instances/db1/props/raw"
+    },
+    {
+     "method": "PUT",
+     "path": "/api/instances/alpha/props/raw"
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": {
+      "text": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": "text"
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": {
+      "text": "motd=raw\nserver-port=1\n"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": {
+      "text": "motd=raw\nrcon.port=47971\nrcon.password=[redacted]\n"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": {
+      "text": "motd=raw edit\nserver-port=47961\nenable-rcon=true\nrcon.port=47971\nrcon.password=[redacted]\nmax-players=9\r\nwhite-list=true\n"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/props/raw",
+     "json": {
+      "text": "motd=[redacted]\nserver-port=47961\nenable-rcon=true\nrcon.port=47971\nrcon.password=[redacted]\n"
+     }
+    },
+    {
+     "get": "/api/instances/alpha/props/raw"
+    },
+    {
+     "post": "/api/instances/beta/props/raw",
+     "json": {
+      "text": "motd=b\n"
+     }
+    },
+    {
+     "get": "/api/instances/alpha/icon"
+    },
+    {
+     "get": "/api/instances/alpha/icon/remove"
+    },
+    {
+     "get": "/api/instances/beta/icon"
+    },
+    {
+     "delete": "/api/instances/alpha/icon"
+    },
+    {
+     "post": "/api/instances/alpha/icon",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/icon",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/alpha/icon",
+     "json": {
+      "png": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/icon",
+     "json": {
+      "png": "not a png at all, not even close to one"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/icon",
+     "json": {
+      "png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+     }
+    },
+    {
+     "post": "/api/instances/beta/icon",
+     "json": {
+      "png": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+     }
+    },
+    {
+     "get": "/api/instances/beta/icon"
+    },
+    {
+     "post": "/api/instances/beta/icon",
+     "json": {
+      "png": "iVBORw0KGgoA A*AANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+     }
+    },
+    {
+     "post": "/api/instances/beta/icon/remove"
+    },
+    {
+     "post": "/api/instances/beta/icon/remove",
+     "json": null
+    },
+    {
+     "get": "/api/instances/beta/icon"
+    }
+   ]
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/alpha/files"
+    },
+    {
+     "get": "/api/instances/alpha/files?path=config"
+    },
+    {
+     "get": "/api/instances/alpha/files?path=./config/"
+    },
+    {
+     "get": "/api/instances/alpha/files?path=../beta"
+    },
+    {
+     "get": "/api/instances/alpha/files?path=/etc"
+    },
+    {
+     "get": "/api/instances/alpha/files?path=notes.txt"
+    },
+    {
+     "get": "/api/instances/alpha/files?path=missing"
+    },
+    {
+     "get": "/api/instances/alpha/files/read?path=notes.txt"
+    },
+    {
+     "get": "/api/instances/alpha/files/read?path=bin.dat"
+    },
+    {
+     "get": "/api/instances/alpha/files/read?path=config"
+    },
+    {
+     "get": "/api/instances/alpha/files/read"
+    },
+    {
+     "get": "/api/instances/alpha/files/read?path=missing.txt"
+    },
+    {
+     "get": "/api/instances/alpha/files/tail?path=logs/latest.log"
+    },
+    {
+     "get": "/api/instances/alpha/files/tail?path=logs/old.log.gz"
+    },
+    {
+     "get": "/api/instances/alpha/files/tail?path=logs/fake.gz"
+    },
+    {
+     "get": "/api/instances/alpha/files/tail?path=bin.dat"
+    },
+    {
+     "get": "/api/instances/alpha/files/image?path=pic.png"
+    },
+    {
+     "get": "/api/instances/alpha/files/image?path=notes.txt"
+    },
+    {
+     "get": "/api/instances/alpha/files/image?path=missing.png"
+    },
+    {
+     "get": "/api/instances/alpha/files/search?q=n"
+    },
+    {
+     "get": "/api/instances/alpha/files/search?q=LOG"
+    },
+    {
+     "get": "/api/instances/alpha/files/search?path=config&q=.yml"
+    },
+    {
+     "get": "/api/instances/alpha/files/download?path=notes.txt"
+    },
+    {
+     "get": "/api/instances/alpha/files/download?path=odd%2F%C3%A9%20%C3%BC%20%F0%9F%98%80.txt"
+    },
+    {
+     "get": "/api/instances/alpha/files/download?path=sub",
+     "body": "skip"
+    },
+    {
+     "get": "/api/instances/alpha/files/download"
+    },
+    {
+     "get": "/api/instances/alpha/files/download?path=missing"
+    },
+    {
+     "get": "/api/instances/alpha/files/nope"
+    },
+    {
+     "method": "PUT",
+     "path": "/api/instances/alpha/files"
+    },
+    {
+     "delete": "/api/instances/alpha/files/delete"
+    },
+    {
+     "post": "/api/instances/alpha/files"
+    },
+    {
+     "post": "/api/instances/alpha/files/bogus",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": "text"
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "notes.txt",
+      "text": "changed\n"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "notes.txt",
+      "text": "changed\n",
+      "version": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "notes.txt",
+      "text": 5,
+      "version": "f572d396fae9206628714fb2ce00f72e94f2258f"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "notes.txt",
+      "text": "changed\n",
+      "version": "f572d396fae9206628714fb2ce00f72e94f2258f"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "fresh.txt",
+      "text": "new\n"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "fresh.txt",
+      "text": "new\n",
+      "create": true
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "fresh.txt",
+      "text": "again\n",
+      "create": true
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "bad.json",
+      "text": "{nope",
+      "create": true
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "bad.json",
+      "text": "{nope",
+      "create": "true",
+      "force": 1
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "bad.json",
+      "text": "{nope",
+      "create": true,
+      "force": true
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/write",
+     "json": {
+      "path": "config",
+      "text": "x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/read",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": {
+      "dir": "",
+      "name": "made"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": {
+      "name": "made"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": {
+      "dir": "config",
+      "name": "a/b"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": {
+      "dir": "config",
+      "name": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": {
+      "dir": "config",
+      "name": "bad?"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/mkdir",
+     "json": {
+      "dir": "nope",
+      "name": "x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "made",
+      "to": "made"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "made",
+      "to": "made/inside"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "made",
+      "to": "config"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "made",
+      "to": "nowhere/x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "made",
+      "to": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "missing",
+      "to": "x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/move",
+     "json": {
+      "from": "made",
+      "to": "moved"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": "notes.txt"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": []
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "notes.txt",
+       "config/a.yml"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "notes.txt"
+      ],
+      "name": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "missing"
+      ],
+      "name": 5
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "notes.txt",
+       "config/a.yml"
+      ],
+      "name": true
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       5
+      ],
+      "name": "x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "notes.txt"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "notes.txt"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/archive",
+     "json": {
+      "paths": [
+       "config/a.yml",
+       "config/b.yml"
+      ],
+      "name": "both"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": {
+      "path": "notes.txt"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": {
+      "path": "config"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": {
+      "path": "fake.zip"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": {
+      "path": "pack.zip"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": {
+      "path": "pack.zip"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/extract",
+     "json": {
+      "path": "t.tgz"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=up.txt",
+     "text": "uploaded\n"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=up.txt",
+     "text": "again\n"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=up.txt&overwrite=1",
+     "text": "replaced\n"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=up.txt&overwrite=true",
+     "text": "not 1\n"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=Pack/sub/a.yml&dir=config",
+     "text": "a: 2\n"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=notes.txt/x&dir=",
+     "text": "x"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload",
+     "text": "no name"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=%2F%2F",
+     "text": "no name"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=x&dir=notes.txt",
+     "text": "x"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=x&dir=missing",
+     "text": "x"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=config&overwrite=1",
+     "text": "x"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=bad%3F",
+     "text": "x"
+    },
+    {
+     "post": "/api/instances/alpha/files/upload?name=empty.bin",
+     "base64": ""
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": null
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": "x"
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": []
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": [
+       "missing"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": [
+       ""
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": [
+       "moved",
+       "config",
+       "config/a.yml"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": [
+       "fresh.txt"
+      ],
+      "withoutCopy": true
+     }
+    },
+    {
+     "post": "/api/instances/alpha/files/delete",
+     "json": {
+      "paths": [
+       "up.txt"
+      ],
+      "withoutCopy": "true"
+     }
+    },
+    {
+     "get": "/api/instances/alpha/files"
+    }
+   ]
+  },
+  {
+   "run": [
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/run1/props"
+    },
+    {
+     "post": "/api/instances/run1/props",
+     "json": {
+      "white-list": "true",
+      "motd": "running"
+     }
+    },
+    {
+     "post": "/api/instances/run1/props",
+     "json": {
+      "motd": "running again"
+     }
+    },
+    {
+     "post": "/api/instances/run1/props/raw",
+     "json": {
+      "text": "motd=raw while running\nserver-port=47830\nenable-rcon=true\nrcon.port=47831\nrcon.password=[redacted]\nwhite-list=true\nbroadcast-rcon-to-ops=true\n"
+     }
+    },
+    {
+     "get": "/api/instances/run1/props/raw"
+    },
+    {
+     "post": "/api/instances/run1/icon",
+     "json": {
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+     }
+    },
+    {
+     "get": "/api/instances/run1/files"
+    },
+    {
+     "get": "/api/instances/run1/files/search?q=world"
+    },
+    {
+     "post": "/api/instances/run1/files/write",
+     "json": {
+      "path": "notes.txt",
+      "text": "while running\n",
+      "version": "f572d396fae9206628714fb2ce00f72e94f2258f"
+     }
+    },
+    {
+     "post": "/api/instances/run1/files/delete",
+     "json": {
+      "paths": [
+       "world"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/run1/files/delete",
+     "json": {
+      "paths": [
+       "plugins"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/run1/files/delete",
+     "json": {
+      "paths": [
+       "plugins/x.jar"
+      ]
+     }
+    },
+    {
+     "post": "/api/instances/run1/files/move",
+     "json": {
+      "from": "notes.txt",
+      "to": "world/notes.txt"
+     }
+    },
+    {
+     "post": "/api/instances/run1/files/upload?name=server.jar&overwrite=1",
+     "text": "x"
+    },
+    {
+     "post": "/api/instances/run1/files/upload?name=added.txt",
+     "text": "fine while running\n"
+    },
+    {
+     "post": "/api/instances/run1/files/extract",
+     "json": {
+      "path": "pack.zip"
+     }
+    }
+   ],
+   "expect": {
+    "includes": "is in use by the running server"
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/run1/props"
+    },
+    {
+     "post": "/api/instances/run1/icon",
+     "json": {
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAAAAAAAAAAAAAAAAAA=="
+     }
+    }
+   ]
+  }
+ ]
+}

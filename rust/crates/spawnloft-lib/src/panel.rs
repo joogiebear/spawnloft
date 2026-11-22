@@ -1,44 +1,78 @@
-//! `spawnloft-core ui`: the panel's HTTP endpoint on 127.0.0.1 (Phase 0 spike, P0-F).
+//! `spawnloft-core ui`: the panel's HTTP endpoint on 127.0.0.1.
 //!
-//! The panel API is still Node (`src/ui.mjs`) until R6 ports it. Until then this is a small
-//! reverse proxy: it starts the Node panel on a port of its own (`node spawnloft.mjs ui --port 0
-//! --no-open`) and forwards every request to it, so a window (the Tauri shell, later the Electron
-//! window of step 2) is pointed at the address and port that will stay the same when the routes
-//! move to Rust. With no Node found it answers with a page that says so.
+//! Every route of the Node panel (`src/ui.mjs`) is answered in this process
+//! (rust/PLAN-CORE-PORT.md C8): `panel/routes.rs` is its `route()`, and the files beside it are
+//! its handlers. Nothing is handed on to another process.
 //!
-//! One request per connection (`Connection: close` both ways), std threads and blocking I/O: the
-//! panel opens a handful of connections, three of them long-lived event streams, which is a thread
-//! each. Request and response bodies are copied byte for byte after the head, so event streams,
-//! uploads and chunked bodies need nothing special.
+//! One request per connection (`Connection: close`), std threads and blocking I/O: the panel
+//! opens a handful of connections, three of them long-lived event streams, which is a thread
+//! each. A route reads its body through `panel/http.rs`, which ends it where the head says.
 //!
-//! Who may call is decided here, before anything is forwarded (`panel_auth`, the same rule the
-//! Node panel applies to itself): the request must be addressed to this panel from this panel,
-//! and carry a session cookie or a signed token. What is forwarded gets a fresh token for the
-//! upstream's own port in place of the caller's credential, so the Node panel checks every
-//! request as it would standing alone; there is no "trust the proxy" mode.
+//! Who may call is decided here, before a route is looked at (`panel_auth`): the request must be
+//! addressed to this panel from this panel, and carry a session cookie or a signed token.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::panel_auth::{self, PanelAuth, Verdict};
+use crate::settings::{self, Layout};
 
-/// What `ui` was asked to do.
+mod backups;
+mod basics;
+mod client;
+mod creates;
+mod databases;
+mod http;
+mod jobs;
+mod pages;
+mod players;
+mod plugins;
+mod routes;
+mod schedules;
+mod server_files;
+mod server_props;
+mod servers;
+mod shared;
+mod sse;
+mod worlds;
+
+/// What the routes answered in this process know about the panel they run in.
+struct Panel {
+    /// Where the data is, resolved once when the panel starts (`LAYOUT` in `ui.mjs`): a change
+    /// to the settings applies at the next start. `None` when it could not be resolved.
+    layout: Option<Layout>,
+    /// Why there is no layout, for the page and the answers that say so.
+    trouble: String,
+    /// Behind the desktop window (`behindWindow()`): it sets `SPAWNLOFT_SHELL` for the core.
+    shell: bool,
+    /// The long jobs this panel started, for the pages that watch them.
+    jobs: Arc<jobs::Jobs>,
+    /// The port this panel listens on: what a browser sent to it must come back to (the
+    /// Microsoft sign-in's redirect address).
+    port: u16,
+}
+
+impl Panel {
+    /// Who the history says did what a route does (`asActor({ kind: 'panel' })`).
+    fn actor() -> crate::activity::Actor {
+        crate::activity::Actor::new("panel", None)
+    }
+}
+
+fn behind_window() -> bool {
+    std::env::var_os("SPAWNLOFT_SHELL").is_some_and(|s| s == "tauri")
+}
+
+/// What the window's `ui` was asked to do.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Options {
     /// Port to bind on 127.0.0.1; 0 picks a free one (what the window shells pass).
     pub port: u16,
-    /// Folder holding `spawnloft.mjs` and `src/` (the Node core) to start the upstream from.
-    pub core_dir: Option<PathBuf>,
-    /// Node executable; found on PATH (or `SPAWNLOFT_NODE`) when not given.
-    pub node: Option<PathBuf>,
-    /// An already running panel to forward to (`http://127.0.0.1:<port>/`), instead of starting one.
-    pub upstream: Option<String>,
-    /// End when stdin reaches end of file: a window shell holds the pipe, so this process (and
-    /// the Node panel under it) never outlives the window, however the window ends.
+    /// End when stdin reaches end of file: a window shell holds the pipe, so this process never
+    /// outlives the window, however the window ends.
     pub exit_with_stdin: bool,
 }
 
@@ -46,249 +80,273 @@ pub struct Options {
 pub const READY_PREFIX: &str = "SpawnLoft panel: ";
 
 const HEAD_LIMIT: usize = 64 * 1024;
-const UPSTREAM_START_TIMEOUT: Duration = Duration::from_secs(60);
 /// How long a client may take to send a request head (P0-F review L5): a connection that never
 /// finishes one would otherwise hold a thread for ever. Bodies and responses have no limit, since
 /// uploads are slow and the panel's event streams stay open for hours.
 const HEAD_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long one write of an answer made here may wait on a client that is not reading.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Runs until killed (or stdin closes with `exit_with_stdin`). Returns an exit code only when it
-/// could not start.
+/// Why a panel did not start.
+#[derive(Debug)]
+pub enum StartError {
+    /// Something else holds the port (`EADDRINUSE`).
+    InUse,
+    Other(String),
+}
+
+/// A panel that listens and has not answered anything yet (`serve()` of `ui.mjs`, resolved).
+pub struct Listening {
+    listener: TcpListener,
+    auth: Arc<PanelAuth>,
+    panel: Arc<Panel>,
+}
+
+impl std::fmt::Debug for Listening {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Listening").field("port", &self.port()).finish()
+    }
+}
+
+impl Listening {
+    /// The port bound: the one asked for, or the one the system picked for 0.
+    pub fn port(&self) -> u16 {
+        self.auth.port()
+    }
+
+    /// The install's key, for the caller that hands a browser its sign-in link.
+    pub fn key(&self) -> &panel_auth::Key {
+        self.auth.key()
+    }
+
+    /// Answers requests, a thread each, until the process ends.
+    pub fn serve(self) {
+        for conn in self.listener.incoming() {
+            let Ok(conn) = conn else { continue };
+            let auth = Arc::clone(&self.auth);
+            let panel = Arc::clone(&self.panel);
+            std::thread::spawn(move || {
+                let _ = handle(conn, &auth, &panel);
+            });
+        }
+    }
+}
+
+/// `panelLog(msg)`: a line in panel.log; losing one is fine.
+pub(crate) fn panel_log(run_dir: &str, msg: &str) {
+    let _ = crate::fsx::mkdir_all(Path::new(run_dir));
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(crate::jspath::join(&[run_dir, "panel.log"]))
+    {
+        let _ = f.write_all(format!("[{}] {msg}\n", crate::time::iso_now()).as_bytes());
+    }
+}
+
+/// A release build ends on a panic (the window starts the core again). Node wrote what went wrong
+/// in panel.log (`guardProcess`); so does this, before the process ends.
+fn log_panics(run_dir: &str) {
+    let run_dir = run_dir.to_string();
+    let before = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        panel_log(&run_dir, &format!("panic: {info}"));
+        before(info);
+    }));
+}
+
+/// What `serve()` does before it listens: task shims and launchers name this install by absolute
+/// path, so they are rewritten if it moved, before anything can run one; and data written by a
+/// newer release is said once in the log.
+fn before_listening(layout: &Layout) {
+    let sched = crate::schedule::Sched::new(&layout.data_root, &layout.run_dir, Panel::actor());
+    let repaired = crate::relocate::repair_after_move(
+        layout,
+        &sched,
+        &crate::relocate::marker_file(layout),
+        &crate::relocate::runtime_signature(),
+        false,
+    );
+    match repaired {
+        Ok(r) if r.moved => panel_log(
+            &layout.run_dir,
+            &format!(
+                "installation moved: rewrote {} task shim(s) and launchers for {} server(s)",
+                r.shims, r.launchers
+            ),
+        ),
+        Ok(_) => {}
+        Err(e) => panel_log(
+            &layout.run_dir,
+            &format!("could not check whether the installation moved: {}", e.message()),
+        ),
+    }
+    let file = crate::data_format::data_format_file(&layout.data_root);
+    let marker = crate::data_format::read(Path::new(&file));
+    if let Some(newer) = crate::data_format::warning(
+        &file,
+        marker.as_ref(),
+        Some(crate::data_format::release_version()),
+    ) {
+        panel_log(&layout.run_dir, &format!("warning: {newer}"));
+    }
+}
+
+/// Starts a panel on 127.0.0.1 (`serve({ port })`). `layout` is where the data is, or why that
+/// could not be worked out: such a panel still listens, and says so on every route but the
+/// updater's.
+pub fn listen(port: u16, layout: Result<Layout, String>) -> Result<Listening, StartError> {
+    if let Ok(layout) = &layout {
+        log_panics(&layout.run_dir);
+        before_listening(layout);
+    }
+    // the install's key, before anything listens: without it nobody could be let in
+    let key = panel_auth::load_key().map_err(StartError::Other)?;
+    // the sign-in pages `spawnloft ui` left behind whose links have died since
+    crate::panel_open::sweep_open_files();
+    let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            StartError::InUse
+        } else {
+            StartError::Other(format!("could not listen on 127.0.0.1:{port}: {e}"))
+        }
+    })?;
+    let bound = listener
+        .local_addr()
+        .map_err(|e| StartError::Other(e.to_string()))?
+        .port();
+    let auth = Arc::new(PanelAuth::new(key, bound, panel_auth::now_ms()));
+    panel_auth::start_idle_clock();
+    let (layout, trouble) = match layout {
+        Ok(l) => (Some(l), String::new()),
+        Err(why) => (None, why),
+    };
+    let panel = Arc::new(Panel {
+        layout,
+        trouble,
+        shell: behind_window(),
+        jobs: Arc::default(),
+        port: bound,
+    });
+    Ok(Listening {
+        listener,
+        auth,
+        panel,
+    })
+}
+
+/// The window's panel: runs until killed (or stdin closes with `exit_with_stdin`). Returns an
+/// exit code only when it could not start.
 pub fn run(opts: Options) -> i32 {
-    let listener = match TcpListener::bind(("127.0.0.1", opts.port)) {
+    // `main()` of the command line makes the data folders before any command runs
+    let layout = Layout::resolve(&settings::load().0)
+        .and_then(|l| l.ensure_dirs().map(|()| l))
+        .map_err(|crash| crash.message().to_string());
+    if let Err(why) = &layout {
+        eprintln!("spawnloft-core ui: {why}");
+    }
+    let listening = match listen(opts.port, layout) {
         Ok(l) => l,
-        Err(e) => {
+        Err(StartError::InUse) => {
             eprintln!(
-                "spawnloft-core ui: could not listen on 127.0.0.1:{}: {e}",
+                "spawnloft-core ui: could not listen on 127.0.0.1:{}: the port is in use",
                 opts.port
             );
             return 1;
         }
-    };
-    let local = match listener.local_addr() {
-        Ok(a) => a,
-        Err(e) => {
+        Err(StartError::Other(e)) => {
             eprintln!("spawnloft-core ui: {e}");
             return 1;
         }
     };
-
-    // the install's key, before anything listens for long: without it nobody could be let in
-    let key = match panel_auth::load_key() {
-        Ok(k) => k,
-        Err(e) => {
-            eprintln!("spawnloft-core ui: {e}");
-            return 1;
-        }
-    };
-    let auth = Arc::new(PanelAuth::new(key, local.port(), panel_auth::now_ms()));
-    panel_auth::start_idle_clock();
-
-    let child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
-    let upstream = match &opts.upstream {
-        Some(u) => match parse_upstream(u) {
-            Some(addr) => Upstream::Node(addr),
-            None => {
-                eprintln!("spawnloft-core ui: --upstream must be http://127.0.0.1:<port>/");
-                return 64;
-            }
-        },
-        None => match start_node_panel(&opts, &child, local.port()) {
-            Ok(addr) => Upstream::Node(addr),
-            Err(why) => {
-                eprintln!("spawnloft-core ui: no Node panel: {why}");
-                Upstream::Missing(why)
-            }
-        },
-    };
-
     if opts.exit_with_stdin {
-        let child = Arc::clone(&child);
         std::thread::spawn(move || {
             let mut sink = [0u8; 256];
             let mut stdin = std::io::stdin();
             while matches!(stdin.read(&mut sink), Ok(n) if n > 0) {}
-            stop_child(&child);
             std::process::exit(0);
         });
     }
-
-    println!("{READY_PREFIX}http://127.0.0.1:{}/", local.port());
+    println!("{READY_PREFIX}http://127.0.0.1:{}/", listening.port());
     let _ = std::io::stdout().flush();
-
-    let upstream = Arc::new(upstream);
-    for conn in listener.incoming() {
-        let Ok(conn) = conn else { continue };
-        let upstream = Arc::clone(&upstream);
-        let auth = Arc::clone(&auth);
-        std::thread::spawn(move || {
-            let _ = handle(conn, &auth, &upstream);
-        });
-    }
-    stop_child(&child);
+    listening.serve();
     0
 }
 
-#[derive(Debug)]
-enum Upstream {
-    Node(SocketAddr),
-    Missing(String),
+/// Whether this user's SpawnLoft panel is what holds `port` (`isPanelAt`). Anything can answer
+/// 200 there, so the panel has to prove it holds this install's key: the request carries a fresh
+/// nonce and the answer must carry its signature. The request is signed as well, so there is no
+/// route that tells a stranger a panel is here.
+pub fn is_panel_at(port: u16) -> bool {
+    probe_panel(port).unwrap_or(false)
 }
 
-/// Set once this process is stopping the Node panel on purpose, so its end is not a crash.
-static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-fn stop_child(child: &Mutex<Option<Child>>) {
-    STOPPING.store(true, std::sync::atomic::Ordering::SeqCst);
-    if let Ok(mut guard) = child.lock()
-        && let Some(mut c) = guard.take()
-    {
-        let _ = c.kill();
-        let _ = c.wait();
+fn probe_panel(port: u16) -> Option<bool> {
+    let key = panel_auth::load_key().ok()?;
+    let nonce = panel_auth::probe_nonce().ok()?;
+    // two seconds for the whole exchange, as `AbortSignal.timeout(2000)`
+    let until = std::time::Instant::now() + Duration::from_secs(2);
+    let left = || {
+        let d = until.saturating_duration_since(std::time::Instant::now());
+        (!d.is_zero()).then_some(d)
+    };
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let mut conn = TcpStream::connect_timeout(&addr, left()?).ok()?;
+    conn.set_write_timeout(left()).ok()?;
+    let request = format!(
+        "GET /api/client/launcher HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: {}\r\n{}: {nonce}\r\nConnection: close\r\n\r\n",
+        panel_auth::authorization(&key, port),
+        panel_auth::PROBE_HEADER,
+    );
+    conn.write_all(request.as_bytes()).ok()?;
+    // an answer larger than this is not a launcher's list
+    const LIMIT: usize = 4 * 1024 * 1024;
+    let mut answer = Vec::new();
+    let mut chunk = [0u8; 16 * 1024];
+    let (head, used) = loop {
+        conn.set_read_timeout(Some(left()?)).ok()?;
+        let n = conn.read(&mut chunk).ok()?;
+        if n == 0 || answer.len() > HEAD_LIMIT {
+            return Some(false);
+        }
+        answer.extend_from_slice(&chunk[..n]);
+        if let Some(end) = answer.windows(4).position(|w| w == b"\r\n\r\n") {
+            break (String::from_utf8_lossy(&answer[..end]).into_owned(), end + 4);
+        }
+    };
+    let mut lines = head.split("\r\n");
+    if lines.next()?.split(' ').nth(1) != Some("200") {
+        return Some(false);
     }
-}
-
-/// `http://127.0.0.1:<port>/` (or `localhost`) only: the proxy never forwards off the machine.
-pub fn parse_upstream(url: &str) -> Option<SocketAddr> {
-    let rest = url.strip_prefix("http://")?;
-    let hostport = rest.split('/').next()?;
-    let (host, port) = hostport.rsplit_once(':')?;
-    if host != "127.0.0.1" && host != "localhost" {
-        return None;
+    let headers: Vec<(String, String)> = lines
+        .filter_map(|l| l.split_once(':'))
+        .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.trim().to_string()))
+        .collect();
+    let header = |name: &str| headers.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str());
+    if !header(panel_auth::PROOF_HEADER).is_some_and(|p| panel_auth::proof_matches(&key, &nonce, p)) {
+        return Some(false);
     }
-    let port: u16 = port.parse().ok()?;
-    if port == 0 {
-        return None;
-    }
-    Some(SocketAddr::from(([127, 0, 0, 1], port)))
-}
-
-/// Node from `--node`, else [`crate::runtime::node`]: `SPAWNLOFT_NODE`, the bundled runtime, or
-/// (a development build only) the first `node` on PATH.
-pub fn find_node(explicit: Option<&Path>) -> Result<PathBuf, String> {
-    if let Some(p) = explicit {
-        return Ok(p.to_path_buf());
-    }
-    crate::runtime::node()
-}
-
-/// The first `node` on PATH (then the places a GUI-started app misses on macOS): what a
-/// development build with no bundled runtime runs on.
-pub fn path_node() -> Option<PathBuf> {
-    let exe = if cfg!(windows) { "node.exe" } else { "node" };
-    let path = std::env::var_os("PATH").unwrap_or_default();
-    std::env::split_paths(&path)
-        .chain(gui_fallback_dirs())
-        .map(|dir| dir.join(exe))
-        .find(|p| p.is_file())
-}
-
-/// An app started from Finder or launchd gets PATH=/usr/bin:/bin:/usr/sbin:/sbin, without the
-/// places Node is installed (found on the Mac mini in P0-F); Electron never needed this because it
-/// carries Node. Checked after PATH, so a PATH entry still wins.
-fn gui_fallback_dirs() -> Vec<PathBuf> {
-    if !cfg!(target_os = "macos") {
-        return Vec::new();
-    }
-    let mut dirs = vec![
-        PathBuf::from("/opt/homebrew/bin"),
-        PathBuf::from("/usr/local/bin"),
-    ];
-    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
-        dirs.push(home.join(".volta/bin"));
-        // nvm keeps one folder per version; any of them will do for the spike (sorted by name)
-        if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
-            let mut versions: Vec<PathBuf> = entries.flatten().map(|e| e.path().join("bin")).collect();
-            versions.sort();
-            dirs.extend(versions.into_iter().rev());
+    let length: Option<usize> = header("content-length").and_then(|v| v.parse().ok());
+    let mut body = answer.split_off(used);
+    while length.is_none_or(|want| body.len() < want) && body.len() <= LIMIT {
+        conn.set_read_timeout(Some(left()?)).ok()?;
+        match conn.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => body.extend_from_slice(&chunk[..n]),
+            Err(_) => return Some(false),
         }
     }
-    dirs
+    if let Some(want) = length {
+        body.truncate(want);
+    } else if header("transfer-encoding").is_some_and(|v| v.eq_ignore_ascii_case("chunked")) {
+        // a panel of the Node core answers in chunks
+        body = unchunked(&body)?;
+    }
+    let parsed: serde_json::Value = serde_json::from_slice(&body).ok()?;
+    Some(parsed.get("profiles").is_some_and(serde_json::Value::is_array))
 }
 
-/// `public_port` is this proxy's port: the Node panel puts it in the Microsoft sign-in's redirect
-/// URI (`SPAWNLOFT_PANEL_PUBLIC_PORT`), so the browser comes back through the address the window
-/// knows and can check, not the upstream's.
-fn start_node_panel(
-    opts: &Options,
-    slot: &Mutex<Option<Child>>,
-    public_port: u16,
-) -> Result<SocketAddr, String> {
-    let core_dir = opts
-        .core_dir
-        .clone()
-        .ok_or("no --core-dir given, so there is no Node core to start")?;
-    let entry = core_dir.join("spawnloft.mjs");
-    if !entry.is_file() {
-        return Err(format!("{} is missing", entry.display()));
-    }
-    let node = find_node(opts.node.as_deref())?;
-    let mut cmd = Command::new(&node);
-    cmd.arg(&entry)
-        // --exit-with-stdin: the panel ends when this process does, a kill included, because the
-        // pipe closes with it (no Node panel left behind by a killed core)
-        .args(["ui", "--port", "0", "--no-open", "--exit-with-stdin"])
-        .current_dir(&core_dir)
-        .env("SPAWNLOFT_PANEL_PUBLIC_PORT", public_port.to_string())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-    // the panel names this binary in what it writes to disk (shims, launchers, MCP config)
-    crate::runtime::prepare(&mut cmd);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("could not start {}: {e}", node.display()))?;
-    // Windows: also a kill-on-close job, for a Node that is busy and not reading its stdin
-    crate::platform::end_with_this_process(&child);
-    // the write end stays open as long as this process lives; never written to
-    if let Some(stdin) = child.stdin.take() {
-        std::mem::forget(stdin);
-    }
-    let stdout = child.stdout.take().ok_or("no stdout from the Node panel")?;
-    if let Ok(mut guard) = slot.lock() {
-        *guard = Some(child);
-    }
-
-    // The URL line, then keep draining so the panel never blocks on a full pipe.
-    let (tx, rx) = std::sync::mpsc::channel::<Option<SocketAddr>>();
-    std::thread::spawn(move || {
-        let mut sent = false;
-        for line in BufReader::new(stdout).lines() {
-            let Ok(line) = line else { break };
-            if !sent && let Some(url) = line.trim().strip_prefix(READY_PREFIX) {
-                let _ = tx.send(parse_upstream(url.trim()));
-                sent = true;
-            }
-        }
-        if !sent {
-            let _ = tx.send(None);
-        } else if !STOPPING.load(std::sync::atomic::Ordering::SeqCst) {
-            // the Node panel died under a running proxy: end too, so the window (which starts the
-            // core again when it ends by itself) brings both back instead of serving 502s for ever
-            eprintln!("spawnloft-core ui: the Node panel exited; stopping so the window can start it again");
-            std::process::exit(70);
-        }
-    });
-    match rx.recv_timeout(UPSTREAM_START_TIMEOUT) {
-        Ok(Some(addr)) => Ok(addr),
-        Ok(None) => {
-            stop_child(slot);
-            Err("the Node panel exited before it printed its address".into())
-        }
-        Err(_) => {
-            stop_child(slot);
-            Err("the Node panel did not start within 60 s".into())
-        }
-    }
-}
-
-/// A parsed request head: the raw lines, so they can be forwarded as they came.
+/// A parsed request head.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Head {
     pub request_line: String,
@@ -317,7 +375,25 @@ impl Head {
     }
 }
 
-/// Routes `spawnloft-core ui` answers itself instead of forwarding (the updater, design 5.1).
+/// A chunked body put together; `None` when it is cut short or is not one.
+fn unchunked(mut rest: &[u8]) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    loop {
+        let line_end = rest.windows(2).position(|w| w == b"\r\n")?;
+        let size_text = std::str::from_utf8(&rest[..line_end]).ok()?;
+        let size = usize::from_str_radix(size_text.split(';').next()?.trim(), 16).ok()?;
+        rest = &rest[line_end + 2..];
+        if size == 0 {
+            return Some(out);
+        }
+        let chunk = rest.get(..size)?;
+        out.extend_from_slice(chunk);
+        rest = rest.get(size + 2..)?;
+    }
+}
+
+/// The updater's and the handover's routes (design 5.1), answered before the panel's own: they
+/// work when the data cannot be found, which is when an update is most wanted.
 pub fn is_local_route(path: &str) -> bool {
     let route = path.split('?').next().unwrap_or(path);
     route == "/api/update" || route.starts_with("/api/update/") || crate::handover::api::is_route(route)
@@ -328,10 +404,9 @@ const LOCAL_BODY_LIMIT: usize = 64 * 1024;
 
 /// Splits `buf` (which holds at least the head) into the head and how many bytes it took.
 ///
-/// Strict on purpose. The rule is decided on this reading of the head and the head is then sent
-/// on with a token for the upstream added, so the upstream must not be able to read it any other
-/// way: no line break but CRLF, no control characters, no folded lines, header names that are
-/// plain tokens. Anything else is not a head (the caller answers 400).
+/// Strict on purpose, so that the rule and the route read one and the same request: no line
+/// break but CRLF, no control characters, no folded lines, header names that are plain tokens.
+/// Anything else is not a head (the caller answers 400).
 pub fn parse_head(buf: &[u8]) -> Option<(Head, usize)> {
     let end = buf.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
     let text = std::str::from_utf8(&buf[..end - 4]).ok()?;
@@ -368,32 +443,6 @@ pub fn parse_head(buf: &[u8]) -> Option<(Head, usize)> {
     ))
 }
 
-/// The head as sent upstream: Host and Origin name the upstream (the Node panel applies its own
-/// check to them), the caller's credential is replaced by `authorization` (a token for the
-/// upstream's port; the caller's own token names this port and its session lives here), and the
-/// connection closes after one exchange.
-pub fn rewrite_head(head: &Head, upstream: SocketAddr, authorization: &str) -> Vec<u8> {
-    let up = format!("127.0.0.1:{}", upstream.port());
-    let mut out = format!("{}\r\n", head.request_line);
-    for (k, v) in &head.headers {
-        let lower = k.to_ascii_lowercase();
-        match lower.as_str() {
-            "host" => out.push_str(&format!("Host: {up}\r\n")),
-            "origin" => out.push_str(&format!("Origin: http://{up}\r\n")),
-            "connection" | "keep-alive" | "proxy-connection" | "authorization" => {}
-            "cookie" => {
-                if let Some(rest) = panel_auth::strip_session_cookies(v) {
-                    out.push_str(&format!("{k}: {rest}\r\n"));
-                }
-            }
-            _ => out.push_str(&format!("{k}: {v}\r\n")),
-        }
-    }
-    out.push_str(&format!("Authorization: {authorization}\r\n"));
-    out.push_str("Connection: close\r\n\r\n");
-    out.into_bytes()
-}
-
 /// Tells the listener a session's request has ended, however `handle` returns.
 struct InUse<'a> {
     auth: &'a PanelAuth,
@@ -408,7 +457,7 @@ impl Drop for InUse<'_> {
     }
 }
 
-fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io::Result<()> {
+fn handle(mut conn: TcpStream, auth: &PanelAuth, panel: &Panel) -> std::io::Result<()> {
     let mut buf = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
     // one deadline for the whole head, not per read: a byte every 29 s would otherwise hold on
@@ -431,6 +480,17 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
             return respond(&mut conn, 400, "text/plain", b"bad request\n");
         }
     };
+    // One reading of where the body ends: a request whose length can be read two ways is refused.
+    let Ok(framing) = http::framing(&head.headers) else {
+        return respond(&mut conn, 400, "text/plain", b"bad request\n");
+    };
+    // Node's parser lets through a path, `*`, and a whole address (`http://host/path`), and
+    // refuses any other target before anything sees it.
+    if !target_is_http(head.path()) {
+        return respond(&mut conn, 400, "text/plain", b"bad request\n");
+    }
+    // `new URL(req.url, 'http://localhost')`: the path a route sees, dot segments resolved
+    let target = http::parse_target(head.path());
     let verdict = auth.decide(
         head.method(),
         head.path(),
@@ -438,6 +498,11 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
         panel_auth::now_ms(),
         panel_auth::idle_now(),
     );
+    // a caller with the key asks whether this is its own panel (see panel_auth)
+    let proof = match &verdict {
+        Verdict::Allow { .. } => auth.proof_for(&head.headers),
+        _ => None,
+    };
     let _in_use = match verdict {
         Verdict::Forbidden => {
             return respond(
@@ -447,7 +512,9 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
                 br#"{"error":"this panel only answers requests addressed to localhost"}"#,
             );
         }
-        Verdict::Login { session, to } => {
+        Verdict::Login { session, to, nonce } => {
+            // the page that carried this link (`spawnloft ui`) has done its job
+            crate::panel_open::remove_open_file(&nonce);
             let cookie = panel_auth::session_cookie(auth.port(), &session);
             return respond_with(
                 &mut conn,
@@ -464,7 +531,7 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
         }
         v @ (Verdict::LoginRefused | Verdict::Unauthorized { api: false }) => {
             // under the desktop window, the page asks the window to sign it in again
-            let shell = std::env::var_os("SPAWNLOFT_SHELL").is_some_and(|s| s == "tauri");
+            let shell = behind_window();
             let refused = matches!(v, Verdict::LoginRefused);
             return respond_with(
                 &mut conn,
@@ -492,7 +559,16 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
         Verdict::Open => InUse { auth, session: None },
         Verdict::Allow { session } => InUse { auth, session },
     };
-    if is_local_route(head.path()) {
+    // the updater's routes are found by the path a route would see (`/api/update/../settings` is
+    // a setting's route), and given it with the query as it came
+    let local = target
+        .as_ref()
+        .filter(|(path, _)| is_local_route(path))
+        .map(|(path, _)| match head.path().split_once('?') {
+            Some((_, query)) => format!("{path}?{query}"),
+            None => path.clone(),
+        });
+    if let Some(local) = local {
         let want = head.content_length().unwrap_or(0);
         if want > LOCAL_BODY_LIMIT {
             return respond(
@@ -511,57 +587,114 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
             body.extend_from_slice(&chunk[..n]);
         }
         body.truncate(want);
-        let route = head.path().split('?').next().unwrap_or("");
+        let route = local.split('?').next().unwrap_or("");
         let (status, json) = if crate::handover::api::is_route(route) {
-            crate::handover::api::handle(head.method(), head.path())
+            crate::handover::api::handle(head.method(), &local)
         } else {
-            crate::update::api::handle(head.method(), head.path(), &body)
+            crate::update::api::handle(head.method(), &local, &body)
         };
-        return respond(&mut conn, status, "application/json", json.to_string().as_bytes());
+        let proved: Vec<(&str, &str)> = proof
+            .iter()
+            .map(|p| (panel_auth::PROOF_HEADER, p.as_str()))
+            .collect();
+        return respond_with(
+            &mut conn,
+            status,
+            "application/json",
+            &proved,
+            json.to_string().as_bytes(),
+        );
     }
     conn.set_read_timeout(None)?;
-    let addr = match upstream {
-        Upstream::Node(addr) => *addr,
-        Upstream::Missing(why) => return missing(&mut conn, &head, why),
+    let expects_continue = head
+        .header("expect")
+        .is_some_and(|v| v.eq_ignore_ascii_case("100-continue"));
+    let (path, query, invalid) = match target {
+        Some((path, query)) => (path, query, false),
+        // `new URL(req.url, 'http://localhost')` threw: answered as any throw of a route is
+        None => (String::new(), Vec::new(), true),
     };
-    let mut up = match TcpStream::connect_timeout(&addr, Duration::from_secs(5)) {
-        Ok(s) => s,
-        Err(e) => {
-            let body = format!("{{\"error\":\"the panel process is not answering: {e}\"}}");
-            return respond(&mut conn, 502, "application/json", body.as_bytes());
+    let mut req = http::Request {
+        method: head.method().to_string(),
+        seg: path
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect(),
+        path,
+        query,
+        body: http::Body::new(&mut conn, buf[used..].to_vec(), framing, expects_continue),
+    };
+    let reply = if invalid {
+        http::failure_reply(&crate::failure::Failure::Internal {
+            head: "TypeError".into(),
+            message: "Invalid URL".into(),
+            code: Some("ERR_INVALID_URL".into()),
+        })
+    } else {
+        match routes::route(panel, &mut req) {
+            Some(reply) => reply,
+            None => {
+                let conn = req.body.into_conn();
+                return missing(conn, &head, &panel.trouble);
+            }
         }
     };
-    up.write_all(&rewrite_head(&head, addr, &auth.authorization_for(addr.port())))?;
-    up.write_all(&buf[used..])?;
+    let head_only = req.method == "HEAD";
+    let conn = req.body.into_conn();
+    // a client that stops reading does not hold the thread: each write has this long
+    conn.set_write_timeout(Some(WRITE_TIMEOUT))?;
+    let sent = http::send(conn, reply, proof.as_deref(), head_only);
+    linger(conn);
+    sent
+}
 
-    // request body (if any) up, response down; each side closes its half when its source ends
-    let mut up_reader = up.try_clone()?;
-    let mut conn_writer = conn.try_clone()?;
-    let pump = std::thread::spawn(move || {
-        let _ = std::io::copy(&mut conn, &mut up);
-        let _ = up.shutdown(Shutdown::Write);
-    });
-    let _ = std::io::copy(&mut up_reader, &mut conn_writer);
-    let _ = conn_writer.shutdown(Shutdown::Both);
-    let _ = up_reader.shutdown(Shutdown::Both);
-    let _ = pump.join();
-    Ok(())
+/// Whether Node's HTTP parser takes `target` as a request target: a path, one that starts with
+/// `*`, or an address with a scheme (letters, then `://`). `x:api/settings` and CONNECT's `host:port` are not.
+fn target_is_http(target: &str) -> bool {
+    if target.starts_with('/') || target.starts_with('*') {
+        return true;
+    }
+    target
+        .split_once("://")
+        .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.bytes().all(|b| b.is_ascii_alphabetic()))
+}
+
+/// Ends a connection whose request may not have been read to its end (a refused upload): the
+/// answer is on its way, and closing with bytes unread would have the system reset the
+/// connection and the client lose the answer. So: no more from this side, then what is still
+/// coming is read and dropped, for a short while and up to a size.
+fn linger(conn: &mut TcpStream) {
+    let _ = conn.shutdown(Shutdown::Write);
+    // two seconds in all, not per read
+    let until = std::time::Instant::now() + Duration::from_secs(2);
+    let mut sink = [0u8; 16 * 1024];
+    let mut dropped = 0usize;
+    while dropped < 4 * 1024 * 1024 {
+        let left = until.saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() || conn.set_read_timeout(Some(left)).is_err() {
+            break;
+        }
+        match conn.read(&mut sink) {
+            Ok(n) if n > 0 => dropped += n,
+            _ => break,
+        }
+    }
 }
 
 fn missing(conn: &mut TcpStream, head: &Head, why: &str) -> std::io::Result<()> {
     if head.path().starts_with("/api/") {
-        let body = format!(
-            "{{\"error\":\"the panel API is not running: {}\"}}",
-            why.replace('\\', "\\\\").replace('"', "\\\"")
-        );
-        return respond(conn, 503, "application/json", body.as_bytes());
+        let body = serde_json::json!({
+            "error": format!("the panel could not work out where its data is: {why}"),
+        });
+        return respond(conn, 503, "application/json", body.to_string().as_bytes());
     }
     let page = format!(
         "<!doctype html><meta charset=utf-8><title>SpawnLoft</title>\
          <body style=\"font:15px system-ui;margin:3em;color:#ddd;background:#1b1d22\">\
          <h1 style=\"font-size:20px\">SpawnLoft could not start</h1>\
-         <p>The window works, but the panel behind it could not start: {}</p>\
-         <p>Reinstalling SpawnLoft usually fixes this. Your servers and worlds are not affected.</p>",
+         <p>SpawnLoft could not work out where its data is: {}</p>\
+         <p>Your servers and worlds are not affected.</p>",
         html_escape(why)
     );
     respond(conn, 503, "text/html; charset=utf-8", page.as_bytes())
@@ -624,20 +757,14 @@ fn respond_with(
 mod tests {
     use super::*;
 
-    fn head(raw: &str) -> Head {
-        parse_head(raw.as_bytes()).unwrap().0
-    }
-
     #[test]
-    fn upstream_must_be_loopback() {
+    fn a_chunked_answer_is_put_together() {
         assert_eq!(
-            parse_upstream("http://127.0.0.1:8770/"),
-            Some(SocketAddr::from(([127, 0, 0, 1], 8770)))
+            unchunked(b"3\r\nabc\r\n2;x=y\r\nde\r\n0\r\n\r\n"),
+            Some(b"abcde".to_vec())
         );
-        assert!(parse_upstream("http://localhost:1/").is_some());
-        assert_eq!(parse_upstream("http://192.168.1.2:8770/"), None);
-        assert_eq!(parse_upstream("https://127.0.0.1:8770/"), None);
-        assert_eq!(parse_upstream("http://127.0.0.1:0/"), None);
+        assert_eq!(unchunked(b"3\r\nab"), None);
+        assert_eq!(unchunked(b"zz\r\n"), None);
     }
 
     #[test]
@@ -652,7 +779,7 @@ mod tests {
     }
 
     #[test]
-    fn a_head_the_upstream_could_read_differently_is_not_a_head() {
+    fn a_head_that_could_be_read_two_ways_is_not_a_head() {
         let ok = "GET /a?b=c HTTP/1.1\r\nHost: x\r\nX-Tab: a\tb\r\n\r\n";
         assert!(parse_head(ok.as_bytes()).is_some());
         for bad in [
@@ -675,51 +802,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rewrite_names_the_upstream_and_closes() {
-        let h = head(
-            "POST /api/x HTTP/1.1\r\nHost: 127.0.0.1:9000\r\nOrigin: http://127.0.0.1:9000\r\n\
-             Connection: keep-alive\r\nContent-Length: 2\r\n\r\n",
-        );
-        let out = String::from_utf8(rewrite_head(
-            &h,
-            SocketAddr::from(([127, 0, 0, 1], 7)),
-            "SpawnLoft up",
-        ))
-        .unwrap();
-        assert!(out.starts_with("POST /api/x HTTP/1.1\r\n"));
-        assert!(out.contains("Host: 127.0.0.1:7\r\n"));
-        assert!(out.contains("Origin: http://127.0.0.1:7\r\n"));
-        assert!(out.contains("Content-Length: 2\r\n"));
-        assert!(!out.contains("keep-alive"));
-        assert!(out.ends_with("Authorization: SpawnLoft up\r\nConnection: close\r\n\r\n"));
-    }
-
-    #[test]
-    fn the_callers_credential_is_not_forwarded() {
-        let h = head(
-            "GET /api/x HTTP/1.1\r\nHost: 127.0.0.1:9000\r\nauthorization: SpawnLoft theirs\r\n\
-             Cookie: theme=dark; spawnloft_9000=session\r\ncookie: spawnloft_9000=again\r\n\r\n",
-        );
-        let out = String::from_utf8(rewrite_head(
-            &h,
-            SocketAddr::from(([127, 0, 0, 1], 7)),
-            "SpawnLoft up",
-        ))
-        .unwrap();
-        assert!(
-            !out.contains("theirs") && !out.contains("session") && !out.contains("again"),
-            "{out}"
-        );
-        assert!(out.contains("Cookie: theme=dark\r\n"), "{out}");
-        assert_eq!(
-            out.to_ascii_lowercase().matches("authorization:").count(),
-            1,
-            "{out}"
-        );
-        assert_eq!(out.to_ascii_lowercase().matches("cookie:").count(), 1, "{out}");
-    }
-
     const TEST_KEY: [u8; 32] = [9; 32];
 
     fn api_header(port: u16) -> String {
@@ -730,17 +812,258 @@ mod tests {
     }
 
     /// A listener that answers `requests` connections through `handle`, and its address.
-    fn front(upstream: Upstream, requests: usize) -> SocketAddr {
+    fn front(requests: usize) -> SocketAddr {
+        // a panel that could not work out where its data is
+        let panel = Panel {
+            layout: None,
+            trouble: "no data".into(),
+            shell: false,
+            jobs: Arc::default(),
+            port: 0,
+        };
+        front_of(panel, requests)
+    }
+
+    fn front_of(panel: Panel, requests: usize) -> SocketAddr {
         let front = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = front.local_addr().unwrap();
         let auth = PanelAuth::new(panel_auth::Key::from_bytes(TEST_KEY), addr.port(), 0);
         std::thread::spawn(move || {
             for _ in 0..requests {
                 let (c, _) = front.accept().unwrap();
-                handle(c, &auth, &upstream).unwrap();
+                // a client that hangs up early is not this listener's failure
+                let _ = handle(c, &auth, &panel);
             }
         });
         addr
+    }
+
+    /// A panel whose data would be in a folder nothing is in; `shell` as behind the window.
+    fn panel_in(name: &str, shell: bool) -> Panel {
+        let root = std::env::temp_dir()
+            .join(format!("sl-panel-{name}-{}", std::process::id()))
+            .to_string_lossy()
+            .into_owned();
+        let at = |leaf: &str| crate::jspath::join(&[&root, leaf]);
+        Panel {
+            layout: Some(Layout {
+                instances_dir: at("instances"),
+                separate_instances: false,
+                registry_file: at("instances.json"),
+                templates_dir: at("templates"),
+                jars_dir: at("jars"),
+                backups_dir: at("backups"),
+                run_dir: at("run"),
+                engines_dir: at("engines"),
+                services_dir: at("services"),
+                settings_file: at("settings.json"),
+                data_root: root,
+            }),
+            trouble: String::new(),
+            shell,
+            jobs: Arc::default(),
+            port: 0,
+        }
+    }
+
+    fn body_of(response: &str) -> &str {
+        response.split_once("\r\n\r\n").map_or("", |(_, b)| b)
+    }
+
+    #[test]
+    fn a_route_is_answered_only_to_a_caller_with_a_credential() {
+        let addr = front_of(panel_in("moved", false), 4);
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 200 OK\r\n"), "{out}");
+        assert!(out.contains("Content-Type: application/json\r\n"), "{out}");
+        assert!(out.contains("Cache-Control: no-store\r\n"), "{out}");
+        assert!(body_of(&out).starts_with("[{\"id\":\"paper\""), "{out}");
+        // decided before the route is looked at
+        let out = exchange(
+            addr,
+            &format!("GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"),
+        );
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
+        assert!(!out.contains("paper"), "{out}");
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: evil.example\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 403"), "{out}");
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nOrigin: http://evil.example\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 403"), "{out}");
+    }
+
+    #[test]
+    fn a_probe_is_answered_only_for_an_allowed_request() {
+        let key = panel_auth::Key::from_bytes(TEST_KEY);
+        let nonce = "abcdefghijklmnopqrstuv";
+        let addr = front_of(panel_in("probe", false), 4);
+        let p = addr.port();
+        let proof_in = |out: &str| {
+            out.lines()
+                .find_map(|l| l.strip_prefix("x-spawnloft-proof: "))
+                .map(str::to_string)
+        };
+        // a route of the panel and one of the updater's
+        for path in ["/api/software", "/api/update"] {
+            let out = exchange(
+                addr,
+                &format!(
+                    "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nX-SpawnLoft-Probe: {nonce}\r\n{}\r\n",
+                    api_header(p)
+                ),
+            );
+            assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+            let proof = proof_in(&out).unwrap_or_else(|| panic!("no proof: {out}"));
+            assert!(panel_auth::proof_matches(&key, nonce, &proof), "{out}");
+        }
+        // no credential: nothing signed with the key goes out
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nX-SpawnLoft-Probe: {nonce}\r\n\r\n"
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
+        assert_eq!(proof_in(&out), None, "{out}");
+        // two probes are not one question
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nX-SpawnLoft-Probe: {nonce}\r\nx-spawnloft-probe: {nonce}\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+        assert_eq!(proof_in(&out), None, "{out}");
+    }
+
+    #[test]
+    fn a_request_whose_length_reads_two_ways_is_refused_before_anything() {
+        let addr = front_of(panel_in("framing", false), 5);
+        let p = addr.port();
+        for lines in [
+            "Content-Length: 2\r\nTransfer-Encoding: chunked\r\n",
+            "Content-Length: 2\r\nContent-Length: 3\r\n",
+            "Content-Length: 2\r\ncontent-length: 2\r\n",
+            "Content-Length: two\r\n",
+            "Transfer-Encoding: gzip\r\n",
+        ] {
+            let out = exchange(
+                addr,
+                &format!(
+                    "POST /api/appearance HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{lines}{}\r\n{{}}",
+                    api_header(p)
+                ),
+            );
+            assert!(out.starts_with("HTTP/1.1 400"), "{lines}: {out}");
+        }
+    }
+
+    #[test]
+    fn a_target_nodes_parser_refuses_is_never_routed() {
+        // WHATWG reads `x:api/software` against a base as the path `api/software`; Node's parser
+        // never let such a request line reach a route
+        let addr = front_of(panel_in("target", false), 6);
+        let p = addr.port();
+        let ask = |line: &str| {
+            exchange(
+                addr,
+                &format!("{line} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n", api_header(p)),
+            )
+        };
+        for line in ["GET x:api/software", "CONNECT 127.0.0.1:443"] {
+            let out = ask(line);
+            assert!(out.starts_with("HTTP/1.1 400"), "{line}: {out}");
+        }
+        // a whole address is a target Node takes, and routes by its path
+        let out = ask(&format!("GET http://127.0.0.1:{p}/api/software"));
+        assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+        let out = ask("OPTIONS *");
+        assert!(out.starts_with("HTTP/1.1 404"), "{out}");
+        // dot segments are resolved before the updater's routes are looked for
+        let out = ask("GET /api/update/../software");
+        assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+        assert!(body_of(&out).starts_with("[{\"id\":\"paper\""), "{out}");
+        // a target `new URL` throws on is a route's throw
+        let out = ask("GET http://[/api/software");
+        assert!(out.starts_with("HTTP/1.1 500"), "{out}");
+        assert_eq!(
+            body_of(&out),
+            r#"{"error":"Invalid URL","code":"ERR_INVALID_URL"}"#,
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn a_body_larger_than_a_route_reads_is_refused_without_being_read() {
+        let addr = front_of(panel_in("large", false), 1);
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!(
+                "POST /api/settings HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: {}\r\n{}\r\n",
+                http::BODY_LIMIT + 1,
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 413"), "{out}");
+        assert_eq!(body_of(&out), r#"{"error":"request body too large"}"#, "{out}");
+    }
+
+    #[test]
+    fn head_gets_the_head_alone_and_the_setup_page_is_only_behind_the_window() {
+        let addr = front_of(panel_in("pages", false), 3);
+        let p = addr.port();
+        let ask = |addr: SocketAddr, line: &str| {
+            let p = addr.port();
+            exchange(
+                addr,
+                &format!("{line} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n", api_header(p)),
+            )
+        };
+        let got = ask(addr, "GET /launcher");
+        assert!(got.starts_with("HTTP/1.1 200"), "{got}");
+        assert!(got.contains("X-Frame-Options: SAMEORIGIN\r\n"), "{got}");
+        assert!(
+            got.contains("Content-Security-Policy: frame-ancestors 'self'\r\n"),
+            "{got}"
+        );
+        assert!(body_of(&got).contains("<html"), "{got}");
+        let head = ask(addr, "HEAD /launcher");
+        assert!(head.starts_with("HTTP/1.1 200"), "{head}");
+        assert_eq!(body_of(&head), "", "{head}");
+        let _ = p;
+        assert!(ask(addr, "GET /setup").starts_with("HTTP/1.1 404"));
+
+        let addr = front_of(panel_in("pages-window", true), 2);
+        let got = ask(addr, "GET /setup");
+        assert!(got.starts_with("HTTP/1.1 200"), "{got}");
+        assert!(got.contains("X-Frame-Options: DENY\r\n"), "{got}");
+        // the window alone may move the data, and only with a credential like any other call
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!("POST /api/setup HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: 2\r\n\r\n{{}}"),
+        );
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
     }
 
     fn exchange(addr: SocketAddr, request: &str) -> String {
@@ -751,31 +1074,9 @@ mod tests {
         out
     }
 
-    /// An upstream that answers each of `requests` connections with the head it was sent.
-    fn echo_upstream(requests: usize) -> SocketAddr {
-        let up = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = up.local_addr().unwrap();
-        std::thread::spawn(move || {
-            for _ in 0..requests {
-                let (mut s, _) = up.accept().unwrap();
-                let mut buf = vec![0u8; 8192];
-                let n = s.read(&mut buf).unwrap();
-                let body = String::from_utf8_lossy(&buf[..n]).to_string();
-                let resp = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                    body.len()
-                );
-                s.write_all(resp.as_bytes()).unwrap();
-            }
-        });
-        addr
-    }
-
     #[test]
     fn nobody_gets_through_without_a_credential() {
-        // an upstream that does not exist: a forwarded request would be a 502, not a 401
-        let nowhere = SocketAddr::from(([127, 0, 0, 1], 9));
-        let addr = front(Upstream::Node(nowhere), 5);
+        let addr = front_of(panel_in("nobody", false), 5);
         let p = addr.port();
         let api = exchange(
             addr,
@@ -819,9 +1120,8 @@ mod tests {
     }
 
     #[test]
-    fn a_login_link_gives_a_session_and_the_upstream_gets_its_own_token() {
-        let up = echo_upstream(2);
-        let addr = front(Upstream::Node(up), 4);
+    fn a_login_link_gives_a_session() {
+        let addr = front_of(panel_in("login", false), 4);
         let p = addr.port();
         let key = panel_auth::Key::from_bytes(TEST_KEY);
         let link = panel_auth::login_path(&key, p, Some("/setup")).unwrap();
@@ -857,38 +1157,26 @@ mod tests {
             "{again}"
         );
 
-        // with the cookie the request is forwarded: no cookie, and a token for the upstream's port
+        // with the cookie a route answers, and so it does for a program's token
         let seen = exchange(
             addr,
-            &format!("GET /api/a HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nCookie: {pair}\r\n\r\n"),
+            &format!("GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nCookie: {pair}\r\n\r\n"),
         );
         assert!(seen.starts_with("HTTP/1.1 200 OK"), "{seen}");
-        assert!(
-            !seen.contains(pair) && !seen.to_ascii_lowercase().contains("cookie:"),
-            "{seen}"
-        );
-        let token = seen
-            .lines()
-            .find_map(|l| l.strip_prefix("Authorization: SpawnLoft "))
-            .expect("a token for the upstream");
-        let now = panel_auth::now_ms();
-        assert!(panel_auth::check_token(&key, token, panel_auth::Purpose::Api, up.port(), now, 0).is_some());
-        assert!(panel_auth::check_token(&key, token, panel_auth::Purpose::Api, p, now, 0).is_none());
-
-        // an api token gets through the same way, and is replaced too
-        let mine = api_header(p);
+        assert!(!seen.contains(pair), "{seen}");
         let seen = exchange(
             addr,
-            &format!("GET /api/b HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{mine}\r\n"),
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n",
+                api_header(p)
+            ),
         );
         assert!(seen.starts_with("HTTP/1.1 200 OK"), "{seen}");
-        assert!(!seen.contains(mine.trim()), "{seen}");
     }
 
     #[test]
-    fn the_sign_in_callback_is_forwarded_without_a_credential() {
-        let up = echo_upstream(1);
-        let addr = front(Upstream::Node(up), 2);
+    fn the_sign_in_callback_is_the_one_route_open_without_a_credential() {
+        let addr = front_of(panel_in("callback", false), 2);
         let p = addr.port();
         let seen = exchange(
             addr,
@@ -897,11 +1185,12 @@ mod tests {
                  Sec-Fetch-Site: cross-site\r\n\r\n"
             ),
         );
-        assert!(seen.starts_with("HTTP/1.1 200 OK"), "{seen}");
+        // it reaches its route, which has no sign-in under way to finish
         assert!(
-            seen.contains("GET /api/client/accounts/login/callback?code=x&state=y HTTP/1.1"),
+            !seen.starts_with("HTTP/1.1 401") && !seen.starts_with("HTTP/1.1 403"),
             "{seen}"
         );
+        assert!(seen.contains("Content-Type: text/html"), "{seen}");
         // nothing else is open: the same request one path over
         let other = exchange(
             addr,
@@ -911,40 +1200,8 @@ mod tests {
     }
 
     #[test]
-    fn proxies_a_request_end_to_end() {
-        // a fake upstream that echoes the Host it was sent
-        let up = TcpListener::bind("127.0.0.1:0").unwrap();
-        let up_addr = up.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (mut s, _) = up.accept().unwrap();
-            let mut buf = vec![0u8; 4096];
-            let n = s.read(&mut buf).unwrap();
-            let (h, _) = parse_head(&buf[..n]).unwrap();
-            let body = h.header("host").unwrap().to_string();
-            let resp = format!(
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            s.write_all(resp.as_bytes()).unwrap();
-        });
-        let addr = front(Upstream::Node(up_addr), 1);
-        let p = addr.port();
-        let out = exchange(
-            addr,
-            &format!(
-                "GET /api/a HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n",
-                api_header(p)
-            ),
-        );
-        assert!(out.starts_with("HTTP/1.1 200 OK"));
-        assert!(out.ends_with(&format!("127.0.0.1:{}", up_addr.port())));
-    }
-
-    #[test]
-    fn refuses_a_foreign_origin_before_forwarding() {
-        // an upstream that does not exist: a forwarded request would be a 502, not a 403
-        let nowhere = SocketAddr::from(([127, 0, 0, 1], 9));
-        let addr = front(Upstream::Node(nowhere), 2);
+    fn refuses_a_foreign_origin_before_a_route() {
+        let addr = front_of(panel_in("origin", false), 2);
         let p = addr.port();
         // a good token does not help a request from another origin, or one from another site
         for line in ["Origin: http://evil.example", "Sec-Fetch-Site: same-site"] {
@@ -960,9 +1217,9 @@ mod tests {
     }
 
     #[test]
-    fn without_node_the_page_says_so_and_the_api_is_503() {
+    fn without_its_data_the_page_says_so_and_the_api_is_503() {
         for (path, kind) in [("/", "text/html"), ("/api/servers", "application/json")] {
-            let addr = front(Upstream::Missing("no node".into()), 1);
+            let addr = front(1);
             let p = addr.port();
             let out = exchange(
                 addr,
@@ -973,14 +1230,14 @@ mod tests {
             );
             assert!(out.starts_with("HTTP/1.1 503"), "{out}");
             assert!(out.contains(kind));
-            assert!(out.contains("no node"));
+            assert!(out.contains("no data"));
         }
     }
 
     #[test]
-    fn updater_routes_are_answered_here_even_without_node() {
-        // an unknown updater route is a 404 from this process, not a 503 from the missing upstream
-        let addr = front(Upstream::Missing("no node".into()), 1);
+    fn updater_routes_are_answered_even_without_the_data() {
+        // an unknown updater route is a 404, not the 503 of a panel with no data
+        let addr = front(1);
         let p = addr.port();
         let out = exchange(
             addr,
