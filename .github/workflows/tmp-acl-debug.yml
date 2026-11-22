@@ -10,18 +10,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-      - name: probe
-        shell: bash
+      - name: probe (files written by Node, as the rig does; round 2)
+        shell: pwsh
         run: |
-          D=$(node -e "const fs=require('fs'),os=require('os'),p=require('path');console.log(fs.realpathSync.native(fs.mkdtempSync(p.join(os.tmpdir(),'sl-acl-'))))")
-          mkdir -p "$D/data/client"
-          echo '{"version":1,"instances":{}}' > "$D/data/instances.json"
-          echo '{}' > "$D/data/client/accounts.json"
-          echo "== raw icacls"
-          /c/Windows/System32/icacls.exe "$(cygpath -w "$D/data/instances.json")"
-          echo "== node inspect"
-          node --input-type=module -e "import('./src/private-files.mjs').then(m=>{const f=process.argv[1];console.log(JSON.stringify(m.currentPrincipal()));const r=m.privateFilesPlatform();console.log(r, JSON.stringify(m.inspectPrivateFile(f)))})" "$(cygpath -w "$D/data/instances.json")"
-          echo "== node doctor --json, rig env"
-          SPAWNLOFT_DATA_ROOT="$(cygpath -w "$D/data")" NODE_ENV=test HOME="$(cygpath -w "$D")" USERPROFILE="$(cygpath -w "$D")" node spawnloft.mjs doctor --json || true
-          echo "== node doctor --json, plain env"
-          SPAWNLOFT_DATA_ROOT="$(cygpath -w "$D/data")" node spawnloft.mjs doctor --json || true
+          $d = node -e "const fs=require('fs'),os=require('os'),p=require('path');const d=fs.realpathSync.native(fs.mkdtempSync(p.join(os.tmpdir(),'sl-acl-')));fs.mkdirSync(p.join(d,'run','data','client'),{recursive:true});fs.writeFileSync(p.join(d,'run','data','instances.json'),JSON.stringify({version:1,instances:{}}));fs.writeFileSync(p.join(d,'run','data','client','accounts.json'),'{}');console.log(d)"
+          $f = "$d\run\data\instances.json"
+          "== folder"; icacls "$d"; icacls "$d\run\data"
+          "== file"; icacls "$f"
+          "== Get-Acl"; (Get-Acl $f).Access | Format-Table IdentityReference,IsInherited,FileSystemRights -AutoSize
+          "== sddl"; (Get-Acl $f).Sddl
+          "== node inspect"
+          node --input-type=module -e "const m=await import('./src/private-files.mjs');const f=process.argv[1];console.log(JSON.stringify(m.inspectPrivateFile(f)))" "$f"
+          "== node doctor --json"
+          $env:SPAWNLOFT_DATA_ROOT="$d\run\data"; $env:NODE_ENV="test"
+          node spawnloft.mjs doctor --json
+          exit 0
