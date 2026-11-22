@@ -81,7 +81,27 @@ enum Run {
     Error(String),
 }
 
+/// libuv on Windows runs a name with no extension only as `name.com` or `name.exe`, never as it
+/// is written, so Node finds no program where a file of that bare name is all there is.
+#[cfg(windows)]
+fn no_program_by_that_name(bin: &str) -> bool {
+    let path = std::path::Path::new(bin);
+    let has_dir = bin.contains(['/', '\\']);
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    has_dir
+        && !name.contains('.')
+        && !["com", "exe"]
+            .iter()
+            .any(|ext| path.with_file_name(format!("{name}.{ext}")).is_file())
+}
+
 fn run(bin: &str, args: &[&str]) -> Run {
+    #[cfg(windows)]
+    if no_program_by_that_name(bin) {
+        return Run::Missing;
+    }
     let mut cmd = Command::new(bin);
     cmd.args(args)
         .stdin(Stdio::null())
@@ -92,6 +112,11 @@ fn run(bin: &str, args: &[&str]) -> Run {
         Ok(c) => c,
         Err(e) => {
             let (code, _) = crate::jspath::error_code(&e);
+            // libuv's name for a file that is not a program, or not one for this machine
+            let code = match e.raw_os_error() {
+                Some(193 | 216) if cfg!(windows) => "EFTYPE",
+                _ => code,
+            };
             return if code == "ENOENT" {
                 Run::Missing
             } else {

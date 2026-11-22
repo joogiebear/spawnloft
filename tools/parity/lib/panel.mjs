@@ -171,6 +171,10 @@ export async function replay(core, args, requests, { cwd, env, ctx }) {
   let panel
   try {
     panel = await startPanel(core, args, { cwd, env })
+    // A token made before the panel began is refused, and on Windows each Node process keeps its
+    // own clock, a few milliseconds from the next one's: a first request sent at once could carry
+    // a time from before the start it has just read about.
+    if (process.platform === 'win32') await new Promise((r) => setTimeout(r, 100))
   } catch (e) {
     return { text: '', problem: e.message }
   }

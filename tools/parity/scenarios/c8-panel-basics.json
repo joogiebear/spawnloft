@@ -45,6 +45,10 @@
  ],
  "normalize": [
   {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
    "pattern": "\\d{4}-\\d\\d-\\d\\dT\\d\\d%3A\\d\\d%3A\\d\\d\\.\\d{3}Z",
    "replace": "<time>"
   },

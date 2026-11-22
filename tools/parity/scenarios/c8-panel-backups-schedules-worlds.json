@@ -7,6 +7,10 @@
  ],
  "normalize": [
   {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
    "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
    "replace": "<size>"
   },

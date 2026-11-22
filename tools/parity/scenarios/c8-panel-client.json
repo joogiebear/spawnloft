@@ -196,6 +196,10 @@
  ],
  "normalize": [
   {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
    "pattern": "^1[5-9]\\d{11}$",
    "replace": "<epoch-ms>"
   },

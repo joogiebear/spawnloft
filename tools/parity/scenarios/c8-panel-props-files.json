@@ -6,6 +6,10 @@
  },
  "normalize": [
   {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
    "pattern": "(file-delete_files_<stamp>)_\\d+",
    "replace": "$1"
   },

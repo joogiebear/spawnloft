@@ -37,6 +37,10 @@
  ],
  "normalize": [
   {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
    "pattern": "\\(build [^)]*\\)",
    "replace": "(build)"
   },

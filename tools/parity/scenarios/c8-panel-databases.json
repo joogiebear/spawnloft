@@ -5,6 +5,10 @@
  },
  "normalize": [
   {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
    "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{24}\\b",
    "replace": "<password>"
   },
