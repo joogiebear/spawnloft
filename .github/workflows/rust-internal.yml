@@ -185,7 +185,7 @@ jobs:
           cargo build --locked -p spawnloft-core --features test-hooks
           cargo build --locked -p spawnloft-fakes --bin fake-scheduler
           exe=; [ "$RUNNER_OS" = Windows ] && exe=.exe
-          echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV""
+          echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV"
       - name: The library's tests with the test hooks on
         working-directory: rust
         run: cargo test --locked -p spawnloft-lib --features test-hooks
