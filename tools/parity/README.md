@@ -25,6 +25,17 @@ purpose: run the scenario with `--record` on each platform (the record is writte
 run had no problem) and say why in the pull request. A step with `"frozen": false` is run and its
 `expect` checked, but left out of the record (for output that depends on the machine).
 
+The records were captured on the GitHub runners (`.github/workflows` capture run of 2026-11-22),
+and they hold what is particular to those machines: a scheduled task's name carries a hash of the
+data folder's path (the rig always uses `<TMPDIR>/sl-parity`, and CI sets `TMPDIR` to the
+runner's temp folder), a tar's entries are in the runner's directory order, and Java discovery
+lists the runner's JVMs (`/usr/lib/jvm/...`). So the check is CI's: on another machine those
+scenarios differ. When a runner image changes what it carries (a new JDK, say), the scenarios
+that list Java fail on that platform; rewrite them there with `--record` (from the Rust side,
+which was held to the Node core's records when they were frozen) and say so in the pull request.
+A scenario's `normalize` rules also run over its record at check time, so a rule added later
+(as `c6b-doctor`'s for the Java and tar versions) needs no new record.
+
 ## Running it
 
 ```
