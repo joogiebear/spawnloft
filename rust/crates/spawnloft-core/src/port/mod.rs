@@ -12,9 +12,11 @@
 //! moves plugins and modpacks: `plugins`, then `pack` and `new --modpack`. C6 moves the scheduled
 //! tasks and what moves or drops a server with them: `task`, `rm` (and `remove`) and `rename`. C7
 //! moves the client launcher, `client`, whole. C6b moves the diagnostics: `doctor` and `diag`.
+//! C9 moves the bot harness, `bot` (the Mineflayer host it drives stays JavaScript).
 
 pub mod args;
 mod backup;
+mod bot;
 mod client;
 mod config;
 mod configure;
@@ -210,6 +212,7 @@ fn dispatch(
         "data" => data::data(&mut ctx),
         "doctor" => doctor::doctor(&mut ctx),
         "diag" => doctor::diag(&mut ctx),
+        "bot" => bot::bot(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

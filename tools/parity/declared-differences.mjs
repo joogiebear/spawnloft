@@ -236,6 +236,26 @@ export const DECLARED = [
     apply: null,
     held: 'no installed build can be in that state (C0-CHECKS.md section 2); the rig\'s code folder is the checkout, which has no instances.json',
   },
+  {
+    // C9 (plan section 5.4): the Rust core has no code folder to run the host from after C10, so
+    // it carries bot-host.cjs inside itself and writes it beside mineflayer before each run
+    id: 'bot-host-script',
+    where: '`bot run` once mineflayer is installed: where the Mineflayer host script lives and which Node runs it',
+    node: 'runs `src/bot-host.cjs` from the code folder on its own Node',
+    rust: 'writes its embedded copy to `bot-host/bot-host.cjs` in the data folder and runs it there, on the bundled runtime\'s Node, else `node` on PATH, with `NODE_OPTIONS` and `NODE_PATH` removed',
+    apply: null,
+    held: 'c9-bot ignores data/bot-host/bot-host.cjs; nothing but the host run reads it, and both sides run the same script on the same Node in the rig',
+  },
+  {
+    // C9: the bot host matches patterns in JavaScript; the core only checks them, in jsregex's
+    // non-Unicode dialect, which is what the existing run-time patterns use
+    id: 'bot-pattern-unicode-mode',
+    where: 'a bot scenario pattern with the `u` or `v` flag whose source is valid without it but not with it (`/\\a/u`, `/a{/u`)',
+    node: 'refused when the scenario is checked',
+    rust: 'accepted when the scenario is checked; the host, which matches in JavaScript, fails that step',
+    apply: null,
+    held: 'scenarios give `u` or `v` only with patterns valid in both dialects',
+  },
 ]
 
 // Both sides' text for one step, evened out by every row that applies to it.
