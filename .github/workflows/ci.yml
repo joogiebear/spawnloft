@@ -1,4 +1,3 @@
-# The other half of verify-build.mjs's complaint that "there is no CI on this repository".
 # This runs what can run without secrets: the Node test suite (the packaging, release and panel
 # page tests; the core is Rust, checked by rust-internal.yml). Building, signing and publishing
 # stay on the release machine - the signing profile lives there.

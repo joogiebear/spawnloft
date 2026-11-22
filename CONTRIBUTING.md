@@ -132,53 +132,23 @@ verbatim as the text of the stable release. A pull request that changes what som
 adds its line there, under the version it will ship in. Release day is then a read-through, not a
 reconstruction from a month of commit messages.
 
-### Betas
+### Betas and releases
 
-> **The 2.0 line (`v2`) retires this pipeline.** `desktop-preview` and `desktop-stable` are
-> removed on `v2` so that merging it into `dev` cannot publish an Electron build to 1.6 beta
-> users. 2.x betas are published only from the Tauri release workflow, on Victor's confirmation.
-> What follows describes 1.x as it still runs on `dev` and `main`.
+Nothing is published by a merge. A 2.x beta or stable release is built from one commit by the
+`installer-mac` and `installer-linux` workflows and on the Windows signing machine, assembled and
+checked by the release gate, and published only on Victor's confirmation. The steps are in
+[`rust/RELEASE.md`](rust/RELEASE.md); [`rust/beta-review/CHECKLIST.md`](rust/beta-review/CHECKLIST.md)
+says when a release may be made at all. Betas are prereleases, so a stable install is never
+offered one; see [the desktop preview guide](desktop/PREVIEW.md) for installation on each platform.
 
-The `desktop-preview` workflow builds the same `dev` commit natively on Windows x64, Apple
-Silicon Mac, Linux x64 and Linux arm64. It publishes one numbered beta only after all four
-pass core tests, bundle verification and the packaged-app smoke checks; on Linux the `.deb` is
-installed with apt on Ubuntu 24.04 and the installed app is what gets opened, and the `.rpm` is
-installed with dnf in a Fedora container. It is all or nothing: one platform failing holds back the
-rest. A red job is not always the code - GitHub's download servers fail now and then, and a
-re-run of the failed job is the answer when the log says 504.
+Before a release, `node desktop/set-version.mjs <version>` sets the version in the two places it is
+written (`package.json` and `desktop/package.json`), and `desktop/STABLE.md` gets one more
+read-through.
 
-Every package uses the source version's base plus `-beta.N`, where N is the workflow run number
-plus one. Manifests record the source version, package version, commit, platform, architecture
-and checksums. The publisher verifies every manifest and updater feed, uploads everything to one
-draft, then publishes it as a prerelease. It refuses mixed commits, missing packages and
-conflicting existing tags. Keep fixes in shared code when they apply to more than one platform;
-platform-specific behaviour must stay explicit and covered on its native runner.
-
-A stable install asks GitHub for the latest release, which leaves pre-releases out, so nobody on a
-stable version is offered a beta. An install that is itself a beta accepts newer betas and newer
-stable releases alike, so it follows each beta and then moves to the stable release when that is
-published. Install the first beta by hand; the rest arrive through the app. See
-[the desktop preview guide](desktop/PREVIEW.md) for installation on each platform.
-
-### Release day
-
-1. Branch `release/X.Y` off `dev`. `node desktop/set-version.mjs X.Y.0` sets the version in the
-   three places it is written. Read `desktop/STABLE.md` once more. Pull request to `main`; it
-   needs `test` and `test-linux` green and every review thread resolved. Merge with a merge commit.
-2. On the Windows signing machine, on `main`: `npm run release:stable` in `desktop/`. It starts
-   the `desktop-stable` workflow (both Macs signed and notarized, both Linux architectures built,
-   installed and exercised), builds and signs Windows, runs the smoke test, waits for CI, collects
-   every platform into one folder and verifies them together. Then it stops.
-3. `npm run release:stable -- --publish` makes it public. That is a separate step on purpose: a
-   stable release reaches every installed copy and cannot be recalled.
-4. It prints what is left: fast-forward `dev` to `main`, and delete the month's beta pre-releases
-   once the update has been seen to arrive.
-
-**Then start the next month.** After a release `dev` sits at a stable version, where the beta
-pipeline switches itself off and says nothing. The first branch of the month runs
-`node desktop/set-version.mjs X.(Y+1).0-beta.1`, and CI refuses a pull request into `dev` that
+**Then start the next month.** After a release `dev` sits at a stable version. The first branch
+of the month runs `node desktop/set-version.mjs X.(Y+1).0-beta.1`, and CI refuses a pull request into `dev` that
 does not carry a prerelease version, so it cannot be forgotten - which it once was, for a whole
 release.
 
-To try a local build, run `npx electron-builder --publish never` in `desktop/` and install the
-result by hand; it never touches GitHub.
+To try a local build, `cargo build -p spawnloft-core -p spawnloft-shell` in `rust/` and run it as
+the README's "Desktop app" section describes; nothing is published from a local build.

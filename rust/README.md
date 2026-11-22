@@ -46,21 +46,16 @@ development with C++" workload (MSVC linker and Windows SDK).
 
 ## How it ships (internal phase)
 
-`.github/workflows/rust-internal.yml` runs on pushes to `v2`: the checks above, the Node tests
-(run against the Rust build), then packages for Windows x64, macOS arm64 and Linux x64 with the binary inside the Electron app
-at `resources/bin/spawnloft-core` (`Contents/MacOS/spawnloft-core` on the Mac), plus the
-`spawnloft-cli` deb and rpm. Everything is a workflow artifact kept for 14 days, versioned
-`2.0.0-internal.<run>`, unsigned on Windows, ad-hoc signed on the Mac, with the app's update
-check turned off. The workflow never publishes, tags, writes a feed or makes a release.
+`.github/workflows/rust-internal.yml` runs on pull requests into and pushes to `v2`: the checks
+above, the parity rig, the Node tests (run against the Rust build), the Tauri window driven over
+WebDriver on Linux, and the panel in a real browser on each platform. It packages and publishes
+nothing. The 2.0 packages (the Tauri app with `spawnloft-core` at `resources/bin/spawnloft-core`,
+and the `spawnloft-cli` deb and rpm) are built by `installer.yml`, `installer-mac.yml` and
+`installer-linux.yml` as workflow artifacts kept for 14 days; none of them publishes, tags or
+makes a release.
 
 `.github/workflows/updater.yml` runs on `v2` when `rust/**` or `desktop/update-envelope.mjs`
 change: throwaway minisign keys made in the job (`SPAWNLOFT_UPDATE_PUBKEYS` overrides the
 compiled-in release keys), two shell builds, a loopback feed with every refusal variant
 (`crates/spawnloft-shell/updater-tests/`), and the design's scenarios 5 to 7 (update, rollback
 with the hold, refusals) on windows-latest. Nothing leaves the runner.
-
-To place a locally built binary where electron-builder picks it up:
-
-```sh
-node desktop/stage-core.mjs        # copies rust/target/release/spawnloft-core into desktop/build/bin/<platform>-<arch>/
-```
