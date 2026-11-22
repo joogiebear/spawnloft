@@ -17,7 +17,7 @@ same way.
 and arm64, Windows x64, macOS arm64), every step's output and exit code, the fake-host requests
 and the whole data tree of the Node core's run, with the machine's paths (`<run>`, `<repo>`,
 `<node>`, `<core>`), the fake hosts' loopback ports (`<fake https://...>`) and the rig's pid
-(`<rig-pid>`) named. (On this branch only `linux-x64` has its records so far; the other three are recorded on their own platforms.) A scenario with no record for the platform it runs on fails, and
+(`<rig-pid>`) named. A scenario with no record for the platform it runs on fails, and
 `test/parity-frozen.test.mjs` checks that every scenario has one for each platform.
 
 A record is the CLI's behaviour. A change to it is a change to what a person sees, made on
