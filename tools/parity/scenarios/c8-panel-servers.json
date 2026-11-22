@@ -565,12 +565,19 @@
     {
      "post": "/api/instances/run1/stop",
      "timeoutMs": 90000
-    },
-    {
-     "post": "/api/instances/run1/stop"
     }
    ],
    "timeoutMs": 400000
+  },
+  {
+   "daemonGone": "run1"
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/run1/stop"
+    }
+   ]
   },
   {
    "panel": [
