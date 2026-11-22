@@ -29,9 +29,13 @@ test('no workflow publishes anything or can write to the repository', () => {
   }
 })
 
-test('the 1.x stable release scripts refuse to run on this line', () => {
-  for (const file of ['release-stable.mjs', 'publish-stable.mjs']) {
-    const text = fs.readFileSync(path.join(root, 'desktop', file), 'utf8')
-    assert.match(text, /^process\.exit\(1\)$/m, `${file} stops before doing anything`)
+test('the Electron app and its 1.x release scripts are gone from this line', () => {
+  for (const file of ['main.js', 'preload.js', 'release.mjs', 'release-stable.mjs', 'publish-stable.mjs', 'finish-release.mjs',
+    'stable.config.cjs', 'preview.config.cjs', 'internal.config.cjs', 'after-pack.js', 'package-lock.json']) {
+    assert.ok(!fs.existsSync(path.join(root, 'desktop', file)), `desktop/${file} is retired`)
+  }
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'desktop', 'package.json'), 'utf8'))
+  for (const deps of [pkg.dependencies, pkg.devDependencies]) {
+    for (const name of Object.keys(deps ?? {})) assert.doesNotMatch(name, /^electron/, `desktop/package.json depends on ${name}`)
   }
 })

@@ -1,6 +1,5 @@
 # Shell scripts must keep LF: "#!/bin/sh\r" is not a program. Everything else follows the checkout.
 *.sh text eol=lf
-/desktop/build/linux/spawnloft text eol=lf
 # The bot host's pinned package.json and lockfile: setup compares them, so they read the same on every OS.
 /src/bot-host/*.json text eol=lf
 # The loaders' captured files: manifest.json names each by the sha1 of its bytes, as published.
