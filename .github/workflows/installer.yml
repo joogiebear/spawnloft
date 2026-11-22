@@ -20,7 +20,6 @@ on:
       - 'mcctl.mjs'
       - 'spawnloft.mjs'
       - 'package.json'
-      - 'test/fixtures/fake-mariadb/**'
       - '.github/workflows/installer.yml'
   workflow_dispatch:
 
@@ -85,13 +84,13 @@ jobs:
             cp ../../target/release/bundle/nsis/SpawnLoft_${v}_x64-setup.exe* "$RUNNER_TEMP/feed/"
           done
           ls -la "$RUNNER_TEMP/feed"
-      - name: Build the native JVM stand-in (spawnloft-fakes' fake-java)
+      - name: Build the native JVM and MariaDB stand-ins (spawnloft-fakes' fake-java, fake-mariadb)
         # both daemons run it as a real java; a release 2.0 core runs no .mjs stand-in
-        working-directory: rust
+        # both daemons run them as real programs; a release 2.0 core runs no .mjs stand-in
         run: |
-          cargo build --release --locked -p spawnloft-fakes --bin fake-java
+          cargo build --release --locked -p spawnloft-fakes --bin fake-java --bin fake-mariadb
           mkdir -p "$RUNNER_TEMP/fakes"
-          cp target/release/fake-java.exe "$RUNNER_TEMP/fakes/"
+          cp target/release/fake-java.exe target/release/fake-mariadb.exe "$RUNNER_TEMP/fakes/"
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ github.run_number }}-setups
@@ -143,6 +142,7 @@ jobs:
         shell: pwsh
         env:
           FAKE_JAVA_EXE: ${{ runner.temp }}\fakes\fake-java.exe
+          FAKE_MARIADB_EXE: ${{ runner.temp }}\fakes\fake-mariadb.exe
         run: |
           $beta = Get-ChildItem "$env:RUNNER_TEMP\beta" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
           $stable = Get-ChildItem "$env:RUNNER_TEMP\stable" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1

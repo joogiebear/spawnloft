@@ -33,7 +33,14 @@ function Start-Scenario($name) {
   # release 2.0 core runs no .mjs stand-in
   if (-not $env:FAKE_JAVA_EXE -or -not (Test-Path $env:FAKE_JAVA_EXE)) { throw "FAKE_JAVA_EXE does not name fake-java.exe: '$env:FAKE_JAVA_EXE'" }
   Copy-Item -Force $env:FAKE_JAVA_EXE (Join-Path $fixtures 'fake-java.exe')
-  Copy-Item -Recurse -Force (Join-Path $env:GITHUB_WORKSPACE 'test\fixtures\fake-mariadb') $fixtures
+  # the MariaDB tools likewise: spawnloft-fakes' fake-mariadb (FAKE_MARIADB_EXE) under each
+  # tool's name in bin\, where both cores look for <name>.exe before <name>.mjs
+  if (-not $env:FAKE_MARIADB_EXE -or -not (Test-Path $env:FAKE_MARIADB_EXE)) { throw "FAKE_MARIADB_EXE does not name fake-mariadb.exe: '$env:FAKE_MARIADB_EXE'" }
+  $mariaBin = Join-Path $fixtures 'fake-mariadb\bin'
+  New-Item -ItemType Directory -Force -Path $mariaBin | Out-Null
+  foreach ($t in 'mariadbd', 'mariadb', 'mariadb-admin', 'mariadb-dump', 'mariadb-install-db') {
+    Copy-Item -Force $env:FAKE_MARIADB_EXE (Join-Path $mariaBin "$t.exe")
+  }
   Set-NodeMode $script:nodeMode
 }
 

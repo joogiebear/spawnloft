@@ -53,3 +53,10 @@ path = "src/bin/fake-scheduler.rs"
 [[bin]]
 name = "fake-java"
 path = "src/bin/fake-java.rs"
+
+# Test-only: the MariaDB tools for the installer scenarios (installer.yml), one program copied
+# under each tool's name; a native port of test/fixtures/fake-mariadb, which a release 2.0 core
+# cannot run.
+[[bin]]
+name = "fake-mariadb"
+path = "src/bin/fake-mariadb.rs"
