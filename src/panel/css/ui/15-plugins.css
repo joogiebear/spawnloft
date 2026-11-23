@@ -1,14 +1,5 @@
 /* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
 @layer legacy {
-  /* ---- plugins: the reference layout for a tool ------------------------------ */
-
-  /*
-    Search first, then what is waiting, then the list. The list is a column of dense rows - a
-    lettered tile, the name over where it came from, the version - separated by the faintest rule,
-    because a list of forty plugins ruled at full strength reads as a spreadsheet.
-  */
-  .plug-add { display: grid; gap: var(--s-3); }
-
   /* Backups' first line: the schedule's state, the last backup's age, and the one action. */
   .bk-status {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
@@ -25,60 +16,5 @@
   .bk-text span:empty { display: none; }
   .bk-last { font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
   .bk-status[data-tone="warn"] .bk-last { color: var(--warn-ink); font-weight: 600; }
-
-  .callout {
-    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
-    padding: var(--s-3) var(--s-4);
-    background: var(--lapis-wash);
-    border: 1px solid var(--lapis-edge);
-    border-radius: var(--r);
-  }
-  .callout-text { flex: 1 1 200px; min-width: 0; display: grid; gap: 2px; }
-  .callout-text b { font: 600 var(--t-3)/1.3 var(--ui); color: var(--lapis-ink); }
-  .callout-text span { font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .callout-progress { flex-basis: 100%; margin: 0; }
-  .callout-progress:empty { display: none; }
-
-  .plug-head { display: flex; align-items: center; gap: var(--s-2); }
-  .plug-head .hist-title { margin: 0; flex: 1; }
-  .plug-head button { padding: 4px 10px; font-size: var(--t-2); }
-
-  .plist { display: grid; }
-  .plug {
-    display: grid;
-    grid-template-columns: 32px minmax(0, 1fr) 12ch 9ch auto;
-    align-items: center;
-    gap: var(--s-3);
-    padding: 9px var(--s-1);
-    border-bottom: 1px solid var(--line-faint);
-    transition: background-color var(--ease);
-  }
-  .plug:last-child { border-bottom: 0; }
-  .plug:hover { background-color: var(--hover); }
-  .plug-tile {
-    display: grid; place-items: center;
-    width: 32px; height: 32px;
-    border-radius: var(--r-sm);
-    background: var(--raised);
-    border: 1px solid var(--line);
-    color: var(--ink-2);
-    font: 650 var(--t-2)/1 var(--display);
-    letter-spacing: .02em;
-  }
-  .plug-main { min-width: 0; display: grid; gap: 2px; }
-  .plug-name { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .plug-src { font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
-  .plug-src code { font: var(--t-1)/1.3 var(--mono); color: var(--ink-3); }
-  .plug-built { color: var(--warn-ink); }
-  .plug-state { display: inline-flex; align-items: center; gap: 6px; font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
-  .plug-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--live); }
-  .plug-state[data-on="false"] { color: var(--ink-3); }
-  .plug-state[data-on="false"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
-  .plug-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 132px; }
-  .plug-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
-  /* The same two verbs on every row, always shown: hidden until hover, they read as missing. */
-  .plug-acts .row-acts { display: inline-flex; gap: 2px; }
-  .plug[data-off] .plug-name, .plug[data-off] .plug-tile { opacity: .55; }
 
 }
