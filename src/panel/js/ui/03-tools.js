@@ -149,12 +149,15 @@ function closeTool() {
 
 /**
  * While a tool has the console's place, the Console tab carries the number of errors it has
- * logged, so a server going wrong behind a plugin list is still seen. Its name says it too.
+ * logged since it was last shown, so a server going wrong behind a plugin list is still seen. Its
+ * name says it too.
  */
 function updateConsoleBadge() {
   const tab = $('#tabConsole');
   const badge = tab.querySelector('[data-badge]');
-  const n = toolView.tool ? levelCounts.error : 0;
+  // Errors since the console was last on screen: one already looked at is not news.
+  if (!toolView.tool) state.errorsSeen = levelCounts.error;
+  const n = toolView.tool ? Math.max(0, levelCounts.error - (state.errorsSeen || 0)) : 0;
   // called for every console line: nothing to do while the console is what is showing
   if (!n && badge.hidden) return;
   badge.hidden = !n;

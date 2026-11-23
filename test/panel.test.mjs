@@ -1292,3 +1292,76 @@ test('Add: a create that is running can be cancelled from its own button', () =>
     assert.match(html, /if \(\$\('#bPackCreate'\)\.dataset\.job\) return;/)
   })
 })
+
+test('the console says why it is empty, holds paused lines, and sends a command without its slash', () => {
+  const make = new Function('state', `
+    const isDb = (row) => Boolean(row && row.kind === 'database');
+    const crashedNow = (row) => Boolean(row && row.crashed) && row.status !== 'running';
+    ${fnSource('consolePhase')}
+    ${fnSource('logStateFor')}
+    ${fnSource('drawableLines')}
+    return { consolePhase, logStateFor, drawableLines }`)
+  const state = { acting: null, cleared: false, paused: false, pausedAt: 0, lines: [1, 2, 3] }
+  const { consolePhase, logStateFor, drawableLines } = make(state)
+  const row = { name: 'survival', label: 'Survival', status: 'stopped' }
+  // stopped: a reason and a Start, not one grey line
+  assert.deepEqual([logStateFor(row, { hasLines: false, shown: 0 }).title, logStateFor(row, { hasLines: false, shown: 0 }).action], ['Survival is stopped', 'start'])
+  assert.equal(logStateFor({ ...row, crashed: true }, { hasLines: false, shown: 0 }).title, 'Survival crashed')
+  // a Start this panel asked for is "starting" though the core already says running
+  state.acting = 'start'
+  assert.equal(consolePhase({ ...row, status: 'running' }), 'starting')
+  assert.match(logStateFor({ ...row, status: 'running' }, { hasLines: false, shown: 0 }).title, /^Starting Survival/)
+  state.acting = null
+  // cleared on a running server does not say "start the server"
+  state.cleared = true
+  assert.equal(logStateFor({ ...row, status: 'running' }, { hasLines: false, shown: 0 }).title, 'Cleared')
+  // a filter that hides everything offers the way back
+  assert.equal(logStateFor(row, { hasLines: true, shown: 0 }).action, 'show-all')
+  assert.equal(logStateFor(row, { hasLines: true, shown: 4 }), null)
+  // a database that runs elsewhere has no log here and offers nothing to start
+  assert.equal(logStateFor({ kind: 'database', external: true, status: 'reachable', name: 'db' }, { hasLines: false, shown: 0 }).action, undefined)
+  // paused: what arrived after the pause is not drawn, whatever the filter does
+  state.paused = true
+  state.pausedAt = 2
+  assert.deepEqual(drawableLines(), [1, 2])
+  state.paused = false
+  assert.deepEqual(drawableLines(), [1, 2, 3])
+  // a command typed as in the game loses its slash; Enter inside an input method is not a send
+  assert.match(html, /box\.value\.trim\(\)\.replace\(\/\^\\\/\(\?=\\S\)\/, ''\)/)
+  assert.match(html, /e\.key === 'Enter' && !e\.isComposing/)
+})
+
+test('plugins know a result they have by where it came from, files sort with folders first, and both follow a start', () => {
+  const { isInstalledHit, projectPage, sortEntries } = lifted(['isInstalledHit', 'projectPage', 'sortEntries'])
+  const plugins = [
+    { name: 'Essentials', managed: true, source: 'modrinth', project: 'ess' },
+    { name: 'Dynmap', managed: false, source: null, project: null },
+  ]
+  // the listing's title is not the jar's name: matched by project
+  assert.equal(isInstalledHit({ id: 'ess', title: 'EssentialsX', source: 'modrinth' }, plugins), true)
+  assert.equal(isInstalledHit({ id: 'ess', title: 'EssentialsX', source: 'hangar' }, plugins), false)
+  // a jar added by hand is known only by its name
+  assert.equal(isInstalledHit({ id: 'dm', title: 'dynmap', source: 'modrinth' }, plugins), true)
+  assert.equal(isInstalledHit({ id: 'wg', title: 'WorldGuard', source: 'modrinth' }, plugins), false)
+
+  assert.equal(projectPage({ slug: 'chunky', source: 'modrinth' }, false), 'https://modrinth.com/plugin/chunky')
+  assert.equal(projectPage({ slug: 'sodium', source: 'modrinth' }, true), 'https://modrinth.com/mod/sodium')
+  assert.equal(projectPage({ slug: 'ViaVersion', author: 'ViaVersion', source: 'hangar' }, false), 'https://hangar.papermc.io/ViaVersion/ViaVersion')
+  assert.equal(projectPage({ slug: 'x', source: 'hangar' }, false), null)
+  assert.equal(projectPage({ source: 'modrinth' }, false), null)
+
+  const entries = [
+    { name: 'b.yml', type: 'file', size: 10, modified: '2026-01-02T00:00:00Z' },
+    { name: 'world', type: 'dir', modified: '2026-01-01T00:00:00Z' },
+    { name: 'a.jar', type: 'file', size: 900, modified: '2026-01-03T00:00:00Z' },
+    { name: 'logs', type: 'dir', modified: '2026-01-04T00:00:00Z' },
+  ]
+  const names = (list) => list.map((e) => e.name)
+  assert.equal(sortEntries(entries, null), entries)
+  assert.deepEqual(names(sortEntries(entries, { key: 'name', dir: 'asc' })), ['logs', 'world', 'a.jar', 'b.yml'])
+  assert.deepEqual(names(sortEntries(entries, { key: 'size', dir: 'desc' })), ['world', 'logs', 'a.jar', 'b.yml'])
+  assert.deepEqual(names(sortEntries(entries, { key: 'modified', dir: 'desc' })), ['logs', 'world', 'a.jar', 'b.yml'])
+
+  // a failed folder upload is one message at the end, not one per file
+  assert.match(fnSource('uploadFiles'), /failed\.push\(/)
+})

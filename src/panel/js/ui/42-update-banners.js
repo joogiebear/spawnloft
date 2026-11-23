@@ -97,7 +97,12 @@ loadJavas();
 loadClientProfiles();
 refresh().then(() => {
   if (consoleOnly) {
-    if (rowOf(consoleOnly)) select(consoleOnly);
+    const row = rowOf(consoleOnly);
+    if (row) {
+      // titled by the name people gave it, not the folder's
+      document.title = (row.label || row.name) + ' \u2014 console';
+      select(consoleOnly);
+    } else consoleGone();
     return;
   }
   if (!state.current && (state.view === 'empty' || state.view === 'home')) showHome();
@@ -109,5 +114,21 @@ setInterval(refresh, 4000);
 $('#bPopConsole').onclick = () => {
   if (!state.current) return;
   // Named per server, so asking twice brings the one already open forward rather than a second.
-  window.open('/?console=' + encodeURIComponent(state.current), 'spawnloft-console-' + state.current, 'width=980,height=660');
+  const opened = window.open('/?console=' + encodeURIComponent(state.current), 'spawnloft-console-' + state.current, 'width=980,height=660');
+  // The app opens it as a window of its own and answers null; a browser answers null when it
+  // blocked the window.
+  if (!opened && !desktop) toast('Your browser blocked the window. Allow pop-ups for this page, then try again.', 'bad');
 };
+
+/**
+ * The console window of a server that is not there any more (removed, or renamed under it): it
+ * says so, rather than falling to an empty Overview with no sidebar to leave it by.
+ */
+function consoleGone() {
+  stopStream();
+  show('empty');
+  $('#emptyTitle').textContent = 'This server no longer exists';
+  $('#emptyLede').textContent = 'It was removed or renamed in SpawnLoft, so this window has nothing to show. You can close it.';
+  $('#emptyDoors').hidden = true;
+  document.title = 'Console \u2014 SpawnLoft';
+}
