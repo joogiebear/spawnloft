@@ -35,7 +35,8 @@ function importSource(raw) {
   let text = String(raw).trim();
   if (/^(["']).*\1$/.test(text)) text = text.slice(1, -1).trim();
   if (!text) return { problem: 'Paste the path to a zip, a tar.gz or a folder, or choose one.' };
-  if (!/^(\/|~[\\/]|[A-Za-z]:[\\/]|\\\\)/.test(text)) return { problem: 'Paste the full path, from the drive or / onwards.' };
+  if (/^~/.test(text)) return { problem: 'Write the full path: ~ for your home folder is not understood here.' };
+  if (!/^(\/|[A-Za-z]:[\\/]|\\\\)/.test(text)) return { problem: 'Paste the full path, from the drive or / onwards.' };
   return { path: text };
 }
 
@@ -206,7 +207,7 @@ async function renderWorlds(opts) {
   const src = Kit.input({ mono: true, placeholder: examplePath(panelPlatform, 'map') });
   const pickers = [];
   if (desktop && desktop.pickFile) {
-    const zip = Kit.button({ label: 'Choose a zip…', size: 'sm' });
+    const zip = Kit.button({ label: 'Choose a file…', size: 'sm' });
     zip.onclick = async () => chosen(await desktop.pickFile('Choose a world archive (a zip or a tar.gz)'));
     pickers.push(zip);
   }
@@ -258,25 +259,36 @@ async function renderWorlds(opts) {
     const activate = makeActive.querySelector('input').checked;
     Kit.busy(go, true);
     go.dataset.holding = '1'; // not redrawn mid-import: a fresh page would offer Import again
+    let out;
     try {
-      const out = await post(base + '/import', { source: source.path, name });
-      if (activate) await post(base + '/activate', { name: out.name });
-      toast('Imported ' + out.name + ' (' + out.sizeHuman
-        + (out.dimensions.length ? ', with ' + dimensionsWords(out.dimensions) : '') + ')'
-        + (activate ? '. It loads the next time the server starts.' : '.'), 'good');
-      src.value = '';
-      wname.value = '';
-      if (activate) await refresh();
-      await again();
-      // the new world, where the list put it
-      const added = $('#worldsBody [data-world="' + CSS.escape(out.name) + '"] button');
-      if (added) added.focus();
+      out = await post(base + '/import', { source: source.path, name });
     } catch (e) {
       // a refusal about the name is said at the name, anything else at the path
       if (/name/i.test(e.message) && !/nothing at|level\.dat/i.test(e.message)) nameField.setError(e.message);
       else srcField.setError(e.message);
       Kit.busy(go, false);
       delete go.dataset.holding;
+      return;
     }
+    // The world is here now. Making it the one in use can still be refused (the server started
+    // meanwhile, say): that is said on its own, and the import stands.
+    let used = false;
+    if (activate) {
+      try { await post(base + '/activate', { name: out.name }); used = true; } catch (e) {
+        toast('Imported ' + out.name + ', but it is not the world in use: ' + e.message, 'bad', { stay: true });
+      }
+    }
+    if (!activate || used) {
+      toast('Imported ' + out.name + ' (' + out.sizeHuman
+        + (out.dimensions.length ? ', with ' + dimensionsWords(out.dimensions) : '') + ')'
+        + (used ? '. It loads the next time the server starts.' : '.'), 'good');
+    }
+    src.value = '';
+    wname.value = '';
+    if (used) await refresh();
+    await again();
+    // the new world, where the list put it
+    const added = $('#worldsBody [data-world="' + CSS.escape(out.name) + '"] button');
+    if (added) added.focus();
   };
 }

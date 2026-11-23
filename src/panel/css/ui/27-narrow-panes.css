@@ -17,16 +17,7 @@
     }
     .who .w-acts { justify-content: flex-start; margin-top: 6px; opacity: 1; }
 
-    .snaps-head { display: none; }
-    .snap {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: "when size" "what tag" "actions actions";
-    }
-    .snap .snap-actions { justify-content: flex-start; margin-top: 6px; opacity: 1; }
-    .snap .tag { justify-self: end; }
-
-    /* The automatic-backup line is a flex row of six controls; without this the interval select
-       squeezed to 30px and stopped being able to show "Daily at 03:00". */
+    /* Rows of controls wrap rather than squeeze a select too narrow to read. */
     .gauge .row, .section .row { flex-wrap: wrap; }
   }
 

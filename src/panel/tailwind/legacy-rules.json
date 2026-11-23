@@ -1,5 +1,5 @@
 {
   "note": "How many style rules, and declarations inside them, the hand-written stylesheets (src/panel/css, all but tokens.css and tailwind.css) still hold. test/panel-css.test.mjs fails when a real number is higher, and asks for this to be lowered when it is lower. Both reach 0 at the end of the UX/UI overhaul.",
-  "rules": 1142,
-  "declarations": 4001
+  "rules": 1138,
+  "declarations": 3994
 }

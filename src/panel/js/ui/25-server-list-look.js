@@ -558,7 +558,12 @@ async function renderScheduler(opts) {
       actions: data.actions,
       kinds: data.kinds,
       days: data.days,
-      onCancel: () => { editor.close(); add.focus(); },
+      onCancel: () => {
+        editor.close();
+        // with no tasks the button beside the heading is hidden: the empty page's own one is the place
+        const back = [...page.querySelectorAll('button')].find((b) => !b.hidden && b.offsetParent && /New task/.test(b.textContent));
+        (back || add).focus();
+      },
       onSubmit: async (payload) => {
         try {
           await post(base, payload);
@@ -663,7 +668,8 @@ function taskCard(task, data, base, again, editor) {
       // Windows starts the task and returns immediately, so there is nothing to report yet beyond
       // having asked. The run log below is where the answer turns up.
       toast('Started. Watch Recent runs for what it did.', 'good');
-      busy(false);
+      // Run now stays off for a few seconds: a second press would start it again
+      setTimeout(() => { if (runNow.isConnected) busy(false); }, 5000);
       // Only if nothing is being edited. The refresh rebuilds the whole pane, and doing that under
       // a half-filled form throws the typing away with nothing said.
       // A restart is in the log in a couple of seconds and a backup of a large world in a minute,

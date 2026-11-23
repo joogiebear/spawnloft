@@ -76,7 +76,7 @@ function backupRefreshFixture(api) {
     replaceWith(next) { this.dataset.backupHistory = next; this.replacements++ },
   }
   // the options card is drawn again with the history; the standing banner is not there when all is well
-  const options = { replaceWith() {} }
+  const options = { replaceWith() {}, contains() { return false } }
   const body = {
     dataset: { for: state.current },
     querySelector(selector) {
@@ -93,6 +93,8 @@ function backupRefreshFixture(api) {
     const rowOf = name => ({ name });
     const renderBackupHistory = (row, data, signature) => signature;
     const backupOptions = () => ({});
+    const lockRestoring = () => {};
+    const document = { activeElement: null };
     return ${fnSource('renderBackups')};
   `)(state, body, api)
   return { render, state, body, history, status }

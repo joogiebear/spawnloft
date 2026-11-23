@@ -294,6 +294,9 @@
   .pb-4 {
     padding-bottom: calc(4px * 4);
   }
+  .pb-6 {
+    padding-bottom: calc(4px * 6);
+  }
   .pb-16 {
     padding-bottom: calc(4px * 16);
   }

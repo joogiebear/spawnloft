@@ -268,10 +268,18 @@ async function renderBackups(opts) {
     // controls, focus and a backup under way belong to the person using the page and must
     // survive a backup taken from the command line.
     if (history.dataset.backupHistory !== signature) {
-      body.querySelector('[data-backup-options]').replaceWith(backupOptions(row, data));
+      // the options are left as they are while someone is on one of them
+      const options = body.querySelector('[data-backup-options]');
+      if (options && !options.contains(document.activeElement)) {
+        const fresh = backupOptions(row, data);
+        options.replaceWith(fresh);
+        lockRestoring(fresh, row.name);
+      }
       history.replaceWith(renderBackupHistory(row, data, signature));
       const standing = body.querySelector('[data-backup-standing]');
       if (standing) paintBackupStanding(standing, row, data, standing.automatic);
+      const auto = body.querySelector('[data-auto-backup]');
+      if (auto && auto.paintLine) auto.paintLine(data);
     }
     return;
   }
@@ -609,10 +617,17 @@ function autoBackupSection(row, base, data, automatic) {
     h('span', { class: 'sl-row-main flex-1 basis-72' },
       h('span', { class: 'sl-row-title type-card', text: 'Automatic backups' }), line),
     Kit.help({ label: 'automatic backups', text: ['They are held by ' + schedulerName + ', so they run with SpawnLoft closed.', schedulerHint] }));
-  const controls = h('div', { class: 'flex flex-wrap items-start gap-4' }, h('div', { class: 'w-64 max-w-full' }, everyField), h('div', { class: 'max-w-80' }, keepField));
+  // Changing how often or how many waits for Save: a drop-down moved with the arrow keys
+  // changes on every press, and each save redraws the page.
+  const apply = Kit.button({ label: 'Save', size: 'sm', kind: 'primary' });
+  apply.setAttribute('aria-label', 'Save how often and how many to keep');
+  apply.hidden = true;
+  const controls = h('div', { class: 'flex flex-wrap items-end gap-4' }, h('div', { class: 'w-64 max-w-full' }, everyField), h('div', { class: 'max-w-80' }, keepField), h('div', { class: 'pb-6' }, apply));
   // Off and nobody asked: the switch is the one control that matters, the rest wait for it.
   controls.hidden = !on;
   const part = h('div', { class: 'flex flex-col gap-4', dataset: { autoBackup: '' } }, head, controls);
+  // a backup from elsewhere moves "last backup", without redrawing the controls
+  part.paintLine = (fresh) => { if (!saving) line.textContent = autoLine(fresh, automatic, lastWholeBackup(fresh.snapshots)); };
   const lingering = lingerNotice(known.background, () => renderBackups({ force: true }));
   if (lingering) part.append(lingering);
 
@@ -624,7 +639,7 @@ function autoBackupSection(row, base, data, automatic) {
     if (problem) { keep.focus(); return; }
     if (saving) return;
     saving = true;
-    for (const c of [onOff, everyBox, keep]) Kit.busy(c, true);
+    for (const c of [onOff, everyBox, keep, apply]) Kit.busy(c, true);
     line.textContent = onOff.checked ? 'Saving…' : 'Turning off…';
     try {
       const chosen = everyBox.value === KEEP_SCHEDULE ? { schedule: known.auto.schedule } : AUTO_INTERVALS.find((o) => o.label === everyBox.value);
@@ -633,9 +648,12 @@ function autoBackupSection(row, base, data, automatic) {
         : { enabled: false });
       toast(!onOff.checked ? 'Automatic backups turned off.' : why === 'switch' ? 'Automatic backups are on.' : 'Automatic backups changed.', 'good');
       await renderBackups({ force: true });
+      // the redraw is a new page: the place someone was working stays where it was
+      const back = $('#backupsBody [data-auto-backup] ' + (why === 'switch' ? '[data-auto-backups]' : 'select'));
+      if (back) back.focus();
     } catch (e) {
       toast(e.message, 'bad');
-      for (const c of [onOff, everyBox, keep]) Kit.busy(c, false);
+      for (const c of [onOff, everyBox, keep, apply]) Kit.busy(c, false);
       onOff.checked = on;
       controls.hidden = !on;
       line.textContent = autoLine(data, automatic, lastWholeBackup(data.snapshots));
@@ -644,9 +662,10 @@ function autoBackupSection(row, base, data, automatic) {
     }
   }
   onOff.addEventListener('change', () => { controls.hidden = !onOff.checked; save('switch'); });
-  everyBox.addEventListener('change', () => save('every'));
-  keep.addEventListener('input', () => keepField.setError(keep.value.trim() ? keepProblem(keep.value, keepsAll) : null));
-  keep.addEventListener('change', () => save('keep'));
+  everyBox.addEventListener('change', () => { apply.hidden = false; });
+  keep.addEventListener('input', () => { apply.hidden = false; keepField.setError(keep.value.trim() ? keepProblem(keep.value, keepsAll) : null); });
+  apply.onclick = () => save('every');
+  keep.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save('every'); } });
   return part;
 }
 
