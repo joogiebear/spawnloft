@@ -412,51 +412,50 @@ async function renderDatabaseBackups(opts) {
   body.dataset.for = row.name;
   body.dataset.signature = signature;
 
-  const el = (tag, cls, text) => {
-    const node = document.createElement(tag);
-    if (cls) node.className = cls;
-    if (text != null) node.textContent = text;
-    return node;
-  };
+  const { h } = Kit;
   const label = row.label || row.name;
   body.textContent = '';
   paneHead(body, 'archive', 'Backups',
     'Backups of this database, kept apart from the servers’ backups. Download one to keep a copy somewhere else.');
+  const page = h('div', { class: 'flex flex-col gap-6' });
+  body.append(page);
 
   if (!data.canDump) {
-    body.append(emptyState('archive', (row.engineLabel || 'This engine') + ' keeps its own checkpoints on disk, so there is '
-      + 'nothing here to dump. Back up the servers that use it instead.'));
+    page.append(Kit.empty({
+      icon: 'archive',
+      title: 'Nothing here to back up',
+      text: (row.engineLabel || 'This engine') + ' keeps its own checkpoints on disk, and a server’s backup does not take them either. '
+        + 'To keep a copy, stop it and copy its data folder somewhere else.',
+    }));
     return;
   }
 
   // ---- take one now ---------------------------------------------------------
-  const now = el('div', 'section');
-  now.append(el('h3', null, 'Back up now'));
   const n = data.databases.length;
-  now.append(el('p', 'hint', n
-    ? 'Dumps ' + data.databases.join(', ') + ' — the database' + (n === 1 ? '' : 's') + ' your servers use here — into one .sql file.'
-    : 'No server is attached to this database yet, so there is nothing of yours in it to dump.'));
-  if (!data.running) now.append(el('p', 'hint', 'Start the database first: a dump is read from the running database.'));
-  const takeRow = el('div', 'row');
-  const tag = el('input');
-  tag.placeholder = 'Label (optional)';
-  tag.setAttribute('aria-label', 'Label for this backup');
+  const tag = Kit.input({ placeholder: 'before the LuckPerms update' });
   tag.maxLength = 40;
-  tag.style.maxWidth = '240px';
-  const take = el('button', 'primary', 'Back up now');
-  take.type = 'button';
+  const tagField = Kit.field({ label: 'Note (optional)', control: tag });
+  const take = Kit.button({ label: 'Back up now', icon: 'archive', kind: 'primary' });
   take.disabled = !data.running || !n;
-  takeRow.append(tag, take);
-  now.append(takeRow);
-  body.append(now);
+  const why = !n
+    ? 'No server uses this database yet, so there is nothing of yours in it to back up.'
+    : !data.running
+    ? 'Start the database first: a backup is read from the running database.'
+    : 'Takes ' + data.databases.join(', ') + ', the database' + (n === 1 ? '' : 's') + ' your servers keep here, into one file.';
+  page.append(Kit.card({ label: 'Back up now' },
+    h('div', { class: 'flex flex-wrap items-end gap-4' },
+      h('div', { class: 'flex-1 basis-72 min-w-0 flex flex-col gap-1' },
+        h('h2', { class: 'm-0 type-card text-ink', text: 'Back up now' }),
+        h('p', { class: 'sl-hint m-0', text: why })),
+      h('div', { class: 'w-72 max-w-full' }, tagField),
+      take)));
 
   take.onclick = async () => {
     dbBackupBusy = true;
-    take.disabled = true;
-    take.textContent = 'Backing up…';
+    Kit.busy(take, true);
     try {
       const out = await post(base, { label: tag.value.trim() || 'manual' });
-      toast('Backed up ' + label + ' to ' + out.taken.name + ' (' + out.taken.sizeHuman + ').', 'good');
+      toast('Backed up ' + label + ' (' + out.taken.sizeHuman + ').', 'good');
     } catch (e) {
       toast(e.message, 'bad');
     } finally {
@@ -466,80 +465,54 @@ async function renderDatabaseBackups(opts) {
   };
 
   // ---- what is kept ---------------------------------------------------------
-  const listTitle = el('h3', 'hist-title', 'Backups (' + data.backups.length + ')');
-  const where = el('div', 'hint mono-path', 'Kept in ' + data.dir);
-  body.append(listTitle, where);
+  const hist = h('section', { class: 'flex flex-col gap-3', 'aria-label': 'History' },
+    h('div', { class: 'flex flex-wrap items-baseline gap-x-3 gap-y-1' },
+      h('h2', { class: 'm-0 type-section text-ink', text: 'History' }),
+      h('span', { class: 'type-meta text-ink-3', text: data.backups.length ? String(data.backups.length) : '' })),
+    h('p', { class: 'sl-hint m-0' }, 'Kept in ', h('span', { class: 'font-mono text-1 break-all', text: data.dir })));
+  page.append(hist);
   if (!data.backups.length) {
-    body.append(emptyState('archive', 'No backups of this database yet. Back up now, before a plugin update or a migration, '
-      + 'and there is a way back.'));
+    hist.append(Kit.empty({ icon: 'archive', title: 'No backups yet', text: 'Back up now, before a plugin update or a move to a new version, and there is a way back.' }));
     return;
   }
 
-  const list = el('div', 'snaps');
-  const head = el('div', 'snaps-head');
-  head.append(el('span', null, 'Backup'), el('span', null, 'Label'), el('span', 'h-why', 'Reason'), el('span', 'h-items', 'Databases'), el('span', null, 'Size'));
-  list.append(head);
-  for (const b of data.backups) {
-    const line = el('div', 'snap');
-    line.dataset.backupName = b.name;
-    line.append(
-      el('span', 'when', stamp(new Date(b.mtime).toISOString())),
-      el('span', 'what', b.databases.length ? b.databases.join(', ') : b.name),
-      el('span', 'tag', b.label || 'manual'),
-      el('span', 'why', snapshotReason(b)),
-      el('span', 'items', b.databases.length + (b.databases.length === 1 ? ' database' : ' databases')),
-      el('span', 'size', b.sizeHuman),
-    );
-    line.querySelector('.what').title = b.name;
-    const acts = el('span', 'snap-actions');
-    const download = el('button', null, 'Download');
-    download.type = 'button';
-    download.setAttribute('aria-label', 'Download ' + b.name);
-    const restore = el('button', null, 'Restore');
-    restore.type = 'button';
+  const rows = data.backups.map((b) => {
+    const when = stamp(new Date(b.mtime).toISOString());
+    const which = 'the backup from ' + when;
+    const restore = Kit.button({ label: 'Restore', icon: 'restore', size: 'sm' });
+    restore.setAttribute('aria-label', 'Restore ' + which);
     restore.disabled = !data.running;
     restore.title = data.running ? '' : 'Start the database to put a backup back into it';
-    const drop = el('button', 'icon-btn');
-    drop.type = 'button';
-    drop.append(icon('trash'));
-    drop.setAttribute('aria-label', 'Delete ' + b.name);
-    drop.title = 'Delete';
-    acts.append(download, restore, drop);
-    line.append(acts);
-    list.append(line);
-
-    // A plain link to the file, clicked for the person: the browser, or the desktop app's own save
-    // dialog, takes it from there.
-    download.onclick = () => {
-      const a = document.createElement('a');
-      a.href = '/api' + base + '/download?file=' + encodeURIComponent(b.name);
-      a.download = b.name;
-      document.body.append(a);
-      a.click();
-      a.remove();
-    };
+    const note = b.label && !['manual', 'pre-restore'].includes(b.label) ? b.label : null;
+    const lines = [
+      note ? h('span', { class: 'type-body text-ink font-strong whitespace-normal', text: '“' + note.replace(/-/g, ' ') + '”' }) : null,
+      h('span', { class: 'sl-row-meta whitespace-normal' },
+        [ago(new Date(b.mtime).toISOString()), snapshotReason(b), b.databases.length ? b.databases.join(', ') : null].filter(Boolean).join(' · '),
+        h('span', { class: 'block font-mono text-1 text-ink-4 truncate', text: b.name })),
+    ];
 
     restore.onclick = async () => {
+      const running = attachedRunning(row);
       const ok = await ask({
-        title: 'Put ' + label + ' back as it was?',
-        text: 'The tables in ' + b.name + ' replace the ones there now, and anything written since it was taken is '
-          + 'lost from them. A backup of how things are now is taken first, so this can be undone from this list. '
-          + 'Stop the servers that use it first if they are writing to it.',
+        title: 'Restore ' + label + ' from ' + when + '?',
+        text: 'What it holds replaces what is there now, and anything written since ' + when + ' is lost from it. '
+          + 'A backup of how things are now is taken first, so this can be undone from this list.'
+          + (running.length ? ' ' + running.join(', ') + (running.length === 1 ? ' is' : ' are') + ' running and may be writing to it: stop ' + (running.length === 1 ? 'it' : 'them') + ' first.' : ''),
         confirmLabel: 'Restore',
         danger: true,
         typeToConfirm: row.name,
       });
       if (!ok) return;
       dbBackupBusy = true;
-      const note = toast('Putting back ' + b.name + '…');
+      const busyNote = toast('Restoring ' + which + '…');
       restoring.set(row.name, b.name);
       lockRestoring(body, row.name);
       try {
         const out = await post(base + '/restore', { file: b.name });
-        note.remove();
-        toast('Put back ' + out.restored + '.' + (out.safety ? ' How it was before is saved as ' + out.safety + '.' : ''), 'good');
+        busyNote.remove();
+        toast('Restored ' + which + '.' + (out.safety ? ' How it was before is kept in this list.' : ''), 'good');
       } catch (e) {
-        note.remove();
+        busyNote.remove();
         toast(e.message, 'bad');
       } finally {
         dbBackupBusy = false;
@@ -548,25 +521,41 @@ async function renderDatabaseBackups(opts) {
       }
     };
 
-    drop.onclick = async () => {
+    const drop = async () => {
       const ok = await ask({
         title: 'Delete this backup?',
-        text: b.name + ', ' + b.sizeHuman + '. Download it first if you want to keep a copy.',
+        text: 'The backup from ' + when + ', ' + b.sizeHuman + '. Download it first if you want to keep a copy.',
         confirmLabel: 'Delete backup',
         danger: true,
       });
       if (!ok) return;
       try {
         await post(base + '/delete', { file: b.name });
-        toast('Deleted ' + b.name + '.', 'good');
+        toast('Deleted ' + which + '.', 'good');
       } catch (e) {
         toast(e.message, 'bad');
       }
       await renderDatabaseBackups({ force: true });
     };
-  }
-  body.append(list);
+    return backupRow({
+      snap: b, title: when, lines, kind: null, size: b.sizeHuman, restore,
+      menu: [
+        { label: 'Download', note: 'A .sql file.', onSelect: () => downloadFile('/api' + base + '/download?file=' + encodeURIComponent(b.name), b.name) },
+        'sep',
+        { label: 'Delete', tone: 'fault', onSelect: drop },
+      ],
+    });
+  });
+  hist.append(Kit.list(rows, 'Backups'));
   lockRestoring(body, row.name);
+}
+
+/** The servers attached to a database that are running now, by the name people know them by. */
+function attachedRunning(db) {
+  return Object.keys(db.attachments || {})
+    .map((name) => rowOf(name))
+    .filter((r) => r && r.status === 'running')
+    .map((r) => r.label || r.name);
 }
 
 /** A database's Settings tab: how to reach it as root, and who is attached. */

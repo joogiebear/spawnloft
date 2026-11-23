@@ -90,11 +90,12 @@ function snapshotReason(snap) {
     'pre-restore': 'Before a restore', 'before-edit': 'Before an AI edit', 'pre-delete': 'Before a delete',
     'pre-rebuild': 'Before a reset', 'pre-upgrade': 'Before an upgrade', 'pre-pack-update': 'Before a pack update',
     'file-edit': 'Before an edit', 'file-replace': 'Before a replace', 'file-delete': 'On delete', 'world-delete': 'On delete',
-    manual: 'Manual', nightly: 'Nightly',
+    'pre-install': 'Before a plugin install', 'pre-update': 'Before a plugin update',
+    manual: 'By hand', nightly: 'Nightly',
   };
   if (named[label]) return named[label];
   if (snap.taskId) return 'Schedule';
-  if (!label) return 'Manual';
+  if (!label) return 'By hand';
   return label.charAt(0).toUpperCase() + label.slice(1).replace(/-/g, ' ');
 }
 
@@ -192,6 +193,10 @@ async function changeBackupsLocation(current) {
  * Restore is the one action here that can destroy something, so it is the one with friction:
  * refused outright while the server is running, and gated behind typing the server's name
  * otherwise. The core refuses too - a page that only disables a button is not a guard.
+ *
+ * The page is three parts, top to bottom: whether this server backs itself up (and a backup now),
+ * where backups go and what they leave out, and the history. Each setting is a control on a row;
+ * the sentences that used to explain them are the line under each.
  */
 let backupRequest = 0;
 let backupPending = null;
@@ -202,6 +207,19 @@ function refreshVisibleBackups() {
 setInterval(refreshVisibleBackups, 4000);
 document.addEventListener('visibilitychange', refreshVisibleBackups);
 window.addEventListener('focus', refreshVisibleBackups);
+
+/**
+ * A row of the options card: what it is, a line about it that may wrap, and its controls at the
+ * end. `meta` may be text or elements.
+ */
+function optionRow({ title, meta, end, data }) {
+  const { h } = Kit;
+  return h('div', { class: 'sl-row flex-wrap', dataset: data || null },
+    h('span', { class: 'sl-row-main basis-72' },
+      h('span', { class: 'sl-row-title whitespace-normal', text: title }),
+      meta ? h('span', { class: 'sl-row-meta whitespace-normal' }, meta) : null),
+    end && end.length ? h('span', { class: 'sl-row-end flex-wrap' }, end) : null);
+}
 
 async function renderBackups(opts) {
   const force = Boolean(opts && opts.force);
@@ -227,6 +245,7 @@ async function renderBackups(opts) {
     if (history && history.isConnected) {
       const status = body.querySelector('[data-backup-status]');
       status.textContent = 'Backup history could not refresh: ' + e.message + '. Trying again shortly.';
+      status.hidden = false;
       return;
     }
     paneError(body, e.message, () => renderBackups({ force: true }));
@@ -240,13 +259,19 @@ async function renderBackups(opts) {
   // The selection can move while the request is in flight; the answer to the old question is not
   // an answer to the new one.
   if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
-  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror, data.pendingRoot, data.cleanCopies]);
+  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror, data.pendingRoot, data.cleanCopies, data.exclude]);
   if (!force && history && history.isConnected) {
-    body.querySelector('[data-backup-status]').textContent = '';
-    // Only history changes in the background. Scope, schedule edits, focus and the archive
-    // progress message belong to the person using the form and must survive a CLI backup.
+    const status = body.querySelector('[data-backup-status]');
+    status.textContent = '';
+    status.hidden = true;
+    // Only the options and the history change in the background. The scope, the schedule's
+    // controls, focus and a backup under way belong to the person using the page and must
+    // survive a backup taken from the command line.
     if (history.dataset.backupHistory !== signature) {
+      body.querySelector('[data-backup-options]').replaceWith(backupOptions(row, data));
       history.replaceWith(renderBackupHistory(row, data, signature));
+      const standing = body.querySelector('[data-backup-standing]');
+      if (standing) paintBackupStanding(standing, row, data, standing.automatic);
     }
     return;
   }
@@ -255,115 +280,26 @@ async function renderBackups(opts) {
   body.textContent = '';
   paneHead(body, 'archive', 'Backups',
     'Back up now, put a backup back, or leave it to a schedule.');
-  const refreshStatus = document.createElement('div');
-  refreshStatus.dataset.backupStatus = '';
-  refreshStatus.className = 'bad';
-  refreshStatus.setAttribute('role', 'status');
-  body.append(refreshStatus);
+  const { h } = Kit;
+  const page = h('div', { class: 'flex flex-col gap-6' });
+  const refreshStatus = h('p', { class: 'sl-error m-0', role: 'status', hidden: true, dataset: { backupStatus: '' } });
+  body.append(page);
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
 
   // ---- where this server stands ---------------------------------------------
-  // Whether anything is backing it up, and when it last was, before any control: Overview flagged
-  // a server that had never been backed up, and its own Backups tool did not say so.
-  const standing = document.createElement('div');
-  standing.className = 'bk-status';
-  standing.setAttribute('role', 'status');
-  body.append(standing);
+  // Said first, as a banner, only when it is a worry: never backed up, or not for a week.
+  const standing = h('div', { hidden: true, dataset: { backupStanding: '' } });
 
-  // ---- take one now ---------------------------------------------------------
-  const now = document.createElement('div');
-  now.className = 'section';
-  const nowTitle = document.createElement('h3');
-  nowTitle.textContent = 'Back up now';
-  const nowRow = document.createElement('div');
-  nowRow.className = 'row';
-  const scope = document.createElement('select');
-  scope.setAttribute('aria-label', 'What to back up');
-  for (const sc of data.scopes) {
-    const o = document.createElement('option');
-    o.value = sc;
-    o.textContent = scopeLabel(sc);
-    o.selected = sc === 'standard';
-    scope.append(o);
-  }
-  scope.style.maxWidth = '170px';
-  const go = iconButton('archive', 'Back up now', 'primary');
-  nowRow.append(scope, go);
-  const nowNote = document.createElement('div');
-  nowNote.className = 'hint';
-  nowNote.textContent = data.running
-    ? 'Standard covers plugins, every world in the folder and config. Safe while running - the one file the server holds locked is left out.'
-    : 'Standard covers plugins, every world in the folder and config. Full is everything except caches and logs.';
-  now.append(nowTitle, nowRow, nowNote);
-  body.append(now);
-
-  // What this server's backups skip: a map plugin's rendered tiles, logs a plugin keeps. Applies
-  // to every backup - by hand, on a schedule, before an upgrade - and never to the copy a file
-  // edit takes, which exists to hold exactly that file.
-  const skip = document.createElement('details');
-  skip.className = 'leave-out';
-  if (data.exclude && data.exclude.length) skip.open = true;
-  const skipTitle = document.createElement('summary');
-  skipTitle.textContent = 'Leave out of backups' + (data.exclude && data.exclude.length ? ' (' + data.exclude.length + ')' : '');
-  const skipText = document.createElement('textarea');
-  skipText.className = 'mono';
-  skipText.rows = 4;
-  skipText.spellcheck = false;
-  skipText.placeholder = 'plugins/dynmap/web\n*.log';
-  skipText.value = (data.exclude || []).join('\n');
-  skipText.setAttribute('aria-label', 'Paths to leave out of backups, one per line');
-  const skipRow = document.createElement('div');
-  skipRow.className = 'row';
-  const skipSave = document.createElement('button');
-  skipSave.type = 'button';
-  skipSave.textContent = 'Save';
-  const skipHint = document.createElement('span');
-  skipHint.className = 'hint';
-  skipHint.textContent = 'One per line, from the server folder; * matches anything. Big things that rebuild themselves are the usual candidates. A restore cannot bring back what was left out.';
-  skipRow.append(skipSave, skipHint);
-  skip.append(skipTitle, skipText, skipRow);
-  // Part of what Back up now takes, so it lives in that card rather than as a card of its own.
-  now.append(skip);
-  skipSave.onclick = async () => {
-    skipSave.disabled = true;
-    try {
-      const out = await post(base + '/exclude', { patterns: skipText.value });
-      skipText.value = out.exclude.join('\n');
-      skipTitle.textContent = 'Leave out of backups' + (out.exclude.length ? ' (' + out.exclude.length + ')' : '');
-      toast(out.exclude.length ? 'Backups will leave out ' + out.exclude.length + (out.exclude.length === 1 ? ' path.' : ' paths.') : 'Backups leave nothing out.', 'good');
-    } catch (e) { toast(e.message, 'bad'); }
-    skipSave.disabled = false;
-  };
-
-  go.onclick = async () => {
-    go.disabled = true;
-    const was = nowNote.textContent;
-    nowNote.textContent = 'Archiving. Large worlds take a moment.';
-    try {
-      const out = await post(base, { scope: scope.value });
-      const problems = out.problems || [];
-      toast('Backup saved' + (out.mirrored ? ', with a second copy' : '') + (problems.length ? ', with something missing.' : '.'), problems.length ? undefined : 'good');
-      for (const p of problems) toast(p, 'bad');
-      if (out.mirrorError) toast(out.mirrorError, 'bad');
-      if (out.skipped?.length) toast('Left out, locked by the running server: ' + out.skipped.join(', '), 'bad');
-      if (out.saveOnWarning) toast(out.saveOnWarning, 'bad');
-      await renderBackups({ force: true });
-    } catch (e) {
-      toast(e.message, 'bad');
-      go.disabled = false;
-      nowNote.textContent = was;
-    }
-  };
-
-  // ---- on a schedule --------------------------------------------------------
+  // ---- automatic, and one now ----------------------------------------------
   // Drawn in two steps. The schedule lives in Windows Task Scheduler, and asking means starting
-  // PowerShell - seconds on a cold machine. Nothing else here needs that answer, so the form and
-  // the history appear at once and this card fills in when the scheduler replies.
-  const auto = autoBackupSection(base, null);
-  body.append(auto);
-  body.append(renderBackupHistory(row, data, signature));
-  paintBackupStanding(standing, row, data, null, go);
+  // PowerShell - seconds on a cold machine. Nothing else here needs that answer, so the card and
+  // the history appear at once and the schedule's controls fill in when the scheduler replies.
+  const auto = autoBackupSection(row, base, data, null);
+  const now = backUpNowPart(row, base, data);
+  const top = Kit.card({ label: 'Automatic backups' }, auto, now);
+  page.append(refreshStatus, standing, top, backupOptions(row, data), renderBackupHistory(row, data, signature));
+  paintBackupStanding(standing, row, data, null);
   lockRestoring(body, row.name);
   let automatic;
   try {
@@ -374,13 +310,74 @@ async function renderBackups(opts) {
   // Only this card's own place is checked, not backupRequest: the history poll bumps that every
   // few seconds, and would otherwise stop a slow schedule answer from ever being shown.
   if (!auto.isConnected || state.current !== row.name || body.dataset.for !== row.name) return;
-  auto.replaceWith(autoBackupSection(base, automatic));
-  paintBackupStanding(standing, row, data, automatic, go);
+  auto.replaceWith(autoBackupSection(row, base, data, automatic));
+  paintBackupStanding(standing, row, data, automatic);
   lockRestoring(body, row.name);
 }
 
-const SCOPE_LABELS = { standard: 'Standard', full: 'Full', worlds: 'Worlds only', config: 'Config only', plugins: 'Plugins only' };
+const SCOPE_LABELS = { standard: 'Standard', full: 'Everything', worlds: 'Worlds only', config: 'Settings only', plugins: 'Plugins and mods only' };
 const scopeLabel = (sc) => SCOPE_LABELS[sc] || sc.charAt(0).toUpperCase() + sc.slice(1);
+
+/** What each choice of "Back up now" takes, said under it and changed with it. */
+function scopeWords(scope, running) {
+  const words = {
+    standard: 'Plugins and mods, every world in the folder, the settings files, and this server’s databases if they are running.',
+    full: 'Everything in the server folder except caches and logs, and this server’s databases if they are running.',
+    worlds: 'Every world in the folder, and nothing else.',
+    config: 'server.properties and the other files in the server folder itself, and the config folder. Not the plugins’ own settings.',
+    plugins: 'The plugins and mods folders, with their settings.',
+  }[scope] || '';
+  // the one file a running server holds locked is the only thing a running backup cannot read
+  return words + (running && words ? ' Safe while the server runs: the one file it holds locked is left out.' : '');
+}
+
+/** "Back up now": what to take, and the button. Part of the top card. */
+function backUpNowPart(row, base, data) {
+  const { h } = Kit;
+  const scope = Kit.select({
+    label: 'What to back up',
+    options: data.scopes.map((sc) => ({ value: sc, label: scopeLabel(sc) })),
+    value: 'standard',
+  });
+  const box = scope.querySelector('select');
+  box.dataset.backupScope = '';
+  const said = h('p', { class: 'sl-hint m-0', role: 'status', text: scopeWords('standard', data.running) });
+  box.addEventListener('change', () => { said.textContent = scopeWords(box.value, data.running); });
+  const go = Kit.button({ label: 'Back up now', icon: 'archive', kind: 'primary' });
+  go.dataset.backupNow = '';
+  go.onclick = async () => {
+    Kit.busy(go, true);
+    go.dataset.holding = '1';
+    const was = said.textContent;
+    said.textContent = 'Backing up. A large world takes a minute or two.';
+    try {
+      const out = await post(base, { scope: box.value });
+      const problems = out.problems || [];
+      toast('Backup saved' + (out.mirrored ? ', with a second copy' : '') + (problems.length ? ', with something missing.' : '.'), problems.length ? undefined : 'good');
+      for (const p of problems) toast(p, 'bad');
+      if (out.mirrorError) toast(out.mirrorError, 'bad');
+      // said as what it is: the backup worked, and these were not in it
+      if (out.skipped?.length) toast('Left out, because the running server holds them open: ' + out.skipped.join(', ') + '.', undefined, { stay: true });
+      if (out.saveOnWarning) toast(out.saveOnWarning, 'bad');
+      said.textContent = was;
+      Kit.busy(go, false);
+      delete go.dataset.holding;
+      await renderBackups({ force: true });
+    } catch (e) {
+      toast(e.message, 'bad');
+      Kit.busy(go, false);
+      delete go.dataset.holding;
+      said.textContent = was;
+    }
+  };
+  return h('div', { class: 'sl-card-part flex flex-wrap items-end gap-4' },
+    h('div', { class: 'flex-1 basis-72 min-w-0 flex flex-col gap-2' },
+      h('div', { class: 'flex flex-wrap items-center gap-3' },
+        h('span', { class: 'type-body text-ink font-strong', text: 'Back up now' }),
+        h('span', { class: 'w-56 max-w-full' }, scope)),
+      said),
+    go);
+}
 
 /** A backup in the sense of "the server is backed up": not the one-file copy an edit takes. */
 // A backup of the server, as against a copy of its plugins, its config or a few files taken before
@@ -464,7 +461,7 @@ function deleteManyQuestion(chosen, snapshots) {
   else if (copies) mix = copies === 1 ? ' It is a small copy kept before a change.' : ' All are small copies kept before changes.';
   return {
     title: chosen.length === 1 ? 'Delete this backup?' : 'Delete ' + chosen.length + ' backups?',
-    text: fileSize(size) + ' in all.' + mix + ' What ' + (chosen.length === 1 ? 'it holds goes with it' : 'they hold goes with them') + ', and there is no way back.'
+    text: fileSize(size) + ' in all.' + mix + ' What ' + (chosen.length === 1 ? 'it holds goes with it' : 'they hold goes with them') + ', second copies included, and there is no way back.'
       + (whole && !wholeLeft ? ' Deleting ' + things + ' leaves no backup of this server.' : ''),
     confirmLabel: chosen.length === 1 ? 'Delete backup' : 'Delete ' + chosen.length + ' backups',
     danger: true,
@@ -494,75 +491,42 @@ const pickedBackups = new Map();
 function scheduledBackupWords(tasks) {
   const first = tasks[0];
   const rest = tasks.length - 1;
-  return '\u201c' + first.name + '\u201d runs ' + describeSchedule(first.schedule)
+  return '“' + first.name + '” runs ' + describeSchedule(first.schedule)
     + (rest > 0 ? ', and ' + rest + ' more' : '') + '. Change it in Schedule.';
 }
 
-/**
- * The line at the top of Backups: is anything backing this server up, when it last was, and the
- * one thing to do about it when the answer is nothing. `automatic` is null while the scheduler is
- * still being asked.
- */
-function paintBackupStanding(box, row, data, automatic, backUpNow) {
-  box.textContent = '';
-  const latest = data.snapshots.filter(isWholeBackup)
+/** When this server was last backed up (a whole backup, not a small copy), as a time, or 0. */
+function lastWholeBackup(snapshots) {
+  return (snapshots || []).filter(isWholeBackup)
     .reduce((at, snap) => Math.max(at, new Date(snap.mtime).getTime() || 0), 0);
+}
+
+/**
+ * The banner over the page when this server's backups are a worry: never backed up, or not for a
+ * week. Nothing when they are fine: the card under it says when the last one was.
+ * `automatic` is null while the scheduler is still being asked.
+ */
+function paintBackupStanding(box, row, data, automatic) {
+  box.automatic = automatic;
+  const latest = lastWholeBackup(data.snapshots);
   const week = 7 * 24 * 3600 * 1000;
   const stale = !latest || Date.now() - latest > week;
   const known = automatic && !automatic.error;
-  // paused in Schedule is not on, whatever made it
   const on = known && automatic.auto && automatic.auto.enabled !== false;
-  // a task made in Schedule that backs this server up counts: the server is being backed up
-  const elsewhere = known && !on && automatic.scheduled && automatic.scheduled.length ? automatic.scheduled : null;
-  box.dataset.tone = stale ? 'warn' : on || elsewhere ? 'live' : '';
-
-  box.append(icon(stale ? 'alert' : on || elsewhere ? 'check' : 'archive'));
-  const text = document.createElement('div');
-  text.className = 'bk-text';
-  const head = document.createElement('b');
-  const sub = document.createElement('span');
-  if (!automatic) {
-    head.textContent = 'Checking the schedule…';
-    // Two lines like every answer below, so the cards under it stay put when the answer lands.
-    sub.textContent = 'Asking whether this server backs itself up.';
-  } else if (!known) {
-    head.textContent = 'Schedule unknown';
-    sub.textContent = automatic.error;
-  } else if (on) {
-    const every = AUTO_INTERVALS.find((o) => sameSchedule(o.schedule, automatic.auto.schedule));
-    const next = whenNext(automatic.auto.nextRun);
-    head.textContent = 'Automatic backups on';
-    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 'all of them')
-      + (next ? ' · next ' + next : '');
-  } else if (elsewhere) {
-    head.textContent = 'Backed up on a schedule';
-    sub.textContent = scheduledBackupWords(elsewhere);
-  } else {
-    head.textContent = 'Automatic backups off';
-    sub.textContent = automatic.automaticAvailable === false
-      ? automatic.automaticUnavailableReason
-      : 'Nothing backs this server up unless you do it by hand.';
-  }
-  text.append(head, sub);
-  const last = document.createElement('span');
-  last.className = 'bk-last';
-  last.textContent = !latest ? 'Never backed up'
-    : (stale ? 'No backup in 7 days · last ' : 'Last backup ') + ago(new Date(latest).toISOString());
-  box.append(text, last);
-
-  // Off, and able to be on: turning it on is the one thing this screen should ask for, so it
-  // takes the primary and Back up now steps down to a plain button beside it.
-  const offer = known && !on && !elsewhere && automatic.automaticAvailable !== false;
-  backUpNow.classList.toggle('primary', !offer);
-  if (offer) {
-    const turnOn = iconButton('clock', 'Turn on nightly backups', 'primary');
-    turnOn.onclick = async () => {
-      busy(turnOn, true);
-      await turnOnBackups(row);
-      await renderBackups({ force: true });
-    };
-    box.append(turnOn);
-  }
+  const said = stale ? (latest ? 'No backup in a week' : 'Never backed up') : '';
+  // repainted only when what it says changes, so a screen reader hears it once
+  if (box.dataset.said === said) return;
+  box.dataset.said = said;
+  box.replaceChildren();
+  // an empty box would still take its place in the page's gaps
+  box.hidden = !stale;
+  if (!stale) return;
+  box.append(Kit.banner({
+    tone: 'warn',
+    title: said,
+    text: (latest ? 'The last whole backup was ' + ago(new Date(latest).toISOString()) + '. ' : 'Nothing of this server is kept anywhere yet. ')
+      + (on ? 'Automatic backups are on and will take one at the next run.' : 'Back up now, or turn on automatic backups below.'),
+  }));
 }
 
 const KEEP_SCHEDULE = '__as-it-is';
@@ -577,326 +541,161 @@ function keepProblem(value, emptyKeepsAll) {
   return null;
 }
 
+/** The line beside the switch: what happens now, and when the last backup was. */
+function autoLine(data, automatic, latest) {
+  const last = latest ? ' Last backup ' + ago(new Date(latest).toISOString()) + '.' : '';
+  if (!automatic) return 'Checking whether this server backs itself up…';
+  if (automatic.error) return 'Could not read the schedule: ' + automatic.error;
+  if (automatic.automaticAvailable === false) return automatic.automaticUnavailableReason;
+  const on = automatic.auto && automatic.auto.enabled !== false;
+  if (on) {
+    const next = whenNext(automatic.auto.nextRun);
+    const ran = automatic.auto.lastResult ? ' Last run: ' + automatic.auto.lastResult + '.' : '';
+    return 'On.' + (next ? ' Next ' + next + '.' : '') + last + ran;
+  }
+  if (automatic.scheduled && automatic.scheduled.length) return 'Backed up by Schedule: ' + scheduledBackupWords(automatic.scheduled) + last;
+  return 'Off. Nothing backs this server up unless you do it by hand.' + last;
+}
+
 /**
- * The automatic-backup card. `data` is null while Task Scheduler is being asked, and carries
- * `error` if asking failed; either way the controls are drawn but cannot be used.
+ * The switch, how often and how many to keep: one row, each a control that saves itself. `automatic`
+ * is null while Task Scheduler is being asked, and carries `error` if asking failed; either way
+ * the controls are drawn but cannot be used.
  */
-function autoBackupSection(base, data) {
-  // Until the scheduler has answered there is nothing to show but the shape of the card.
-  const known = data && !data.error ? data : {};
-  const auto = document.createElement('div');
-  auto.className = 'section';
-  const autoTitle = document.createElement('h3');
-  autoTitle.textContent = 'Automatic backups';
+function autoBackupSection(row, base, data, automatic) {
+  const { h } = Kit;
+  const known = automatic && !automatic.error ? automatic : {};
+  const settled = Boolean(automatic) && !automatic.error && automatic.automaticAvailable !== false;
+  const on = Boolean(known.auto) && known.auto.enabled !== false;
 
-  const autoRow = document.createElement('div');
-  autoRow.className = 'row';
-  const onOff = document.createElement('input');
-  onOff.type = 'checkbox';
-  onOff.className = 'switch';
-  onOff.checked = Boolean(known.auto);
-  // the word beside it is "On" or "Off", which named the switch "Off, checkbox"
+  const sw = Kit.toggle({ label: 'Automatic backups', checked: on, disabled: !settled });
+  const onOff = sw.querySelector('input');
+  // the switch's words are the row's title; a screen reader still hears its name
+  sw.querySelector('.sl-choice-text').classList.add('sl-sr');
   onOff.setAttribute('aria-label', 'Automatic backups');
-  const onOffLabel = document.createElement('label');
-  onOffLabel.className = 'row';
-  onOffLabel.style.cursor = 'pointer';
-  // The word beside the switch is the switch's state, not the name of the "on" position: "On" next
-  // to a switch that was off read as a server being backed up when it was not.
-  const onOffWord = document.createElement('span');
-  const sayState = () => { onOffWord.textContent = onOff.checked ? 'On' : 'Off'; };
-  onOff.addEventListener('change', sayState);
-  sayState();
-  onOffLabel.append(onOff, onOffWord);
+  onOff.dataset.autoBackups = '';
+  const line = h('span', { class: 'sl-row-meta whitespace-normal', role: 'status', text: autoLine(data, automatic, lastWholeBackup(data.snapshots)) });
 
-  const every = document.createElement('select');
-  for (const opt of AUTO_INTERVALS) {
-    const o = document.createElement('option');
-    o.value = opt.label;
-    // the label is the choice's key; what is shown says the time this computer's way
-    o.textContent = opt.schedule.at ? opt.label.replace(opt.schedule.at, clockWords(opt.schedule.at)) : opt.label;
-    o.selected = known.auto ? sameSchedule(opt.schedule, known.auto.schedule) : opt.label === 'Daily at 03:00';
-    every.append(o);
-  }
+  const every = Kit.select({
+    label: 'How often',
+    options: AUTO_INTERVALS.map((opt) => ({
+      value: opt.label,
+      // the label is the choice's key; what is shown says the time this computer's way
+      label: opt.schedule.at ? opt.label.replace(opt.schedule.at, clockWords(opt.schedule.at)) : opt.label,
+    })),
+    value: known.auto ? (AUTO_INTERVALS.find((o) => sameSchedule(o.schedule, known.auto.schedule)) || {}).label : 'Daily at 03:00',
+  });
+  const everyBox = every.querySelector('select');
   // A schedule made elsewhere (daily at 04:30, say) matches none of the choices. Without a choice
-  // of its own the list would show the first one, "Every hour", and Apply would save that.
-  const custom = known.auto && !AUTO_INTERVALS.some((opt) => sameSchedule(opt.schedule, known.auto.schedule));
-  if (custom) {
-    const o = document.createElement('option');
-    o.value = KEEP_SCHEDULE;
-    o.textContent = capital(describeSchedule(known.auto.schedule)) + ' (as it is now)';
-    o.selected = true;
-    every.prepend(o);
+  // of its own the list would show the first one, "Every hour", and a change would save that.
+  if (known.auto && !AUTO_INTERVALS.some((opt) => sameSchedule(opt.schedule, known.auto.schedule))) {
+    everyBox.prepend(h('option', { value: KEEP_SCHEDULE, text: capital(describeSchedule(known.auto.schedule)) + ' (as it is now)', selected: true }));
+    everyBox.value = KEEP_SCHEDULE;
   }
-  every.setAttribute('aria-label', 'How often');
-  every.style.maxWidth = '190px';
 
-  const keepLabel = document.createElement('span');
-  keepLabel.className = 'hint';
-  keepLabel.textContent = 'keeping';
-  const keep = document.createElement('input');
-  keep.type = 'number';
-  keep.min = '1';
-  keep.max = '365';
-  // A task that keeps everything (made elsewhere) shows as that, not as 7: Apply would otherwise
+  // A task that keeps everything (made elsewhere) shows as that, not as 7: a change would otherwise
   // start deleting its older backups for someone who only changed the time.
   const keepsAll = Boolean(known.auto) && known.auto.keep == null;
-  keep.value = keepsAll ? '' : String((known.auto && known.auto.keep) || 7);
-  if (keepsAll) keep.placeholder = 'all';
-  keep.style.maxWidth = '68px';
-  keep.setAttribute('aria-label', 'How many automatic backups to keep');
-  const keepAfter = document.createElement('span');
-  keepAfter.className = 'hint';
-  keepAfter.textContent = 'of them';
-  const keepUnit = document.createElement('span');
-  keepUnit.className = 'unit';
-  keepUnit.append(keepLabel, keep, keepAfter);
+  const keep = Kit.input({ type: 'number', value: keepsAll ? '' : String((known.auto && known.auto.keep) || 7), placeholder: keepsAll ? 'all' : null });
+  keep.min = '1';
+  keep.max = '365';
+  keep.classList.add('w-24');
+  const keepField = Kit.field({ label: 'Keep the newest', control: keep, hint: 'Automatic ones only. Backups you make by hand are never removed.' });
+  const everyField = Kit.field({ label: 'How often', control: every });
+  for (const c of [everyBox, keep]) c.disabled = !settled;
 
-  const apply = document.createElement('button');
-  apply.textContent = 'Apply';
-  autoRow.append(onOffLabel, every, keepUnit, apply);
-
-  const autoState = document.createElement('div');
-  autoState.className = 'hint';
-  autoState.textContent = known.auto
-    ? 'Held by ' + schedulerName + '. Last run: ' + (known.auto.lastResult || 'unknown')
-      + '. Next: ' + (whenNext(known.auto.nextRun) || 'unknown') + '.'
-    : schedulerHint;
-  auto.append(autoTitle, autoRow, autoState);
+  const head = h('div', { class: 'flex flex-wrap items-center gap-4' },
+    sw,
+    h('span', { class: 'sl-row-main flex-1 basis-72' },
+      h('span', { class: 'sl-row-title type-card', text: 'Automatic backups' }), line),
+    Kit.help({ label: 'automatic backups', text: ['They are held by ' + schedulerName + ', so they run with SpawnLoft closed.', schedulerHint] }));
+  const controls = h('div', { class: 'flex flex-wrap items-start gap-4' }, h('div', { class: 'w-64 max-w-full' }, everyField), h('div', { class: 'max-w-80' }, keepField));
+  // Off and nobody asked: the switch is the one control that matters, the rest wait for it.
+  controls.hidden = !on;
+  const part = h('div', { class: 'flex flex-col gap-4', dataset: { autoBackup: '' } }, head, controls);
   const lingering = lingerNotice(known.background, () => renderBackups({ force: true }));
-  if (lingering) auto.append(lingering);
-  if (known.automaticAvailable === false) {
-    autoRow.hidden = true;
-    autoState.textContent = known.automaticUnavailableReason;
-    for (const control of [onOff, every, keep, apply]) control.disabled = true;
-  }
+  if (lingering) part.append(lingering);
 
-  // What the number means, and what it does not touch, where the number is.
-  const keepNote = document.createElement('div');
-  keepNote.className = 'hint';
-  keepNote.setAttribute('role', 'status');
-  const sayKeep = (problem) => {
-    keepNote.textContent = problem || 'Keeps the newest automatic backups, up to that many. Backups you make by hand are never removed.';
-    keepNote.classList.toggle('bad', Boolean(problem));
-    keep.setAttribute('aria-invalid', String(Boolean(problem)));
-  };
-  sayKeep(null);
-  keepNote.hidden = known.automaticAvailable === false;
-  keep.addEventListener('input', () => sayKeep(keepProblem(keep.value, keepsAll)));
-  auto.append(keepNote);
-
-  apply.onclick = async () => {
+  let saving = false;
+  async function save(why) {
     // an empty or impossible number used to be saved as "keep everything", with a toast that said scheduled
     const problem = onOff.checked ? keepProblem(keep.value, keepsAll) : null;
-    sayKeep(problem);
+    keepField.setError(problem);
     if (problem) { keep.focus(); return; }
-    apply.disabled = true;
+    if (saving) return;
+    saving = true;
+    for (const c of [onOff, everyBox, keep]) Kit.busy(c, true);
+    line.textContent = onOff.checked ? 'Saving…' : 'Turning off…';
     try {
-      const chosen = every.value === KEEP_SCHEDULE ? { schedule: known.auto.schedule } : AUTO_INTERVALS.find((o) => o.label === every.value);
+      const chosen = everyBox.value === KEEP_SCHEDULE ? { schedule: known.auto.schedule } : AUTO_INTERVALS.find((o) => o.label === everyBox.value);
       await post(base + '/auto', onOff.checked
         ? { enabled: true, schedule: chosen.schedule, keep: keep.value.trim() ? Number(keep.value) : null }
         : { enabled: false });
-      toast(onOff.checked ? 'Automatic backups scheduled.' : 'Automatic backups turned off.', 'good');
+      toast(!onOff.checked ? 'Automatic backups turned off.' : why === 'switch' ? 'Automatic backups are on.' : 'Automatic backups changed.', 'good');
       await renderBackups({ force: true });
     } catch (e) {
       toast(e.message, 'bad');
-      apply.disabled = false;
-    }
-  };
-
-  const settled = data && !data.error;
-  if (!settled) {
-    // While asking, the card keeps the "off" wording, the commonest answer, so it does not change
-    // height when the answer lands; the line at the top of the tab says it is still checking.
-    autoState.textContent = data ? 'Could not read the schedule: ' + data.error : schedulerHint;
-    for (const control of [onOff, every, keep, apply]) control.disabled = true;
-  }
-  return auto;
-}
-
-// A restore in progress, by server or database name, and the backup it is putting back. While
-// one runs every button in its list is off and the row says so: a second restore, a delete or a
-// new backup pressed on top of it is how a world is lost, and a toast that leaves after five
-// seconds says nothing about a job that runs for minutes. The API refuses those as well; this is
-// so nobody has to find that out.
-const restoring = new Map();
-function lockRestoring(scope, owner) {
-  const which = restoring.get(owner);
-  if (!which || !scope) return;
-  for (const b of scope.querySelectorAll('button')) {
-    b.disabled = true;
-    b.title = 'Wait for the restore to finish';
-  }
-  for (const line of scope.querySelectorAll('[data-backup-name]')) {
-    if (line.dataset.backupName !== which || line.hasAttribute('data-restoring')) continue;
-    line.setAttribute('data-restoring', '');
-    line.setAttribute('aria-busy', 'true');
-    const when = line.querySelector('.when');
-    if (when) {
-      when.setAttribute('role', 'status');
-      when.textContent = 'Restoring this one\u2026 it can take a few minutes.';
+      for (const c of [onOff, everyBox, keep]) Kit.busy(c, false);
+      onOff.checked = on;
+      controls.hidden = !on;
+      line.textContent = autoLine(data, automatic, lastWholeBackup(data.snapshots));
+    } finally {
+      saving = false;
     }
   }
+  onOff.addEventListener('change', () => { controls.hidden = !onOff.checked; save('switch'); });
+  everyBox.addEventListener('change', () => save('every'));
+  keep.addEventListener('input', () => keepField.setError(keep.value.trim() ? keepProblem(keep.value, keepsAll) : null));
+  keep.addEventListener('change', () => save('keep'));
+  return part;
 }
 
-/**
- * What the Restore dialog may promise about the copy kept first. The copy holds the files the
- * backup lists, as they are now. A backup that lists nothing (made by hand, or by an old version)
- * gets no copy, and the databases a backup carries are never in it: both are said, not implied.
- */
-function restoreWords(snap) {
-  const files = (snap.members || []).some((m) => m !== 'databases');
-  const dbs = (snap.databases || []).length > 0;
-  return {
-    copy: files
-      ? 'A copy of the files as they are now is kept in this list first.'
-      : 'This backup does not record what it holds, so no copy of how things are now can be kept.',
-    note: dbs ? ' The databases are not part of the copy kept first: back them up from their own page if you may want them back.' : '',
-  };
-}
-
-function renderBackupHistory(row, data, signature) {
+/** Where backups go, a second copy, small copies, and what they leave out: one row each. */
+function backupOptions(row, data) {
+  const { h } = Kit;
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
-  // ---- what is already there ------------------------------------------------
-  const hist = document.createElement('div');
-  hist.dataset.backupHistory = signature;
-  const histTitle = document.createElement('h3');
-  histTitle.className = 'hist-title';
-  histTitle.textContent = 'History';
-  // how many and how much: the count alone said nothing about the disk they take
-  const totals = backupTotals(data.snapshots);
-  const histSum = document.createElement('p');
-  histSum.className = 'hist-sum';
-  histSum.textContent = data.snapshots.length ? historyWords(totals) : '';
-  histSum.hidden = !data.snapshots.length;
-  const redraw = () => { if (hist.isConnected) hist.replaceWith(renderBackupHistory(row, data, signature)); };
-  // Small copies are out of the list until asked for: forty one-file copies hid the four backups.
-  const shown = data.snapshots.filter((s) => showSmallCopies || !s.copy);
-  if (!pickedBackups.has(row.name)) pickedBackups.set(row.name, new Set());
-  const picked = pickedBackups.get(row.name);
-  // a tick on something that is no longer listed, or is locked now, is not a tick
-  for (const name of [...picked]) {
-    if (!shown.some((s) => s.name === name && !s.locked)) picked.delete(name);
-  }
-  const copiesRow = document.createElement('div');
-  copiesRow.className = 'row where';
-  const copiesSaid = document.createElement('span');
-  copiesSaid.className = 'hint';
-  copiesSaid.textContent = data.cleanCopies
-    ? 'Small copies older than ' + data.copyDays + ' days are removed each time a backup or a copy is taken.'
-    : 'Small copies, kept before an install or an edit, stay until you delete them.';
-  const cleanBtn = document.createElement('button');
-  cleanBtn.className = 'ghost inline';
-  cleanBtn.type = 'button';
-  cleanBtn.dataset.cleanCopies = '';
-  cleanBtn.textContent = data.cleanCopies ? 'Keep them' : 'Remove after ' + data.copyDays + ' days';
-  cleanBtn.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
-  copiesRow.append(copiesSaid, cleanBtn);
-  if (totals.copies.count) {
-    const toggle = document.createElement('button');
-    toggle.className = 'ghost inline';
-    toggle.type = 'button';
-    toggle.dataset.showCopies = '';
-    toggle.textContent = (showSmallCopies ? 'Hide small copies (' : 'Show small copies (') + totals.copies.count + ')';
-    toggle.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
-    toggle.onclick = () => {
-      showSmallCopies = !showSmallCopies;
-      redraw();
-      const again = $('#backupsBody [data-show-copies]');
-      if (again) again.focus();
-    };
-    copiesRow.append(toggle);
-  }
-  cleanBtn.onclick = async () => {
-    if (data.cleanCopies) {
-      cleanBtn.disabled = true;
-      try {
-        await post(base + '/clean-copies', { on: false });
-        toast('Small copies are kept until you delete them.', 'good');
-        await renderBackups({ force: true });
-      } catch (e) { toast(e.message, 'bad'); cleanBtn.disabled = false; }
-      return;
-    }
-    const { remove, ...question } = cleanCopiesQuestion(data.snapshots, data.copyDays);
-    const got = await ask({
-      ...question,
-      // only the ones this question counted go now; the server checks each again
-      submit: () => post(base + '/clean-copies', { on: true, remove }),
-    });
-    if (!got) return;
-    const gone = (got.out && got.out.removed) || [];
-    toast('Small copies older than ' + data.copyDays + ' days are now removed as new ones are taken.'
-      + (gone.length ? ' ' + gone.length + ' went now, ' + fileSize(got.out.size || 0) + ' freed.' : '')
-      + (gone.length < remove.length ? ' ' + (remove.length - gone.length) + ' could not be removed yet.' : ''), gone.length < remove.length ? 'bad' : 'good');
-    await renderBackups({ force: true });
-  };
-  const where = document.createElement('div');
-  where.className = 'row where';
-  const wherePath = document.createElement('span');
-  wherePath.className = 'hint mono-path';
-  wherePath.textContent = data.dir;
-  const change = document.createElement('button');
-  change.className = 'ghost inline';
-  change.type = 'button';
-  change.textContent = 'Change';
-  change.title = 'Where backups are kept, for every server';
-  change.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
-  where.append(wherePath, change);
+  const rows = [];
+
+  // ---- where ----------------------------------------------------------------
+  const change = Kit.button({ label: 'Change', size: 'sm' });
+  change.setAttribute('aria-label', 'Change where backups are kept');
   change.onclick = () => changeBackupsLocation(data.root);
+  const whereEnd = [change];
+  const whereMeta = [h('span', { class: 'block font-mono text-1 text-ink-3 break-all', text: data.dir }), 'For every server.'];
   // A change that is saved but waiting for a restart is said here, with the way back.
-  let pending = null;
   if (data.pendingRoot) {
-    pending = document.createElement('div');
-    pending.className = 'row where';
-    const said = document.createElement('span');
-    said.className = 'hint';
-    said.setAttribute('role', 'status');
-    said.textContent = backupsMoveWords(data.root, data.pendingRoot).pending;
-    const undo = document.createElement('button');
-    undo.className = 'ghost inline';
-    undo.type = 'button';
-    undo.textContent = 'Keep the current folder';
-    undo.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
+    whereMeta.push(h('span', { class: 'block text-warn-ink', role: 'status', text: backupsMoveWords(data.root, data.pendingRoot).pending }));
+    const undo = Kit.button({ label: 'Keep the current folder', size: 'sm' });
     undo.onclick = async () => {
-      undo.disabled = true;
+      Kit.busy(undo, true);
       try {
         await post('/settings', { backupsDir: data.root });
         toast('Backups stay in ' + data.root + '.', 'good');
         await renderBackups({ force: true });
-      } catch (e) { toast(e.message, 'bad'); undo.disabled = false; }
+      } catch (e) { toast(e.message, 'bad'); Kit.busy(undo, false); }
     };
-    pending.append(said, undo);
+    whereEnd.push(undo);
   }
+  rows.push(optionRow({ title: 'Where backups are kept', meta: whereMeta, end: whereEnd }));
 
-  // The mirror: a second drive every snapshot is copied to as it is taken. Its absence is
-  // stated as the risk it is, because servers and snapshots on one disk fail together.
-  const mirrorRow = document.createElement('div');
-  mirrorRow.className = 'row where';
-  const mirrorPath = document.createElement('span');
-  mirrorPath.className = 'hint mono-path';
-  mirrorPath.textContent = data.mirror
-    ? 'also copied to ' + data.mirror
-    : 'No second copy: backups live on one drive, beside what they back up.';
-  const mset = document.createElement('button');
-  mset.className = 'ghost inline';
-  mset.type = 'button';
-  mset.textContent = data.mirror ? 'Change' : 'Add a second copy';
-  mset.title = 'A second place, ideally another drive, that every new backup is copied to';
-  mset.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
-  mirrorRow.append(mirrorPath, mset);
+  // ---- the mirror ---------------------------------------------------------------
+  // A second drive every backup is copied to as it is taken. Its absence is stated as the risk it
+  // is, because servers and backups on one disk fail together.
+  const mset = Kit.button({ label: data.mirror ? 'Change' : 'Add a second copy', size: 'sm' });
+  mset.setAttribute('aria-label', data.mirror ? 'Change where the second copy goes' : 'Add a second copy');
+  const mirrorEnd = [mset];
   if (data.mirror) {
-    const moff = document.createElement('button');
-    moff.className = 'ghost inline';
-    moff.type = 'button';
-    moff.textContent = 'Off';
-    moff.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
-    mirrorRow.append(moff);
+    const moff = Kit.button({ label: 'Turn off', size: 'sm', kind: 'ghost' });
+    moff.setAttribute('aria-label', 'Turn off the second copy');
     moff.onclick = async () => {
+      Kit.busy(moff, true);
       try {
         await post('/settings', { backupsMirrorDir: '' });
         toast('Second copies turned off. The ones already made stay where they are.', 'good');
         await renderBackups({ force: true });
-      } catch (e) { toast(e.message, 'bad'); }
+      } catch (e) { toast(e.message, 'bad'); Kit.busy(moff, false); }
     };
+    mirrorEnd.push(moff);
   }
   mset.onclick = async () => {
     let chosen = null;
@@ -919,328 +718,416 @@ function renderBackupHistory(row, data, signature) {
     }
     try {
       const out = saved || await post('/settings', { backupsMirrorDir: chosen });
-      toast('New backups are now also copied to ' + out.backupsMirrorDir + '. No restart needed.', 'good');
+      toast('New backups are now also copied to ' + out.backupsMirrorDir + '. Backups taken before now are not copied.', 'good');
       await renderBackups({ force: true });
     } catch (e) { toast(e.message, 'bad'); }
   };
+  rows.push(optionRow({
+    title: 'Second copy on another drive',
+    meta: data.mirror
+      ? [h('span', { class: 'block font-mono text-1 text-ink-3 break-all', text: data.mirror }), 'Every new backup, for every server, is copied there too.']
+      : 'Off. Backups sit on the same drive as the servers, so one disk failure can take both.',
+    end: mirrorEnd,
+  }));
 
+  // ---- small copies ---------------------------------------------------------------
+  const keepCopies = Kit.select({
+    label: 'Small safety copies',
+    options: [{ value: 'keep', label: 'Keep until I delete them' }, { value: 'clean', label: 'Remove after ' + data.copyDays + ' days' }],
+    value: data.cleanCopies ? 'clean' : 'keep',
+  });
+  const copiesBox = keepCopies.querySelector('select');
+  copiesBox.dataset.cleanCopies = '';
+  copiesBox.addEventListener('change', async () => {
+    const back = () => { copiesBox.value = data.cleanCopies ? 'clean' : 'keep'; };
+    if (copiesBox.value === 'keep') {
+      Kit.busy(copiesBox, true);
+      try {
+        await post(base + '/clean-copies', { on: false });
+        toast('Small copies are kept until you delete them.', 'good');
+        await renderBackups({ force: true });
+      } catch (e) { toast(e.message, 'bad'); Kit.busy(copiesBox, false); back(); }
+      return;
+    }
+    const { remove, ...question } = cleanCopiesQuestion(data.snapshots, data.copyDays);
+    const got = await ask({
+      ...question,
+      // only the ones this question counted go now; the server checks each again
+      submit: () => post(base + '/clean-copies', { on: true, remove }),
+    });
+    if (!got) { back(); return; }
+    const gone = (got.out && got.out.removed) || [];
+    toast('Small copies older than ' + data.copyDays + ' days are now removed as new ones are taken.'
+      + (gone.length ? ' ' + gone.length + ' went now, ' + fileSize(got.out.size || 0) + ' freed.' : '')
+      + (gone.length < remove.length ? ' ' + (remove.length - gone.length) + ' could not be removed yet.' : ''), gone.length < remove.length ? 'bad' : 'good');
+    await renderBackups({ force: true });
+  });
+  rows.push(optionRow({
+    title: 'Small safety copies',
+    meta: 'Made before a plugin install or update, and before a file is edited, replaced or deleted. Undo in Activity uses them.',
+    end: [h('span', { class: 'w-56 max-w-full' }, keepCopies)],
+  }));
+
+  // ---- left out -------------------------------------------------------------------
+  // What this server's backups skip: a map plugin's rendered tiles, logs a plugin keeps. Applies
+  // to every backup - by hand, on a schedule, before an upgrade - and never to the copy a file
+  // edit takes, which exists to hold exactly that file.
+  const exclude = data.exclude || [];
+  const edit = Kit.button({ label: 'Edit', size: 'sm' });
+  edit.setAttribute('aria-label', 'Edit what backups leave out');
+  edit.onclick = async () => {
+    const text = Kit.textarea({ value: exclude.join('\n'), placeholder: 'plugins/dynmap/web\n*.log', mono: true, rows: 6 });
+    text.spellcheck = false;
+    const field = Kit.field({ label: 'Paths to leave out, one per line', control: text, hint: 'From the server folder. * matches anything. Big things that rebuild themselves are the usual ones, such as a web map’s tiles.' });
+    const got = await ask({
+      title: 'Leave out of backups',
+      text: 'Every backup of this server skips these, automatic ones included. A restore cannot bring back what was left out.',
+      detail: field,
+      confirmLabel: 'Save',
+      submit: () => post(base + '/exclude', { patterns: text.value }),
+    });
+    if (!got) return;
+    const n = got.out.exclude.length;
+    toast(n ? 'Backups will leave out ' + n + (n === 1 ? ' path.' : ' paths.') : 'Backups leave nothing out.', 'good');
+    await renderBackups({ force: true });
+  };
+  rows.push(optionRow({
+    title: 'Left out of backups',
+    meta: exclude.length
+      ? h('span', { class: 'font-mono text-1 break-all', text: exclude.join(', ') })
+      : 'Nothing. Every backup takes all of what it covers.',
+    end: [edit],
+  }));
+
+  return h('section', { class: 'flex flex-col gap-3', 'aria-label': 'Backup options', dataset: { backupOptions: '' } },
+    h('h2', { class: 'm-0 type-section text-ink', text: 'Options' }),
+    h('div', { class: 'sl-list' }, rows));
+}
+
+// A restore in progress, by server or database name, and the backup it is putting back. While
+// one runs every button in its list is off and the row says so: a second restore, a delete or a
+// new backup pressed on top of it is how a world is lost, and a toast that leaves after five
+// seconds says nothing about a job that runs for minutes. The API refuses those as well; this is
+// so nobody has to find that out.
+const restoring = new Map();
+function lockRestoring(scope, owner) {
+  const which = restoring.get(owner);
+  if (!which || !scope) return;
+  for (const b of scope.querySelectorAll('button, select, input')) {
+    b.disabled = true;
+    b.title = 'Wait for the restore to finish';
+  }
+  for (const line of scope.querySelectorAll('[data-backup-name]')) {
+    if (line.dataset.backupName !== which || line.hasAttribute('data-restoring')) continue;
+    line.setAttribute('data-restoring', '');
+    line.setAttribute('aria-busy', 'true');
+    const when = line.querySelector('[data-when]');
+    if (when) {
+      when.setAttribute('role', 'status');
+      when.textContent = 'Restoring this one… it can take a few minutes.';
+    }
+  }
+}
+
+/**
+ * What the Restore dialog may promise about the copy kept first. The copy holds the files the
+ * backup lists, as they are now. A backup that lists nothing (made by hand, or by an old version)
+ * gets no copy, and the databases a backup carries are never in it: both are said, not implied.
+ */
+function restoreWords(snap) {
+  const files = (snap.members || []).some((m) => m !== 'databases');
+  const dbs = (snap.databases || []).length > 0;
+  return {
+    copy: files
+      ? 'A copy of the files as they are now is kept in this list first.'
+      : 'This backup does not record what it holds, so no copy of how things are now can be kept.',
+    note: dbs ? ' The databases are not part of the copy kept first: back them up from their own page if you may want them back.' : '',
+  };
+}
+
+/** What a backup holds, in a word or two: "Standard", "one file", "Plugins and mods only". */
+function backupKindWords(snap) {
+  const onlyFile = singleFileOf(snap);
+  const fromFiles = FILES_SNAPSHOT[snap.label] && snap.scope === 'files' ? FILES_SNAPSHOT[snap.label] : null;
+  // An archive with no manifest (made by hand, or by an old version) reports its scope as "?".
+  const unknown = !fromFiles && !onlyFile && (!snap.scope || snap.scope === '?');
+  const kind = fromFiles ? capital(fromFiles.tag) : onlyFile ? 'One file' : unknown ? 'Contents not recorded' : scopeLabel(snap.scope);
+  const dbs = (snap.databases || []).length;
+  return kind + (dbs ? ' + ' + (dbs === 1 ? 'database' : dbs + ' databases') : '');
+}
+
+/**
+ * One backup in a list, the server's or a database's: when, what and why, its size, Restore, and
+ * the rest under a menu. `extra` adds lines under the title; `menu` is the menu's items.
+ */
+function backupRow({ snap, title, lines, kind, size, restore, menu, picker }) {
+  const { h } = Kit;
+  const opener = menu && menu.length ? Kit.menu({ icon: 'dots', kind: 'ghost', title: 'More for ' + title, items: menu }) : null;
+  if (opener) opener.querySelector('button').classList.add('sl-btn-icon', 'sl-btn-sm');
+  return h('div', { class: 'sl-row flex-wrap items-start @wide/pane:flex-nowrap', dataset: { backupName: snap.name } },
+    picker || null,
+    h('span', { class: 'sl-row-main basis-80' },
+      h('span', { class: 'sl-row-title whitespace-normal', dataset: { when: '' }, text: title }),
+      lines),
+    h('span', { class: 'sl-row-end flex-wrap' },
+      kind ? h('span', { class: 'sl-pill', text: kind }) : null,
+      h('span', { class: 'w-20 text-right font-mono text-2 text-ink-2', text: size }),
+      restore || null,
+      opener));
+}
+
+function renderBackupHistory(row, data, signature) {
+  const { h } = Kit;
+  const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
+  const hist = h('section', { class: 'flex flex-col gap-3', 'aria-label': 'History', dataset: { backupHistory: signature } });
+  // how many and how much: the count alone said nothing about the disk they take
+  const totals = backupTotals(data.snapshots);
+  const redraw = () => { if (hist.isConnected) hist.replaceWith(renderBackupHistory(row, data, signature)); };
+  // Small copies are out of the list until asked for: forty one-file copies hid the four backups.
+  const shown = data.snapshots.filter((s) => showSmallCopies || !s.copy);
+  if (!pickedBackups.has(row.name)) pickedBackups.set(row.name, new Set());
+  const picked = pickedBackups.get(row.name);
+  // a tick on something that is no longer listed, or is locked now, is not a tick
+  for (const name of [...picked]) {
+    if (!shown.some((s) => s.name === name && !s.locked)) picked.delete(name);
+  }
+  let toggle = null;
+  if (totals.copies.count) {
+    toggle = Kit.button({ label: (showSmallCopies ? 'Hide small copies (' : 'Show small copies (') + totals.copies.count + ')', size: 'sm', kind: 'ghost' });
+    toggle.dataset.showCopies = '';
+    toggle.setAttribute('aria-pressed', String(showSmallCopies));
+    toggle.onclick = () => {
+      showSmallCopies = !showSmallCopies;
+      redraw();
+      const again = $('#backupsBody [data-show-copies]');
+      if (again) again.focus();
+    };
+  }
+  hist.append(h('div', { class: 'flex flex-wrap items-baseline gap-x-3 gap-y-1' },
+    h('h2', { class: 'm-0 type-section text-ink', text: 'History' }),
+    h('span', { class: 'flex-1 type-meta text-ink-3', text: data.snapshots.length ? historyWords(totals) : '' }),
+    toggle));
   // Restore is off while the server runs, and only a tip on a button that cannot take focus said why
-  const stopFirst = document.createElement('p');
-  stopFirst.className = 'hint';
-  stopFirst.style.margin = '0 0 8px';
-  stopFirst.textContent = 'Stop the server to restore a backup. Everything else here works while it runs.';
-  stopFirst.hidden = !(data.running && data.snapshots.length);
-  hist.append(histTitle, histSum, stopFirst, where, ...(pending ? [pending] : []), mirrorRow, copiesRow);
+  if (data.running && data.snapshots.length) hist.append(h('p', { class: 'sl-hint m-0', text: 'Stop the server to restore a backup. Everything else here works while it runs.' }));
 
   if (!data.snapshots.length) {
-    hist.append(emptyState('archive', 'Nothing here yet. Reset and delete both take one '
-      + 'automatically before they run, so this fills up on its own.'));
-  } else if (!shown.length) {
-    hist.append(emptyState('archive', 'No backups. What is here is small copies kept before changes: '
-      + '"Show small copies" lists them.'));
-  } else {
-    // ---- several at once ------------------------------------------------------
-    const bar = document.createElement('div');
-    bar.className = 'snap-bar';
-    const allLabel = document.createElement('label');
-    const all = document.createElement('input');
-    all.type = 'checkbox';
-    all.dataset.pickAll = '';
-    allLabel.append(all, document.createTextNode('Select all'));
-    const said = document.createElement('span');
-    said.className = 'said';
-    said.setAttribute('role', 'status');
-    const dropMany = document.createElement('button');
-    dropMany.type = 'button';
-    dropMany.className = 'danger';
-    dropMany.dataset.deleteMany = '';
-    dropMany.textContent = 'Delete selected';
-    bar.append(allLabel, said, dropMany);
-    const free = shown.filter((s) => !s.locked);
-    const chosenNow = () => shown.filter((s) => picked.has(s.name));
-    const paintBar = () => {
-      const chosen = chosenNow();
-      said.textContent = pickedWords(chosen);
-      dropMany.hidden = !chosen.length;
-      all.disabled = !free.length;
-      all.checked = free.length > 0 && chosen.length === free.length;
-      all.indeterminate = chosen.length > 0 && chosen.length < free.length;
-      allLabel.title = free.length ? '' : 'Every backup here is locked';
-    };
-    all.onchange = () => {
-      const on = all.checked;
-      for (const s of free) {
-        if (on) picked.add(s.name); else picked.delete(s.name);
-      }
-      for (const box of hist.querySelectorAll('.snap .pick:not(:disabled)')) {
-        box.checked = on;
-        box.closest('.snap').toggleAttribute('data-picked', on);
-      }
+    hist.append(Kit.empty({ icon: 'archive', title: 'No backups yet', text: 'Back up now, or turn on automatic backups. Reset and delete each take one by themselves before they run, so this also fills up on its own.' }));
+    lockRestoring(hist, row.name);
+    return hist;
+  }
+  if (!shown.length) {
+    hist.append(Kit.empty({ icon: 'archive', title: 'No backups', text: 'What is here is small copies kept before changes. Show small copies lists them.' }));
+    lockRestoring(hist, row.name);
+    return hist;
+  }
+
+  // ---- several at once ------------------------------------------------------
+  const allBox = Kit.checkbox({ label: 'Select all' });
+  const all = allBox.querySelector('input');
+  all.dataset.pickAll = '';
+  const said = h('span', { class: 'flex-1 type-meta text-ink-3', role: 'status' });
+  const dropMany = Kit.button({ label: 'Delete selected', kind: 'danger', size: 'sm' });
+  dropMany.dataset.deleteMany = '';
+  hist.append(h('div', { class: 'flex flex-wrap items-center gap-x-4 gap-y-2 min-h-8' }, allBox, said, dropMany));
+  const free = shown.filter((s) => !s.locked);
+  const chosenNow = () => shown.filter((s) => picked.has(s.name));
+  const paintBar = () => {
+    const chosen = chosenNow();
+    said.textContent = pickedWords(chosen);
+    dropMany.hidden = !chosen.length;
+    all.disabled = !free.length;
+    all.checked = free.length > 0 && chosen.length === free.length;
+    all.indeterminate = chosen.length > 0 && chosen.length < free.length;
+    allBox.title = free.length ? '' : 'Every backup here is locked';
+  };
+  all.onchange = () => {
+    const on = all.checked;
+    for (const s of free) {
+      if (on) picked.add(s.name); else picked.delete(s.name);
+    }
+    for (const box of hist.querySelectorAll('[data-pick]:not(:disabled)')) box.checked = on;
+    paintBar();
+  };
+  dropMany.onclick = async () => {
+    const chosen = chosenNow();
+    if (!chosen.length) return;
+    const got = await ask({
+      ...deleteManyQuestion(chosen, data.snapshots),
+      submit: () => post(base + '/delete-many', { snapshots: chosen.map((s) => s.name) }),
+    });
+    if (!got) return;
+    picked.clear();
+    const out = got.out || {};
+    toast(deletedManyWords(out), (out.removed || []).length && !(out.skipped || []).length ? 'good' : 'bad');
+    await renderBackups({ force: true });
+  };
+
+  const rows = shown.map((snap) => {
+    const which = backupWords(snap);
+    const pick = h('input', { type: 'checkbox', class: 'sl-check mt-1', dataset: { pick: '' }, 'aria-label': 'Select ' + which });
+    pick.disabled = Boolean(snap.locked);
+    if (snap.locked) pick.title = 'Locked. Unlock it first.';
+    pick.checked = picked.has(snap.name);
+    pick.onchange = () => {
+      if (pick.checked) picked.add(snap.name); else picked.delete(snap.name);
       paintBar();
     };
-    dropMany.onclick = async () => {
-      const chosen = chosenNow();
-      if (!chosen.length) return;
-      const got = await ask({
-        ...deleteManyQuestion(chosen, data.snapshots),
-        submit: () => post(base + '/delete-many', { snapshots: chosen.map((s) => s.name) }),
-      });
-      if (!got) return;
-      picked.clear();
-      const out = got.out || {};
-      toast(deletedManyWords(out), (out.removed || []).length && !(out.skipped || []).length ? 'good' : 'bad');
-      await renderBackups({ force: true });
-    };
-    hist.append(bar);
-    const list = document.createElement('div');
-    list.className = 'snaps picks';
-    // Column labels for the grid below. Presentation only: aria-hidden, since each row already
-    // says what its cells are in its own words.
-    const head = document.createElement('div');
-    head.className = 'snaps-head';
-    head.setAttribute('aria-hidden', 'true');
-    for (const [label, cls] of [['Backup', ''], ['Contents', ''], ['Reason', 'h-why'], ['Items', 'h-items'], ['Size', '']]) {
-      const cell = document.createElement('span');
-      if (cls) cell.className = cls;
-      cell.textContent = label;
-      head.append(cell);
+
+    const lines = [];
+    if (snap.note) lines.push(h('span', { class: 'type-body text-ink font-strong whitespace-normal', text: '“' + snap.note + '”' }));
+    // An AI assistant snapshots the one file it is about to change, and the Files tool what it is
+    // about to edit, replace or delete. Each says which, so it does not read as a whole backup.
+    const onlyFile = singleFileOf(snap);
+    const fromFiles = FILES_SNAPSHOT[snap.label] && snap.scope === 'files' ? FILES_SNAPSHOT[snap.label] : null;
+    const onlyWhat = onlyFile || (fromFiles ? describeMembers(snap.members) : null);
+    if (onlyWhat) {
+      lines.push(h('span', {
+        class: 'sl-row-meta',
+        text: 'Only ' + onlyWhat + (fromFiles ? ', ' + fromFiles.why : snap.label === 'before-edit' ? ', as it was before an AI assistant changed it' : ''),
+      }));
     }
-    list.append(head);
-    for (const snap of shown) {
-      const el = document.createElement('div');
-      el.className = 'snap';
-      el.dataset.backupName = snap.name;
-      const pick = document.createElement('input');
-      pick.type = 'checkbox';
-      pick.className = 'pick';
-      pick.setAttribute('aria-label', 'Select ' + backupWords(snap));
-      pick.disabled = Boolean(snap.locked);
-      if (snap.locked) pick.title = 'Locked. Unlock it first.';
-      pick.checked = picked.has(snap.name);
-      el.toggleAttribute('data-picked', pick.checked);
-      pick.onchange = () => {
-        if (pick.checked) picked.add(snap.name); else picked.delete(snap.name);
-        el.toggleAttribute('data-picked', pick.checked);
-        paintBar();
-      };
-      const when = document.createElement('div');
-      when.className = 'when';
-      const age = ago(snap.mtime);
-      when.textContent = stamp(snap.mtime) + (age ? '  \u00b7  ' + age : '');
-      const what = document.createElement('div');
-      what.className = 'what';
-      what.textContent = snap.name;
-      // An AI assistant snapshots the one file it is about to change. Its scope says "config", but
-      // it holds that file and nothing else, and a restore puts back only that file - so it says
-      // which file rather than leaving it to read as a copy of the whole configuration.
-      const onlyFile = singleFileOf(snap);
-      // The Files tool copies what it is about to edit, replace or delete - one file, or the few
-      // things selected - and says which in the same way.
-      const fromFiles = FILES_SNAPSHOT[snap.label] && snap.scope === 'files' ? FILES_SNAPSHOT[snap.label] : null;
-      const onlyWhat = onlyFile || (fromFiles ? describeMembers(snap.members) : null);
-      if (onlyWhat) {
-        const which = document.createElement('div');
-        which.className = 'hint';
-        which.textContent = 'Only ' + onlyWhat;
-        // The row truncates, so the path is the line and the reason is the tooltip.
-        which.title = snap.label === 'before-edit'
-          ? onlyWhat + ' as it was before an AI assistant changed it. Restoring puts back this file and nothing else.'
-          : fromFiles
-          ? onlyWhat + ' ' + fromFiles.why + '. Restoring puts back ' + (onlyFile ? 'this file' : 'these') + ' and nothing else.'
-          : 'Restoring puts back ' + onlyWhat + ' and nothing else.';
-        what.append(which);
-      }
-      // A backup that is missing a database, or may hold a half-written world, says so on its row:
-      // the moment that matters is the restore, long after the toast that reported it has gone.
-      if (snap.problems && snap.problems.length) {
-        el.setAttribute('data-problem', '');
-        const warn = document.createElement('div');
-        warn.className = 'snap-warn';
-        warn.append(icon('alert'), document.createTextNode(snap.problems.join(' ')));
-        what.append(warn);
-      }
-      if (snap.note) {
-        const note = document.createElement('div');
-        note.className = 'snap-note';
-        note.textContent = snap.note;
-        what.prepend(note);
-      }
-      const size = document.createElement('div');
-      size.className = 'size';
-      size.textContent = snap.sizeHuman;
-      const why = document.createElement('div');
-      why.className = 'why';
-      why.textContent = snapshotReason(snap);
-      const items = document.createElement('div');
-      items.className = 'items';
-      const n = (snap.members || []).length;
-      items.textContent = n ? n + (n === 1 ? ' item' : ' items') : '';
-      const tag = document.createElement('div');
-      tag.className = 'tag';
-      // An archive with no manifest (made by hand, or by an old version) reports its scope as "?".
-      const unknownScope = !fromFiles && !onlyFile && (!snap.scope || snap.scope === '?');
-      if (unknownScope) {
-        tag.classList.add('unknown');
-        tag.title = 'This archive does not record what it covers.';
-      }
-      tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : unknownScope ? 'Unknown' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
-      if (onlyWhat) tag.title = 'Holds only ' + onlyWhat + '. Restoring it puts back ' + (onlyFile ? 'that file' : 'those') + ' and nothing else.';
-      if (snap.databases && snap.databases.length) {
-        tag.title = 'Includes a dump of ' + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ');
-      }
-      const actions = document.createElement('div');
-      actions.className = 'snap-actions';
-      // each button says which backup it is for; they were five "Download"s and five "Delete"s
-      const which = backupWords(snap);
-      const restore = iconButton('restore', 'Restore');
-      restore.setAttribute('aria-label', 'Restore: ' + which);
-      restore.disabled = data.running;
-      restore.title = data.running
-        ? 'Stop the server first'
-        : 'Put this backup back over the server files';
-      const glyph = (name, label) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'icon-btn';
-        b.append(icon(name));
-        b.setAttribute('aria-label', label + ': ' + which);
-        b.title = label;
-        return b;
-      };
-      const lock = glyph(snap.locked ? 'lock' : 'unlock', snap.locked ? 'Locked - nothing deletes it. Unlock' : 'Lock, so nothing deletes it');
-      lock.setAttribute('aria-pressed', String(Boolean(snap.locked)));
-      const noteBtn = glyph('pencil', snap.note ? 'Change its note' : 'Add a note');
-      const download = glyph('download', 'Download');
-      // One labelled verb per row, Restore; the rest are glyphs, Delete included, so five buttons
-      // do not out-shout the snapshot they belong to. Delete still asks before it does anything.
-      const drop = glyph('trash', 'Delete');
-      drop.dataset.tone = 'danger';
-      if (snap.locked) {
-        el.setAttribute('data-locked', '');
-        drop.disabled = true;
-        drop.title = 'Locked. Unlock it first.';
-      }
-      actions.append(lock, noteBtn, download, restore, drop);
-      // in the order it is read; where each sits is the stylesheet's (grid areas)
-      el.append(pick, when, what, tag, why, items, size, actions);
-      list.append(el);
-
-      lock.onclick = async () => {
-        lock.disabled = true;
-        try {
-          await post(base + '/lock', { snapshot: snap.name, locked: !snap.locked });
-          toast(snap.locked ? 'Unlocked. Retention can remove it again.' : 'Locked. Neither Delete nor a schedule\u2019s retention will remove it.', 'good');
-          await renderBackups({ force: true });
-        } catch (e) {
-          toast(e.message, 'bad');
-          lock.disabled = false;
-        }
-      };
-      noteBtn.onclick = async () => {
-        const got = await ask({
-          title: 'A note for this backup',
-          text: 'A few words saying what it is - "before the 1.21 upgrade". Empty removes it.',
-          input: { label: 'Note', value: snap.note || '', placeholder: 'before the 1.21 upgrade' },
-          confirmLabel: 'Save',
-          submit: ({ text }) => post(base + '/note', { snapshot: snap.name, note: text }),
-        });
-        if (got) await renderBackups({ force: true });
-      };
-      download.onclick = () => {
-        const a = document.createElement('a');
-        a.href = '/api' + base + '/download?snapshot=' + encodeURIComponent(snap.name);
-        a.download = snap.name;
-        document.body.append(a);
-        a.click();
-        a.remove();
-      };
-
-      restore.onclick = async () => {
-        const covers = describeMembers(snap.members);
-        const dbs = snap.databases && snap.databases.length
-          ? ' The database dump' + (snap.databases.length > 1 ? 's' : '') + ' it holds ('
-            + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ')
-            + ') are imported too, which needs that database running.'
-          : '';
-        const left = snap.excluded && snap.excluded.length
-          ? ' It was taken leaving out ' + snap.excluded.join(', ') + ', which it cannot bring back.'
-          : '';
-        const flawed = snap.problems && snap.problems.length ? ' Note: ' + snap.problems.join(' ') : '';
-        const words = restoreWords(snap);
-        const ok = await ask({
-          title: 'Restore into ' + row.name + '?',
-          text: 'This puts back ' + covers + ' from ' + backupWords(snap)
-            + '. Anything changed since then is overwritten.' + left + dbs + flawed
-            + words.note,
-          choices: [
-            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. ' + words.copy },
-            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. ' + words.copy },
-          ],
-          confirmLabel: 'Restore',
-          danger: true,
-          typeToConfirm: row.name,
-        });
-        if (!ok) return;
-        const note = toast('Restoring ' + backupWords(snap) + '\u2026');
-        restoring.set(row.name, snap.name);
-        lockRestoring($('#backupsBody').dataset.for === row.name ? $('#backupsBody') : hist, row.name);
-        const send = (withoutCopy) => post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean', withoutCopy: withoutCopy });
-        try {
-          let out;
-          try {
-            out = await send(false);
-          } catch (e) {
-            // The copy could not be kept, usually a full disk. Nothing has changed; going ahead
-            // without it is a second, separate yes.
-            if (e.code !== 'no-copy') throw e;
-            const sure = await ask({
-              title: 'Restore without keeping a copy?',
-              text: e.message + ' Restoring now overwrites what is there with no way back.',
-              confirmLabel: 'Restore without a copy',
-              danger: true,
-              typeToConfirm: row.name,
-            });
-            if (!sure) { note.remove(); return; }
-            out = await send(true);
-          }
-          if (out.safety) toast('How it was before is kept as ' + out.safety + '.', 'good');
-          note.remove();
-          const imported = (out.databases && out.databases.imported) || [];
-          const skipped = (out.databases && out.databases.skipped) || [];
-          toast('Restored ' + backupWords(snap) + (imported.length ? ', with ' + imported.length + ' database' + (imported.length > 1 ? 's' : '') + ' imported' : '') + '.', 'good');
-          for (const d of skipped) toast('Database ' + d.database + ' not imported: ' + d.reason, 'bad');
-        } catch (e) {
-          note.remove();
-          toast(e.message, 'bad');
-        } finally {
-          restoring.delete(row.name);
-          // only when this server's Backups is still what is on screen; elsewhere the next visit draws it
-          if (state.current === row.name) await renderBackups({ force: true });
-        }
-      };
-
-      drop.onclick = async () => {
-        const ok = await ask({
-          title: 'Delete this backup?',
-          text: backupWords(snap, true) + ', ' + snap.sizeHuman + '. What it holds goes with it.',
-          confirmLabel: 'Delete backup',
-          danger: true,
-        });
-        if (!ok) return;
-        try {
-          await post(base + '/delete', { snapshot: snap.name });
-          toast('Deleted ' + backupWords(snap) + '.', 'good');
-          await renderBackups({ force: true });
-        } catch (e) {
-          toast(e.message, 'bad');
-        }
-      };
+    const n = (snap.members || []).length;
+    const age = ago(snap.mtime);
+    lines.push(h('span', { class: 'sl-row-meta whitespace-normal' },
+      [age, snapshotReason(snap), n && !onlyWhat ? n + (n === 1 ? ' item' : ' items') : null, snap.locked ? 'Locked' : null].filter(Boolean).join(' · '),
+      h('span', { class: 'block font-mono text-1 text-ink-4 truncate', text: snap.name })));
+    // A backup that is missing a database, or may hold a half-written world, says so on its row:
+    // the moment that matters is the restore, long after the toast that reported it has gone.
+    if (snap.problems && snap.problems.length) {
+      lines.push(h('span', { class: 'flex items-start gap-2 type-meta text-warn-ink whitespace-normal' }, Kit.icon('alert', 'mt-0.5 shrink-0'), snap.problems.join(' ')));
     }
-    hist.append(list);
-    paintBar();
-  }
+
+    const restore = Kit.button({ label: 'Restore', icon: 'restore', size: 'sm' });
+    restore.setAttribute('aria-label', 'Restore ' + which);
+    restore.disabled = data.running;
+    restore.title = data.running ? 'Stop the server first' : 'Put this backup back over the server files';
+    restore.onclick = () => restoreBackup(row, base, snap, hist);
+
+    const menu = [
+      { label: snap.locked ? 'Unlock' : 'Lock', note: snap.locked ? 'Delete and clean-up can remove it again.' : 'Nothing deletes it, by hand or automatically.', onSelect: () => lockBackup(base, snap) },
+      { label: snap.note ? 'Change its note' : 'Add a note', onSelect: () => noteBackup(base, snap) },
+      { label: 'Download', note: 'A .tar.gz file. 7-Zip, Finder or tar opens it.', onSelect: () => downloadFile('/api' + base + '/download?snapshot=' + encodeURIComponent(snap.name), snap.name) },
+      'sep',
+      { label: 'Delete', tone: 'fault', disabled: Boolean(snap.locked), note: snap.locked ? 'Locked. Unlock it first.' : null, onSelect: () => deleteBackup(base, snap) },
+    ];
+    return backupRow({ snap, title: stamp(snap.mtime), lines, kind: backupKindWords(snap), size: snap.sizeHuman, restore, menu, picker: pick });
+  });
+  hist.append(Kit.list(rows, 'Backups'));
+  paintBar();
   lockRestoring(hist, row.name);
   return hist;
+}
+
+/** A file from the panel, saved the way a link to it is: the browser's, or the app's, save dialog. */
+function downloadFile(href, name) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+async function lockBackup(base, snap) {
+  try {
+    await post(base + '/lock', { snapshot: snap.name, locked: !snap.locked });
+    toast(snap.locked ? 'Unlocked. Delete and clean-up can remove it again.' : 'Locked. Nothing deletes it until you unlock it.', 'good');
+    await renderBackups({ force: true });
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+}
+
+async function noteBackup(base, snap) {
+  const got = await ask({
+    title: 'A note for this backup',
+    text: 'A few words saying what it is - "before the 1.21 upgrade". Empty removes it.',
+    input: { label: 'Note', value: snap.note || '', placeholder: 'before the 1.21 upgrade' },
+    confirmLabel: 'Save',
+    submit: ({ text }) => post(base + '/note', { snapshot: snap.name, note: text }),
+  });
+  if (got) await renderBackups({ force: true });
+}
+
+async function deleteBackup(base, snap) {
+  const ok = await ask({
+    title: 'Delete this backup?',
+    text: backupWords(snap, true) + ', ' + snap.sizeHuman + '. What it holds goes with it, its second copy too.',
+    confirmLabel: 'Delete backup',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await post(base + '/delete', { snapshot: snap.name });
+    toast('Deleted ' + backupWords(snap) + '.', 'good');
+    await renderBackups({ force: true });
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+}
+
+async function restoreBackup(row, base, snap, hist) {
+  const covers = describeMembers(snap.members);
+  const dbs = snap.databases && snap.databases.length
+    ? ' The database dump' + (snap.databases.length > 1 ? 's' : '') + ' it holds ('
+      + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ')
+      + ') are imported too, which needs that database running.'
+    : '';
+  const left = snap.excluded && snap.excluded.length
+    ? ' It was taken leaving out ' + snap.excluded.join(', ') + ', which it cannot bring back.'
+    : '';
+  const flawed = snap.problems && snap.problems.length ? ' Note: ' + snap.problems.join(' ') : '';
+  const words = restoreWords(snap);
+  const ok = await ask({
+    title: 'Restore into ' + (row.label || row.name) + '?',
+    text: 'This puts back ' + covers + ' from ' + backupWords(snap)
+      + '. Anything changed since then is overwritten.' + left + dbs + flawed
+      + words.note,
+    choices: [
+      { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. ' + words.copy },
+      { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. ' + words.copy },
+    ],
+    confirmLabel: 'Restore',
+    danger: true,
+    typeToConfirm: row.name,
+  });
+  if (!ok) return;
+  const note = toast('Restoring ' + backupWords(snap) + '…');
+  restoring.set(row.name, snap.name);
+  lockRestoring($('#backupsBody').dataset.for === row.name ? $('#backupsBody') : hist, row.name);
+  const send = (withoutCopy) => post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean', withoutCopy: withoutCopy });
+  try {
+    let out;
+    try {
+      out = await send(false);
+    } catch (e) {
+      // The copy could not be kept, usually a full disk. Nothing has changed; going ahead
+      // without it is a second, separate yes.
+      if (e.code !== 'no-copy') throw e;
+      const sure = await ask({
+        title: 'Restore without keeping a copy?',
+        text: e.message + ' Restoring now overwrites what is there with no way back.',
+        confirmLabel: 'Restore without a copy',
+        danger: true,
+        typeToConfirm: row.name,
+      });
+      if (!sure) { note.remove(); return; }
+      out = await send(true);
+    }
+    if (out.safety) toast('How it was before is kept as ' + backupNamesToWords(out.safety) + ', in this list.', 'good');
+    note.remove();
+    const imported = (out.databases && out.databases.imported) || [];
+    const skipped = (out.databases && out.databases.skipped) || [];
+    toast('Restored ' + backupWords(snap) + (imported.length ? ', with ' + imported.length + ' database' + (imported.length > 1 ? 's' : '') + ' imported' : '') + '.', 'good');
+    for (const d of skipped) toast('Database ' + d.database + ' not imported: ' + d.reason, 'bad');
+  } catch (e) {
+    note.remove();
+    toast(e.message, 'bad');
+  } finally {
+    restoring.delete(row.name);
+    // only when this server's Backups is still what is on screen; elsewhere the next visit draws it
+    if (state.current === row.name) await renderBackups({ force: true });
+  }
 }
 
 /**

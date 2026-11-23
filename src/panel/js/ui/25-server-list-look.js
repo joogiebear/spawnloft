@@ -182,44 +182,25 @@ const STEP_PRESETS = [
 ];
 
 function stepsEditor(action) {
-  const el = document.createElement('div');
-  el.className = 'steps';
+  const { h } = Kit;
   let steps = action ? action.steps.map((st) => ({ ...st })) : STEP_PRESETS[0].steps.map((st) => ({ ...st }));
-  const list = document.createElement('ol');
-  list.className = 'step-list';
-  const tools = document.createElement('div');
-  tools.className = 'row';
-  const add = document.createElement('select');
-  add.setAttribute('aria-label', 'Add a step');
-  add.append(new Option('Add a step\u2026', ''));
-  for (const [k, label] of Object.entries(STEP_LABELS)) add.append(new Option(label, k));
-  const preset = document.createElement('select');
-  preset.setAttribute('aria-label', 'Start from a ready-made chain');
-  preset.append(new Option('Start from\u2026', ''));
-  STEP_PRESETS.forEach((p, i) => preset.append(new Option(p.label, String(i))));
-  tools.append(add, preset);
+  const list = h('ol', { class: 'sl-list m-0', 'aria-label': 'Steps' });
+  const addWrap = Kit.select({ label: 'Add a step', options: [{ value: '', label: 'Add a step…' }, ...Object.entries(STEP_LABELS).map(([k, label]) => ({ value: k, label }))], value: '' });
+  const add = addWrap.querySelector('select');
+  const presetWrap = Kit.select({ label: 'Start from a ready-made chain', options: [{ value: '', label: 'Start from…' }, ...STEP_PRESETS.map((p, i) => ({ value: String(i), label: p.label }))], value: '' });
+  const preset = presetWrap.querySelector('select');
+  const tools = h('div', { class: 'flex flex-wrap gap-2' }, h('span', { class: 'w-56 max-w-full' }, addWrap), h('span', { class: 'w-80 max-w-full' }, presetWrap));
+  const running = Kit.checkbox({ label: 'Only while the server is running', note: 'Otherwise the whole task is skipped.', checked: Boolean(action && action.onlyWhenRunning) });
+  const going = Kit.checkbox({ label: 'Keep going if a step fails', checked: Boolean(action && action.keepGoing) });
+  const runningBox = running.querySelector('input');
+  const goingBox = going.querySelector('input');
+  const el = h('div', { class: 'flex flex-col gap-3' }, list, tools, h('div', { class: 'flex flex-col' }, running, going));
 
-  const running = document.createElement('label');
-  running.className = 'check';
-  const runningBox = document.createElement('input');
-  runningBox.type = 'checkbox';
-  runningBox.checked = Boolean(action && action.onlyWhenRunning);
-  running.append(runningBox, document.createTextNode(' Only while the server is running - otherwise the whole task is skipped'));
-  const going = document.createElement('label');
-  going.className = 'check';
-  const goingBox = document.createElement('input');
-  goingBox.type = 'checkbox';
-  goingBox.checked = Boolean(action && action.keepGoing);
-  going.append(goingBox, document.createTextNode(' Keep going if a step fails'));
-  el.append(list, tools, running, going);
-
-  const num = (value, min, max, width) => {
-    const i = document.createElement('input');
-    i.type = 'number';
+  const num = (value, min, max, label) => {
+    const i = Kit.input({ type: 'number', value: String(value), label });
     i.min = String(min);
     i.max = String(max);
-    i.value = String(value);
-    i.style.maxWidth = width || '80px';
+    i.classList.add('w-20');
     return i;
   };
 
@@ -232,76 +213,60 @@ function stepsEditor(action) {
   const draw = () => {
     list.textContent = '';
     steps.forEach((st, i) => {
-      const li = document.createElement('li');
-      li.className = 'step';
-      const name = document.createElement('b');
-      name.textContent = STEP_LABELS[st.do] || st.do;
-      const fields = document.createElement('span');
-      fields.className = 'step-fields';
+      const fields = h('span', { class: 'flex flex-wrap items-center gap-2 flex-1 basis-64 min-w-0 type-meta text-ink-2' });
       if (st.do === 'say' || st.do === 'command') {
-        const t = document.createElement('input');
+        const t = Kit.input({
+          value: st.do === 'say' ? (st.text || '') : (st.line || ''),
+          placeholder: st.do === 'say' ? 'What the players see' : 'save-all',
+          label: st.do === 'say' ? 'What the players see' : 'The command to run',
+          mono: st.do === 'command',
+        });
         t.maxLength = 400;
-        t.value = st.do === 'say' ? (st.text || '') : (st.line || '');
-        t.placeholder = st.do === 'say' ? 'What the players see' : 'save-all';
-        t.setAttribute('aria-label', st.do === 'say' ? 'What the players see' : 'The command to run');
+        t.classList.add('flex-1', 'basis-40');
         t.oninput = () => { if (st.do === 'say') st.text = t.value; else st.line = t.value; };
         fields.append(t);
       } else if (st.do === 'wait') {
-        const n = num(st.seconds != null ? Math.round(st.seconds / 60 * 10) / 10 : 1, 0.1, 60);
+        const n = num(st.seconds != null ? Math.round(st.seconds / 60 * 10) / 10 : 1, 0.1, 60, 'Minutes to wait');
         n.step = '0.5';
-        n.setAttribute('aria-label', 'Minutes to wait');
         n.oninput = () => { st.seconds = Math.round(Number(n.value) * 60); };
-        fields.append(n, document.createTextNode(' minutes'));
+        fields.append(n, 'minutes');
       } else if (st.do === 'countdown') {
-        const n = num(st.minutes || 5, 1, 60);
-        n.setAttribute('aria-label', 'Minutes of countdown');
-        const m = document.createElement('input');
+        const n = num(st.minutes || 5, 1, 60, 'Minutes of countdown');
+        const m = Kit.input({ value: st.message || 'Server restarting', label: 'What the countdown says' });
         m.maxLength = 120;
-        m.value = st.message || 'Server restarting';
-        m.setAttribute('aria-label', 'What the countdown says');
+        m.classList.add('flex-1', 'basis-40');
         // what the players will read, shown: it was a tip on the box
-        const eg = document.createElement('span');
-        eg.className = 'hint';
+        const eg = h('span', { class: 'basis-full sl-hint' });
         const sayEg = () => {
           const mins = Number(n.value) || 5;
-          eg.textContent = 'Players see \u201c' + (m.value || 'Server restarting') + ' in ' + mins + (mins === 1 ? ' minute' : ' minutes') + '\u201d, then again at one minute and at ten seconds.';
+          eg.textContent = 'Players see “' + (m.value || 'Server restarting') + ' in ' + mins + (mins === 1 ? ' minute' : ' minutes') + '”, then again at one minute and at ten seconds.';
         };
         n.oninput = () => { st.minutes = Number(n.value); sayEg(); };
         m.oninput = () => { st.message = m.value; sayEg(); };
         sayEg();
-        fields.append(n, document.createTextNode(' minutes: '), m, eg);
+        fields.append(n, 'minutes:', m, eg);
       } else if (st.do === 'backup') {
-        const n = num(st.keep || 7, 1, 365);
-        n.setAttribute('aria-label', 'How many backups to keep');
+        const n = num(st.keep || 7, 1, 365, 'How many backups to keep');
         n.oninput = () => { st.keep = Number(n.value); };
-        fields.append(document.createTextNode('keeping '), n);
+        fields.append('keeping', n);
       }
-      const acts = document.createElement('span');
-      acts.className = 'step-acts';
       const mv = (label, glyph, d) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'icon-btn';
-        b.textContent = glyph;
-        b.setAttribute('aria-label', label);
-        b.title = label;
         const j = i + d;
+        const b = h('button', { type: 'button', class: 'sl-btn sl-btn-ghost sl-btn-sm sl-btn-icon', 'aria-label': label, title: label, text: glyph });
         b.disabled = j < 0 || j >= steps.length;
         // the step moved, and focus goes with it: on the same arrow, or the other one at an end
         b.onclick = () => { [steps[i], steps[j]] = [steps[j], steps[i]]; draw(); focusStep(j, label); };
         return b;
       };
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'icon-btn';
-      rm.setAttribute('aria-label', 'Remove this step');
-      rm.title = 'Remove this step';
-      rm.append(icon('close'));
+      const rm = Kit.button({ icon: 'close', kind: 'ghost', size: 'sm', title: 'Remove this step' });
       rm.onclick = () => { steps.splice(i, 1); draw(); focusStep(Math.min(i, steps.length - 1), 'Remove this step'); };
-      acts.append(mv('Move up', '\u2191', -1), mv('Move down', '\u2193', 1), rm);
-      li.append(name, fields, acts);
-      list.append(li);
+      list.append(h('li', { class: 'sl-row flex-wrap' },
+        h('span', { class: 'w-5 text-center font-mono text-1 text-ink-3', 'aria-hidden': 'true', text: String(i + 1) }),
+        h('span', { class: 'w-36 type-body font-strong text-ink', text: STEP_LABELS[st.do] || st.do }),
+        fields,
+        h('span', { class: 'flex gap-1' }, mv('Move up', '↑', -1), mv('Move down', '↓', 1), rm)));
     });
+    if (!steps.length) list.append(h('li', { class: 'sl-row sl-hint', text: 'No steps yet. Add one, or start from a ready-made chain.' }));
   };
   add.onchange = () => {
     if (!add.value) return;
@@ -334,95 +299,62 @@ function stepsEditor(action) {
  * <p>Returns the element; the caller decides where it goes and what happens on submit.
  */
 function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
-  const form = document.createElement('div');
-  form.className = 'task-form';
-
-  const mk = (label, control) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'field';
-    const l = document.createElement('label');
-    l.textContent = label;
-    wrap.append(l, control);
-    return wrap;
-  };
-  const select = (options, value) => {
-    const el = document.createElement('select');
-    for (const o of options) {
-      const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
-      opt.selected = o.value === value;
-      el.append(opt);
-    }
-    return el;
+  const { h } = Kit;
+  const pick = (label, options, value) => Kit.select({ label, options, value });
+  const field = (label, control, width) => {
+    const f = Kit.field({ label, control });
+    return width ? h('div', { class: width + ' max-w-full' }, f) : f;
   };
 
-  const act = select(actions.map((a) => ({ value: a.type, label: a.label })), task?.action?.type ?? 'backup');
-  const actField = mk('What should happen', act);
+  const actWrap = pick(null, actions.map((a) => ({ value: a.type, label: a.label })), task?.action?.type ?? 'backup');
+  const act = actWrap.querySelector('select');
+  const actField = field('What should happen', actWrap, 'w-80');
 
-  const line = document.createElement('input');
-  line.placeholder = 'say Server restarting in 5 minutes';
-  line.value = task?.action?.line ?? '';
+  const line = Kit.input({ value: task?.action?.line ?? '', placeholder: 'say Server restarting in 5 minutes', mono: true });
   line.maxLength = 400;
-  const lineField = mk('Console command to send', line);
+  const lineField = field('Console command to send', line);
 
-  const keep = document.createElement('input');
-  keep.type = 'number';
+  const keep = Kit.input({ type: 'number', value: String(task?.action?.keep ?? 7) });
   keep.min = '1';
   keep.max = '365';
-  keep.value = String(task?.action?.keep ?? 7);
-  keep.style.maxWidth = '90px';
-  const keepField = mk('Backups to keep', keep);
+  const keepField = field('Backups to keep', keep, 'w-40');
 
-  const warn = document.createElement('input');
-  warn.type = 'number';
+  const warn = Kit.input({ type: 'number', value: String(task?.action?.warnMinutes ?? 5) });
   warn.min = '0';
   warn.max = '60';
-  warn.value = String(task?.action?.warnMinutes ?? 5);
-  warn.style.maxWidth = '90px';
-  const warnField = mk('Minutes of warning first', warn);
+  const warnField = field('Minutes of warning first', warn, 'w-56');
 
-  const kind = select(kinds.map((k) => ({ value: k, label: KIND_LABELS[k] || k })), task?.schedule?.kind ?? 'daily');
-  const every = document.createElement('input');
-  every.type = 'number';
+  const kindWrap = pick(null, kinds.map((k) => ({ value: k, label: KIND_LABELS[k] || k })), task?.schedule?.kind ?? 'daily');
+  const kind = kindWrap.querySelector('select');
+  const every = Kit.input({ type: 'number', value: String(task?.schedule?.every ?? 6) });
   every.min = '1';
-  every.value = String(task?.schedule?.every ?? 6);
-  every.style.maxWidth = '90px';
-  const at = document.createElement('input');
-  at.type = 'time';
-  at.value = task?.schedule?.at ?? '03:00';
-  at.style.maxWidth = '130px';
-  const day = select(days.map((d) => ({ value: d, label: DAY_NAMES[d] || d })), task?.schedule?.day ?? 'SUN');
-  day.style.maxWidth = '150px';
+  const at = Kit.input({ type: 'time', value: task?.schedule?.at ?? '03:00' });
+  const dayWrap = pick(null, days.map((d) => ({ value: d, label: DAY_NAMES[d] || d })), task?.schedule?.day ?? 'SUN');
+  const day = dayWrap.querySelector('select');
 
-  const everyField = mk('How many', every);
-  const atField = mk('At', at);
-  const dayField = mk('On', day);
-  const whenRow = document.createElement('div');
-  whenRow.className = 'when-row';
-  whenRow.append(mk('How often', kind), everyField, dayField, atField);
+  const everyField = field('How many', every, 'w-28');
+  const atField = field('At', at, 'w-36');
+  const dayField = field('On', dayWrap, 'w-44');
+  const whenRow = h('div', { class: 'flex flex-wrap items-start gap-3' }, field('How often', kindWrap, 'w-56'), everyField, dayField, atField);
 
-  const title = document.createElement('input');
+  const title = Kit.input({ value: task?.name ?? '' });
   title.maxLength = 60;
-  title.value = task?.name ?? '';
-  const titleField = mk('Call it', title);
+  const titleField = field('Call it', title, 'w-80');
 
-  const note = document.createElement('div');
-  note.className = 'hint';
+  const note = h('p', { class: 'sl-hint m-0' });
 
-  const row = document.createElement('div');
-  row.className = 'row';
-  const save = document.createElement('button');
-  save.className = 'primary';
-  save.textContent = task ? 'Save changes' : 'Create task';
-  const cancel = document.createElement('button');
-  cancel.textContent = 'Cancel';
-  row.append(save, cancel);
+  const save = Kit.button({ label: task ? 'Save changes' : 'Create task', kind: 'primary' });
+  const cancel = Kit.button({ label: 'Cancel', kind: 'ghost' });
+  const buttons = h('div', { class: 'flex flex-wrap gap-2' }, save, cancel);
 
   const chain = stepsEditor(task && task.action && task.action.type === 'steps' ? task.action : null);
-  const chainField = mk('Steps, in order', chain.el);
+  const chainField = h('div', { class: 'flex flex-col gap-2' }, h('span', { class: 'sl-label', text: 'Steps, in order' }), chain.el);
 
-  form.append(actField, lineField, keepField, warnField, chainField, whenRow, titleField, note, row);
+  // `task-form` is how the page knows a form is open and must not be redrawn under it
+  const form = Kit.card({ label: task ? 'Edit ' + task.name : 'New task' },
+    h('h3', { class: 'm-0 type-card text-ink', text: task ? 'Edit “' + task.name + '”' : 'New task' }),
+    actField, lineField, keepField, warnField, chainField, whenRow, titleField, note, buttons);
+  form.classList.add('task-form');
 
   const sync = () => {
     const a = act.value;
@@ -476,11 +408,11 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     }
     if (kind.value === 'daily' || kind.value === 'weekly') sched.at = at.value;
     if (kind.value === 'weekly') sched.day = day.value;
-    save.disabled = true;
+    Kit.busy(save, true);
     try {
       await onSubmit({ name: title.value.trim(), action, schedule: sched });
     } finally {
-      save.disabled = false;
+      Kit.busy(save, false);
     }
   };
   return form;
@@ -520,23 +452,11 @@ function scheduleSubtitle(platform, linger) {
  */
 function lingerNotice(background, refresh) {
   if (panelPlatform !== 'linux' || !background || background.linger !== false) return null;
-  const box = document.createElement('div');
   const headless = background.session !== 'desktop';
-  box.className = headless ? 'notice warn' : 'notice';
-  const text = document.createElement('div');
-  text.className = 'text';
-  const lead = document.createElement('b');
-  lead.textContent = headless ? 'These only run while you are logged in.' : 'These pause when you log out.';
-  text.append(lead, headless
-    ? ' Your account stops its background tasks when you log out. On a server you connect to and disconnect from, a nightly backup would never run.'
-    : ' They run while you are logged in, with the screen locked too. Turn this on if backups and servers should keep going after you log out of this computer.');
-  const acts = document.createElement('div');
-  acts.className = 'acts';
-  const fix = document.createElement('button');
-  fix.textContent = 'Keep running after logout';
+  const fix = Kit.button({ label: 'Keep running after logout', size: 'sm' });
   fix.title = 'Turns on lingering for your account (loginctl enable-linger)';
   fix.onclick = async () => {
-    fix.disabled = true;
+    Kit.busy(fix, true);
     try {
       await api('/scheduler/linger', { method: 'POST' });
       toast('Scheduled tasks will now run while you are logged out.', 'good');
@@ -544,12 +464,25 @@ function lingerNotice(background, refresh) {
     } catch (e) {
       // Policy may require a password, which a page cannot supply; the message carries the command.
       toast(e.message, 'bad');
-      fix.disabled = false;
+      Kit.busy(fix, false);
     }
   };
-  acts.append(fix);
-  box.append(text, acts);
-  return box;
+  return Kit.banner({
+    tone: headless ? 'warn' : null,
+    icon: 'clock',
+    title: headless ? 'These only run while you are logged in' : 'These pause when you log out',
+    text: headless
+      ? 'Your account stops its background tasks when you log out. On a server you connect to and disconnect from, a nightly backup would never run.'
+      : 'They run while you are logged in, with the screen locked too. Turn this on if backups and servers should keep going after you log out of this computer.',
+    actions: [fix],
+  });
+}
+
+/** A run's outcome as a word and a tone: Windows' and SpawnLoft's words, said one way. */
+function runOutcome(status) {
+  if (status === 'ok') return { text: 'Worked', tone: 'live' };
+  if (status === 'skipped') return { text: 'Skipped', tone: null };
+  return { text: 'Did not work', tone: 'fault' };
 }
 
 async function renderScheduler(opts) {
@@ -576,11 +509,11 @@ async function renderScheduler(opts) {
   paneHead(body, 'clock', 'Scheduled work',
     data.available === false ? 'Not available in this preview.'
       : scheduleSubtitle(panelPlatform, data.background && data.background.linger));
+  const { h } = Kit;
+  const page = h('div', { class: 'flex flex-col gap-6' });
+  body.append(page);
   if (data.available === false) {
-    const note = document.createElement('p');
-    note.className = 'hint';
-    note.textContent = data.reason;
-    body.append(note);
+    page.append(Kit.empty({ icon: 'clock', title: 'Scheduling is not available here', text: data.reason }));
     return;
   }
 
@@ -599,28 +532,24 @@ async function renderScheduler(opts) {
     },
   };
 
-  // ---- what a schedule is, before the list of them ---------------------------
-  // The title row already says tasks run with SpawnLoft closed; which scheduler holds them and
-  // what happens at sleep or sign-out is for whoever asks.
-  const intro = document.createElement('details');
-  intro.className = 'more';
-  const introTitle = document.createElement('summary');
-  introTitle.textContent = 'How this runs';
-  const introText = document.createElement('p');
-  introText.className = 'hint';
-  introText.textContent = 'Held by ' + schedulerName + '. ' + schedulerHint;
-  intro.append(introTitle, introText);
-  body.append(intro);
   const lingering = lingerNotice(data.background, again);
-  if (lingering) body.append(lingering);
+  if (lingering) page.append(lingering);
 
-  // ---- add ------------------------------------------------------------------
-  const addWrap = document.createElement('div');
-  const add = iconButton('plus', 'New task', 'primary');
-  addWrap.append(add);
-  body.append(addWrap);
+  // ---- the tasks ------------------------------------------------------------
+  const add = Kit.button({ label: 'New task', icon: 'plus', kind: 'primary' });
   // With no tasks the empty state carries the one primary action, so two never sit stacked.
   add.hidden = !data.tasks.length;
+  const tasks = h('section', { class: 'flex flex-col gap-3', 'aria-label': 'Tasks' },
+    h('div', { class: 'flex flex-wrap items-center gap-x-3 gap-y-2' },
+      h('h2', { class: 'm-0 type-section text-ink', text: 'Tasks' }),
+      h('span', { class: 'type-meta text-ink-3', text: data.tasks.length ? String(data.tasks.length) : '' }),
+      // what runs them, and when they do not, for whoever asks
+      Kit.help({ label: 'how scheduled work runs', text: ['Held by ' + schedulerName + '.', schedulerHint] }),
+      h('span', { class: 'flex-1' }),
+      add));
+  page.append(tasks);
+  const formSlot = h('div', { class: 'contents' });
+  tasks.append(formSlot);
 
   add.onclick = () => {
     editor.close();
@@ -629,7 +558,7 @@ async function renderScheduler(opts) {
       actions: data.actions,
       kinds: data.kinds,
       days: data.days,
-      onCancel: () => editor.close(),
+      onCancel: () => { editor.close(); add.focus(); },
       onSubmit: async (payload) => {
         try {
           await post(base, payload);
@@ -640,24 +569,21 @@ async function renderScheduler(opts) {
         }
       },
     });
-    addWrap.append(form);
+    formSlot.append(form);
+    form.querySelector('select, input').focus();
     editor.restore = () => { form.remove(); add.hidden = !data.tasks.length; };
   };
 
-  // ---- the tasks ------------------------------------------------------------
-  const listTitle = document.createElement('h3');
-  listTitle.className = 'hist-title';
-  listTitle.textContent = 'Tasks (' + data.tasks.length + ')';
-
   if (!data.tasks.length) {
-    body.append(emptyState('clock', 'Nothing scheduled. A nightly backup and a daily restart are '
-      + 'the two most servers ever need.', { icon: 'plus', label: 'New task', onClick: () => add.onclick() }));
+    tasks.append(Kit.empty({
+      icon: 'clock',
+      title: 'Nothing scheduled',
+      text: 'A nightly backup and a daily restart are the two most servers ever need.',
+      actions: [Kit.button({ label: 'New task', icon: 'plus', kind: 'primary', onClick: () => add.onclick() })],
+    }));
   } else {
-    body.append(listTitle);
-    const list = document.createElement('div');
-    list.className = 'tasks';
-    for (const task of data.tasks) list.append(taskCard(task, data, base, again, editor));
-    body.append(list);
+    tasks.append(h('div', { class: 'grid gap-3 grid-cols-[repeat(auto-fill,minmax(340px,1fr))] items-start' },
+      data.tasks.map((task) => taskCard(task, data, base, again, editor))));
   }
 
   // ---- what actually ran ----------------------------------------------------
@@ -665,116 +591,79 @@ async function renderScheduler(opts) {
   // said so at length. The runs section appears once there is a task to produce one.
   if (!data.tasks.length && !data.runs.length) return;
 
-  const runTitle = document.createElement('h3');
-  runTitle.className = 'hist-title';
-  runTitle.style.marginTop = '18px';
-  runTitle.textContent = 'Recent runs';
-  body.append(runTitle);
-
+  const runs = h('section', { class: 'flex flex-col gap-3', 'aria-label': 'Recent runs' },
+    h('h2', { class: 'm-0 type-section text-ink', text: 'Recent runs' }));
+  page.append(runs);
   if (!data.runs.length) {
-    body.append(emptyState('bolt', 'Nothing has run yet. Every run writes a line here, including '
-      + 'the ones that fail.'));
-  } else {
-    const runs = document.createElement('div');
-    runs.className = 'runs';
-    for (const r of data.runs) {
-      const el = document.createElement('div');
-      el.className = 'run';
-      el.dataset.status = r.status;
-      const when = document.createElement('span');
-      when.className = 'r-when';
-      when.textContent = stamp(r.at);
-      const who = document.createElement('span');
-      who.className = 'r-who';
-      const task = (data.tasks || []).find((t) => t.id === r.id);
-      who.textContent = (task && task.name) || r.id || r.action;
-      const what = document.createElement('span');
-      what.className = 'r-what';
-      // A skip is neither a success nor a failure and reads as neither. Prefixing every line with
-      // its outcome would be noise when almost all of them say ok.
-      // the folder a backup went to is the same every night; when it was taken is what differs
-      const said = backupNamesToWords(String(r.detail || '').replace(/^.*[\\/](?=[^\\/]*\.tar\.gz)/, ''));
-      what.textContent = (r.status === 'ok' ? '' : r.status + ': ') + said;
-      what.title = r.detail || '';
-      el.append(when, who, what);
-      runs.append(el);
-    }
-    body.append(runs);
+    runs.append(Kit.empty({ icon: 'bolt', title: 'Nothing has run yet', text: 'Every run writes a line here, including the ones that do not work.' }));
+    return;
   }
+  runs.append(Kit.list(data.runs.map((r) => {
+    const task = (data.tasks || []).find((t) => t.id === r.id);
+    // the folder a backup went to is the same every night; when it was taken is what differs
+    const said = backupNamesToWords(String(r.detail || '').replace(/^.*[\\/](?=[^\\/]*\.tar\.gz)/, ''));
+    const outcome = runOutcome(r.status);
+    const line = h('div', { class: 'sl-row', dataset: { status: r.status } },
+      h('span', { class: 'sl-row-main' },
+        h('span', { class: 'sl-row-title', text: (task && task.name) || r.id || r.action }),
+        h('span', { class: 'sl-row-meta whitespace-normal break-words' + (r.status === 'ok' || r.status === 'skipped' ? '' : ' text-fault-ink'), text: said, title: r.detail || '' })),
+      h('span', { class: 'sl-row-end' }, Kit.pill({ text: outcome.text, tone: outcome.tone }), h('span', { class: 'whitespace-nowrap', text: stamp(r.at) })));
+    return line;
+  }), 'Recent runs'));
 }
 
 /** One scheduled task, with the four things you can do to it. */
 function taskCard(task, data, base, again, editor) {
-  const el = document.createElement('div');
-  el.className = 'task';
-  if (!task.enabled) el.setAttribute('data-off', '');
-  else if (!task.known) el.setAttribute('data-missing', '');
+  const { h } = Kit;
+  let said;
+  if (!task.enabled) said = { text: 'Off', tone: null };
+  // SpawnLoft has a definition the system scheduler has never heard of. Someone deleted it there,
+  // or the query failed - either way it is not going to run, and saying "Ready" would be a lie.
+  else if (!task.known) said = { text: 'Not in ' + (panelPlatform === 'win32' ? 'Windows' : 'the scheduler'), tone: 'fault' };
+  else said = { text: task.state || 'Ready', tone: task.state === 'Running' ? 'live' : null };
+  const pill = Kit.pill(said);
+  if (!task.known && task.enabled) pill.title = 'SpawnLoft has this task but the system scheduler does not. Edit it to put it back.';
 
-  const what = document.createElement('div');
-  what.className = 't-what';
-  what.textContent = task.name;
-  // The Backups tab makes one of these and keeps a toggle pointing at it. Showing it here without
-  // saying so would leave someone wondering where it came from - and deleting it from here is
-  // allowed, so the label also explains what the toggle will read afterwards.
-  if (task.owner === 'backups') {
-    const from = document.createElement('span');
-    from.className = 't-owner';
-    from.textContent = 'from the Backups tab';
-    what.append(' ', from);
-  }
-
-  const state = document.createElement('div');
-  state.className = 't-state';
-  if (!task.enabled) {
-    state.textContent = 'Off';
-    state.dataset.tone = 'off';
-  } else if (!task.known) {
-    // spawnloft has a definition Windows has never heard of. Someone deleted it in Task Scheduler, or
-    // the query failed - either way it is not going to run, and saying "Ready" would be a lie.
-    state.textContent = 'Not in Windows';
-    state.dataset.tone = 'bad';
-    state.title = 'SpawnLoft has this task but the system scheduler does not. Edit it to put it back.';
-  } else {
-    state.textContent = task.state || 'Ready';
-    state.dataset.tone = task.state === 'Running' ? 'good' : '';
-  }
-
-  const when = document.createElement('div');
-  when.className = 't-when';
-  const bits = [actionSummary(task, data.actions), describeSchedule(task.schedule)];
-  when.textContent = bits.join('  \u00b7  ');
+  const lines = [h('span', { class: 'sl-row-meta whitespace-normal', text: actionSummary(task, data.actions) + ' · ' + describeSchedule(task.schedule) })];
   if (task.enabled && task.known) {
     const next = whenNext(task.nextRun);
-    const extra = document.createElement('div');
-    extra.textContent = (next ? 'Next ' + next : 'No next run scheduled')
-      + (task.lastResult ? '  \u00b7  last run: ' + task.lastResult : '');
-    when.append(extra);
+    lines.push(h('span', { class: 'sl-row-meta whitespace-normal', text: (next ? 'Next ' + next : 'No next run scheduled') + (task.lastResult ? ' · Last run: ' + task.lastResult : '') }));
   }
+  // The Backups tab makes one of these and keeps a switch pointing at it. Showing it here without
+  // saying so would leave someone wondering where it came from - and deleting it from here is
+  // allowed, so the label also explains what the switch will read afterwards.
+  if (task.owner === 'backups') lines.push(h('span', { class: 'sl-row-meta', text: 'Made by the Backups tab’s switch.' }));
 
-  const acts = document.createElement('div');
-  acts.className = 't-acts';
-  const runNow = iconButton('bolt', 'Run now');
-  const toggle = document.createElement('button');
-  toggle.textContent = task.enabled ? 'Turn off' : 'Turn on';
-  const edit = iconButton('pencil', 'Edit');
-  const drop = iconButton('trash', 'Delete', 'danger');
-  acts.append(runNow, toggle, edit, drop);
-  el.append(what, state, when, acts);
+  const runNow = Kit.button({ label: 'Run now', icon: 'bolt', size: 'sm' });
+  const toggle = Kit.button({ label: task.enabled ? 'Turn off' : 'Turn on', size: 'sm' });
+  const edit = Kit.button({ label: 'Edit', icon: 'pencil', size: 'sm' });
+  const drop = Kit.button({ icon: 'trash', kind: 'ghost', size: 'sm', title: 'Delete ' + task.name });
+  for (const [b, verb] of [[runNow, 'Run'], [toggle, task.enabled ? 'Turn off' : 'Turn on'], [edit, 'Edit']]) b.setAttribute('aria-label', verb + ' ' + task.name + (verb === 'Run' ? ' now' : ''));
+  const buttons = [runNow, toggle, edit, drop];
 
-  const busy = (on) => { for (const b of acts.children) b.disabled = on; };
+  const el = Kit.card({ label: task.name, tone: !task.known && task.enabled ? 'fault' : null },
+    h('div', { class: 'flex items-start gap-3' },
+      h('span', { class: 'sl-row-main' }, h('span', { class: 'sl-row-title whitespace-normal font-strong', text: task.name }), lines),
+      pill),
+    h('div', { class: 'flex flex-wrap gap-2' }, buttons));
+  el.dataset.task = task.id;
+  if (!task.enabled) el.classList.add('opacity-70');
+
+  const busy = (on, back) => { for (const b of buttons) Kit.busy(b, on); if (!on && back) back.focus(); };
 
   runNow.onclick = async () => {
-    // The pane says whose tasks it is showing; `state` in here is this card's own status cell.
+    // The pane says whose tasks it is showing.
     const server = $('#schedulerBody').dataset.for;
     // A task that stops or restarts the server does it to whoever is on, now and not at 4 a.m.
     const question = stopQuestion(taskDisconnects(task), rowOf(server), []);
-    if (question && !(await ask({ ...question, title: 'Run \u201c' + task.name + '\u201d now?', confirmLabel: 'Run now' }))) return;
+    if (question && !(await ask({ ...question, title: 'Run “' + task.name + '” now?', confirmLabel: 'Run now' }))) return;
     busy(true);
     try {
       await post(base + '/' + encodeURIComponent(task.id) + '/run');
       // Windows starts the task and returns immediately, so there is nothing to report yet beyond
       // having asked. The run log below is where the answer turns up.
       toast('Started. Watch Recent runs for what it did.', 'good');
+      busy(false);
       // Only if nothing is being edited. The refresh rebuilds the whole pane, and doing that under
       // a half-filled form throws the typing away with nothing said.
       // A restart is in the log in a couple of seconds and a backup of a large world in a minute,
@@ -788,7 +677,7 @@ function taskCard(task, data, base, again, editor) {
       }
     } catch (e) {
       toast(e.message, 'bad');
-      busy(false);
+      busy(false, runNow);
     }
   };
 
@@ -799,7 +688,7 @@ function taskCard(task, data, base, again, editor) {
       await again();
     } catch (e) {
       toast(e.message, 'bad');
-      busy(false);
+      busy(false, toggle);
     }
   };
 
@@ -810,7 +699,7 @@ function taskCard(task, data, base, again, editor) {
       kinds: data.kinds,
       days: data.days,
       task,
-      onCancel: () => editor.close(),
+      onCancel: () => { editor.close(); edit.focus(); },
       onSubmit: async (payload) => {
         try {
           await post(base + '/' + encodeURIComponent(task.id), payload);
@@ -821,14 +710,17 @@ function taskCard(task, data, base, again, editor) {
         }
       },
     });
+    // the form takes the whole row of the grid: a form in a card-width cell has its fields crushed
+    form.classList.add('col-span-full');
     el.hidden = true;
     el.after(form);
+    form.querySelector('select, input').focus();
     editor.restore = () => { form.remove(); el.hidden = false; };
   };
 
   drop.onclick = async () => {
     const ok = await ask({
-      title: 'Delete "' + task.name + '"?',
+      title: 'Delete “' + task.name + '”?',
       text: 'It stops running and is removed from the system scheduler. Backups it already took '
         + 'are not touched.',
       confirmLabel: 'Delete task',
@@ -842,9 +734,8 @@ function taskCard(task, data, base, again, editor) {
       await again();
     } catch (e) {
       toast(e.message, 'bad');
-      busy(false);
+      busy(false, drop);
     }
   };
   return el;
 }
-

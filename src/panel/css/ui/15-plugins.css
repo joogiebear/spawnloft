@@ -9,22 +9,6 @@
   */
   .plug-add { display: grid; gap: var(--s-3); }
 
-  /* Backups' first line: the schedule's state, the last backup's age, and the one action. */
-  .bk-status {
-    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
-    padding: var(--s-3) var(--s-4);
-    border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface);
-  }
-  .bk-status > .ico { width: 18px; height: 18px; flex: none; color: var(--ink-3); }
-  .bk-status[data-tone="live"] > .ico { color: var(--live); }
-  .bk-status[data-tone="warn"] { border-color: var(--warn-edge); background: var(--warn-wash); }
-  .bk-status[data-tone="warn"] > .ico { color: var(--warn); }
-  .bk-text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
-  .bk-text b { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
-  .bk-text span { font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
-  .bk-text span:empty { display: none; }
-  .bk-last { font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
-  .bk-status[data-tone="warn"] .bk-last { color: var(--warn-ink); font-weight: 600; }
 
   .callout {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);

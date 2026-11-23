@@ -75,9 +75,16 @@ function backupRefreshFixture(api) {
     isConnected: true, dataset: { backupHistory: '' }, replacements: 0,
     replaceWith(next) { this.dataset.backupHistory = next; this.replacements++ },
   }
+  // the options card is drawn again with the history; the standing banner is not there when all is well
+  const options = { replaceWith() {} }
   const body = {
     dataset: { for: state.current },
-    querySelector(selector) { return selector === '[data-backup-history]' ? history : status },
+    querySelector(selector) {
+      if (selector === '[data-backup-history]') return history
+      if (selector === '[data-backup-options]') return options
+      if (selector === '[data-backup-standing]') return null
+      return status
+    },
   }
   const render = new Function('state', 'body', 'api', `
     let backupRequest = 0;
@@ -85,6 +92,7 @@ function backupRefreshFixture(api) {
     const $ = () => body;
     const rowOf = name => ({ name });
     const renderBackupHistory = (row, data, signature) => signature;
+    const backupOptions = () => ({});
     return ${fnSource('renderBackups')};
   `)(state, body, api)
   return { render, state, body, history, status }
@@ -335,7 +343,7 @@ test('a restore locks its list: every button off, and the row says it is restori
     return { dataset: { backupName: name }, attrs, when,
       hasAttribute: (k) => attrs.has(k), setAttribute: (k, v) => attrs.set(k, v), querySelector: () => when }
   }
-  const scopeOf = (buttons, lines) => ({ querySelectorAll: (sel) => (sel === 'button' ? buttons : lines) })
+  const scopeOf = (buttons, lines) => ({ querySelectorAll: (sel) => (sel === 'button, select, input' ? buttons : lines) })
   const { lockRestoring, restoring } = new Function(`${constSource('restoring')}\n${fnSource('lockRestoring')}\nreturn { lockRestoring, restoring }`)()
 
   const buttons = [button(), button(), button()]
@@ -387,7 +395,7 @@ test('the Backups strip counts only backups of the server, and a custom schedule
   for (const text of [words.before, words.after]) assert.match(text, /not moved|nothing was moved/)
   assert.match(words.pending, /^Changes to \/new\/backups when SpawnLoft restarts\./)
   // the choice that keeps a schedule made elsewhere exists, and is what Apply sends for it
-  assert.match(html, /every\.value === KEEP_SCHEDULE \? \{ schedule: known\.auto\.schedule \}/)
+  assert.match(html, /everyBox\.value === KEEP_SCHEDULE \? \{ schedule: known\.auto\.schedule \}/)
 })
 
 test('a tool drawn for a stopped server is drawn again when the server starts, unless that would lose typing', () => {
@@ -1098,7 +1106,7 @@ test('the backup history says what it holds, and asks plainly before several go 
 
   const mixed = deleteManyQuestion([list[0], list[2], list[5]], list)
   assert.equal(mixed.title, 'Delete 3 backups?')
-  assert.equal(mixed.text, '2.0 GB in all. 2 are small copies kept before a change; the rest are not. What they hold goes with them, and there is no way back.')
+  assert.equal(mixed.text, '2.0 GB in all. 2 are small copies kept before a change; the rest are not. What they hold goes with them, second copies included, and there is no way back.')
   assert.equal(mixed.confirmLabel, 'Delete 3 backups')
   assert.equal(mixed.danger, true)
   // every backup of the server is among them: said, since the small copies left do not back it up
@@ -1114,7 +1122,7 @@ test('the backup history says what it holds, and asks plainly before several go 
   assert.doesNotMatch(deleteManyQuestion([config], [config]).text, /leaves no backup|small cop/)
   const one = deleteManyQuestion([list[1]], [list[1]])
   assert.equal(one.title, 'Delete this backup?')
-  assert.match(one.text, /What it holds goes with it, and there is no way back\. Deleting this backup leaves no backup of this server\.$/)
+  assert.match(one.text, /What it holds goes with it, second copies included, and there is no way back\. Deleting this backup leaves no backup of this server\.$/)
 
   assert.equal(deletedManyWords({ removed: ['a', 'b'], size: 5 * MB, skipped: [] }), 'Deleted 2 backups, 5.0 MB freed.')
   assert.equal(deletedManyWords({ removed: ['a'], size: MB, skipped: [{ name: 'x', reason: 'locked' }, { name: 'y', reason: 'missing' }, { name: 'z', reason: 'missing' }] }),
@@ -1124,8 +1132,8 @@ test('the backup history says what it holds, and asks plainly before several go 
     'Deleted 1 backup, 1.0 MB freed. 1 is open in another program, or still downloading, and stays.')
   // a change whose copy has gone says so where Undo was
   assert.match(html, /e\.snapshotGone && !undone\.has\(e\.snapshot\)/)
-  // the tick box is not a grid column: the database backups list shares these rows
-  assert.match(html, /\.snaps\.picks \.snaps-head, \.snaps\.picks \.snap \{ position: relative;/)
+  // the tick boxes pick rows for a delete of several
+  assert.match(html, /querySelectorAll\('\[data-pick\]:not\(:disabled\)'\)/)
 
   // the list starts without the small copies, and the page asks the core which they are
   assert.match(html, /let showSmallCopies = false;/)
