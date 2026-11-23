@@ -291,7 +291,7 @@ function Seed-Old-Node([switch] $Hold) {
   Copy-Item -Force $script:harnessNode "$rt\old-20261120-101500\node.exe"
   Set-Content "$rt\node-$ver\LICENSE" 'Node.js licence'
   @{ node = $ver; exe = "node-$ver/node.exe"; platform = 'win32'; arch = 'x64' } | ConvertTo-Json | Set-Content "$rt\runtime.json"
-  Set-Content "$inst\resources\core\mcctl.mjs" '// the Node core of an older 2.0 build'
+  Set-Content "$inst\resources\core\mcctl.mjs" "#!/usr/bin/env node`n// spawnloft: the SpawnLoft command line.`n// (the Node core of an older 2.0 build)"
   @{ name = 'spawnloft'; version = '2.0.0-internal.900' } | ConvertTo-Json | Set-Content "$inst\resources\core\package.json"
   Set-Content "$inst\resources\core\internal-defaults.json" '{ "daemon": "rust" }'
   Set-Content "$inst\resources\core\src\hold.mjs" 'setInterval(() => {}, 1 << 30)'
