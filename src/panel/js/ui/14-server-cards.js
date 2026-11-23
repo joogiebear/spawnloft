@@ -390,6 +390,11 @@ function showPlayState() {
   const b = $('#bLauncher');
   const what = playState.launching ? 'launching' : running.length ? 'running' : '';
   if (what) b.dataset.state = what; else delete b.dataset.state;
+  // a launch under way or a game running, seen from any page
+  const dot = $('#playDot');
+  dot.hidden = !what;
+  dot.dataset.tone = what === 'launching' ? 'warn' : 'live';
+  dot.toggleAttribute('data-busy', what === 'launching');
   const words = playState.launching ? 'Play: starting ' + playState.launching : running.length ? 'Play: ' + running.join(', ') + (running.length === 1 ? ' is' : ' are') + ' running' : 'Play';
   b.title = words;
   b.setAttribute('aria-label', words);

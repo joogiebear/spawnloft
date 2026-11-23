@@ -105,6 +105,7 @@ function renderVitals(row) {
   const latest = live ? row.latest : null;
 
   if (isDb(row)) {
+    dl.hidden = false;
     dl.dataset.count = '2';
     const attached = Object.keys(row.attachments || {});
     const mem = vitalCell('memory', 'Memory', 'The whole database process');
@@ -121,7 +122,6 @@ function renderVitals(row) {
     return;
   }
   delete dl.dataset.count;
-  dl.toggleAttribute('data-off', !live);
 
   const backup = vitalCell('backup', 'Last backup');
   if (vitalsView.name !== row.name || vitalsView.backupAt === undefined) bigNumber(backup.dd, '…');
@@ -131,18 +131,11 @@ function renderVitals(row) {
     backup.wrap.title = stamp(new Date(vitalsView.backupAt).toISOString());
   }
 
-  // Not running: three dashes said nothing about why they were dashes. One line says it, in the
-  // space the live numbers take, and Last backup stays, since it is true either way.
-  if (!live) {
-    const off = document.createElement('p');
-    off.className = 'vitals-off';
-    off.textContent = state.acting === 'start' || state.acting === 'restart'
-      ? 'Starting. Players, TPS and memory appear once it answers.'
-      : crashedNow(row) ? 'Crashed. The console shows the last lines before it stopped.'
-        : 'Not running. Start it to see players, TPS and memory.';
-    dl.append(off, backup.wrap);
-    return;
-  }
+  // Not running: no numbers at all. The state pill says stopped or crashed, the console says why,
+  // and Start is the thing to do; dashes in the space the numbers take said nothing. Last backup
+  // is on the Backups tab either way.
+  dl.hidden = !live;
+  if (!live) return;
 
   const players = vitalCell('players', 'Players',
     latest == null ? 'Waiting for the server to answer' : '');

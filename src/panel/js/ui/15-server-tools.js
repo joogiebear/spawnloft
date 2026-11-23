@@ -107,7 +107,7 @@ setInterval(() => {
     const since = Number(el.dataset.since);
     if (!since) continue;
     const text = duration(Date.now() - since);
-    el.textContent = el.classList.contains('spill') ? 'Running \u00b7 ' + text : text;
+    el.textContent = el.matches('[data-state-text]') || el.classList.contains('spill') ? 'Running \u00b7 ' + text : text;
   }
 }, 1000);
 

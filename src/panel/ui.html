@@ -101,17 +101,17 @@
 
 <div id="banner"><div id="upgradeNotices" aria-live="polite"></div></div>
 
-<header>
-  <span class="brand">
+<header class="relative z-5 flex h-13 flex-none items-center gap-3 border-b border-line-soft bg-chrome pr-4 pl-5">
+  <span class="flex flex-none items-center gap-2.5">
     <svg viewBox="0 0 64 64" width="21" height="21" aria-hidden="true">
       <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
       <polygon points="8,20 32,32 32,54 8,42" fill="var(--cube-left)"/>
       <polygon points="56,20 32,32 32,54 56,42" fill="var(--cube-right)"/>
       <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="var(--cube-cutout)"/>
     </svg>
-    <b>SpawnLoft</b>
+    <b class="font-display text-4 font-strong tracking-display tight:hidden">SpawnLoft</b>
   </span>
-  <span class="grow"></span>
+  <span class="flex-1"></span>
   <button type="button" class="java-chip" id="javaChip" hidden>
     <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-alert"/></svg><span>Java</span>
   </button>
@@ -121,45 +121,28 @@
   </button>
 </header>
 
-<main>
+<main class="grid min-h-0 grid-cols-[240px_minmax(0,1fr)] compact:grid-cols-[56px_minmax(0,1fr)]">
   <!--
-    The sidebar: every server, and under the open one, its sections. One list down the side rather
-    than tabs across the top and a dock down the right, so switching server and switching tool are
-    the same gesture, and the list is the only navigation there is. Under 1200px it folds to an
-    icon rail and the names become tooltips.
+    The sidebar: Overview and Play, then every server and database. It is a steady list: a server's
+    tools are tabs under its own header, so opening one never pushes the list around. Under 1200px
+    it folds to a rail of tiles and icons, and the names become tooltips.
   -->
-  <aside class="side" id="side">
-    <nav class="srv-tabs" aria-label="Servers">
-      <div class="tabs-scroll" id="list">
-        <button type="button" class="stab stab-home" id="tabHome" title="Overview">
-          <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-grid"/></svg><span class="nm">Overview</span>
+  <aside class="sl-side" id="side">
+    <nav class="sl-side-nav" id="list" aria-label="Servers">
+      <button type="button" class="sl-nav-item" id="tabHome" title="Overview">
+        <svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-grid"/></svg><span class="sl-nav-name">Overview</span>
+      </button>
+      <button type="button" class="sl-nav-item" id="bLauncher" title="Play">
+        <svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span class="sl-nav-name">Play</span><span class="sl-dot" id="playDot" aria-hidden="true" hidden></span>
+      </button>
+      <!-- The one way to add from anywhere: beside the heading of what it adds to. -->
+      <div class="sl-nav-head" id="serversHead" data-group="Servers">
+        <span>Servers</span>
+        <button type="button" class="sl-btn sl-btn-ghost sl-btn-sm sl-btn-icon" id="bNew" title="New server" aria-label="New server">
+          <svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>
         </button>
       </div>
-      <!--
-        The open server's sections. Moved under that server's row by markTabs(), and out of the
-        list before renderList() reconciles it, so the list only ever has to think about servers.
-        Console first: it is where a server opens, and the others announce expanded or collapsed
-        because pressing the open one again goes back to the console.
-      -->
-      <nav class="dock" id="dock" aria-label="Server tools" hidden>
-        <button type="button" id="tabConsole" aria-current="page"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-terminal"/></svg><span class="lbl">Console</span></button>
-        <button type="button" id="tabPlugins" data-pane="plugins" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span class="lbl">Plugins</span><b class="dock-badge" hidden></b></button>
-        <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
-        <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
-        <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
-        <button type="button" id="tabActivity" data-pane="activity" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="lbl">Activity</span></button>
-        <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
-        <button type="button" id="tabPerformance" data-pane="performance" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span class="lbl">Stats</span></button>
-        <button type="button" id="tabScheduler" data-pane="scheduler" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span class="lbl">Schedule</span></button>
-        <button type="button" id="tabSettings" data-pane="settings" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span class="lbl">Settings</span></button>
-      </nav>
     </nav>
-    <button type="button" class="side-new" id="bNew" title="New server">
-      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">New server</span>
-    </button>
-    <button type="button" class="side-new side-play" id="bLauncher" title="Play">
-      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span class="nm">Play</span>
-    </button>
   </aside>
   <section class="stage">
 
@@ -241,16 +224,18 @@
         rather than state - the jar, the RCON port, the world's name - live in Settings now; what
         stays here is what changes while you watch.
       -->
-      <div class="srv-strip">
-        <div class="srv-title">
-          <div class="srv-name">
-            <h1 id="srvName">—</h1>
-            <span class="srv-id" id="srvId" hidden tabindex="0" title="The name the folder and the commands use"></span>
-            <span class="spill" id="srvState"></span>
-            <span class="badge" id="srvOffline" hidden tabindex="0" title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings.">Anyone can join</span>
+      <div class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3 px-7 pt-5 pb-4 compact:px-5">
+        <span class="sl-tile sl-tile-lg" id="srvTile" aria-hidden="true"></span>
+        <div class="grid min-w-0 max-w-full flex-[0_1_auto] gap-1.5">
+          <div class="flex min-w-0 items-center gap-2.5">
+            <h1 class="m-0 min-w-0 truncate type-page" id="srvName">—</h1>
+            <span class="whitespace-nowrap font-mono text-2 text-ink-3" id="srvId" hidden tabindex="0" title="The name the folder and the commands use"></span>
+            <span class="sl-pill" id="srvState"><span class="sl-dot" aria-hidden="true"></span><span data-state-text></span></span>
+            <span class="sl-pill" data-tone="warn" id="srvOffline" hidden tabindex="0" title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings."><span class="sl-dot" data-tone="warn" aria-hidden="true"></span>Anyone can join</span>
           </div>
           <div class="srv-meta" id="srvMeta"></div>
         </div>
+        <!-- Live numbers only while it runs: a stopped server's header is who it is and Start. -->
         <dl class="vitals" id="srvVitals"></dl>
         <div class="srv-actions">
           <button id="bRestart"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-restart"/></svg>Restart</button>
@@ -270,12 +255,32 @@
       <div id="srvDiag"></div>
 
       <!--
+        The server's tools, as tabs under its header. Console first: it is where a server opens. A
+        tool takes the console's place; from 1600px the console keeps a column beside it. The arrow
+        keys move along the tabs and Enter or Space opens one, since opening reads from the disk.
+      -->
+      <div class="@container overflow-x-auto overflow-y-hidden px-5 shadow-[inset_0_-1px_0_var(--line-soft)]" id="dockRow">
+        <div class="sl-tabs flex-nowrap [&>.sl-tab]:after:bottom-0 @max-[1080px]:[&>.sl-tab>.sl-ico]:hidden" id="dock" role="tablist" aria-label="Server tools">
+          <button type="button" role="tab" class="sl-tab" id="tabConsole" aria-selected="true" aria-controls="paneConsole"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-terminal"/></svg><span data-label>Console</span><span class="sl-count" data-tone="fault" data-badge hidden></span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabPlugins" data-pane="plugins" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span data-label>Plugins</span><span class="sl-count" data-tone="accent" data-badge hidden></span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabFiles" data-pane="files" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span data-label>Files</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabWorlds" data-pane="worlds" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span data-label>Worlds</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabBackups" data-pane="backups" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span data-label>Backups</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabActivity" data-pane="activity" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span data-label>Activity</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabPlayers" data-pane="players" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span data-label>Players</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabPerformance" data-pane="performance" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span data-label>Stats</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabScheduler" data-pane="scheduler" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span data-label>Schedule</span></button>
+          <button type="button" role="tab" class="sl-tab" id="tabSettings" data-pane="settings" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span data-label>Settings</span></button>
+        </div>
+      </div>
+
+      <!--
         The console stays; everything else opens beside it. The console is what someone is
         watching while they change a plugin or read a backup list, and the old tabs made that a
         choice between the two.
       -->
       <div class="work" id="work">
-      <section class="console" id="paneConsole" aria-label="Console">
+      <section class="console" id="paneConsole" role="tabpanel" aria-labelledby="tabConsole">
         <div class="con-bar">
           <span class="con-search">
             <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
@@ -332,11 +337,7 @@
         </div>
       </section>
 
-      <section class="tool" id="toolPanel" aria-labelledby="toolTitle" tabindex="-1" hidden>
-        <div class="tool-head">
-          <h2 id="toolTitle"></h2>
-          <button type="button" class="icon-btn" id="toolClose" aria-label="Close" title="Close"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
-        </div>
+      <section class="tool" id="toolPanel" role="tabpanel" tabindex="-1" hidden>
         <div class="panes">
           <div class="pane pane-scroll" id="panePlugins" tabindex="-1">
             <div class="pane-body wide" id="pluginsBody"></div>
@@ -367,11 +368,6 @@
           </div>
         </div>
       </section>
-
-      <!-- While a tool fills the space, the console is still one line tall rather than gone. -->
-      <button type="button" class="con-mini" id="conMini" hidden>
-        <b>Console</b><span class="last" id="conMiniLast"></span><span class="errs" id="conMiniErr"></span>
-      </button>
 
       </div>
     </div>

@@ -53,10 +53,22 @@
 /* ---- files that use classes from here (rule 3) ------------------------------------------ */
 @source "../components.html";
 @source "../js/components/gallery.js";
+/* phase 4: the shell (header, sidebar, server header, the tools' tabs) */
+@source "../ui.html";
+@source "../js/ui/03-tools.js";
+@source "../js/ui/06-server-tabs.js";
+@source "../js/ui/07-server-strip.js";
 /* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
    sources as plain words. Never built until the old rules are gone; the phase that removes an old
-   one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.) */
-@source not inline("grow inline sr-only");
+   one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.)
+   `visible` is no old class, but turns up as a plain word and nothing wants the utility. */
+@source not inline("grow inline sr-only visible");
+
+/* The window is narrow enough that the sidebar folds to a rail (components.css, .sl-side), and
+   narrow enough that the header drops its wordmark. The only two window queries the panel has;
+   everything inside the stage measures the stage or its pane. */
+@custom-variant compact (@media (max-width: 1199px));
+@custom-variant tight (@media (max-width: 840px));
 
 @theme inline {
   /* ---- colour -------------------------------------------------------------------------- */

@@ -335,3 +335,49 @@ Tailwind 4.3.5 is wired in, with no visible change. What later phases need to kn
   Safari are the engines behind WebView2 and WKWebView, not the SpawnLoft window itself; the
   Linux window itself is checked for the layer order and that the old sheets still draw. Windows and macOS windows on real hardware stay on the
   phase 14 list.
+
+## 13. Phase 3 as built (2026-11-23)
+
+The shared building blocks, in #277. What later phases need to know:
+
+- **Blocks.** `src/panel/tailwind/components.css` holds every block as an `sl-` class in Tailwind's
+  `components` layer, written with token values only (a test refuses colours there). Each block
+  is in the `/components` page in every state; that page exists only in development and
+  test-hooks builds. Run the core from a checkout and open `/components` to see them.
+- **Kit.** `src/panel/js/shared/kit.js` is a plain script loaded on `ui.html`, and makes each
+  block: `Kit.button`, `Kit.field`, `Kit.tile`, `Kit.tabs`, `Kit.menu`, `Kit.dialog` and the rest.
+  A page builds its parts from these instead of writing class lists by hand.
+- **Tiles.** A server's colour comes from its id (`Kit.tileTone`), never its label, so renaming it
+  keeps its colour. There are six tones (`--tile-1` to `--tile-6`), none of them amber or red.
+- **Fonts.** Inter, Bricolage Grotesque and JetBrains Mono are bundled in `src/panel/fonts/` with
+  their OFL licences, served from `/assets/fonts/`.
+- **Default theme.** SpawnLoft (lime). Only a saved `classic` stays Classic, so an install that
+  never chose now opens lime. The release notes should say so.
+- **Preflight** stays off until phase 14. Blocks that are native controls start from `all: unset`.
+- **Reduced motion** stops every animation, matching the old sheets. An indeterminate progress bar
+  then fills dimmed rather than standing still at a width.
+
+## 14. Phase 4 as built (2026-11-23)
+
+The shell and navigation, from L1, L3 and L4.
+
+- **Sidebar** (`.sl-side` in components.css, rows built in `06-server-tabs.js`). It lists Overview,
+  Play, a Servers heading with the only `+` (New server), each server, then Databases. A row is the
+  server's tile (its own `server-icon.png` when it has one), its name over software and version
+  (or "Crashed", or "N online"), and a state dot. A stopped server's dot is a hollow ring
+  (`Kit.dot({ hollow })`). The list never moves when a server opens. Under 1200px of window it
+  folds to a 56px rail of tiles and icons, with the dot on the tile's corner.
+- **Server header.** The large tile, the name, the state pill, the address line, and Start, Stop
+  and Restart. Players, TPS and memory show only while it runs. A stopped server's header is who
+  it is and Start; last backup is on the Backups tab.
+- **Tools are tabs** (`#dock`, `role="tablist"`) under the header and notices. Console is first.
+  Left and Right move along them, and Enter or Space opens one (manual activation, because a tool
+  reads from the disk as it opens). The tool's own title bar and the one-line console under an
+  open tool are gone. Instead, the Console tab carries the console's error count while a tool has
+  its place. From 1600px the console still keeps a column beside the tool. A database shows only
+  its four tabs.
+- **Window queries.** `compact:` (under 1200px) and `tight:` (under 840px) are the panel's only two.
+  Everything inside the stage still measures the stage or its pane.
+- **Renamed:** the chart's `.grid` lines are now `.gridline`, so the `grid` utility is free.
+- **Old rules removed:** header, wordmark, sidebar, dock, mini console, tool head and server strip
+  (1,256 rules and 4,366 declarations left).

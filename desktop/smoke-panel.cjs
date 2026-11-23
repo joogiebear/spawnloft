@@ -95,15 +95,15 @@ async function main() {
   const name = 'panel-smoke'
   const consoleFile = path.join(data, 'run', name, 'console.log')
 
-  // each server remembers which tool was open and a second press closes it, so these check
-  // aria-expanded rather than blindly clicking
+  // each server remembers which tool was open, so these check the tab's aria-selected rather than
+  // assume where it starts
   async function openTool(id) {
     const button = page.locator(`#${id}`)
-    if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
+    if (await button.getAttribute('aria-selected') !== 'true') await button.click()
     await page.locator('#toolPanel').waitFor({ state: 'visible' })
   }
   async function showConsole() {
-    if (await page.locator('#toolPanel').isVisible()) await page.locator('#toolClose').click()
+    if (await page.locator('#toolPanel').isVisible()) await page.locator('#tabConsole').click()
     await page.locator('#log').waitFor({ state: 'visible' })
   }
   // Settings shows one section at a time; the databases are the last one, added once the form has read
@@ -569,7 +569,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     const consolePage = await popped
     await consolePage.waitForLoadState('domcontentloaded')
     await consolePage.locator('#log').waitFor({ state: 'visible' })
-    assert.equal(await consolePage.locator('.dock').isVisible(), false, 'The console window must not show the tool dock')
+    assert.equal(await consolePage.locator('#dock').isVisible(), false, 'The console window must not show the tools\' tabs')
     assert.equal(await consolePage.title(), `${name} — console`)
     await consolePage.close()
     record('PASS: a server console opens in its own window, without the rest of the panel')
