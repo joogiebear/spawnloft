@@ -1183,7 +1183,7 @@ async function renderServerSettings() {
   const row = rowOf(state.current);
   const body = $('#settingsBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
-  if (isDb(row)) { body.classList.remove('set-screen'); return renderDatabaseSettings(row); }
+  if (isDb(row)) return renderDatabaseSettings(row);
 
   // Re-rendering under someone mid-edit would silently discard what they had typed. A caller that
   // arrives while the file is still being read gets the read in progress, so awaiting this means
@@ -1198,7 +1198,6 @@ let settingsPaneWatch = null;
 
 async function buildServerSettings(row, body) {
   body.dataset.for = row.name;
-  body.classList.add('set-screen');
   paneLoading(body);
 
   const base = '/instances/' + encodeURIComponent(row.name);
@@ -1222,25 +1221,31 @@ async function buildServerSettings(row, body) {
     return node;
   };
 
-  const nav = el('nav', 'set-nav');
+  /*
+    The sections listed on the left and the open one beside it, at most 820px of rows, because a
+    label and a control 1200px apart read as two unrelated things. Under 760px the list is a row
+    above the form; on an Ultra pane server.properties gets a third column (see showRaw).
+  */
+  const nav = el('nav', 'flex flex-wrap gap-1 self-start @min-[761px]/pane:sticky @min-[761px]/pane:top-4 @min-[761px]/pane:flex-col @min-[761px]/pane:flex-nowrap @min-[761px]/pane:gap-0.5');
   nav.setAttribute('aria-label', 'Settings sections');
-  const form = el('div', 'set-form');
-  const rawView = el('div', 'set-raw');
+  nav.dataset.settingsNav = '';
+  const form = el('div', 'flex flex-col gap-7 min-w-0');
+  const rawView = el('div', 'flex flex-col gap-3 min-w-0');
   rawView.hidden = true;
-  body.append(nav, form, rawView);
+  body.append(el('div', 'grid grid-cols-1 items-start gap-x-7 gap-y-5 @min-[761px]/pane:grid-cols-[240px_minmax(0,1fr)] @ultra/pane:grid-cols-[240px_minmax(0,1fr)_clamp(420px,36%,900px)]'));
+  body.lastChild.append(nav, form, rawView);
 
   // ---- sections and the list of them ------------------------------------------
 
   const navButtons = new Map();
   const addNav = (key, title, target) => {
-    const b = el('button');
+    const b = el('button', 'sl-nav-item w-auto justify-between @min-[761px]/pane:w-full');
     b.type = 'button';
     b.dataset.section = key;
-    const word = el('span');
+    const word = el('span', 'sl-nav-name');
     word.textContent = title;
-    const dot = el('span', 'dot');
+    const dot = Kit.dot({ tone: 'accent' });
     dot.hidden = true;
-    dot.setAttribute('aria-hidden', 'true');
     b.append(word, dot);
     b.onclick = () => {
       showRaw(false);
@@ -1251,7 +1256,10 @@ async function buildServerSettings(row, body) {
     return b;
   };
   const markNav = (key) => {
-    for (const [k, n] of navButtons) n.button.setAttribute('aria-current', String(k === key));
+    for (const [k, n] of navButtons) {
+      if (k === key) n.button.setAttribute('aria-current', 'page');
+      else n.button.removeAttribute('aria-current');
+    }
   };
 
   const sections = new Map();
@@ -1276,12 +1284,16 @@ async function buildServerSettings(row, body) {
     if (sections.has(key)) return sections.get(key);
     meta = meta || (data.groups || []).find((g) => g.key === key)
       || { title: 'Other settings', blurb: 'Everything not filed above.' };
-    const sec = el('section', 'section set-group');
+    // A wide pane puts the open section's rows two abreast, each still a label beside its control.
+    // Server software and Databases lay themselves out.
+    const sec = el('section', meta.plain
+      ? 'flex flex-col gap-3'
+      : 'grid grid-cols-1 content-start gap-x-10 @min-[1500px]/pane:grid-cols-2');
     sec.dataset.section = key;
-    const head = el('div', 'set-head');
-    const h = el('h3');
+    const head = el('div', 'col-span-full flex flex-col gap-1 border-b border-line-soft pb-2');
+    const h = el('h3', 'm-0 type-section text-ink');
     h.textContent = meta.title;
-    const blurb = el('p');
+    const blurb = el('p', 'sl-hint m-0');
     blurb.textContent = meta.blurb;
     head.append(h, blurb);
     sec.append(head);
@@ -1305,14 +1317,14 @@ async function buildServerSettings(row, body) {
   const helpInto = (parent, text) => {
     if (!text) return;
     const m = /^(.+?[.!?])\s+(\S[\s\S]*)$/.exec(text);
-    const first = el('p', 'hint');
+    const first = el('p', 'sl-hint m-0');
     first.textContent = m ? m[1] : text;
     parent.append(first);
     if (!m) return;
-    const more = el('details', 'more');
-    const summary = el('summary');
+    const more = el('details');
+    const summary = el('summary', 'w-max cursor-pointer list-none py-1 -my-1 type-meta text-accent-ink hover:underline [&::-webkit-details-marker]:hidden');
     summary.textContent = 'More';
-    const rest = el('p', 'hint');
+    const rest = el('p', 'sl-hint mt-1 mb-0');
     rest.textContent = m[2];
     more.append(summary, rest);
     parent.append(more);
@@ -1320,17 +1332,18 @@ async function buildServerSettings(row, body) {
 
   const entries = [];
   const addRow = (section, { id, label, help, control, entry }) => {
-    const line = el('div', 'set-row');
-    const left = el('div', 'set-label');
-    const title = el('div', 'set-title');
-    const lab = el('label');
+    // A changed row's box wears the accent edge, so what Save would write is visible at a glance.
+    const line = el('div', 'grid grid-cols-1 items-start gap-x-5 gap-y-2 border-b border-line-faint py-3 last:border-b-0 @min-[761px]/pane:grid-cols-[minmax(0,1fr)_280px] [&[data-changed]_.sl-input]:border-accent-edge [&[data-changed]_.sl-switch]:border-accent-edge');
+    const left = el('div', 'flex min-w-0 flex-col gap-1');
+    const title = el('div', 'flex flex-wrap items-center gap-x-2 gap-y-1');
+    const lab = el('label', 'cursor-pointer type-body font-strong text-ink');
     lab.htmlFor = id;
     lab.textContent = label;
-    const tags = el('span', 'set-tags');
+    const tags = el('span', 'flex gap-1');
     title.append(lab, tags);
     left.append(title);
     helpInto(left, help);
-    const right = el('div', 'set-control');
+    const right = el('div', 'flex min-w-0 flex-col gap-1.5');
     right.append(control);
     line.append(left, right);
     section.append(line);
@@ -1347,7 +1360,7 @@ async function buildServerSettings(row, body) {
     // would be written and ignored.
     if (f.gameRule) {
       // an output is something a label can name, so the row reads as one thing
-      const where = el('output', 'hint');
+      const where = el('output', 'sl-hint m-0 py-2');
       where.id = 'p_' + f.key;
       where.textContent = 'Set with /gamerule';
       addRow(sectionFor(f.group || 'other'), {
@@ -1361,18 +1374,35 @@ async function buildServerSettings(row, body) {
       continue;
     }
     let input;
-    if (f.type === 'bool' || f.type === 'enum') {
-      input = el('select');
-      const opts = f.type === 'bool' ? ['true', 'false'] : f.options;
-      for (const v of opts) {
+    let box = null;
+    if (f.type === 'bool') {
+      // A switch, read and written as the file's own words: its value is "true" or "false", so
+      // everything that compares or saves a field treats it as it treats a text box.
+      box = Kit.toggle({ label: f.label, checked: String(f.value) === 'true' });
+      box.querySelector('.sl-choice-text').classList.add('sl-sr');
+      box.classList.add('self-start', 'min-h-8');
+      input = box.querySelector('input');
+      Object.defineProperty(input, 'value', {
+        configurable: true,
+        get() { return this.checked ? 'true' : 'false'; },
+        set(v) { this.checked = String(v) === 'true'; },
+      });
+    } else if (f.type === 'enum') {
+      input = el('select', 'sl-input');
+      for (const v of f.options) {
         const o = el('option');
         o.value = v;
-        o.textContent = f.type === 'bool' ? (v === 'true' ? 'Yes' : 'No') : v;
+        o.textContent = v;
         o.selected = String(f.value) === v;
         input.append(o);
       }
+      box = el('span', 'sl-input-group');
+      const caret = el('span', 'sl-input-caret');
+      caret.setAttribute('aria-hidden', 'true');
+      caret.append(Kit.icon('caret'));
+      box.append(input, caret);
     } else {
-      input = el('input');
+      input = el('input', f.type === 'url' ? 'sl-input sl-input-mono' : 'sl-input');
       input.type = f.type === 'int' ? 'number' : f.type === 'url' ? 'url' : 'text';
       if (f.type === 'int') { input.min = String(f.min); input.max = String(f.max); }
       if (f.type === 'url') { input.placeholder = 'https://'; input.spellcheck = false; }
@@ -1384,16 +1414,16 @@ async function buildServerSettings(row, body) {
     controls.set(f.key, c);
     // A number field's own min and max only stop the spinner; typed, 5000 players went through to
     // Save. The range is said under the field as it is typed, and Save waits for it.
-    let control = input;
+    let control = box || input;
     let invalid;
     if (f.type === 'int') {
       const bad = fieldNote(input);
-      control = el('div', 'set-stack');
+      control = el('div', 'flex min-w-0 flex-col gap-1.5');
       // what the number counts, beside it: "10" alone does not say chunks or blocks
       let field = input;
       if (f.unit) {
-        field = el('div', 'set-unit');
-        const unit = el('span', 'hint');
+        field = el('div', 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2');
+        const unit = el('span', 'sl-hint m-0');
         unit.id = input.id + '_unit';
         unit.textContent = f.unit;
         input.setAttribute('aria-describedby', unit.id + ' ' + bad.id);
@@ -1404,7 +1434,7 @@ async function buildServerSettings(row, body) {
       input.addEventListener('input', invalid);
     } else if (f.type === 'url') {
       const bad = fieldNote(input);
-      control = el('div', 'set-stack');
+      control = el('div', 'flex min-w-0 flex-col gap-1.5');
       control.append(input, bad);
       invalid = () => {
         const problem = linkProblem(input.value);
@@ -1434,7 +1464,8 @@ async function buildServerSettings(row, body) {
     // Changing who can join on a world that already has players is an identity change, not a
     // setting change. Said next to the control, while the decision is being made.
     if (f.key === 'online-mode' && players && players.count > 0) {
-      const warn = el('div', 'inline-warn');
+      const warn = el('p', 'm-0 rounded-sm border border-warn-edge bg-warn-wash px-3 py-2 type-meta text-warn-ink');
+      warn.setAttribute('role', 'status');
       warn.hidden = true;
       input.addEventListener('change', () => {
         const changed = input.value !== c.original;
@@ -1475,16 +1506,17 @@ async function buildServerSettings(row, body) {
   // effect at the next java exit rather than the next start, but that is the panel's problem to
   // route, not a reason for a second button on the screen.
   const crash = sectionFor('crash', { title: 'If it crashes', blurb: 'What SpawnLoft does when the server dies without being asked to.' });
-  const arSwitch = el('input', 'switch');
-  arSwitch.type = 'checkbox';
+  const arToggle = Kit.toggle({ label: 'Restart it automatically', checked: mine.autoRestart });
+  arToggle.querySelector('.sl-choice-text').classList.add('sl-sr');
+  arToggle.classList.add('self-start', 'min-h-8');
+  const arSwitch = arToggle.querySelector('input');
   arSwitch.id = 's_autorestart';
-  arSwitch.checked = mine.autoRestart;
   addRow(crash, {
     id: arSwitch.id,
     label: 'Restart it automatically',
     help: 'Comes back ten seconds after a crash. Three crashes in ten minutes and it stays down instead '
       + 'of grinding all night; stopping it yourself always sticks.',
-    control: arSwitch,
+    control: arToggle,
     entry: {
       // Read again by the supervisor at every exit, so it is in force as soon as it is saved.
       kind: 'own', key: 'autoRestart', live: true,
@@ -1493,7 +1525,7 @@ async function buildServerSettings(row, body) {
       reset: () => { arSwitch.checked = mine.autoRestart; },
     },
   });
-  const whInput = el('input', 'mono');
+  const whInput = el('input', 'sl-input sl-input-mono');
   whInput.id = 's_webhook';
   whInput.autocomplete = 'off';
   whInput.spellcheck = false;
@@ -1501,7 +1533,7 @@ async function buildServerSettings(row, body) {
   whInput.value = mine.webhook;
   // The same test the server applies, said before Save rather than as a toast after it.
   const whBad = fieldNote(whInput);
-  const whWrap = el('div', 'set-stack');
+  const whWrap = el('div', 'flex min-w-0 flex-col gap-1.5');
   whWrap.append(whInput, whBad);
   const whCheck = () => {
     const v = whInput.value.trim();
@@ -1532,16 +1564,21 @@ async function buildServerSettings(row, body) {
   // needs 17 on one and 25 on the other, so the picker lists every Java found on the box and
   // takes a path for one it did not find. Each server keeps its own choice.
   const jv = sectionFor('java', { title: 'Java and memory', blurb: 'What the server runs on, and how much memory it may use. Both take effect at the next start.' });
-  const jvWrap = el('div', 'set-stack');
-  const jvSelect = el('select');
+  const jvWrap = el('div', 'flex min-w-0 flex-col gap-1.5');
+  const jvSelect = el('select', 'sl-input');
   jvSelect.id = 's_java';
-  const jvCustom = el('input', 'mono');
+  const jvGroup = el('span', 'sl-input-group');
+  const jvCaret = el('span', 'sl-input-caret');
+  jvCaret.setAttribute('aria-hidden', 'true');
+  jvCaret.append(Kit.icon('caret'));
+  jvGroup.append(jvSelect, jvCaret);
+  const jvCustom = el('input', 'sl-input sl-input-mono');
   jvCustom.autocomplete = 'off';
   jvCustom.spellcheck = false;
   jvCustom.placeholder = examplePath(panelPlatform, 'java');
   jvCustom.setAttribute('aria-label', 'Path to java');
   jvCustom.hidden = true;
-  jvWrap.append(jvSelect, jvCustom);
+  jvWrap.append(jvGroup, jvCustom);
   // Until the list arrives the select is empty, and an empty select must not read as "clear the
   // Java" when Save compares it with what the server had.
   let javaReady = false;
@@ -1558,7 +1595,7 @@ async function buildServerSettings(row, body) {
       reset: () => selectJava(mine.java),
     },
   });
-  const jvHint = jvRow.left.querySelector('.hint');
+  const jvHint = jvRow.left.querySelector('.sl-hint');
   const selectJava = (bin) => {
     const option = Array.from(jvSelect.options).find((o) => o.value === bin);
     if (option) { jvSelect.value = bin; jvCustom.hidden = true; }
@@ -1584,15 +1621,11 @@ async function buildServerSettings(row, body) {
         + 'For one installed somewhere else, pick the last option and paste the path to ' + JAVA_FILE + '.'
       : needLine + 'No Java was found on this computer. Install one, or paste the path to ' + JAVA_FILE + '. ';
     if (found.download && !found.found.length) {
-      const get = el('button', 'ghost');
-      get.type = 'button';
-      get.textContent = 'Get Java';
-      get.onclick = () => openOutside(found.download);
+      const get = Kit.button({ label: 'Get Java', kind: 'link', size: 'sm', onClick: () => openOutside(found.download) });
       jvHint.append(get);
     }
     // A Java marked too old could be chosen and saved with nothing said
-    const jvOld = el('div', 'hint');
-    jvOld.style.color = 'var(--warn-ink)';
+    const jvOld = el('p', 'm-0 type-meta text-warn-ink');
     jvOld.setAttribute('aria-live', 'polite');
     jvRow.left.append(jvOld);
     const sayOld = () => {
@@ -1621,13 +1654,13 @@ async function buildServerSettings(row, body) {
     if (!jvCustom.hidden) jvCustom.focus();
   };
 
-  const memInput = el('input', 'mono');
+  const memInput = el('input', 'sl-input sl-input-mono');
   memInput.id = 's_memory';
   memInput.autocomplete = 'off';
   memInput.value = mine.memory;
   const memBad = fieldNote(memInput);
   memInput.addEventListener('input', () => checkMemory(memInput, memBad));
-  const memWrap = el('div', 'set-stack');
+  const memWrap = el('div', 'flex min-w-0 flex-col gap-1.5');
   memWrap.append(memInput, memBad);
   addRow(jv, {
     id: memInput.id,
@@ -1646,20 +1679,18 @@ async function buildServerSettings(row, body) {
   // ---- the Java arguments ------------------------------------------------------
   // SpawnLoft's recommended flags (Aikar's) unless the owner writes their own. The whole launch line
   // is shown under it, so what the checkbox and the box mean is visible rather than described.
-  const flagsWrap = el('div', 'set-stack');
-  const flagsOwn = el('label', 'check');
-  const flagsBox = el('input');
-  flagsBox.type = 'checkbox';
-  flagsBox.checked = Boolean(mine.jvmFlags);
-  flagsOwn.append(flagsBox, document.createTextNode(' Use my own Java arguments'));
-  const flagsText = el('textarea', 'mono');
+  const flagsWrap = el('div', 'flex min-w-0 flex-col gap-2');
+  const flagsOwn = Kit.checkbox({ label: 'Use my own Java arguments', checked: Boolean(mine.jvmFlags) });
+  const flagsBox = flagsOwn.querySelector('input');
+  const flagsText = el('textarea', 'sl-input sl-input-mono');
   flagsText.id = 's_jvmFlags';
   flagsText.rows = 3;
   flagsText.spellcheck = false;
   flagsText.value = mine.jvmFlags;
   flagsText.hidden = !flagsBox.checked;
   flagsText.setAttribute('aria-label', 'Java arguments');
-  const flagsLine = el('code', 'launch-line');
+  // the whole launch line, so what the box and the arguments mean is seen rather than described
+  const flagsLine = el('code', 'block whitespace-pre-wrap break-all rounded-sm border border-line-soft bg-sunken px-3 py-2 font-mono text-1 text-ink-3');
   flagsWrap.append(flagsOwn, flagsText, flagsLine);
   const jarName = (row.jar || 'server.jar').split(/[\\/]/).pop();
   const showLaunch = () => {
@@ -1698,15 +1729,14 @@ async function buildServerSettings(row, body) {
   // update; on a Fabric or Spigot server it would have nothing true to say, so it is not there.
   const canUpdate = ['paper', 'purpur', 'folia', 'asp'].includes(row.loader ?? 'paper');
   if (canUpdate) {
-    const soft = sectionFor('software', { title: 'Server software', blurb: 'The server build this server runs.' });
-    const softNow = el('div', 'hint mono-path');
+    const soft = sectionFor('software', { title: 'Server software', blurb: 'The server build this server runs.', plain: true });
+    const softNow = el('p', 'm-0 truncate font-mono text-2 text-ink-3');
     softNow.textContent = row.jar || '—';
-    const softRow = el('div', 'row');
-    const softCheck = iconButton('restore', 'Check for updates');
+    const softCheck = Kit.button({ label: 'Check for updates', icon: 'restore', size: 'sm' });
+    const softRow = el('div', 'flex flex-wrap gap-2');
     softRow.append(softCheck);
-    const softOut = el('div');
-    softOut.style.display = 'grid';
-    softOut.style.gap = '8px';
+    const softOut = el('div', 'flex flex-col items-start gap-2');
+    softOut.setAttribute('aria-live', 'polite');
     soft.append(softNow, softRow, softOut);
 
     // The whole page is drawn again after an upgrade, unless that would take unsaved changes in
@@ -1724,7 +1754,7 @@ async function buildServerSettings(row, body) {
     softCheck.onclick = async () => {
       softCheck.disabled = true;
       softOut.textContent = '';
-      const asking = el('div', 'hint');
+      const asking = el('p', 'sl-hint m-0');
       asking.textContent = 'Checking for updates…';
       softOut.append(asking);
       let info;
@@ -1732,7 +1762,7 @@ async function buildServerSettings(row, body) {
         info = await api(base + '/upgrade');
       } catch (e) {
         asking.remove();
-        const bad = el('div', 'bad');
+        const bad = el('p', 'sl-error m-0');
         bad.textContent = e.message;
         softOut.append(bad);
         softCheck.disabled = false;
@@ -1742,7 +1772,7 @@ async function buildServerSettings(row, body) {
       softOut.textContent = '';
 
       const line = (text) => {
-        const node = el('div', 'hint');
+        const node = el('p', 'sl-hint m-0');
         node.textContent = text;
         softOut.append(node);
         return node;
@@ -1758,20 +1788,19 @@ async function buildServerSettings(row, body) {
         line('Build ' + info.latestBuild.build + ' is available for ' + info.current.version
           + (channel && channel !== 'STABLE' ? ' (' + channel.toLowerCase() + ')' : '')
           + '. The jar it runs now stays in the folder as the way back.');
-        const go = el('button', 'primary');
-        go.textContent = 'Update to build ' + info.latestBuild.build;
+        const go = Kit.button({ label: 'Update to build ' + info.latestBuild.build, kind: 'primary', size: 'sm' });
         softOut.append(go);
         go.onclick = async () => {
-          go.disabled = true;
-          go.textContent = 'Downloading…';
+          Kit.busy(go, true);
+          go.lastChild.textContent = 'Downloading…';
           try {
             const out = await post(base + '/upgrade', {});
             toast('Now on ' + out.to + '.' + (out.running ? ' Restart to load it.' : ''), 'good');
             await afterUpgrade();
           } catch (e) {
             toast(e.message, 'bad');
-            go.disabled = false;
-            go.textContent = 'Update to build ' + info.latestBuild.build;
+            Kit.busy(go, false);
+            go.lastChild.textContent = 'Update to build ' + info.latestBuild.build;
           }
         };
       } else {
@@ -1782,8 +1811,7 @@ async function buildServerSettings(row, body) {
         const next = info.newerVersions[0];
         line('Minecraft ' + next + ' is out. Crossing versions migrates the worlds on the next '
           + 'start, and worlds do not migrate back.');
-        const cross = el('button');
-        cross.textContent = 'Upgrade to ' + next + '…';
+        const cross = Kit.button({ label: 'Upgrade to ' + next + '…', size: 'sm' });
         softOut.append(cross);
         cross.onclick = async () => {
           const ok = await ask({
@@ -1796,8 +1824,8 @@ async function buildServerSettings(row, body) {
             typeToConfirm: row.name,
           });
           if (!ok) return;
-          cross.disabled = true;
-          cross.textContent = 'Downloading…';
+          Kit.busy(cross, true);
+          cross.lastChild.textContent = 'Downloading…';
           const note = toast('Backing up, then downloading ' + info.label + ' ' + next + '…');
           try {
             const out = await post(base + '/upgrade', { version: next });
@@ -1807,8 +1835,8 @@ async function buildServerSettings(row, body) {
           } catch (e) {
             note.remove();
             toast(e.message, 'bad');
-            cross.disabled = false;
-            cross.textContent = 'Upgrade to ' + next + '…';
+            Kit.busy(cross, false);
+            cross.lastChild.textContent = 'Upgrade to ' + next + '…';
           }
         };
       }
@@ -1822,23 +1850,19 @@ async function buildServerSettings(row, body) {
     heading: that nothing here reaches a running server until it starts again. Save and restart is
     offered only while the server is running; stopped, Save is the primary button.
   */
-  const bar = el('div', 'pane-foot set-bar');
-  const barDot = el('span', 'bar-dot');
-  barDot.setAttribute('aria-hidden', 'true');
-  const barCount = el('b', 'bar-count');
-  const barWhen = el('span', 'hint');
+  const bar = el('div', 'pane-foot flex flex-wrap items-center gap-x-3 gap-y-2');
+  bar.setAttribute('role', 'region');
+  bar.setAttribute('aria-label', 'Unsaved settings');
+  const barDot = Kit.dot({ tone: 'accent' });
+  const barCount = el('b', 'type-body font-strong text-ink');
+  barCount.setAttribute('role', 'status');
+  const barWhen = el('span', 'sl-hint m-0');
   const applyWhen = 'Take effect when ' + (row.label || row.name) + ' next starts.';
   bar.hidden = true;
-  const discard = el('button', 'ghost');
-  discard.type = 'button';
-  discard.textContent = 'Discard';
-  const save = el('button');
-  save.type = 'button';
-  save.textContent = 'Save';
-  const saveRestart = el('button', 'primary');
-  saveRestart.type = 'button';
-  saveRestart.textContent = 'Save and restart';
-  const grow = el('span', 'grow');
+  const discard = Kit.button({ label: 'Discard', kind: 'ghost' });
+  const save = Kit.button({ label: 'Save' });
+  const saveRestart = Kit.button({ label: 'Save and restart', kind: 'primary' });
+  const grow = el('span', 'flex-1');
   bar.append(barDot, barCount, barWhen, grow, discard, save, saveRestart);
   body.append(bar);
 
@@ -1884,9 +1908,7 @@ async function buildServerSettings(row, body) {
       e.tags.textContent = '';
       const tag = changed ? 'Changed' : e.tag || (e.isDefault && e.isDefault() ? 'Default' : '');
       if (tag) {
-        const t = el('span', 'set-tag');
-        t.textContent = tag;
-        if (changed) t.dataset.tone = 'changed';
+        const t = Kit.pill({ text: tag, tone: changed ? 'accent' : null });
         t.title = changed ? 'Different from what is saved' : e.tag ? 'Kept in the world, not in server.properties' : 'Not in server.properties yet: this is Minecraft\u2019s own default';
         e.tags.append(t);
       }
@@ -1910,7 +1932,7 @@ async function buildServerSettings(row, body) {
     // Offered only when a restart would do something: asking people to be disconnected for a
     // change that is already in force is the one thing this bar must not do.
     saveRestart.hidden = !running || !waiting.needsRestart;
-    save.className = saveRestart.hidden ? 'primary' : '';
+    save.classList.toggle('sl-btn-primary', saveRestart.hidden);
   }
   form.addEventListener('input', update);
   form.addEventListener('change', update);
@@ -1975,25 +1997,22 @@ async function buildServerSettings(row, body) {
     snapshotted on its own first. A save here does not go through the bar: it is one file, written
     at once, and the form's own changes are left as they are.
   */
-  const rawHead = el('div', 'set-head');
-  const rawTitle = el('h3', 'mono');
+  const rawHead = el('div', 'flex flex-col gap-1 border-b border-line-soft pb-2');
+  const rawTitle = el('h3', 'm-0 type-section font-mono text-ink');
   rawTitle.textContent = 'server.properties';
-  const rawBlurb = el('p');
+  const rawBlurb = el('p', 'sl-hint m-0');
   rawBlurb.textContent = 'The whole file. Values shown as [redacted] are hidden: leave those lines as they are. '
     + 'The ports and RCON are set by SpawnLoft at every start, so a change to them is refused.';
   rawHead.append(rawTitle, rawBlurb);
-  const rawText = el('textarea', 'mono');
+  const rawText = el('textarea', 'sl-input sl-input-mono min-h-[440px] resize-y leading-relaxed @ultra/pane:min-h-[clamp(440px,60vh,1200px)]');
   rawText.spellcheck = false;
   rawText.setAttribute('aria-label', 'server.properties');
   rawText.rows = 24;
-  const rawRow = el('div', 'row');
-  const rawSave = el('button', 'primary');
-  rawSave.type = 'button';
-  rawSave.textContent = 'Save file';
-  const rawReload = el('button', 'ghost');
-  rawReload.type = 'button';
-  rawReload.textContent = 'Reload';
-  const rawNote = el('span', 'hint');
+  const rawRow = el('div', 'flex flex-wrap items-center gap-3');
+  const rawSave = Kit.button({ label: 'Save file', kind: 'primary' });
+  const rawReload = Kit.button({ label: 'Reload', kind: 'ghost' });
+  const rawNote = el('span', 'sl-hint m-0');
+  rawNote.setAttribute('role', 'status');
   rawRow.append(rawSave, rawReload, rawNote);
   rawView.append(rawHead, rawText, rawRow);
   let rawLoaded = null;
@@ -2084,11 +2103,11 @@ async function buildServerSettings(row, body) {
   });
   settingsPaneWatch.observe(body.closest('.pane-scroll'));
 
-  const sep = el('div', 'set-nav-sep');
+  const sep = el('div', 'mx-2.5 my-2 hidden h-px bg-line-soft @min-[761px]/pane:block');
   sep.setAttribute('role', 'separator');
   nav.append(sep);
   const rawNav = addNav('raw', 'server.properties', rawView);
-  rawNav.classList.add('mono');
+  rawNav.querySelector('.sl-nav-name').classList.add('font-mono', 'text-2');
   rawNav.onclick = () => { showRaw(true); rawText.focus(); };
   // On an Ultra pane the file is on screen from the start, so it is read from the start.
   showRaw(false);

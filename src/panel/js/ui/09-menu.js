@@ -75,9 +75,7 @@ function buildMoreMenu() {
 async function openUpgrade() {
   setTool('settings');
   await renderServerSettings();
-  const soft = $$('#settingsBody .set-head h3').find((h) => h.textContent === 'Server software');
-  const key = soft && soft.closest('.set-group').dataset.section;
-  if (key) $('#settingsBody .set-nav [data-section="' + CSS.escape(key) + '"]')?.click();
+  $('#settingsBody [data-settings-nav] [data-section="software"]')?.click();
 }
 
 function renderServer(row) {

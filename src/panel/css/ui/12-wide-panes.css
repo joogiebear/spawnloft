@@ -2,13 +2,6 @@
 @layer legacy {
   /* ---- panes that use the width they are given ------------------------------- */
 
-  /* Settings: one card per group, flowing into as many columns as fit. Cards in a row share a
-     bottom edge; the card keeps its fields at the top so the extra height is empty below them. */
-  /* min(330px, 100%): at the app's 900px minimum the pane is narrower than one 330px card, and a
-     fixed minimum pushed the whole pane into a sideways scroll. */
-  #settingsBody { grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); align-items: stretch; }
-  #settingsBody > .hint, #settingsBody > .row, #settingsBody > .bad, #settingsBody > .pane-foot { grid-column: 1 / -1; }
-  .set-group { align-content: start; }
 
   /*
     The save bar stays in view, stuck to the bottom of the scroller the way the title sticks to the

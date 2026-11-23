@@ -1236,7 +1236,7 @@ test('Settings: a link is checked as it is typed, and a game rule is a row that 
   assert.match(words, /\/gamerule in the Console/)
   // the row has no field, is never a change, wears its tag, and is something a label can name
   assert.match(html, /if \(f\.gameRule\) \{[\s\S]{0,900}changed: \(\) => false, tag: 'Game rule'[\s\S]{0,80}continue;/)
-  assert.match(html, /const where = el\('output', 'hint'\);/)
+  assert.match(html, /const where = el\('output', 'sl-hint m-0 py-2'\);/)
   assert.match(ignoredWords(['PvP']), /^PvP was not saved: .* it is a game rule, changed with \/gamerule in the Console\.$/)
   assert.match(ignoredWords(['PvP', 'Monsters', 'The Nether']), /^PvP, Monsters and The Nether were not saved: .* they are game rules/)
   // a number says what it counts, and the field is described by it
