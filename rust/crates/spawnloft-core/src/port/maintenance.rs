@@ -127,6 +127,37 @@ fn resources_of(exe: &Path) -> Option<PathBuf> {
     (named(bin, "bin") && named(resources, "resources")).then(|| resources.to_path_buf())
 }
 
+/// `runtime.json` as 2.0's stage-runtime.mjs wrote it: an object whose `node` is a version and
+/// whose `exe` is `node-<version>/node.exe` (the file's name alone could be another app's).
+#[cfg(any(windows, test))]
+fn is_our_runtime_record(file: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return false;
+    };
+    let Ok(serde_json::Value::Object(record)) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return false;
+    };
+    match (
+        record.get("node").and_then(serde_json::Value::as_str),
+        record.get("exe").and_then(serde_json::Value::as_str),
+    ) {
+        (Some(node), Some(exe)) => !node.is_empty() && exe.starts_with(&format!("node-{node}/")),
+        _ => false,
+    }
+}
+
+/// What the Node core's entry says of itself (`// spawnloft: the SpawnLoft command line.`, and
+/// `// mcctl: ...` in 1.x), in its first lines.
+#[cfg(any(windows, test))]
+fn is_our_core_entry(file: &Path) -> bool {
+    use std::io::Read;
+    let mut head = [0u8; 512];
+    let Ok(n) = std::fs::File::open(file).and_then(|mut f| f.read(&mut head)) else {
+        return false;
+    };
+    String::from_utf8_lossy(&head[..n]).contains("the SpawnLoft command line")
+}
+
 /// The `resources\runtime` (the bundled Node) and `resources\core` (the Node core) that 2.0
 /// builds before C10 shipped (rust/PLAN-CORE-PORT.md sections 5.1 and 7). An update leaves what
 /// the new package does not list, and the installer removes them itself unless a Node process
@@ -134,12 +165,13 @@ fn resources_of(exe: &Path) -> Option<PathBuf> {
 /// does (installer.nsi SPAWNLOFT_REMOVE_NODE): every node.exe first, and when one cannot be
 /// deleted both folders stay, for a later repair or install. A failed delete is never an error,
 /// and nothing outside the two folders is touched. A folder is only taken for SpawnLoft's when it
-/// holds what SpawnLoft put there (`runtime\runtime.json`, `core\mcctl.mjs`): the install folder
+/// holds what SpawnLoft put there (a `runtime\runtime.json` record naming `node-<ver>/`, a
+/// `core\mcctl.mjs` that names itself the SpawnLoft command line): the install folder
 /// can be one the person chose, and another app's `resources\core` is not ours to delete.
 #[cfg(any(windows, test))]
 fn remove_node_leftovers(resources: &Path) -> Leftovers {
-    let runtime = Some(resources.join("runtime")).filter(|r| r.join("runtime.json").is_file());
-    let core = Some(resources.join("core")).filter(|c| c.join("mcctl.mjs").is_file());
+    let runtime = Some(resources.join("runtime")).filter(|r| is_our_runtime_record(&r.join("runtime.json")));
+    let core = Some(resources.join("core")).filter(|c| is_our_core_entry(&c.join("mcctl.mjs")));
     if runtime.is_none() && core.is_none() {
         return Leftovers::None;
     }
@@ -269,6 +301,9 @@ mod tests {
         ] {
             std::fs::write(resources.join(file), "x").unwrap();
         }
+        // what 2.0 builds before C10 wrote (stage-runtime.mjs, mcctl.mjs)
+        std::fs::write(resources.join("runtime/runtime.json"), RUNTIME_RECORD).unwrap();
+        std::fs::write(resources.join("core/mcctl.mjs"), CORE_ENTRY).unwrap();
         assert_eq!(remove_node_leftovers(&resources), Leftovers::Removed);
         assert!(!resources.join("runtime").exists() && !resources.join("core").exists());
         for kept in ["bin/spawnloft-core.exe", "bin/spawnloft.cmd", "LICENSE"] {
@@ -290,8 +325,45 @@ mod tests {
         std::fs::remove_dir_all(resources.join("core")).unwrap();
         // a core folder left alone (its runtime already gone) goes too
         std::fs::create_dir_all(resources.join("core")).unwrap();
-        std::fs::write(resources.join("core/mcctl.mjs"), "x").unwrap();
+        std::fs::write(resources.join("core/mcctl.mjs"), CORE_ENTRY).unwrap();
         assert_eq!(remove_node_leftovers(&resources), Leftovers::Removed);
         std::fs::remove_dir_all(&resources).unwrap();
+    }
+
+    const RUNTIME_RECORD: &str =
+        "{\n  \"node\": \"24.22.3\",\n  \"exe\": \"node-24.22.3/node.exe\",\n  \"platform\": \"win32\"\n}\n";
+    const CORE_ENTRY: &str =
+        "#!/usr/bin/env node\n// spawnloft: the SpawnLoft command line.\nimport fs from 'node:fs'\n";
+
+    #[test]
+    fn only_folders_with_spawnlofts_own_record_and_entry_are_ours() {
+        let dir = scratch("markers");
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("f");
+        let check = |text: &str| {
+            std::fs::write(&f, text).unwrap();
+            (is_our_runtime_record(&f), is_our_core_entry(&f))
+        };
+        assert_eq!(check(RUNTIME_RECORD), (true, false));
+        assert_eq!(check(CORE_ENTRY), (false, true));
+        // 1.x's entry named the CLI mcctl
+        assert_eq!(
+            check("#!/usr/bin/env node\n// mcctl: the SpawnLoft command line.\n"),
+            (false, true)
+        );
+        // another app's files of the same names
+        for other in [
+            "x",
+            "{}",
+            "[]",
+            "{\"node\": \"24\"}",
+            "{\"node\": \"24.22.3\", \"exe\": \"bin/node.exe\"}",
+            "{\"node\": \"\", \"exe\": \"node-/node.exe\"}",
+            "import x from 'y'\n",
+        ] {
+            assert_eq!(check(other), (false, false), "{other}");
+        }
+        assert!(!is_our_runtime_record(&dir.join("missing")) && !is_our_core_entry(&dir.join("missing")));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

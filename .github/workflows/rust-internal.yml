@@ -205,7 +205,8 @@ jobs:
 
   zip-fuzz:
     # The cargo-fuzz targets of the zip readers (rust/fuzz), a minute each, seeded with archives
-    # the Rust writer makes. Nightly is pinned by date; the targets never ship.
+    # the Rust writer makes and archives 1.x wrote (rust/fuzz/seeds). Nightly is pinned by date;
+    # the targets never ship.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -230,6 +231,8 @@ jobs:
           for z in "" --zip64; do
             target/debug/zip-probe create "fuzz/corpus/zip_read/rust$z.zip" "$seed/src" $z -- w
           done
+          # and the frozen archives 1.x wrote (fuzz/seeds/README.md)
+          cp fuzz/seeds/zip_read/*.zip fuzz/corpus/zip_read/
       - name: Fuzz the zip readers
         working-directory: rust/fuzz
         run: |

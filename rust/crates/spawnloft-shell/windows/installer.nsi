@@ -739,11 +739,60 @@ FunctionEnd
 ; one cannot be deleted, BOTH folders stay for this run, and the next install (or `spawnloft
 ; repair`, spawnloft-core port/maintenance.rs) removes them once nothing holds them. Nothing
 ; outside the two folders is touched.
+;
+; Push <file>, Push <text>, Call SpawnLoftFileHas, Pop: "1" when a line of <file> among its first
+; 16 holds <text>, else "0". How a folder is known for SpawnLoft's own by what is in its marker,
+; not by the marker's name alone (spawnloft-core port/maintenance.rs reads the same).
+Function SpawnLoftFileHas
+  Exch $R1 ; text
+  Exch
+  Exch $R2 ; file
+  Push $R3
+  Push $R4
+  Push $R5
+  StrCpy $R5 "0"
+  ClearErrors
+  FileOpen $R3 $R2 r
+  ${IfNot} ${Errors}
+    StrCpy $R4 0
+    ${Do}
+      ClearErrors
+      FileRead $R3 $R2
+      ${If} ${Errors}
+        ${Break}
+      ${EndIf}
+      ${WordFind} "$R2" "$R1" "E#" $R2
+      ${IfNot} ${Errors}
+        StrCpy $R5 "1"
+        ${Break}
+      ${EndIf}
+      IntOp $R4 $R4 + 1
+    ${LoopUntil} $R4 >= 16
+    FileClose $R3
+  ${EndIf}
+  ClearErrors
+  StrCpy $R1 $R5
+  Pop $R5
+  Pop $R4
+  Pop $R3
+  Pop $R2
+  Exch $R1
+FunctionEnd
+
 !macro SPAWNLOFT_REMOVE_NODE
-  ; only folders SpawnLoft wrote (runtime.json, mcctl.mjs): the install folder can be one the
+  ; only folders SpawnLoft wrote: a runtime.json record naming node-<ver>/ (stage-runtime.mjs),
+  ; an mcctl.mjs that says it is the SpawnLoft command line. The install folder can be one the
   ; person chose, and another app's resources\core or resources\runtime is not ours
   StrCpy $R6 0
-  ${If} ${FileExists} "$INSTDIR\resources\runtime\runtime.json"
+  Push "$INSTDIR\resources\runtime\runtime.json"
+  Push '"exe": "node-'
+  Call SpawnLoftFileHas
+  Pop $R4
+  Push "$INSTDIR\resources\core\mcctl.mjs"
+  Push "the SpawnLoft command line"
+  Call SpawnLoftFileHas
+  Pop $R5
+  ${If} $R4 == "1"
     ClearErrors
     FindFirst $R7 $R8 "$INSTDIR\resources\runtime\*"
     ${DoWhile} $R8 != ""
@@ -764,10 +813,10 @@ FunctionEnd
   ${If} $R6 = 1
     DetailPrint "node.exe is in use; resources\runtime and resources\core stay until that program ends"
   ${Else}
-    ${If} ${FileExists} "$INSTDIR\resources\runtime\runtime.json"
+    ${If} $R4 == "1"
       RMDir /r "$INSTDIR\resources\runtime"
     ${EndIf}
-    ${If} ${FileExists} "$INSTDIR\resources\core\mcctl.mjs"
+    ${If} $R5 == "1"
       RMDir /r "$INSTDIR\resources\core"
     ${EndIf}
   ${EndIf}
