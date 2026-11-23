@@ -1,0 +1,1416 @@
+/* ==========================================================================
+   The shared building blocks (docs/ux-ui-plan-2026-11/PLAN.md phase 3), in Tailwind's
+   `components` layer: above every old stylesheet, below the utility classes, so a utility on an
+   element still adjusts a block, and nothing an old sheet says about `button` or `input` reaches
+   one.
+
+   Every class here starts `sl-`, so none can be mistaken for an old one or for a utility. Build
+   them with Kit (src/panel/js/shared/kit.js) rather than by hand where Kit has a maker: it puts
+   the roles and the ARIA in as well as the classes. /components in a development build shows
+   every block in every state, in either theme.
+
+   Two rules hold for all of them:
+
+   1. Preflight is off (panel.css says why), and the old sheets still style bare elements: a
+      `button` there has a border, a lift, a hover that moves it. So a block built on a native
+      control starts from `all: unset` and says everything it wants. One built on a <dialog>
+      cannot (that would unset what keeps a closed dialog hidden), so it sets each property the
+      old dialog rule sets instead.
+   2. Values come from tokens.css only. A colour, a size or a corner that is not a token is a
+      token missing, not a number to write here.
+   ========================================================================== */
+
+@layer components {
+  /* ---- the page ---------------------------------------------------------------------- */
+  /* A page built only from these blocks (the components page) starts here. */
+  .sl-page {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--void);
+    color: var(--ink);
+    font: var(--t-4)/1.5 var(--ui);
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  .sl-page *,
+  .sl-page *::before,
+  .sl-page *::after {
+    box-sizing: border-box;
+  }
+
+  /* `hidden` hides a block whatever display it has. The old sheets say this for their pages
+     ([hidden] in 02-lit-edges.css); a page built only from these blocks has no old sheet. */
+  :where([class^="sl-"], [class*=" sl-"])[hidden] {
+    display: none !important;
+  }
+
+  /* Read by a screen reader, not drawn. */
+  .sl-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---- icons ------------------------------------------------------------------------- */
+  /* The sprite in ui.html (<use href="#i-name">), sized in ems so it follows its text. */
+  .sl-ico {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
+
+  /* ---- button ------------------------------------------------------------------------ */
+  /* Five kinds: primary (one per area, the thing the area is for), secondary (the default),
+     ghost (a quiet verb among content), danger, and link (a verb inside a sentence). Three
+     heights; the smallest is still --hit, so a row of buttons lines up with a field beside it. */
+  .sl-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    height: 36px;
+    min-width: 0;
+    padding: 0 14px;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--ink);
+    font: 500 var(--t-3)/1 var(--ui);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--ease), border-color var(--ease), color var(--ease);
+  }
+  .sl-btn:hover {
+    background: var(--hover-hi);
+    border-color: var(--ink-4);
+  }
+  .sl-btn:active {
+    background: var(--hover);
+  }
+  .sl-btn:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: var(--ring-offset);
+  }
+  .sl-btn:disabled,
+  .sl-btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: var(--edge);
+  }
+  .sl-btn > .sl-ico {
+    font-size: 16px;
+  }
+
+  .sl-btn-primary {
+    background: var(--primary-top);
+    border-color: var(--primary-edge);
+    color: var(--primary-ink);
+    font-weight: 600;
+  }
+  .sl-btn-primary:hover {
+    background: var(--primary-hover-top);
+    border-color: var(--primary-hover-top);
+  }
+  .sl-btn-primary:active {
+    background: var(--primary-top);
+  }
+  .sl-btn-primary:disabled,
+  .sl-btn-primary[aria-disabled="true"] {
+    background: var(--primary-top);
+    border-color: var(--primary-edge);
+  }
+
+  .sl-btn-ghost {
+    border-color: transparent;
+    color: var(--ink-2);
+  }
+  .sl-btn-ghost:hover {
+    background: var(--hover);
+    border-color: transparent;
+    color: var(--ink);
+  }
+  .sl-btn-ghost:disabled,
+  .sl-btn-ghost[aria-disabled="true"] {
+    border-color: transparent;
+  }
+
+  .sl-btn-danger {
+    background: var(--fault-fill);
+    border-color: var(--fault-edge);
+    color: var(--fault-ink);
+  }
+  .sl-btn-danger:hover {
+    background: var(--fault-wash);
+    border-color: var(--fault);
+  }
+  .sl-btn-danger:disabled,
+  .sl-btn-danger[aria-disabled="true"] {
+    background: var(--fault-fill);
+    border-color: var(--fault-edge);
+  }
+
+  .sl-btn-link {
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-xs);
+    color: var(--lapis-ink);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+  }
+  .sl-btn-link:hover {
+    background: transparent;
+    text-decoration-color: currentColor;
+  }
+  .sl-btn-link:active {
+    background: transparent;
+  }
+
+  .sl-btn-sm {
+    height: var(--hit);
+    padding: 0 10px;
+    gap: 6px;
+    font-size: var(--t-2);
+  }
+  .sl-btn-lg {
+    height: 44px;
+    padding: 0 18px;
+    font-size: var(--t-4);
+  }
+  /* An icon and nothing else: square, and named by aria-label (Kit.button does both). */
+  .sl-btn-icon {
+    width: 36px;
+    padding: 0;
+  }
+  .sl-btn-icon.sl-btn-sm {
+    width: var(--hit);
+  }
+  .sl-btn-icon.sl-btn-lg {
+    width: 44px;
+  }
+
+  /* Working: the label stays, so the button keeps its width and says what it is doing, and a
+     spinner takes the icon's place. Kit.busy() sets and clears it. */
+  .sl-btn[aria-busy="true"] {
+    cursor: progress;
+    pointer-events: none;
+  }
+  .sl-btn[aria-busy="true"] > .sl-ico {
+    display: none;
+  }
+  .sl-btn[aria-busy="true"]::before {
+    content: "";
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    opacity: 0.8;
+    animation: sl-spin 0.7s linear infinite;
+  }
+
+  /* ---- fields ------------------------------------------------------------------------ */
+  /* A label over its control, then one line of help or the reason it was refused. */
+  .sl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .sl-label {
+    font: var(--type-label);
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sl-hint {
+    margin: 0;
+    font: var(--type-meta);
+    color: var(--ink-3);
+  }
+  .sl-error {
+    margin: 0;
+    font: 500 var(--t-2)/1.45 var(--ui);
+    color: var(--fault-ink);
+  }
+
+  .sl-input {
+    all: unset;
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    padding: 0 12px;
+    background: var(--sunken);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font: var(--t-3)/1.4 var(--ui);
+    cursor: text;
+    transition: border-color var(--ease), background-color var(--ease);
+  }
+  .sl-input::placeholder {
+    color: var(--ink-3);
+    opacity: 1;
+  }
+  .sl-input:hover {
+    border-color: var(--edge);
+  }
+  /* The ring is drawn over the border, not outside it, so a row of fields does not jostle. */
+  .sl-input:focus,
+  .sl-input:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -1px;
+    border-color: var(--lapis-edge);
+    background: var(--field-focus);
+  }
+  .sl-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .sl-input[aria-invalid="true"],
+  .sl-input[aria-invalid="true"]:focus {
+    border-color: var(--fault);
+    outline-color: var(--fault);
+  }
+  .sl-input-mono {
+    font-family: var(--mono);
+  }
+  textarea.sl-input {
+    height: auto;
+    min-height: 88px;
+    padding: 8px 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    resize: vertical;
+  }
+  select.sl-input {
+    padding-right: 34px;
+    cursor: pointer;
+  }
+  select.sl-input option {
+    background: var(--raised);
+    color: var(--ink);
+  }
+
+  /* A field with something inside it: a search glyph, a "/" before a command, a unit after. */
+  .sl-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .sl-input-group > .sl-input {
+    padding-left: 34px;
+  }
+  .sl-input-group > .sl-input-lead {
+    position: absolute;
+    left: 12px;
+    display: flex;
+    color: var(--ink-3);
+    font: var(--t-3)/1 var(--mono);
+    pointer-events: none;
+  }
+  .sl-input-group > .sl-input-lead > .sl-ico {
+    font-size: 14px;
+  }
+  /* The chevron of a select, drawn from the sprite so it takes the ink colour. */
+  .sl-input-group > .sl-input-caret {
+    position: absolute;
+    right: 12px;
+    display: flex;
+    color: var(--ink-2);
+    pointer-events: none;
+  }
+  .sl-input-group > select.sl-input {
+    padding-left: 12px;
+  }
+
+  /* ---- check box, radio, switch ------------------------------------------------------ */
+  /* The control and its words are one label, so the words are the rest of the hit area. */
+  .sl-choice {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: var(--hit);
+    padding: 7px 0;
+    color: var(--ink);
+    font: var(--t-3)/1.4 var(--ui);
+    cursor: pointer;
+  }
+  .sl-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sl-choice-text > small {
+    font: var(--type-meta);
+    color: var(--ink-3);
+  }
+  .sl-choice:has(> input:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .sl-check,
+  .sl-radio {
+    all: unset;
+    box-sizing: border-box;
+    flex: none;
+    position: relative;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+    border: 1px solid var(--edge);
+    background: var(--sunken);
+    cursor: inherit;
+    transition: background-color var(--ease), border-color var(--ease);
+  }
+  .sl-check {
+    border-radius: var(--r-xs);
+  }
+  .sl-radio {
+    border-radius: 50%;
+  }
+  .sl-check:checked,
+  .sl-radio:checked {
+    background: var(--choice-top);
+    border-color: var(--choice-top);
+  }
+  /* the tick: two borders of a box turned 45 degrees */
+  .sl-check:checked::after {
+    content: "";
+    position: absolute;
+    left: 4.5px;
+    top: 1.5px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--control-mark);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .sl-radio:checked::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--control-mark);
+  }
+  .sl-check:focus-visible,
+  .sl-radio:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: var(--ring-offset);
+  }
+
+  /* A setting that takes effect the moment it is changed. An <input type="checkbox"
+     role="switch">, so it is a check box to the browser and a switch to a screen reader. */
+  .sl-switch {
+    all: unset;
+    box-sizing: border-box;
+    flex: none;
+    position: relative;
+    width: 34px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--raised-hi);
+    border: 1px solid var(--edge);
+    cursor: inherit;
+    transition: background-color var(--ease), border-color var(--ease);
+  }
+  .sl-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ink-2);
+    transition: transform var(--ease), background-color var(--ease);
+  }
+  .sl-switch:checked {
+    background: var(--switch-top);
+    border-color: var(--switch-top);
+  }
+  .sl-switch:checked::after {
+    transform: translateX(14px);
+    background: var(--control-mark);
+  }
+  .sl-switch:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: var(--ring-offset);
+  }
+
+  /* ---- segmented control ------------------------------------------------------------- */
+  /* Pick one of a few, shown all at once: a filter, a range. Buttons with aria-pressed. */
+  .sl-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+  }
+  .sl-seg > button {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: calc(var(--r-sm) - 2px);
+    color: var(--ink-2);
+    font: 500 var(--t-3)/1 var(--ui);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ease), color var(--ease);
+  }
+  .sl-seg > button:hover {
+    color: var(--ink);
+    background: var(--hover);
+  }
+  .sl-seg > button[aria-pressed="true"] {
+    background: var(--raised);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .sl-seg > button:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: 0;
+  }
+
+  /* ---- pill, dot, count -------------------------------------------------------------- */
+  /* A state in a word: Running, Stopped, Crashed. The tone says it twice, with a dot and a
+     colour, so it never rests on colour alone; the word says it a third time. */
+  .sl-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--raised);
+    color: var(--ink-2);
+    font: 600 var(--t-2)/1 var(--ui);
+    white-space: nowrap;
+  }
+  .sl-pill[data-tone="live"] {
+    background: var(--live-fill);
+    color: var(--live-ink);
+  }
+  .sl-pill[data-tone="warn"] {
+    background: var(--warn-wash);
+    color: var(--warn-ink);
+  }
+  .sl-pill[data-tone="fault"] {
+    background: var(--fault-wash);
+    color: var(--fault-ink);
+  }
+  .sl-pill[data-tone="accent"] {
+    background: var(--lapis-fill);
+    color: var(--lapis-ink);
+  }
+
+  .sl-dot {
+    flex: none;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--idle);
+  }
+  .sl-pill > .sl-dot {
+    width: 6px;
+    height: 6px;
+  }
+  .sl-dot[data-tone="live"] {
+    background: var(--live);
+  }
+  .sl-dot[data-tone="warn"] {
+    background: var(--warn);
+  }
+  .sl-dot[data-tone="fault"] {
+    background: var(--fault);
+  }
+  .sl-dot[data-tone="accent"] {
+    background: var(--lapis);
+  }
+  /* Starting and stopping: the same dot, breathing. */
+  .sl-dot[data-busy] {
+    animation: sl-breathe 1.4s ease-in-out infinite;
+  }
+
+  /* A number on a tab or a filter: how many warnings, how many updates. */
+  .sl-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--raised-hi);
+    color: var(--ink-2);
+    font: 650 var(--t-1)/1 var(--ui);
+  }
+  .sl-count[data-tone="warn"] {
+    background: var(--warn-wash);
+    color: var(--warn-ink);
+  }
+  .sl-count[data-tone="fault"] {
+    background: var(--fault-wash);
+    color: var(--fault-ink);
+  }
+  .sl-count[data-tone="accent"] {
+    background: var(--primary-top);
+    color: var(--primary-ink);
+  }
+
+  /* ---- tile: a server's face --------------------------------------------------------- */
+  /* Its own server-icon.png when it has one, otherwise its initial on one of six colours picked
+     from its name (Kit.tile). Three sizes: a sidebar row, a compact card, a header. */
+  .sl-tile {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    overflow: hidden;
+    border-radius: var(--r-sm);
+    background: var(--raised);
+    color: var(--ink-2);
+    font: 700 var(--t-5)/1 var(--display);
+    user-select: none;
+  }
+  .sl-tile > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    image-rendering: pixelated;
+  }
+  .sl-tile > .sl-ico {
+    font-size: 16px;
+  }
+  .sl-tile-sm {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-xs);
+    font-size: var(--t-3);
+  }
+  .sl-tile-lg {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--r);
+    font-size: var(--t-6);
+  }
+  .sl-tile[data-tone="1"] { background: var(--tile-1-bg); color: var(--tile-1-ink); }
+  .sl-tile[data-tone="2"] { background: var(--tile-2-bg); color: var(--tile-2-ink); }
+  .sl-tile[data-tone="3"] { background: var(--tile-3-bg); color: var(--tile-3-ink); }
+  .sl-tile[data-tone="4"] { background: var(--tile-4-bg); color: var(--tile-4-ink); }
+  .sl-tile[data-tone="5"] { background: var(--tile-5-bg); color: var(--tile-5-ink); }
+  .sl-tile[data-tone="6"] { background: var(--tile-6-bg); color: var(--tile-6-ink); }
+  /* not a server: a database, an account with no face */
+  .sl-tile[data-tone="plain"] {
+    background: var(--raised);
+    color: var(--ink-2);
+    border: 1px solid var(--line);
+  }
+
+  /* ---- card -------------------------------------------------------------------------- */
+  .sl-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+    padding: var(--card-pad);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--card-radius);
+  }
+  /* A row-shaped card: a stopped server, a database. */
+  .sl-card-compact {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 14px var(--s-5);
+  }
+  .sl-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+  }
+  /* The part of a card under a rule: its numbers, its footer. */
+  .sl-card-part {
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--line-soft);
+  }
+  .sl-card[data-tone="accent"] {
+    border-color: var(--lapis-edge);
+  }
+
+  /* ---- type -------------------------------------------------------------------------- */
+  /* The small uppercase word over a group: SERVERS, RECENT ACTIVITY. */
+  .sl-eyebrow {
+    margin: 0;
+    font: var(--type-label);
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sl-code {
+    font: 0.92em/1 var(--mono);
+    color: var(--ink);
+  }
+  .sl-kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    border: 1px solid var(--edge);
+    border-bottom-width: 2px;
+    border-radius: var(--r-xs);
+    background: var(--raised);
+    color: var(--ink);
+    font: 500 var(--t-1)/1.3 var(--mono);
+  }
+
+  /* A page's title, one line about it, and its one or two main verbs. */
+  .sl-page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-4);
+  }
+  .sl-page-head > :first-child {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+  .sl-page-title {
+    margin: 0;
+    font: 700 34px/1.1 var(--display);
+    letter-spacing: var(--track-display);
+    color: var(--ink);
+  }
+  .sl-page-lede {
+    margin: 6px 0 0;
+    color: var(--ink-2);
+    font: var(--t-4)/1.5 var(--ui);
+  }
+  .sl-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+  }
+
+  /* ---- stat -------------------------------------------------------------------------- */
+  /* A live number: its name over it, its unit after it, quieter. */
+  .sl-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .sl-stat-value {
+    font: 600 var(--t-6)/1.15 var(--display);
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .sl-stat-unit {
+    margin-left: 4px;
+    font: 400 var(--t-3)/1 var(--ui);
+    color: var(--ink-3);
+  }
+  .sl-stat-sm > .sl-stat-value {
+    font: 600 var(--t-5)/1.25 var(--ui);
+  }
+
+  /* ---- list and row ------------------------------------------------------------------ */
+  /* Rows inside a box, divided by the faintest rule. A row is a tile or icon, a name over one
+     line of facts, and whatever ends it: a time, a pill, a button. */
+  .sl-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 4px var(--s-4);
+    list-style: none;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--card-radius);
+  }
+  .sl-list > .sl-row + .sl-row,
+  .sl-list > [role="listitem"] + [role="listitem"],
+  .sl-list > li + li {
+    border-top: 1px solid var(--line-faint);
+  }
+  .sl-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 52px;
+    padding: 10px 0;
+    min-width: 0;
+    color: var(--ink);
+    text-align: left;
+  }
+  .sl-row-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .sl-row-title {
+    overflow: hidden;
+    color: var(--ink);
+    font: 500 var(--t-3)/1.4 var(--ui);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sl-row-meta {
+    overflow: hidden;
+    color: var(--ink-3);
+    font: var(--type-meta);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sl-row-end {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--ink-3);
+    font: var(--type-meta);
+  }
+  /* A row that is itself the thing to press. */
+  button.sl-row,
+  a.sl-row {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 52px;
+    padding: 10px var(--s-2);
+    margin: 0 calc(-1 * var(--s-2));
+    width: calc(100% + 2 * var(--s-2));
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background-color var(--ease);
+  }
+  button.sl-row:hover,
+  a.sl-row:hover {
+    background: var(--hover);
+  }
+  button.sl-row:focus-visible,
+  a.sl-row:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -2px;
+  }
+
+  /* ---- table ------------------------------------------------------------------------- */
+  .sl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font: var(--t-3)/1.4 var(--ui);
+    color: var(--ink);
+  }
+  .sl-table th {
+    padding: 0 var(--s-3) var(--s-2);
+    border-bottom: 1px solid var(--line);
+    font: var(--type-label);
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .sl-table td {
+    padding: 10px var(--s-3);
+    border-bottom: 1px solid var(--line-faint);
+    vertical-align: middle;
+  }
+  .sl-table tr:last-child > td {
+    border-bottom: 0;
+  }
+  .sl-table th:first-child,
+  .sl-table td:first-child {
+    padding-left: 0;
+  }
+  .sl-table th:last-child,
+  .sl-table td:last-child {
+    padding-right: 0;
+  }
+  .sl-table .sl-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .sl-table tbody > tr:hover > td {
+    background: var(--hover);
+  }
+
+  /* ---- tabs -------------------------------------------------------------------------- */
+  /* A row of places under a header: a server's tools. The current one is underlined in the
+     accent. Kit.tabs gives them arrow keys. */
+  .sl-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+  }
+  .sl-tab {
+    all: unset;
+    box-sizing: border-box;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 12px;
+    color: var(--ink-2);
+    font: 500 var(--t-3)/1 var(--ui);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--ease);
+  }
+  .sl-tab::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: transparent;
+    transition: background-color var(--ease);
+  }
+  .sl-tab:hover {
+    color: var(--ink);
+  }
+  .sl-tab:hover::after {
+    background: var(--edge);
+  }
+  .sl-tab[aria-selected="true"],
+  .sl-tab[aria-current="page"] {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .sl-tab[aria-selected="true"]::after,
+  .sl-tab[aria-current="page"]::after {
+    background: var(--lapis);
+  }
+  .sl-tab:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -2px;
+    border-radius: var(--r-xs);
+  }
+  .sl-tab > .sl-ico {
+    font-size: 15px;
+  }
+
+  /* ---- navigation item --------------------------------------------------------------- */
+  /* A row of the sidebar: Overview, Play, a server, a database. Current is lit with the accent
+     along its left edge. */
+  .sl-nav-item {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: var(--r-sm);
+    color: var(--ink-2);
+    font: 500 var(--t-4)/1.3 var(--ui);
+    cursor: pointer;
+    transition: background-color var(--ease), color var(--ease);
+  }
+  .sl-nav-item:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+  .sl-nav-item[aria-current="page"] {
+    background: var(--raised);
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--lapis);
+  }
+  .sl-nav-item:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -2px;
+  }
+  .sl-nav-item > .sl-ico {
+    font-size: 16px;
+  }
+  /* a server or a database: tile, name over facts, state dot */
+  .sl-nav-item-rich {
+    min-height: 44px;
+    padding: 0 8px;
+    color: var(--ink);
+  }
+  .sl-nav-text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .sl-nav-name {
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sl-nav-item[aria-current="page"] .sl-nav-name {
+    font-weight: 600;
+  }
+  .sl-nav-meta {
+    overflow: hidden;
+    color: var(--ink-3);
+    font: 400 var(--t-2)/1.35 var(--ui);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sl-nav-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin: var(--s-4) 0 var(--s-1);
+    padding: 0 10px;
+    font: var(--type-label);
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .sl-nav-head > :first-child {
+    flex: 1 1 auto;
+  }
+
+  /* ---- menu -------------------------------------------------------------------------- */
+  /* A short list of verbs under a button. Kit.menu opens it, walks it with the arrow keys and
+     closes it on Escape, a click outside, or a choice. */
+  .sl-menu-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .sl-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    max-width: 360px;
+    padding: 4px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-lg);
+  }
+  .sl-menu-item {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: var(--r-sm);
+    color: var(--ink);
+    font: 500 var(--t-3)/1.35 var(--ui);
+    cursor: pointer;
+  }
+  .sl-menu-item > small {
+    font: var(--type-meta);
+    color: var(--ink-3);
+  }
+  .sl-menu-item:hover,
+  .sl-menu-item:focus-visible {
+    background: var(--hover-hi);
+    outline: none;
+  }
+  /* The keyboard's place has to read apart from where the pointer happens to rest. */
+  .sl-menu-item:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -2px;
+  }
+  .sl-menu-item[data-tone="fault"] {
+    color: var(--fault-ink);
+  }
+  .sl-menu-item[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .sl-menu-sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--line);
+  }
+
+  /* ---- dialog and sheet -------------------------------------------------------------- */
+  /* On a <dialog>, opened with showModal(). Not `all: unset` (see the top of this file): each
+     property the old `dialog` rule sets is set here instead. */
+  .sl-dialog {
+    box-sizing: border-box;
+    width: min(480px, calc(100vw - 48px));
+    max-width: none;
+    max-height: calc(100vh - 48px);
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    background: var(--raised);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    font: var(--t-4)/1.5 var(--ui);
+    animation: none;
+  }
+  .sl-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .sl-dialog::backdrop {
+    background: var(--dialog-backdrop);
+    backdrop-filter: none;
+  }
+  .sl-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-5) var(--s-6) 0;
+  }
+  .sl-dialog-title {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 0;
+    font: var(--type-section);
+    color: var(--ink);
+  }
+  .sl-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding: var(--s-3) var(--s-6) var(--s-1);
+    overflow-y: auto;
+    color: var(--ink-2);
+    font: var(--t-3)/1.6 var(--ui);
+  }
+  .sl-dialog-body > p {
+    margin: 0;
+  }
+  .sl-dialog-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+    padding: var(--s-5) var(--s-6);
+  }
+
+  /* A sheet comes in from the right and takes the full height: a form too long for a dialog. */
+  .sl-sheet {
+    width: min(560px, 100vw);
+    height: 100vh;
+    max-height: none;
+    margin: 0 0 0 auto;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+  }
+  .sl-sheet .sl-dialog-body {
+    flex: 1 1 auto;
+  }
+  .sl-sheet .sl-dialog-foot {
+    border-top: 1px solid var(--line-soft);
+  }
+
+  /* ---- toast ------------------------------------------------------------------------- */
+  /* Kit.toast puts these in a .sl-toasts stack it makes at the bottom right. */
+  .sl-toasts {
+    position: fixed;
+    right: var(--s-5);
+    bottom: var(--s-5);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-2);
+    pointer-events: none;
+  }
+  .sl-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    width: min(400px, calc(100vw - 40px));
+    padding: 12px 14px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-md);
+    color: var(--ink);
+    font: var(--t-3)/1.45 var(--ui);
+    pointer-events: auto;
+  }
+  .sl-toast > .sl-ico {
+    margin-top: 2px;
+    font-size: 16px;
+    color: var(--lapis);
+  }
+  .sl-toast-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .sl-toast[data-tone="live"] > .sl-ico {
+    color: var(--live);
+  }
+  .sl-toast[data-tone="fault"] {
+    border-color: var(--fault-edge);
+  }
+  .sl-toast[data-tone="fault"] > .sl-ico {
+    color: var(--fault);
+  }
+  .sl-toast .sl-btn-icon {
+    width: 24px;
+    height: 24px;
+    margin: -3px -4px -3px 0;
+  }
+
+  /* ---- banner ------------------------------------------------------------------------ */
+  /* Something that needs someone, said once, with what to do about it beside it. */
+  .sl-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 14px var(--s-4);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    color: var(--ink);
+  }
+  .sl-banner > .sl-ico {
+    font-size: 20px;
+    color: var(--lapis);
+  }
+  .sl-banner-text {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+  .sl-banner-title {
+    font: 600 var(--t-4)/1.4 var(--ui);
+  }
+  .sl-banner-body {
+    color: var(--ink-2);
+    font: var(--t-3)/1.5 var(--ui);
+  }
+  .sl-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+  }
+  .sl-banner[data-tone="warn"] {
+    background: var(--warn-wash);
+    border-color: var(--warn-edge);
+  }
+  .sl-banner[data-tone="warn"] > .sl-ico {
+    color: var(--warn);
+  }
+  .sl-banner[data-tone="warn"] .sl-banner-title {
+    color: var(--warn-ink);
+  }
+  .sl-banner[data-tone="fault"] {
+    background: var(--fault-wash);
+    border-color: var(--fault-edge);
+  }
+  .sl-banner[data-tone="fault"] > .sl-ico {
+    color: var(--fault);
+  }
+  .sl-banner[data-tone="fault"] .sl-banner-title {
+    color: var(--fault-ink);
+  }
+  .sl-banner[data-tone="live"] {
+    background: var(--live-wash);
+    border-color: var(--live-edge);
+  }
+  .sl-banner[data-tone="live"] > .sl-ico {
+    color: var(--live);
+  }
+
+  /* ---- empty state ------------------------------------------------------------------- */
+  /* Nothing here yet: what would be here, and the one thing to do about it. */
+  .sl-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-7) var(--s-5);
+    text-align: center;
+    color: var(--ink-2);
+  }
+  .sl-empty > .sl-ico {
+    margin-bottom: var(--s-2);
+    font-size: 28px;
+    color: var(--ink-3);
+  }
+  .sl-empty-title {
+    margin: 0;
+    font: var(--type-section);
+    color: var(--ink);
+  }
+  .sl-empty-text {
+    max-width: 44ch;
+    margin: 0;
+    font: var(--t-3)/1.6 var(--ui);
+  }
+  .sl-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+  }
+
+  /* ---- progress, spinner, skeleton --------------------------------------------------- */
+  /* How far a known amount of work has got: a div with role="progressbar" and its share in
+     --value (0 to 1). With no value it is work of unknown length, and a band runs along it. */
+  .sl-progress {
+    position: relative;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--raised-hi);
+  }
+  .sl-progress::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--value, 0) * 100%);
+    border-radius: inherit;
+    background: var(--lapis);
+    transition: width var(--ease);
+  }
+  .sl-progress[data-tone="warn"]::after {
+    background: var(--warn);
+  }
+  .sl-progress[data-tone="fault"]::after {
+    background: var(--fault);
+  }
+  .sl-progress:not([aria-valuenow])::after {
+    width: 35%;
+    animation: sl-sweep 1.3s ease-in-out infinite;
+  }
+
+  .sl-spinner {
+    display: inline-block;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--edge);
+    border-top-color: var(--lapis);
+    animation: sl-spin 0.7s linear infinite;
+  }
+
+  /* Where text is on its way: grey bars the size of what will be there. */
+  .sl-skeleton {
+    display: block;
+    height: 12px;
+    border-radius: var(--r-xs);
+    background: var(--raised);
+    animation: sl-breathe 1.6s ease-in-out infinite;
+  }
+
+  /* ---- help ------------------------------------------------------------------------------ */
+  /* One line beside a control, and the longer story behind a small "?", folded. */
+  .sl-help {
+    color: var(--ink-2);
+    font: var(--t-3)/1.6 var(--ui);
+  }
+  .sl-help > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--edge);
+    border-radius: 50%;
+    color: var(--ink-2);
+    font: 650 var(--t-1)/1 var(--ui);
+    list-style: none;
+    cursor: pointer;
+  }
+  .sl-help > summary::-webkit-details-marker {
+    display: none;
+  }
+  .sl-help > summary:hover,
+  .sl-help[open] > summary {
+    border-color: var(--lapis-edge);
+    color: var(--lapis-ink);
+  }
+  .sl-help > summary:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: var(--ring-offset);
+  }
+  .sl-help > p {
+    max-width: 60ch;
+    margin: var(--s-2) 0 0;
+  }
+
+  /* ---- motion -------------------------------------------------------------------------- */
+  @keyframes sl-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes sl-breathe {
+    50% {
+      opacity: 0.45;
+    }
+  }
+  @keyframes sl-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(290%);
+    }
+  }
+  /*
+    Reduced motion means none here, as the legacy sheets already make it on every page that loads
+    them: a still spinner beside aria-busy still says "working". An indeterminate bar cannot stand
+    still at a width, which would read as "this far done", so it fills dimmed instead.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    .sl-spinner,
+    .sl-btn[aria-busy="true"]::before,
+    .sl-dot[data-busy],
+    .sl-skeleton {
+      animation: none;
+    }
+    .sl-progress:not([aria-valuenow])::after {
+      width: 100%;
+      opacity: 0.4;
+      animation: none;
+    }
+  }
+}

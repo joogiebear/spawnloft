@@ -261,13 +261,39 @@ export const DECLARED = [
     apply: null,
     held: 'c9-bot ignores data/bot-host/bot-host.cjs; nothing but the host run reads it, and both sides run the same script on the same Node in the rig',
   },
+  {
+    // UX phase 3 (docs/ux-ui-plan-2026-11/PLAN.md section 5): the SpawnLoft look is what an install
+    // opens in unless Classic was saved. Only the answer before any save differs: once a theme is
+    // saved, both sides answer what was saved, and that is still compared.
+    id: 'default-theme',
+    // added after the records were frozen (C10), so the rig evens out the frozen text too
+    late: true,
+    where: 'the panel\'s `/api/appearance` before a theme has been saved',
+    node: '`"theme": "classic"`',
+    rust: '`"theme": "spawnloft"`',
+    commands: ['ui'],
+    apply: (text) => {
+      let saved = false
+      return text.split(/(?=^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) )/m).map((part) => {
+        const line = part.slice(0, part.indexOf('\n') + 1 || part.length)
+        if (!/\/api\/appearance\b/.test(line)) return part
+        if (/^POST /.test(line)) {
+          if (/^\s+200\b/m.test(part.slice(line.length).split('\n')[0] ?? '')) saved = true
+          return part
+        }
+        return saved ? part : part.replace(/"theme"(\s*):(\s*)"(?:classic|spawnloft)"/g, '"theme"$1:$2"<unsaved default>"')
+      }).join('')
+    },
+  },
 ]
 
-// Both sides' text for one step, evened out by every row that applies to it.
-export function applyDeclared(text, command) {
+// Both sides' text for one step, evened out by every row that applies to it. With lateOnly, only
+// the rows added after the records were frozen: the frozen text already went through the others.
+export function applyDeclared(text, command, { lateOnly = false } = {}) {
   let out = text
   for (const row of DECLARED) {
     if (!row.apply) continue
+    if (lateOnly && !row.late) continue
     if (row.commands && !row.commands.includes(command)) continue
     out = row.apply(out)
   }

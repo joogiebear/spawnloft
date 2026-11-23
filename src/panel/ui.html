@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="classic">
+<html lang="en" data-theme="spawnloft">
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark">
 <meta name="spawnloft-platform" content="win32">
@@ -646,14 +646,14 @@
           <p class="hint">Choose your colors. Your selection is saved on this computer and applies immediately.</p>
           <div class="theme-options">
             <label class="theme-option">
+              <input type="radio" name="appTheme" value="spawnloft">
+              <span class="theme-preview theme-preview-spawnloft" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span><strong>SpawnLoft</strong><small>Charcoal, warm white, and lime. The default</small></span>
+            </label>
+            <label class="theme-option">
               <input type="radio" name="appTheme" value="classic">
               <span class="theme-preview theme-preview-classic" aria-hidden="true"><i></i><i></i><i></i></span>
               <span><strong>Classic</strong><small>The original blue palette</small></span>
-            </label>
-            <label class="theme-option">
-              <input type="radio" name="appTheme" value="spawnloft">
-              <span class="theme-preview theme-preview-spawnloft" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span><strong>SpawnLoft</strong><small>Charcoal, warm white, and lime</small></span>
             </label>
           </div>
           <p id="themeStatus" class="hint" aria-live="polite"></p>
@@ -808,6 +808,7 @@
 <span class="sr-only" id="live" aria-live="polite"></span>
 
 <script src="/assets/js/shared/session.js"></script>
+<script src="/assets/js/shared/kit.js"></script>
 <script src="/assets/js/ui/00-globals.js"></script>
 <script src="/assets/js/ui/01-api.js"></script>
 <script src="/assets/js/ui/02-chrome.js"></script>

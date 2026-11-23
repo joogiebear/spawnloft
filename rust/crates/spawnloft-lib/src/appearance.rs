@@ -8,12 +8,16 @@ use crate::settings;
 
 pub const THEMES: [&str; 2] = ["classic", "spawnloft"];
 
-/// `normalizeTheme(value)`: older settings files have no theme, and an unknown value must not
-/// become an arbitrary HTML attribute.
+/// The look a settings file with no theme opens in: SpawnLoft's own, the website's lime
+/// (docs/ux-ui-plan-2026-11/PLAN.md section 11). Classic is kept for whoever chose it.
+pub const DEFAULT_THEME: &str = "spawnloft";
+
+/// `normalizeTheme(value)`: a settings file with no theme opens in the default look, and an
+/// unknown value must not become an arbitrary HTML attribute.
 pub fn normalize_theme(value: Option<&Value>) -> &'static str {
     match value.and_then(Value::as_str) {
-        Some("spawnloft") => "spawnloft",
-        _ => "classic",
+        Some("classic") => "classic",
+        _ => DEFAULT_THEME,
     }
 }
 
@@ -44,8 +48,10 @@ mod tests {
 
     #[test]
     fn only_the_two_themes_are_ever_a_theme() {
-        assert_eq!(normalize_theme(None), "classic");
+        assert_eq!(normalize_theme(None), "spawnloft");
         assert_eq!(normalize_theme(Some(&json!("spawnloft"))), "spawnloft");
+        // a saved choice of Classic is kept
+        assert_eq!(normalize_theme(Some(&json!("classic"))), "classic");
         for odd in [
             json!("\"><script>"),
             json!(1),
@@ -53,7 +59,7 @@ mod tests {
             json!(["spawnloft"]),
             json!("Spawnloft"),
         ] {
-            assert_eq!(normalize_theme(Some(&odd)), "classic", "{odd}");
+            assert_eq!(normalize_theme(Some(&odd)), "spawnloft", "{odd}");
         }
     }
 }

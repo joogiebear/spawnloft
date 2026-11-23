@@ -8,3 +8,5 @@
 /src/panel/css/tailwind.css text eol=lf
 /src/panel/tailwind/** text eol=lf
 /test/fixtures/tailwind-probe/** text eol=lf
+# The bundled typefaces: bytes, never text.
+/src/panel/fonts/*.woff2 binary

@@ -1,4 +1,62 @@
   /* ==========================================================================
+     The typefaces, bundled so Windows, macOS and Linux draw the same letters: Bricolage Grotesque
+     for headings and big numbers, Inter for everything else, JetBrains Mono for the console,
+     paths and addresses (the website's, docs/ux-ui-plan-2026-11/PLAN.md section 11). Each is one
+     variable font in two files, Latin and the rest of Latin; a page only fetches the second when
+     it has a letter from it. All three are under the SIL Open Font License, kept beside the files
+     in src/panel/fonts/. The families below fall back to the system's own when a letter is in
+     neither file.
+     ========================================================================== */
+  @font-face {
+    font-family: "Bricolage Grotesque";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/assets/fonts/bricolage-grotesque-latin-ext.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "Bricolage Grotesque";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/assets/fonts/bricolage-grotesque-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/assets/fonts/inter-latin-ext.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/assets/fonts/inter-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url("/assets/fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url("/assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  /* ==========================================================================
      Design tokens.
 
      The one copy. ui.html, launcher.html and setup.html each load this file before their own
@@ -50,10 +108,11 @@
     --fault: #f2645c;
     --idle:  #8f98ae;
 
-    --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-    /* Headings and big numbers: the display cut of the same family, drawn for sizes above 20px. */
-    --display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", Menlo, monospace;
+    /* The bundled faces first (see the top of this file), then each system's own. */
+    --ui: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    /* Headings and big numbers. */
+    --display: "Bricolage Grotesque", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", Menlo, monospace;
 
     /* Corner radii. Classic keeps the rounder set; SpawnLoft redeclares these four and nothing
        else that is not a colour, to match the sharper corners of the website it takes its
@@ -187,6 +246,17 @@
     --cube-right: #24357a;
     --cube-cutout: #cfe0ff;
     --chart-cpu: #7aa2ff;
+
+    /* A server's tile when it has no icon of its own: its initial on one of six colours, picked
+       from its name so it is the same everywhere it appears (Kit.tileTone in
+       js/shared/kit.js). Dark grounds with light ink, the same in both themes, each pair 7:1 or
+       better. */
+    --tile-1-bg: #2c4a1c; --tile-1-ink: #dbf4b2;
+    --tile-2-bg: #1d3a4a; --tile-2-ink: #bfe3f5;
+    --tile-3-bg: #4a2f1d; --tile-3-ink: #f5d9bf;
+    --tile-4-bg: #3b2550; --tile-4-ink: #e4cff7;
+    --tile-5-bg: #2a2f5a; --tile-5-ink: #d0d6fb;
+    --tile-6-bg: #1d4a3f; --tile-6-ink: #bff5e4;
   }
 
   /* The same design in the website's colours. Only colours and the four corner radii may appear

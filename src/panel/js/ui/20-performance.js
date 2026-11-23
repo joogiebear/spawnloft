@@ -61,7 +61,7 @@ function chart(samples, { pick, max, colour, label }) {
 
   for (let i = 1; i < 4; i++) {
     const y = (H / 4) * i;
-    el.append(svg('line', { class: 'grid', x1: 0, y1: y, x2: W, y2: y }));
+    el.append(svg('line', { class: 'gridline', x1: 0, y1: y, x2: W, y2: y }));
   }
   if (samples.length < 2) return el;
 

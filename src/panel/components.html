@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" data-theme="spawnloft">
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpawnLoft components</title>
+<!--
+  Every shared building block (src/panel/tailwind/components.css, made by js/shared/kit.js) in
+  every state, for whoever builds a page. Served at /components by a development build only
+  (rust/crates/spawnloft-lib/src/panel/pages.rs). The panel puts the icon sprite from ui.html in
+  place of the mark below, so the glyphs here are the panel's own.
+-->
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/tailwind.css">
+<body class="sl-page">
+<!-- sprite from ui.html -->
+<main id="gallery" class="mx-auto flex max-w-[1240px] flex-col gap-10 px-10 pt-8 pb-16"></main>
+<script src="/assets/js/shared/kit.js"></script>
+<script src="/assets/js/components/gallery.js"></script>
+</body>
+</html>

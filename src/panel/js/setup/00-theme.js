@@ -1,4 +1,4 @@
 'use strict';
-  // Electron supplies the saved preference before this file paints. Only the two known names
-  // reach the attribute; opening setup.html by itself keeps the original Classic appearance.
-  document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') === 'spawnloft' ? 'spawnloft' : 'classic';
+  // The panel puts the saved theme in place of the question below when it serves this file. Only
+  // the two known names reach the attribute; anything else is the default SpawnLoft look.
+  document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') === 'classic' ? 'classic' : 'spawnloft';
