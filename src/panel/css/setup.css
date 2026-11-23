@@ -1,0 +1,202 @@
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    /* Plain, like the panel: the accent is kept for things that can be clicked. */
+    background: var(--void);
+    color: var(--ink);
+    font: var(--t-4)/1.55 var(--ui);
+    -webkit-font-smoothing: antialiased;
+    display: grid;
+    place-items: center;
+    padding: 28px;
+    overflow: auto;
+  }
+  /* The panel's ring, lifted over component transitions the same way; see src/ui.html. */
+  :root :focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); transition-property: none; }
+
+  .card {
+    width: min(660px, 100%);
+    background: var(--glass);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--s-6) var(--s-7) var(--s-6);
+  }
+
+  .brand { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-6); }
+  .brand svg { display: block; }
+  .brand polygon:nth-child(1) { fill: var(--cube-top); }
+  .brand polygon:nth-child(2) { fill: var(--cube-left); }
+  .brand polygon:nth-child(3) { fill: var(--cube-right); }
+  .brand polygon:nth-child(4) { fill: var(--cube-cutout); }
+  .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
+  /* Where this screen sits in getting started. Two steps because that is all there is: choosing
+     folders here, then the panel itself. The done-or-current dot is filled so the eye finds
+     "you are here" without reading the labels. */
+  .steps { margin: 0 0 0 auto; padding: 0; list-style: none; display: flex; align-items: center; gap: var(--s-2); font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
+  .steps li { display: flex; align-items: center; gap: 6px; }
+  .steps li + li::before { content: ""; width: 18px; height: 1px; background: var(--line); margin-right: 2px; }
+  .steps .dot { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--edge); font: 600 var(--t-1)/1 var(--ui); color: var(--ink-3); }
+  .steps [aria-current="step"] { color: var(--ink); }
+  .steps [aria-current="step"] .dot { background: var(--lapis); border-color: var(--lapis); color: var(--void); }
+
+  h1 { font: 650 var(--t-6)/1.2 var(--display); margin: 0 0 var(--s-2); letter-spacing: -.025em; }
+  p.sub { color: var(--ink-2); margin: 0 0 var(--s-6); font-size: var(--t-4); line-height: 1.6; }
+  p.sub b { color: var(--ink); font-weight: 600; }
+
+  .fieldlabel {
+    display: block;
+    margin-bottom: var(--s-2);
+    font: 650 var(--t-1)/1 var(--ui);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-3);
+  }
+  .pathrow { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
+  input[type="text"] {
+    flex: 1;
+    background: var(--sunken);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: 7px 11px;
+    font: var(--t-3)/1.4 var(--mono);
+    width: 100%;
+    min-height: var(--hit);
+    /* Carved into the surface the way the panel's fields are. */
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+    transition: all var(--ease);
+  }
+  input[type="text"]:hover { border-color: var(--edge); }
+  :root input[type="text"]:focus {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -1px;
+    border-color: var(--lapis-edge);
+    background-color: var(--field-focus);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: var(--hit);
+    background: rgba(var(--ink-rgb), .035);
+    color: var(--ink);
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    padding: 0 12px;
+    font: 500 var(--t-3)/1.4 var(--ui);
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: var(--lift);
+    transition: all var(--ease);
+  }
+  button:where(:hover:not(:disabled)) { border-color: rgba(var(--ink-rgb), .2); background: var(--hover-hi); transform: translateY(-1px); }
+  button:where(:active:not(:disabled)) { transform: translateY(0); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  /* The panel's primary, at its size: the wizard's own larger, padded Continue made the first
+     screen look like a different app from the one it opens. */
+  button.primary { background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom)); border-color: var(--setup-primary-edge); color: var(--setup-primary-ink); font-weight: 600; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 6px 18px -8px rgba(var(--accent-rgb), .75); }
+  button.primary:hover:not(:disabled) { background: linear-gradient(180deg, var(--primary-hover-top), var(--primary-hover-bottom)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .26), 0 10px 24px -8px rgba(var(--accent-rgb), .85); }
+  button.sm { padding: 0 var(--s-2); font-size: var(--t-2); gap: 5px; }
+
+  .hint { font-size: var(--t-2); color: var(--ink-3); line-height: 1.5; }
+
+  .toggle {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--s-1) var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    margin: var(--s-5) 0;
+    cursor: pointer;
+    transition: all var(--ease);
+  }
+  .toggle:hover { border-color: var(--edge); background: var(--raised); }
+  .toggle:has(input:checked) { border-color: var(--lapis-edge); background: var(--lapis-wash); }
+  /* Explicit rows and columns throughout. The checkbox sits on the title line rather than centred
+     against the whole block - a control beside the explanation reads as if it belongs to the
+     explanation - and pinning the text to column 2 stops auto-placement dropping it into the
+     checkbox's column and collapsing the layout. */
+  .toggle input { grid-row: 1; grid-column: 1; align-self: center; width: 16px; height: 16px; accent-color: var(--lapis); margin: 0; cursor: pointer; }
+  .toggle b { grid-row: 1; grid-column: 2; font-size: var(--t-3); font-weight: 600; }
+  .toggle .why { grid-row: 2; grid-column: 2; color: var(--ink-3); font-size: var(--t-2); line-height: 1.5; }
+
+  /* Prerequisite readout, using the same lamp language the panel uses for a server. */
+  .check {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-1) var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    margin-bottom: var(--s-5);
+  }
+  /* Explicit columns: the button is hidden when Java is fine, and auto-placement would otherwise
+     slide the explanation into the empty third column and strand it against the right edge. */
+  .check .lamp { grid-row: 1; grid-column: 1; align-self: center; }
+  .check b { grid-row: 1; grid-column: 2; font-size: var(--t-3); font-weight: 600; }
+  .check .why { grid-row: 2; grid-column: 2; color: var(--ink-3); font-size: var(--t-2); line-height: 1.5; }
+  .check .acts { grid-row: 1 / 3; grid-column: 3; display: flex; gap: var(--s-2); align-self: center; }
+
+  .lamp {
+    --lamp: var(--idle);
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lamp);
+    flex: none;
+  }
+  .lamp::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--lamp) 0%, transparent 70%);
+    opacity: .38;
+  }
+  [data-state="ok"]   .lamp { --lamp: var(--live); }
+  [data-state="warn"] .lamp { --lamp: var(--warn); }
+  [data-state="bad"]  .lamp { --lamp: var(--fault); }
+  [data-state="ok"] .lamp::after { animation: breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { opacity: .2; } 50% { opacity: .75; } }
+
+  .err {
+    color: var(--fault-ink);
+    background: var(--fault-wash);
+    border: 1px solid var(--fault-edge);
+    border-radius: var(--r-sm);
+    padding: var(--s-3) var(--s-4);
+    font-size: var(--t-3);
+    white-space: pre-wrap;
+    margin-bottom: var(--s-4);
+  }
+
+  footer { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  /* The servers folder sits between the toggle and the Java readout; without its own gap its hint
+     ran straight into the readout's border. */
+  #serversBlock { margin-bottom: var(--s-5); }
+
+  :root[data-theme="spawnloft"] ::selection { background: var(--lapis); color: var(--void); }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-track { background: transparent; }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-hover); }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-corner { background: transparent; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+    .lamp::after { opacity: .45; }
+  }

@@ -1,0 +1,71 @@
+  /* ---- toasts ------------------------------------------------------------ */
+
+  #toasts { position: fixed; right: 18px; bottom: 64px; display: grid; gap: 8px; z-index: 40; justify-items: end; }
+  .toast {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    max-width: 420px;
+    background: var(--glass-strong);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--edge);
+    border-left: var(--spine) solid var(--lapis);
+    border-radius: var(--r-sm);
+    padding: var(--s-3) var(--s-4);
+    font-size: var(--t-3);
+    line-height: 1.5;
+    box-shadow: var(--shadow-lg);
+    animation: toast-in .2s ease-out;
+  }
+  .toast.bad { border-left-color: var(--fault); }
+  .toast.good { border-left-color: var(--live); }
+  .toast > .ico { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--lapis); }
+  .toast.bad > .ico { color: var(--fault); }
+  .toast.good > .ico { color: var(--live); }
+  .toast .x { width: var(--hit); height: var(--hit); margin: -6px -10px -6px 0; padding: 0; background: none; border: 0; box-shadow: none; color: var(--ink-3); }
+  .toast .x:hover:not(:disabled) { background: none; color: var(--ink); transform: none; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /*
+    Compact: under 1200px the sidebar folds to a rail of lamps and icons, and the names become
+    tooltips. The width goes to the console and the tools, which is where a 1024px window needs it.
+  */
+  @media (max-width: 1199px) {
+    main { grid-template-columns: 56px minmax(0, 1fr); }
+    .srv-tabs { padding: var(--s-2) 6px; }
+    .stab, .dock button, .side-new { justify-content: center; padding: 0; height: 40px; }
+    .stab .nm, .stab .note, .dock button .lbl, .side-new .nm { display: none; }
+    /* The headings fold to the hairline between the groups. */
+    .tabs-head { height: 1px; margin: var(--s-2) 6px; overflow: hidden; color: transparent; background: var(--line); }
+    .stab-ico { width: 20px; height: 20px; }
+    .stab-ico .ico { width: 17px; height: 17px; }
+    .stab[aria-current="page"] { box-shadow: none; }
+    .dock { margin: 2px 0 var(--s-2); padding: 0; border-left: 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); padding-block: 4px; }
+    .dock button { height: 36px; }
+    .dock button .ico { width: 17px; height: 17px; }
+    .dock-badge { position: absolute; top: 3px; right: 5px; }
+    .side-new { margin: 0 6px var(--s-2); }
+    .side-play { margin-top: calc(var(--s-1) - var(--s-2)); }
+    .srv-strip { padding-left: var(--s-5); }
+  }
+  /* Header chrome: the wordmark goes when the window itself is narrow. Everything inside the
+     stage measures the stage or its pane instead; this and the compact rail above are the only
+     width queries left on the window. */
+  @media (max-width: 840px) {
+    .brand b { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+    .lamp::after { opacity: .45; }
+  }

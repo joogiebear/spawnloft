@@ -1,0 +1,58 @@
+  /* ---- a pane with nothing in it yet ---------------------------------------- */
+
+  .empty-pane {
+    display: grid;
+    justify-items: center;
+    gap: var(--s-3);
+    padding: var(--s-7) var(--s-5);
+    text-align: center;
+  }
+  .empty-pane p {
+    margin: 0;
+    max-width: 46ch;
+    font: var(--t-3)/1.6 var(--ui);
+    color: var(--ink-3);
+  }
+  /* Big and faint. It marks the space without competing with the sentence that explains it. */
+  .empty-pane .empty-mark {
+    width: 34px; height: 34px;
+    color: var(--edge);
+    stroke-width: 1.25;
+  }
+  .empty-pane > button { margin-top: var(--s-1); }
+
+  /* A read that failed: what went wrong, in the reader's words, and the one thing to do about it. */
+  .pane-error .empty-mark { color: var(--fault); }
+  .pane-error p { color: var(--ink-2); }
+
+  /*
+    Loading. Grey bars where the rows will be, at the rows' height, so the pane holds its shape and
+    nothing jumps when the answer arrives. The previous server's content is never left showing
+    under a new server's name while it loads.
+  */
+  .skeleton { display: grid; gap: var(--s-3); padding-top: var(--s-2); }
+  .skeleton i {
+    display: block; height: 14px; border-radius: var(--r-xs);
+    background: linear-gradient(90deg, rgba(var(--ink-rgb), .05) 0 40%, rgba(var(--ink-rgb), .09) 50%, rgba(var(--ink-rgb), .05) 60% 100%) 0 0 / 300% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  .skeleton i:nth-child(1) { width: 38%; height: 18px; margin-bottom: var(--s-2); }
+  .skeleton i:nth-child(3n) { width: 72%; }
+  .skeleton i:nth-child(3n + 1):not(:first-child) { width: 86%; }
+  .skeleton i:nth-child(3n + 2) { width: 64%; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+  /*
+    Tooltips. One look for every title in the panel: the script lifts an element's title into this
+    box on hover or keyboard focus, so a tooltip reaches keyboard users too and reads the same
+    everywhere instead of being the operating system's.
+  */
+  #tip {
+    position: fixed; z-index: 60; max-width: 320px; pointer-events: none;
+    padding: 6px 10px; border-radius: var(--r-xs);
+    background: var(--raised-hi); border: 1px solid var(--edge); box-shadow: var(--shadow-md);
+    color: var(--ink); font: var(--type-meta); white-space: pre-line;
+    opacity: 0; transform: translateY(2px); transition: opacity 120ms ease-out, transform 120ms ease-out;
+  }
+  #tip[data-on] { opacity: 1; transform: none; }
+

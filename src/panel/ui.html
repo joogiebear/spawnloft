@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<meta name="spawnloft-platform" content="win32">
+<meta name="spawnloft-managed-mysql" content="true">
+<title>SpawnLoft</title>
+
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/ui/00-theme-picker.css">
+<link rel="stylesheet" href="/assets/css/ui/01-icons.css">
+<link rel="stylesheet" href="/assets/css/ui/02-lit-edges.css">
+<link rel="stylesheet" href="/assets/css/ui/03-frame.css">
+<link rel="stylesheet" href="/assets/css/ui/04-sidebar.css">
+<link rel="stylesheet" href="/assets/css/ui/05-layout.css">
+<link rel="stylesheet" href="/assets/css/ui/06-stage.css">
+<link rel="stylesheet" href="/assets/css/ui/07-controls.css">
+<link rel="stylesheet" href="/assets/css/ui/08-empty-state.css">
+<link rel="stylesheet" href="/assets/css/ui/09-overview.css">
+<link rel="stylesheet" href="/assets/css/ui/10-server-view.css">
+<link rel="stylesheet" href="/assets/css/ui/11-work-area.css">
+<link rel="stylesheet" href="/assets/css/ui/12-wide-panes.css">
+<link rel="stylesheet" href="/assets/css/ui/13-snapshot-history.css">
+<link rel="stylesheet" href="/assets/css/ui/14-performance.css">
+<link rel="stylesheet" href="/assets/css/ui/15-plugins.css">
+<link rel="stylesheet" href="/assets/css/ui/16-players.css">
+<link rel="stylesheet" href="/assets/css/ui/17-settings-groups.css">
+<link rel="stylesheet" href="/assets/css/ui/18-server-settings.css">
+<link rel="stylesheet" href="/assets/css/ui/19-switch.css">
+<link rel="stylesheet" href="/assets/css/ui/20-section-intro.css">
+<link rel="stylesheet" href="/assets/css/ui/21-empty-pane.css">
+<link rel="stylesheet" href="/assets/css/ui/22-scheduled-tasks.css">
+<link rel="stylesheet" href="/assets/css/ui/23-console.css">
+<link rel="stylesheet" href="/assets/css/ui/24-sheets.css">
+<link rel="stylesheet" href="/assets/css/ui/25-dialog.css">
+<link rel="stylesheet" href="/assets/css/ui/26-toasts.css">
+<link rel="stylesheet" href="/assets/css/ui/27-narrow-panes.css">
+
+<!--
+  One sprite, defined once, referenced with <use href="#i-name">.
+
+  Inline rather than a file, because the panel is a single document that has to work with no network
+  at all - and an icon font would be a second thing to ship and a worse thing to style.
+
+  Drawn on a 16 grid with square caps and joins. That is for legibility at this size, not a nod to
+  anything - a rounded cap on a 1.5px stroke at 16px is half a pixel of blur on every terminal, and
+  the app's actual visual language is the isometric block in the brand mark, which does not survive
+  being shrunk to a toolbar glyph. These are here to be found quickly, and every one sits beside its
+  own word.
+-->
+<svg id="sprite" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <symbol id="i-terminal" viewBox="0 0 16 16"><path d="M2 3h12v10H2z"/><path d="M5 7l2 1.5L5 10"/><path d="M8.5 10.5H11"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 16 16"><path d="M2 3h12v3H2z"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></symbol>
+  <symbol id="i-user" viewBox="0 0 16 16"><path d="M5.5 3h5v4h-5z"/><path d="M3 14v-2.5h10V14"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 16 16"><path d="M1.5 9h3l2-5 2.5 9 2-4h3.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/><path d="M8 5.5V8h2.5"/></symbol>
+  <symbol id="i-server" viewBox="0 0 16 16"><path d="M2 3h12v4H2zM2 9h12v4H2z"/><path d="M4.5 5h.5M4.5 11h.5"/></symbol>
+  <symbol id="i-database" viewBox="0 0 16 16"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8"/><path d="M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></symbol>
+  <symbol id="i-cache" viewBox="0 0 16 16"><path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3M2 11l6 3 6-3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2 4.5h12M2 11.5h12"/><path d="M5 3v3M11 10v3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 16 16"><path d="M5 2v3.5M11 2v3.5"/><path d="M3.5 5.5h9V9a4.5 4.5 0 0 1-9 0z"/><path d="M8 13.5V15"/></symbol>
+  <symbol id="i-map" viewBox="0 0 16 16"><path d="M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5z"/><path d="M6 2.5v10M10 4v10"/></symbol>
+
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 3l8 5-8 5z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 16 16"><path d="M4 4h8v8H4z"/></symbol>
+  <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13 2v3h-3"/></symbol>
+  <symbol id="i-external" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5"/><path d="M12 9.5v4H2.5v-9.5h4"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4h4.5l1.5 2H14v7H2z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 4.9-.7"/></symbol>
+  <symbol id="i-history" viewBox="0 0 16 16"><path d="M2.8 9.5A5.5 5.5 0 1 0 4 4.2"/><path d="M3.5 1.8v2.7h2.7"/><path d="M8 5v3.2l2.2 1.5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z"/><path d="M9.5 2v3h3"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6"/><path d="M2.5 11v2.5h11V11"/></symbol>
+  <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 16 16"><path d="M3.25 8h.5M7.75 8h.5M12.25 8h.5" stroke-width="2.5"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4"/></symbol>
+
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z"/><path d="M6 3v10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.5h10"/><path d="M4.5 4.5V13h7V4.5"/><path d="M6.5 4.5V3h3v1.5"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M2.5 13.5V11L11 2.5 13.5 5 5 13.5z"/></symbol>
+  <!-- Tips pulled in: at the original 31-degree vertices the miter projected ~2.8 units past
+       the point, which is outside the viewBox, and every render clipped both ends flat. -->
+  <symbol id="i-bolt" viewBox="0 0 16 16" stroke-miterlimit="2"><path d="M9 2.8L4.6 8.5h3.4L7 13.2l4.4-5.7H8z"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.8-3.85"/><path d="M3 2v3h3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><path d="M2.5 2.5h8v8h-8z"/><path d="M10.5 10.5L14 14"/></symbol>
+
+  <symbol id="i-grid" viewBox="0 0 16 16"><path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16" stroke-linejoin="round"><path d="M6.6 1.5h2.8l.4 1.9 1.4.8 1.8-.6 1.4 2.4-1.4 1.3v1.4l1.4 1.3-1.4 2.4-1.8-.6-1.4.8-.4 1.9H6.6l-.4-1.9-1.4-.8-1.8.6L1.6 10l1.4-1.3V7.3L1.6 6l1.4-2.4 1.8.6 1.4-.8z"/><circle cx="8" cy="8" r="2"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 16 16"><path d="M5 3.5v9M11 3.5v9"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><path d="M5.5 5.5h8v8h-8z"/><path d="M10.5 5.5v-3h-8v8h3"/></symbol>
+  <symbol id="i-wrap" viewBox="0 0 16 16"><path d="M2 4h12M2 12h3"/><path d="M2 8h9.5a2 2 0 0 1 0 4H8"/><path d="M9.5 10.5L8 12l1.5 1.5"/></symbol>
+  <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 2.5v8"/><path d="M5 5.5l3-3 3 3"/><path d="M3 9v4.5h10V9"/></symbol>
+  <symbol id="i-popout" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7"/><path d="M13.5 2.5L8 8"/><path d="M11.5 9.5v4h-9v-9h4"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 16 16" stroke-miterlimit="2"><path d="M8 2.5l6 11H2z"/><path d="M8 6.5v3.5M8 11.5v1"/></symbol>
+</svg>
+
+<div id="banner"><div id="upgradeNotices" aria-live="polite"></div></div>
+
+<header>
+  <span class="brand">
+    <svg viewBox="0 0 64 64" width="21" height="21" aria-hidden="true">
+      <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
+      <polygon points="8,20 32,32 32,54 8,42" fill="var(--cube-left)"/>
+      <polygon points="56,20 32,32 32,54 56,42" fill="var(--cube-right)"/>
+      <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="var(--cube-cutout)"/>
+    </svg>
+    <b>SpawnLoft</b>
+  </span>
+  <span class="grow"></span>
+  <button type="button" class="java-chip" id="javaChip" hidden>
+    <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-alert"/></svg><span>Java</span>
+  </button>
+  <button id="bUpdate" class="ghost" hidden>Check for updates</button>
+  <button type="button" class="icon-btn" id="bSettings" aria-label="Preferences" title="Preferences">
+    <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg>
+  </button>
+</header>
+
+<main>
+  <!--
+    The sidebar: every server, and under the open one, its sections. One list down the side rather
+    than tabs across the top and a dock down the right, so switching server and switching tool are
+    the same gesture, and the list is the only navigation there is. Under 1200px it folds to an
+    icon rail and the names become tooltips.
+  -->
+  <aside class="side" id="side">
+    <nav class="srv-tabs" aria-label="Servers">
+      <div class="tabs-scroll" id="list">
+        <button type="button" class="stab stab-home" id="tabHome" title="Overview">
+          <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-grid"/></svg><span class="nm">Overview</span>
+        </button>
+      </div>
+      <!--
+        The open server's sections. Moved under that server's row by markTabs(), and out of the
+        list before renderList() reconciles it, so the list only ever has to think about servers.
+        Console first: it is where a server opens, and the others announce expanded or collapsed
+        because pressing the open one again goes back to the console.
+      -->
+      <nav class="dock" id="dock" aria-label="Server tools" hidden>
+        <button type="button" id="tabConsole" aria-current="page"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-terminal"/></svg><span class="lbl">Console</span></button>
+        <button type="button" id="tabPlugins" data-pane="plugins" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span class="lbl">Plugins</span><b class="dock-badge" hidden></b></button>
+        <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
+        <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
+        <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
+        <button type="button" id="tabActivity" data-pane="activity" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="lbl">Activity</span></button>
+        <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
+        <button type="button" id="tabPerformance" data-pane="performance" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span class="lbl">Stats</span></button>
+        <button type="button" id="tabScheduler" data-pane="scheduler" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span class="lbl">Schedule</span></button>
+        <button type="button" id="tabSettings" data-pane="settings" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span class="lbl">Settings</span></button>
+      </nav>
+    </nav>
+    <button type="button" class="side-new" id="bNew" title="New server">
+      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">New server</span>
+    </button>
+    <button type="button" class="side-new side-play" id="bLauncher" title="Play">
+      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span class="nm">Play</span>
+    </button>
+  </aside>
+  <section class="stage">
+
+    <!-- ============ Play: the game launcher as a page of the panel =========== -->
+    <div class="view play" id="vPlay">
+      <iframe id="playFrame" title="Play"></iframe>
+    </div>
+
+    <!-- ============ nothing selected ===================================== -->
+
+    <div class="view empty" id="vEmpty">
+      <svg class="mark" viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
+        <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
+        <polygon points="8,20 32,32 32,54 8,42" fill="var(--cube-left)"/>
+        <polygon points="56,20 32,32 32,54 56,42" fill="var(--cube-right)"/>
+        <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="var(--cube-cutout)"/>
+      </svg>
+      <h1 id="emptyTitle">No servers yet</h1>
+      <p class="lede" id="emptyLede">
+        SpawnLoft runs Minecraft servers on this machine — start them, watch the console, send
+        commands, and reset a world without going near a terminal.
+      </p>
+      <div class="doors" id="emptyDoors">
+        <button class="door" id="dNew">
+          <b>Create a server</b>
+          <span>Downloads Paper and sets up a fresh world on a free port. Takes about a minute.</span>
+        </button>
+        <button class="door" id="dAdopt">
+          <b>Add one you already have</b>
+          <span>Points SpawnLoft at a server folder on this machine. Nothing is moved or rewritten.</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ the overview ========================================== -->
+    <!--
+      Every server at once: what each is doing, and the few things that want someone's attention.
+      The screen the Overview tab opens, and the first one once there is anything to show on it.
+    -->
+    <div class="view home" id="vHome">
+      <div class="home-head">
+        <div class="home-title">
+          <h1>Your servers</h1>
+          <ul class="home-chips" id="homeSummary" aria-label="Summary"></ul>
+        </div>
+        <button class="primary" id="homeNew"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>New server</button>
+      </div>
+      <!-- attention, cards and databases share a column, so a feed beside them sizes nothing of theirs -->
+      <div class="home-main">
+        <p class="home-fail" id="homeFail" role="status" hidden>
+          <span>Backup ages and this machine's memory could not be read.</span>
+          <button type="button" class="ghost sm" id="homeFailRetry">Try again</button>
+        </p>
+        <section class="attention" id="homeAttention" aria-labelledby="attTitle" hidden>
+          <h2 class="hist-title" id="attTitle">Needs attention</h2>
+          <div class="att-grid" id="attGrid"></div>
+          <button type="button" class="more-link" id="attMore" hidden></button>
+        </section>
+        <section class="home-servers" aria-labelledby="homeSrvTitle">
+          <h2 class="sr-only" id="homeSrvTitle">Servers</h2>
+          <div class="home-cards" id="homeCards"></div>
+        </section>
+        <section class="home-dbs" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
+          <h2 class="hist-title" id="homeDbTitle">Databases</h2>
+          <div class="dbs-grid" id="dbsGrid"></div>
+        </section>
+      </div>
+      <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
+        <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
+        <ol class="feed" id="homeActList"></ol>
+        <button type="button" class="more-link" id="homeActMore" hidden></button>
+      </section>
+    </div>
+
+    <!-- ============ a server is selected ================================= -->
+    <div class="view server" id="vServer">
+      <!--
+        Who this is, how it is doing, and the verbs, in one strip. The facts that are configuration
+        rather than state - the jar, the RCON port, the world's name - live in Settings now; what
+        stays here is what changes while you watch.
+      -->
+      <div class="srv-strip">
+        <div class="srv-title">
+          <div class="srv-name">
+            <h1 id="srvName">—</h1>
+            <span class="srv-id" id="srvId" hidden tabindex="0" title="The name the folder and the commands use"></span>
+            <span class="spill" id="srvState"></span>
+            <span class="badge" id="srvOffline" hidden tabindex="0" title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings.">Anyone can join</span>
+          </div>
+          <div class="srv-meta" id="srvMeta"></div>
+        </div>
+        <dl class="vitals" id="srvVitals"></dl>
+        <div class="srv-actions">
+          <button id="bRestart"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-restart"/></svg>Restart</button>
+          <button id="bStop"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-stop"/></svg>Stop</button>
+          <button class="primary" id="bStart"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start</button>
+          <span class="menu-wrap" id="moreWrap">
+            <button type="button" id="bManage" class="icon-btn" aria-label="More actions" title="More actions"
+              aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu">
+              <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-dots"/></svg>
+            </button>
+            <div class="menu" id="moreMenu" role="menu" aria-labelledby="bManage" hidden></div>
+          </span>
+        </div>
+      </div>
+
+      <div id="srvNotice"></div>
+      <div id="srvDiag"></div>
+
+      <!--
+        The console stays; everything else opens beside it. The console is what someone is
+        watching while they change a plugin or read a backup list, and the old tabs made that a
+        choice between the two.
+      -->
+      <div class="work" id="work">
+      <section class="console" id="paneConsole" aria-label="Console">
+        <div class="con-bar">
+          <span class="con-search">
+            <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
+            <input id="conSearch" placeholder="Filter the console" autocomplete="off" aria-label="Filter the console">
+          </span>
+          <span class="seg" role="group" aria-label="Filter by level">
+            <button data-lvl="all" aria-pressed="true">All</button>
+            <button data-lvl="warn">Warnings <b class="n" data-tone="warn" id="nWarn">0</b></button>
+            <button data-lvl="error">Errors <b class="n" data-tone="fault" id="nErr">0</b></button>
+          </span>
+          <span class="grow"></span>
+          <span class="con-count" id="conCount"></span>
+          <span class="con-tools">
+          <button type="button" id="bPause" class="icon-btn" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
+          <button type="button" id="bWrap" class="icon-btn" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
+          <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
+          <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+          </span>
+          <button type="button" id="bDiagZip"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg>Diagnostics</button>
+          <span class="menu-wrap" id="shareWrap">
+            <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+            <div class="menu" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
+              <button role="menuitem" id="miExportFile" tabindex="-1">
+                <b>Save to a .log file</b>
+                <span>Keeps a copy beside this server's backups.</span>
+              </button>
+              <button role="menuitem" id="miExportShare" tabindex="-1">
+                <b>Upload to mclo.gs</b>
+                <span>Publishes a shareable link and opens it.</span>
+              </button>
+              <div class="menu-sep" role="separator"></div>
+              <button role="menuitemcheckbox" id="bNums" aria-checked="false" tabindex="-1">
+                <b>Line numbers</b>
+              </button>
+              <button role="menuitem" id="bClear" tabindex="-1">
+                <b>Clear the view</b>
+                <span>The log file on disk is untouched.</span>
+              </button>
+            </div>
+          </span>
+        </div>
+        <div class="log-wrap">
+          <pre id="log" tabindex="0" role="log" aria-label="Server console"></pre>
+          <button class="jump" id="bJump" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-download"/></svg><span id="jumpLabel">Jump to latest</span></button>
+        </div>
+
+        <div class="cmd" id="cmdRow">
+          <label class="cmd-field">
+            <span class="prompt" aria-hidden="true">/</span>
+            <input id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" spellcheck="false" aria-label="Server command">
+          </label>
+          <button id="bSend" class="primary">Send</button>
+          <button id="bCmdStart" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start server</button>
+        </div>
+      </section>
+
+      <section class="tool" id="toolPanel" aria-labelledby="toolTitle" tabindex="-1" hidden>
+        <div class="tool-head">
+          <h2 id="toolTitle"></h2>
+          <button type="button" class="icon-btn" id="toolClose" aria-label="Close" title="Close"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="panes">
+          <div class="pane pane-scroll" id="panePlugins" tabindex="-1">
+            <div class="pane-body wide" id="pluginsBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="paneFiles" tabindex="-1">
+            <div class="pane-body wide" id="filesBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="paneWorlds" tabindex="-1">
+            <div class="pane-body wide" id="worldsBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="paneBackups" tabindex="-1">
+            <div class="pane-body wide" id="backupsBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="paneActivity" tabindex="-1">
+            <div class="pane-body wide" id="activityBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="panePlayers" tabindex="-1">
+            <div class="pane-body wide" id="playersBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="panePerformance" tabindex="-1">
+            <div class="pane-body wide" id="performanceBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="paneScheduler" tabindex="-1">
+            <div class="pane-body wide" id="schedulerBody"></div>
+          </div>
+          <div class="pane pane-scroll" id="paneSettings" tabindex="-1">
+            <div class="pane-body" id="settingsBody"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- While a tool fills the space, the console is still one line tall rather than gone. -->
+      <button type="button" class="con-mini" id="conMini" hidden>
+        <b>Console</b><span class="last" id="conMiniLast"></span><span class="errs" id="conMiniErr"></span>
+      </button>
+
+      </div>
+    </div>
+
+    <!-- ============ add a server ========================================= -->
+    <div class="view sheet" id="vAdd">
+      <div class="sheet-head">
+        <h1 id="addTitle">Add a server</h1>
+        <span class="grow"></span>
+        <button class="ghost" id="bAddClose">Close</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="new" aria-selected="true">Create a new one</button>
+        <button role="tab" data-tab="pack" aria-selected="false">From a modpack</button>
+        <button role="tab" data-tab="adopt" aria-selected="false">Add one I already have</button>
+        <button role="tab" data-tab="db" aria-selected="false">A database</button>
+      </div>
+
+      <form class="sheet-body" id="formNew">
+        <h2 class="form-group-title">What to run</h2>
+        <div class="field">
+          <label for="nName">Name</label>
+          <input id="nName" name="name" required autocomplete="off" placeholder="Survival (Season 3)" maxlength="48">
+          <div class="hint">Anything you like. The folder and the console use <code id="nNameSlug">—</code></div>
+          <div class="bad" id="nNameBad"></div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <div class="field" style="flex:1">
+            <label for="nLoader">Software</label>
+            <select id="nLoader" name="loader">
+              <!-- Filled from /api/software; Paper stands in until that answers. -->
+              <option value="paper" selected>Paper</option>
+            </select>
+            <div class="hint" id="nLoaderHint">Runs plugins</div>
+          </div>
+          <div class="field" style="flex:2">
+            <label for="nVersion">Minecraft version</label>
+            <select id="nVersion" name="version"><option value="">Loading versions…</option></select>
+            <div class="hint" id="nVersionHint">Downloads the newest stable Paper build.</div>
+            <div class="bad field-note" id="nVersionBad" role="status"></div>
+            <div class="inline-warn" id="nJavaWarn" hidden></div>
+          </div>
+          <div class="field" style="flex:1">
+            <label for="nMem">Memory</label>
+            <input id="nMem" name="memory" value="4G" class="mono" autocomplete="off" inputmode="text">
+            <div class="hint">e.g. 4G</div>
+            <div class="bad" id="nMemBad"></div>
+          </div>
+          <div class="field" style="flex:1">
+            <label for="nPort">Port</label>
+            <input id="nPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off" min="1024" max="65535" aria-describedby="nPortBad">
+            <div class="hint">Blank picks a free one</div>
+            <div class="bad field-note" id="nPortBad" aria-live="polite"></div>
+          </div>
+        </div>
+        <h2 class="form-group-title" id="nJoinTitle">Who can join</h2>
+        <div class="field">
+          <div class="choice" id="nJoin" role="radiogroup" aria-labelledby="nJoinTitle">
+            <label>
+              <input type="radio" name="onlineMode" value="online" checked>
+              <b>Require a Minecraft account</b>
+              <span>Only people who own Minecraft can join, each under their own name. Recommended.</span>
+            </label>
+            <label>
+              <input type="radio" name="onlineMode" value="offline">
+              <b>Anyone, as any name</b>
+              <span>Nobody's account is checked, so anyone can join under any name. For testing by
+                yourself, or with no internet. Not safe for a public server.</span>
+            </label>
+          </div>
+        </div>
+        <div class="prog" id="newProg" hidden>
+          <div class="track"><div class="bar" id="newBar"></div></div>
+          <div class="msg" id="newMsg"></div>
+        </div>
+        <div class="new-summary" id="newSummary" aria-live="polite"></div>
+        <div class="row">
+          <button type="submit" class="primary" id="bCreate">Create server</button>
+          <span class="hint" id="newHint">Accepts the Minecraft EULA on your behalf, as the operator of this machine.</span>
+        </div>
+      </form>
+
+      <form class="sheet-body" id="formPack" hidden>
+        <div class="field">
+          <label for="pSearch">Modpack</label>
+          <div class="row">
+            <input id="pSearch" type="search" placeholder="Search Modrinth — server-ready Fabric and NeoForge packs" autocomplete="off">
+            <button type="button" id="bPackSearch">Search</button>
+          </div>
+          <div class="hint">The pack decides the Minecraft version, the loader and the mods. You pick a name and how much memory it gets.</div>
+        </div>
+        <div id="packResults"></div>
+        <div id="packChosenWrap" hidden>
+          <div class="field">
+            <label>Chosen pack</label>
+            <div class="hint" id="packChosen" style="font-size:13px;color:var(--ink)"></div>
+          </div>
+          <div class="row" style="align-items:flex-start;margin-top:12px">
+            <div class="field" style="flex:2">
+              <label for="pName">Name</label>
+              <input id="pName" autocomplete="off" maxlength="48">
+              <div class="hint">Folder and console: <code id="pNameSlug">—</code></div>
+              <div class="bad" id="pNameBad"></div>
+            </div>
+            <div class="field" style="flex:1">
+              <label for="pMem">Memory</label>
+              <input id="pMem" value="4G" class="mono" autocomplete="off">
+              <div class="hint">Modded servers want 4G or more.</div>
+              <div class="bad" id="pMemBad"></div>
+            </div>
+          </div>
+          <div class="prog" id="packProg" hidden style="margin-top:12px">
+            <div class="track"><div class="bar" id="packBar"></div></div>
+            <div class="msg" id="packMsg"></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button type="submit" class="primary" id="bPackCreate">Create server from this pack</button>
+            <span class="hint">Downloads every server-side file the pack lists, checksummed, before the server exists.</span>
+          </div>
+        </div>
+      </form>
+
+      <form class="sheet-body" id="formAdopt" hidden>
+        <div class="field">
+          <label for="aDir">Server folder</label>
+          <div class="row">
+            <input id="aDir" class="mono" spellcheck="false" placeholder="The folder the server is in" autocomplete="off">
+            <button type="button" id="bBrowse" hidden>Browse…</button>
+          </div>
+          <div class="hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <div class="field" style="flex:2">
+            <label for="aName">Name in SpawnLoft</label>
+            <input id="aName" autocomplete="off" placeholder="Survival" maxlength="48">
+            <div class="hint">The console and commands use <code id="aNameSlug">—</code></div>
+            <div class="bad" id="aNameBad"></div>
+          </div>
+          <div class="field" style="flex:1">
+            <label for="aMem">Memory</label>
+            <input id="aMem" value="4G" class="mono" autocomplete="off" inputmode="text">
+            <div class="bad" id="aMemBad"></div>
+          </div>
+        </div>
+        <div class="row">
+          <button type="submit" class="primary" id="bAdopt">Add server</button>
+          <span class="hint">Nothing is moved. Its port and the rest of its settings are read from its own server.properties.</span>
+        </div>
+      </form>
+
+      <form class="sheet-body" id="formDb" hidden>
+        <p class="hint" style="margin:0 0 4px">
+          A database for plugins that want one — MySQL for LuckPerms, CoreProtect, Plan and the rest;
+          Redis for messaging between servers. Run here, downloaded once and supervised like a server,
+          reachable only from this machine. Or point at one you already run.
+        </p>
+        <div class="field">
+          <div class="choice" id="dMode">
+            <label>
+              <input type="radio" name="dbMode" value="run" checked>
+              <b>Run one here</b>
+              <span>MySQL from Oracle, or Redis by way of Microsoft's Garnet. SpawnLoft installs what each engine needs.</span>
+            </label>
+            <label>
+              <input type="radio" name="dbMode" value="connect">
+              <b>Connect to one I already run</b>
+              <span>A MySQL or Redis database you already run. Registered with its address so servers can be attached; never started or stopped from here.</span>
+            </label>
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <div class="field" style="flex:2">
+            <label for="dName">Name</label>
+            <input id="dName" name="name" required autocomplete="off" placeholder="Database" maxlength="48">
+            <div class="hint">The commands use <code id="dNameSlug">—</code></div>
+            <div class="bad" id="dNameBad"></div>
+          </div>
+          <div class="field" style="flex:1;min-width:170px">
+            <label for="dEngine">Engine</label>
+            <select id="dEngine" name="engine"><option value="mysql" selected>MySQL</option></select>
+            <div class="hint" id="dEngineHint">MySQL-compatible</div>
+          </div>
+          <div class="field" style="flex:2" id="dVersionWrap">
+            <label for="dVersion">Version</label>
+            <select id="dVersion" name="version"><option value="">Loading versions…</option></select>
+            <div class="hint" id="dVersionHint">Newest stable release first.</div>
+          </div>
+          <div class="field" style="flex:1">
+            <label for="dPort">Port</label>
+            <input id="dPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off">
+            <div class="hint" id="dPortHint">Blank picks the engine's usual port or the next free one</div>
+          </div>
+        </div>
+        <div class="row" style="align-items:flex-start" id="dConnect" hidden>
+          <div class="field" style="flex:2">
+            <label for="dHost">Host</label>
+            <input id="dHost" class="mono" value="127.0.0.1" autocomplete="off">
+            <div class="hint">Where it listens</div>
+          </div>
+          <div class="field" style="flex:1" id="dUserWrap">
+            <label for="dUser">Admin user</label>
+            <input id="dUser" class="mono" value="root" autocomplete="off">
+            <div class="hint">Makes databases and users</div>
+          </div>
+          <div class="field" style="flex:2">
+            <label for="dPassword">Password</label>
+            <input id="dPassword" type="password" class="mono" autocomplete="off">
+            <div class="hint" id="dPasswordHint">XAMPP's root has none</div>
+          </div>
+          <div class="field" style="flex:3" id="dToolsWrap">
+            <label for="dTools">Client tools folder <span class="hint">(optional)</span></label>
+            <input id="dTools" class="mono" placeholder="The bin folder of MySQL or MariaDB" autocomplete="off">
+            <div class="hint">Where the MySQL client tools live. Found on its own in the usual places.</div>
+          </div>
+        </div>
+        <div class="prog" id="dbProg" hidden>
+          <div class="track"><div class="bar" id="dbBar"></div></div>
+          <div class="msg" id="dbMsg"></div>
+        </div>
+        <div class="row">
+          <button type="submit" class="primary" id="bDbCreate">Add database</button>
+          <span class="hint" id="dbHint">The engine downloads once for each version; every database on that version shares it.</span>
+        </div>
+      </form>
+    </div>
+
+    <!-- ============ feedback ============================================= -->
+    <div class="view sheet" id="vFeedback">
+      <div class="sheet-head">
+        <h1>Feedback</h1>
+        <span class="grow"></span>
+        <button class="ghost" id="bFbClose">Close</button>
+      </div>
+      <div class="sheet-body wide">
+        <p class="hint" style="margin:0">
+          SpawnLoft is in beta and reports are read. Every door opens GitHub in your browser; nothing
+          is sent from here on its own.
+        </p>
+        <div class="doors">
+          <button class="door" id="dBug">
+            <b>Something broke</b>
+            <span>Opens a bug report with the version, Java, server status and the panel log already
+              filled in, and puts the full diagnostics on your clipboard to paste under it. No
+              passwords, no webhook.</span>
+          </button>
+          <button class="door" id="dAsk">
+            <b>A question</b>
+            <span>Opens a new post in the project's Q&amp;A. How something works, whether it can
+              do a thing, why a server will not start. Answers stay findable for the next
+              person.</span>
+          </button>
+          <button class="door" id="dIdea">
+            <b>An idea</b>
+            <span>Opens a new post in Ideas. A feature you wish it had, a server kind it should
+              support. Say what you were trying to do, not only what to add.</span>
+          </button>
+        </div>
+        <p class="hint" id="fbNote" style="margin:0"></p>
+      </div>
+    </div>
+
+    <!-- ============ settings ============================================= -->
+    <div class="view sheet" id="vSettings">
+      <div class="sheet-head">
+        <h1>Preferences</h1>
+        <span class="grow"></span>
+        <button class="ghost" id="bSetClose">Close</button>
+      </div>
+      <div class="sheet-body wide">
+        <fieldset class="theme-picker">
+          <legend>Appearance</legend>
+          <p class="hint">Choose your colors. Your selection is saved on this computer and applies immediately.</p>
+          <div class="theme-options">
+            <label class="theme-option">
+              <input type="radio" name="appTheme" value="classic">
+              <span class="theme-preview theme-preview-classic" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span><strong>Classic</strong><small>The original blue palette</small></span>
+            </label>
+            <label class="theme-option">
+              <input type="radio" name="appTheme" value="spawnloft">
+              <span class="theme-preview theme-preview-spawnloft" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span><strong>SpawnLoft</strong><small>Charcoal, warm white, and lime</small></span>
+            </label>
+          </div>
+          <p id="themeStatus" class="hint" aria-live="polite"></p>
+          <!-- Desktop app only: a plain browser has its own zoom. -->
+          <div class="ui-size" id="uiSizeRow" hidden>
+            <label for="uiSize"><strong>Interface size</strong><small>Auto fits the screen. Ctrl and + or -, Ctrl 0 for 100%.</small></label>
+            <select id="uiSize">
+              <option value="auto" id="uiSizeAuto">Auto</option>
+              <option value="0.8">80%</option><option value="0.9">90%</option><option value="1">100%</option>
+              <option value="1.1">110%</option><option value="1.25">125%</option><option value="1.5">150%</option>
+              <option value="1.75">175%</option><option value="2">200%</option>
+            </select>
+          </div>
+        </fieldset>
+        <div>
+          <h2>Where SpawnLoft keeps things</h2>
+          <p class="hint" style="margin:0 0 12px">
+            Servers that already exist stay in the folders they are in, so changing this only
+            affects servers created from now on.
+          </p>
+          <dl class="kv" id="setPaths"></dl>
+        </div>
+        <div class="row" id="setActions"></div>
+        <div id="setUpdCore" hidden>
+          <h2>Updates</h2>
+          <p class="hint" id="updSummary" style="margin:0 0 10px"></p>
+          <div id="updOffer" hidden class="upd-offer"></div>
+          <div id="updHold" hidden class="upd-offer"></div>
+          <div id="updMsg" class="hint" hidden style="margin:0 0 10px"></div>
+          <div class="row" style="margin:0 0 12px">
+            <button type="button" id="updCheck">Check now</button>
+          </div>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" id="updBeta" class="switch" style="flex:none;margin-top:2px">
+            <span>
+              <strong>Get beta builds</strong>
+              <span class="hint" style="display:block;margin-top:2px">
+                New features as they are finished, instead of once they reach the monthly release.
+                Back up a server you care about first. You can turn this off at any time; nothing is
+                downgraded when you do.
+              </span>
+            </span>
+          </label>
+          <details id="updRollbackBox" style="margin-top:14px">
+            <summary>Reinstall a previous version</summary>
+            <p class="hint" style="margin:8px 0">
+              Going back pauses updates below the version you left until you resume them here.
+              A version that cannot read your servers' data is not offered.
+            </p>
+            <div id="updRollbacks"></div>
+          </details>
+          <details id="updLogBox" style="margin-top:10px">
+            <summary>Update log</summary>
+            <pre id="updLog" class="hint" style="white-space:pre-wrap;margin:8px 0 0;max-height:240px;overflow:auto"></pre>
+          </details>
+        </div>
+        <div id="setUpdates" hidden>
+          <h2>Updates</h2>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" id="setBeta" class="switch" style="flex:none;margin-top:2px">
+            <span>
+              <strong>Get beta builds</strong>
+              <span class="hint" style="display:block;margin-top:2px">
+                New features as they are finished, usually several builds a month, instead of once
+                they reach the monthly release. Every beta passes the same automated tests as a
+                release on every platform, but has not had a month of use: back up a server you care
+                about first. You can turn this off at any time.
+              </span>
+            </span>
+          </label>
+          <p id="setBetaStatus" class="hint" aria-live="polite" style="margin:10px 0 0"></p>
+        </div>
+        <div id="setMcp">
+          <h2>AI assistants</h2>
+          <p class="hint" style="margin:0 0 12px">
+            Let an AI app that supports MCP, such as Claude Desktop or Claude Code, check on and run
+            your servers. You choose the app; SpawnLoft sends nothing on its own. What the tools return
+            &mdash; console lines, player names, plugin lists &mdash; goes to that app's provider.
+            Passwords and webhooks never do.
+          </p>
+          <!-- Plain tick boxes, not switches: nothing here is saved or in force. They only change
+               the setup text below, and what an assistant may do is whatever its own copy says. -->
+          <fieldset id="mcpOptions" style="border:0;padding:0;margin:0 0 12px">
+            <legend style="padding:0;margin-bottom:4px"><strong>Choose what the setup text below asks for</strong></legend>
+            <p class="hint" style="margin:0 0 8px">These are not saved here and do not show what an app is using now. After changing one, copy the text again and put it in the app.</p>
+            <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
+              <input type="checkbox" id="mcpDestructive" style="flex:none;margin-top:3px">
+              <span><strong>Include restoring backups, force-kill and Minecraft version upgrades</strong>
+                <span class="hint" style="display:block;margin-top:2px">Left out, the assistant is never offered them. Included, each still describes what it would do and waits to be confirmed.</span></span>
+            </label>
+            <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+              <input type="checkbox" id="mcpIps" style="flex:none;margin-top:3px">
+              <span><strong>Include players' IP addresses</strong>
+                <span class="hint" style="display:block;margin-top:2px">The console records one each time someone joins. Left out, the assistant never sees them.</span></span>
+            </label>
+          </fieldset>
+          <p class="hint" style="margin:0 0 6px">For Claude Desktop, add this to <code>claude_desktop_config.json</code> (Settings &rarr; Developer &rarr; Edit Config), then restart it:</p>
+          <textarea id="mcpJson" class="mono" readonly rows="9" style="width:100%;resize:vertical" aria-label="Claude Desktop configuration"></textarea>
+          <p class="hint" style="margin:10px 0 6px">For Claude Code, run this in a terminal:</p>
+          <textarea id="mcpCli" class="mono" readonly rows="3" style="width:100%;resize:vertical" aria-label="Claude Code command"></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="ghost" id="bMcpJson">Copy Claude Desktop config</button>
+            <button class="ghost" id="bMcpCli">Copy Claude Code command</button>
+          </div>
+        </div>
+        <div>
+          <h2>About</h2>
+          <dl class="kv" id="setAbout"></dl>
+        </div>
+        <div>
+          <h2>Feedback</h2>
+          <p class="hint" style="margin:0 0 12px">
+            A bug report with the diagnostics already filled in, a question, or an idea. Each opens
+            GitHub in your browser; nothing is sent from here on its own.
+          </p>
+          <div class="row"><button id="bFeedback">Send feedback…</button></div>
+        </div>
+        <div>
+          <h2>Reporting a problem</h2>
+          <p class="hint" style="margin:0 0 12px">
+            Copies the version, the Java found, where things live, every server's status, the
+            panel's own log and the last console lines of the selected server. No passwords and
+            no webhook. Paste it into a GitHub issue.
+          </p>
+          <div class="row"><button class="ghost" id="bDiag">Copy diagnostics</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <h2 id="dlgTitle"></h2>
+  <div class="dlg-body" id="dlgBody">
+    <p id="dlgText"></p>
+    <div class="choice" id="dlgChoice" hidden></div>
+    <div class="field" id="dlgTypeWrap" hidden>
+      <label for="dlgType" id="dlgTypeLabel"></label>
+      <input id="dlgType" class="mono" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="dlgDetail" hidden></div>
+    <p class="hint bad" id="dlgError" role="alert" hidden></p>
+  </div>
+  <footer>
+    <button id="dlgCancel">Cancel</button>
+    <button id="dlgOk" class="primary">Confirm</button>
+  </footer>
+</dialog>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
+<span class="sr-only" id="live" aria-live="polite"></span>
+
+<script src="/assets/js/shared/session.js"></script>
+<script src="/assets/js/ui/00-globals.js"></script>
+<script src="/assets/js/ui/01-api.js"></script>
+<script src="/assets/js/ui/02-chrome.js"></script>
+<script src="/assets/js/ui/03-tools.js"></script>
+<script src="/assets/js/ui/04-sheets.js"></script>
+<script src="/assets/js/ui/05-servers.js"></script>
+<script src="/assets/js/ui/06-server-tabs.js"></script>
+<script src="/assets/js/ui/07-server-strip.js"></script>
+<script src="/assets/js/ui/08-vitals.js"></script>
+<script src="/assets/js/ui/09-menu.js"></script>
+<script src="/assets/js/ui/10-diagnosis.js"></script>
+<script src="/assets/js/ui/11-overview.js"></script>
+<script src="/assets/js/ui/12-recent-activity.js"></script>
+<script src="/assets/js/ui/13-needs-attention.js"></script>
+<script src="/assets/js/ui/14-server-cards.js"></script>
+<script src="/assets/js/ui/15-server-tools.js"></script>
+<script src="/assets/js/ui/16-console.js"></script>
+<script src="/assets/js/ui/17-console-controls.js"></script>
+<script src="/assets/js/ui/18-lifecycle.js"></script>
+<script src="/assets/js/ui/19-server-properties.js"></script>
+<script src="/assets/js/ui/20-performance.js"></script>
+<script src="/assets/js/ui/21-players.js"></script>
+<script src="/assets/js/ui/22-plugins.js"></script>
+<script src="/assets/js/ui/23-worlds.js"></script>
+<script src="/assets/js/ui/24-scheduler.js"></script>
+<script src="/assets/js/ui/25-server-list-look.js"></script>
+<script src="/assets/js/ui/26-files.js"></script>
+<script src="/assets/js/ui/27-editor.js"></script>
+<script src="/assets/js/ui/28-activity.js"></script>
+<script src="/assets/js/ui/29-backups.js"></script>
+<script src="/assets/js/ui/30-manage.js"></script>
+<script src="/assets/js/ui/31-databases.js"></script>
+<script src="/assets/js/ui/32-command.js"></script>
+<script src="/assets/js/ui/33-add-server.js"></script>
+<script src="/assets/js/ui/34-from-modpack.js"></script>
+<script src="/assets/js/ui/35-paths.js"></script>
+<script src="/assets/js/ui/36-feedback.js"></script>
+<script src="/assets/js/ui/37-versions.js"></script>
+<script src="/assets/js/ui/38-prerequisites.js"></script>
+<script src="/assets/js/ui/39-desktop-updates.js"></script>
+<script src="/assets/js/ui/40-startup.js"></script>
+<script src="/assets/js/ui/41-handover.js"></script>
+<script src="/assets/js/ui/42-update-banners.js"></script>

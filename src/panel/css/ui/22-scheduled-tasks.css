@@ -1,0 +1,74 @@
+  /* ---- scheduled tasks ---------------------------------------------------- */
+
+  /* Task cards tile sideways before they stack. The edit form keeps the full row; a form in a
+     card-width cell is a form with its fields crushed. */
+  .tasks { display: grid; grid-template-columns: repeat(auto-fill, minmax(370px, 1fr)); gap: var(--s-3); align-items: start; }
+  .tasks > .task-form { grid-column: 1 / -1; }
+  .task {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "what state" "when when" "acts acts";
+    gap: 6px 14px;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--ease);
+  }
+  /*
+    No spine for a healthy task. "Ready" is the normal state of every task on the screen. The one
+    worth marking is a task spawnloft believes in that Windows has never heard of - that one will never
+    fire, and it should look like it.
+  */
+  .task::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: var(--spine);
+    background: transparent;
+  }
+  .task[data-missing]::before { background: var(--fault); }
+  .task[data-off] { opacity: .62; box-shadow: none; }
+  .task .t-what { grid-area: what; font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
+  .task .t-owner { font: 400 var(--t-1)/1 var(--ui); color: var(--ink-3); letter-spacing: 0; }
+  .task .t-when { grid-area: when; font: var(--t-2)/1.5 var(--ui); color: var(--ink-3); }
+  .task .t-when code { font: var(--t-1)/1 var(--mono); color: var(--ink-2); }
+  .task .t-acts { grid-area: acts; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .task .t-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
+  .t-state {
+    grid-area: state; align-self: start;
+    display: inline-flex; align-items: center; gap: 5px;
+    font: 600 var(--t-1)/1 var(--ui); letter-spacing: .02em;
+    padding: 4px 9px; border-radius: 999px; white-space: nowrap;
+    background: rgba(var(--ink-rgb), .04); color: var(--ink-2); border: 1px solid var(--edge);
+  }
+  .t-state::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .t-state[data-tone="good"] { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
+  .t-state[data-tone="bad"] { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
+  .t-state[data-tone="off"] { color: var(--ink-3); }
+
+  /* The form for a new or edited task. Fields appear and vanish with the kind of schedule
+     chosen, so it is a grid of rows rather than a fixed set of columns. */
+  .task-form { display: grid; gap: var(--s-3); border-color: var(--edge); }
+  .task-form .field { display: grid; gap: 6px; }
+  .task-form label { font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .task-form .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+  .task-form .when-row .field { flex: 0 0 auto; }
+
+  .runs { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .run {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 14px; align-items: baseline;
+    padding: 8px var(--s-4); background: transparent;
+    border-bottom: 1px solid var(--line);
+    font: var(--t-1)/1.5 var(--mono);
+    transition: all var(--ease);
+  }
+  .run:last-child { border-bottom: 0; }
+  .run:hover { background: rgba(var(--ink-rgb), .035); }
+  .run .r-when { color: var(--ink-3); white-space: nowrap; }
+  .run .r-who { color: var(--ink-2); white-space: nowrap; }
+  .run .r-what { color: var(--ink-2); overflow-wrap: anywhere; }
+  .run[data-status="FAILED"] .r-what { color: var(--fault); }
+  .run[data-status="skipped"] .r-what { color: var(--ink-3); }
+
+  .hist-title { margin: 0 0 8px; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+

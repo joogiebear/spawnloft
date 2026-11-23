@@ -1,0 +1,69 @@
+  /* ---- panes that use the width they are given ------------------------------- */
+
+  /* Settings: one card per group, flowing into as many columns as fit. Cards in a row share a
+     bottom edge; the card keeps its fields at the top so the extra height is empty below them. */
+  /* min(330px, 100%): at the app's 900px minimum the pane is narrower than one 330px card, and a
+     fixed minimum pushed the whole pane into a sideways scroll. */
+  #settingsBody { grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr)); align-items: stretch; }
+  #settingsBody > .hint, #settingsBody > .row, #settingsBody > .bad, #settingsBody > .pane-foot { grid-column: 1 / -1; }
+  .set-group { align-content: start; }
+
+  /*
+    The save bar stays in view, stuck to the bottom of the scroller the way the title sticks to the
+    top, saying how many changes are waiting so the button is never a guess.
+  */
+  .pane-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+    margin: var(--s-2) calc(-1 * var(--s-6)) calc(-1 * var(--s-6));
+    padding: var(--s-3) var(--s-6);
+    border-top: 1px solid var(--line);
+    background: var(--glass-strong);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+  }
+  .pane-foot .hint { margin: 0; }
+
+  [data-backup-status]:empty { display: none; }
+
+  @container pane (min-width: 860px) {
+    /* Backups: "now" and "automatic" are peers and sit side by side; the history below them is a
+       list of rows and wants the full width. */
+    #backupsBody { grid-template-columns: 1fr 1fr; align-items: start; }
+    #backupsBody > :not(.section) { grid-column: 1 / -1; }
+    /* Performance: the two widgets share the row, so processor and memory can be read against
+       each other at the same instant. */
+    #performanceBody { grid-template-columns: 1fr 1fr; align-items: start; }
+    #performanceBody > .ranges, #performanceBody > .hint, #performanceBody > .facts,
+    #performanceBody > .bad { grid-column: 1 / -1; }
+  }
+  /*
+    Ultra: split before stretch. A row stops reading as one line past about 1400px, so a pane that
+    has more room than that divides into a well and a companion instead of growing. Backups keeps
+    the history as the well, with Back up now and Automatic stacked beside it and the status line across both; Players
+    puts the chosen player beside the list; Settings shows the raw file beside the form; Stats lays
+    its gauges two by two with the numbers of the range under each chart. The companion is a second
+    column the lower tiers simply do not have, so nothing changes below 2000px.
+  */
+  @container pane (min-width: 2000px) {
+    #backupsBody { grid-template-columns: minmax(0, 1fr) clamp(420px, 36%, 900px); grid-auto-flow: row dense; gap: var(--s-5) var(--s-6); }
+    #backupsBody > .section { grid-column: 2; }
+    #backupsBody > [data-backup-history] { grid-column: 1; grid-row: span 3; }
+    #backupsBody > .bk-status { grid-column: 1 / -1; }
+    #performanceBody { gap: var(--s-5); }
+    /* The fourth cell of the two-by-two: uptime, start and sample count as a small table. */
+    #performanceBody > .facts {
+      grid-column: auto; align-self: stretch;
+      display: grid; grid-template-columns: max-content minmax(0, 1fr); align-content: start; gap: var(--s-2) var(--s-4);
+      padding: var(--s-4) var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm);
+    }
+    #performanceBody > .facts > span { display: contents; }
+  }
+  /* .row wraps rather than crushing its controls when the pane is narrow. */
+  .row { flex-wrap: wrap; }
+

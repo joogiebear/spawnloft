@@ -1066,6 +1066,64 @@ mod tests {
         assert!(out.starts_with("HTTP/1.1 401"), "{out}");
     }
 
+    #[test]
+    fn the_pages_files_are_served_by_exact_name_behind_the_sign_in() {
+        let addr = front_of(panel_in("assets", false), 15);
+        let p = addr.port();
+        let ask = |line: &str| {
+            exchange(
+                addr,
+                &format!("{line} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n", api_header(p)),
+            )
+        };
+        let css = ask("GET /assets/css/tokens.css");
+        assert!(css.starts_with("HTTP/1.1 200"), "{css}");
+        assert!(css.contains("Content-Type: text/css; charset=utf-8\r\n"), "{css}");
+        assert!(css.contains("X-Content-Type-Options: nosniff\r\n"), "{css}");
+        assert!(css.contains("Cache-Control: no-store\r\n"), "{css}");
+        assert_eq!(css.matches("Cache-Control").count(), 1, "{css}");
+        assert!(
+            css.contains("Cross-Origin-Resource-Policy: same-origin\r\n"),
+            "{css}"
+        );
+        assert!(body_of(&css).contains(":root {"), "{css}");
+        let js = ask("GET /assets/js/shared/session.js");
+        assert!(js.starts_with("HTTP/1.1 200"), "{js}");
+        assert!(
+            js.contains("Content-Type: text/javascript; charset=utf-8\r\n"),
+            "{js}"
+        );
+        let head = ask("HEAD /assets/js/shared/session.js");
+        assert!(head.starts_with("HTTP/1.1 200"), "{head}");
+        assert_eq!(body_of(&head), "", "{head}");
+        // a name that is not compiled in, however it is spelled, is not found
+        for line in [
+            "GET /assets/",
+            "GET /assets/css",
+            "GET /assets/ui.html",
+            "GET /assets/css/nope.css",
+            "GET /assets/css%2Ftokens.css",
+            "GET /assets/css/tokens.css%00",
+            "GET /assets//css/tokens.css",
+            "GET /assets/..%2F..%2FCargo.toml",
+        ] {
+            let out = ask(line);
+            assert!(out.starts_with("HTTP/1.1 404"), "{line}: {out}");
+        }
+        // dot segments resolve first, as for every route: this one is the same file
+        assert!(ask("GET /assets/js/../css/tokens.css").starts_with("HTTP/1.1 200"));
+        // and out of /assets/ is not /assets/
+        assert!(ask("GET /assets/../Cargo.toml").starts_with("HTTP/1.1 404"));
+        assert!(ask("POST /assets/css/tokens.css").starts_with("HTTP/1.1 405"));
+        // no exception to the sign-in for a file
+        let bare = exchange(
+            addr,
+            &format!("GET /assets/css/tokens.css HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"),
+        );
+        assert!(bare.starts_with("HTTP/1.1 401"), "{bare}");
+        assert!(!bare.contains(":root {"), "{bare}");
+    }
+
     fn exchange(addr: SocketAddr, request: &str) -> String {
         let mut c = TcpStream::connect(addr).unwrap();
         c.write_all(request.as_bytes()).unwrap();

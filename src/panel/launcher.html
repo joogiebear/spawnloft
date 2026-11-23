@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>SpawnLoft Launcher</title>
+
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+
+<script src="/assets/js/launcher/00-theme.js"></script>
+
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/launcher.css">
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></symbol>
+  <symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.5 14c.4-2.8 2.6-4.5 5.5-4.5s5.1 1.7 5.5 4.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4.5 6.5l3.5 3.5 3.5-3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" fill="currentColor"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M1.75 3.5h4.5l1.5 1.75h6.5v7.25h-12.5z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 1.75l6.5 11.75h-13z"/><path d="M8 6.5v3.25M8 11.5v.5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.25v4M8 4.75v.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3.25 3.25L13 4.75"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.25"/><path d="M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5L7 9M11.5 9.5v4h-9v-9h4"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z" fill="var(--cube-top)"/><path d="M3.5 7.25L12 12v9.5l-8.5-4.75z" fill="var(--cube-left)"/><path d="M20.5 7.25L12 12v9.5l8.5-4.75z" fill="var(--cube-right)"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg width="24" height="24" aria-hidden="true"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Launcher</small></div></div>
+    <h1 class="pagetitle">Play</h1>
+    <span class="grow"></span>
+    <div class="menuhost" data-menu="account" id="chipwrap"></div>
+  </header>
+  <main class="stage" id="stage"></main>
+  <div id="sheet"></div>
+  <!-- what the page says aloud: these two stay put while everything above is rebuilt, so a
+       notice is read once when it appears and not again at every rebuild -->
+  <div class="sr" id="say" role="status" aria-live="polite"></div>
+  <div class="sr" id="sayNow" role="alert"></div>
+</div>
+
+<script src="/assets/js/launcher/01-intro.js"></script>
+<script src="/assets/js/shared/session.js"></script>
+<script src="/assets/js/launcher/02-globals.js"></script>
+<script src="/assets/js/launcher/03-pure-helpers.js"></script>
+<script src="/assets/js/launcher/04-dom.js"></script>
+<script src="/assets/js/launcher/05-panel.js"></script>
+<script src="/assets/js/launcher/06-state.js"></script>
+<script src="/assets/js/launcher/07-menus.js"></script>
+<script src="/assets/js/launcher/08-render.js"></script>
+<script src="/assets/js/launcher/09-account-chip.js"></script>
+<script src="/assets/js/launcher/10-play.js"></script>
+<script src="/assets/js/launcher/11-launching.js"></script>
+<script src="/assets/js/launcher/12-setup-sheet.js"></script>
+<script src="/assets/js/launcher/13-accounts.js"></script>
+<script src="/assets/js/launcher/14-poll.js"></script>
+<script src="/assets/js/launcher/15-start.js"></script>

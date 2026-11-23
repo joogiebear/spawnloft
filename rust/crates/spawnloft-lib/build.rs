@@ -3,6 +3,7 @@
 // two build-time settings are validated here, so a typo fails the build instead of shipping a
 // binary that trusts nothing (or trusts the wrong thing).
 fn main() {
+    panel_assets();
     let target = std::env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
     println!("cargo:rustc-env=SPAWNLOFT_TARGET={target}");
     println!("cargo:rerun-if-env-changed=SPAWNLOFT_VERSION");
@@ -55,4 +56,72 @@ fn main() {
             "SPAWNLOFT_FEED_BASELINE must be an ISO instant like 2026-12-01T00:00:00Z, got `{baseline}`"
         );
     }
+}
+
+/// The panel's stylesheets and scripts (`src/panel/css`, `src/panel/js`), compiled in as a table
+/// of exact names (`panel/pages.rs`): the `/assets/` route answers those names and nothing else.
+/// Only `.css` and `.js` files are taken; the names are plain path segments of lower-case
+/// letters, digits, `-` and `.`, so a file that would need escaping or could read as a different
+/// path stops the build instead.
+fn panel_assets() {
+    use std::path::{Path, PathBuf};
+    let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+    let root = manifest.join("../../../src/panel");
+    fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, PathBuf)>) {
+        println!("cargo:rerun-if-changed={}", dir.display());
+        let mut entries: Vec<_> = std::fs::read_dir(dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+            .map(|e| e.expect("read_dir").path())
+            .collect();
+        entries.sort();
+        for path in entries {
+            // a link could loop, or pull in a file from outside the checkout
+            let meta = std::fs::symlink_metadata(&path).expect("symlink_metadata");
+            assert!(
+                !meta.file_type().is_symlink(),
+                "{}: a link is not taken into the panel; put the file itself there",
+                path.display()
+            );
+            if meta.is_dir() {
+                walk(&path, base, out);
+                continue;
+            }
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext != "css" && ext != "js" {
+                continue;
+            }
+            println!("cargo:rerun-if-changed={}", path.display());
+            let name = path
+                .strip_prefix(base)
+                .expect("under src/panel")
+                .components()
+                .map(|c| c.as_os_str().to_str().expect("a UTF-8 file name").to_string())
+                .collect::<Vec<_>>()
+                .join("/");
+            assert!(
+                name.split('/').all(|seg| !seg.is_empty()
+                    && !seg.starts_with('.')
+                    && seg
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.')),
+                "src/panel/{name}: an asset name is lower-case letters, digits, `-` and `.` only"
+            );
+            out.push((name, path));
+        }
+    }
+    let mut assets = Vec::new();
+    for top in ["css", "js"] {
+        walk(&root.join(top), &root, &mut assets);
+    }
+    assets.sort();
+    let mut table = String::from("&[\n");
+    for (name, path) in &assets {
+        table.push_str(&format!(
+            "    ({name:?}, include_str!({:?})),\n",
+            path.display().to_string()
+        ));
+    }
+    table.push_str("]\n");
+    let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR")).join("panel_assets.rs");
+    std::fs::write(out, table).expect("write panel_assets.rs");
 }

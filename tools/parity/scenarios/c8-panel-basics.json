@@ -44,7 +44,7 @@
   "home/**/panel.key"
  ],
  "normalize": [
-  {"pattern": "(content-type: text/html; charset=utf-8\\n)\\d+ bytes, sha256 [0-9a-f]{64}", "replace": "$1<panel page: any edit to src/ui.html changes its bytes>"},
+  {"pattern": "(content-type: text/html; charset=utf-8\\n(?:  [^\\n]*\\n)*)\\d+ bytes, sha256 [0-9a-f]{64}", "replace": "$1<panel page: any edit under src/panel/ changes its bytes>"},
   {"pattern": "(^|\\\\n)os: [^\\n\"\\\\]*", "flags": "gm", "replace": "$1os: <machine>"},
   {"pattern": "%0Aos%3A\\+.*?%0A", "replace": "%0Aos%3A+<machine>%0A"},
   {
