@@ -1,104 +1,5 @@
 /* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
 @layer legacy {
-  /* ---- snapshot history: a data grid ---------------------------------------- */
-
-  /*
-    A dense grid: one row per snapshot, fixed columns so sizes and tags line up down the page, a
-    column header above, and the row actions faded until the row is pointed at - they are the same
-    two verbs on every line, and at full strength they were the loudest thing in the list.
-  */
-  .snaps { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
-  .snaps-head, .snap {
-    display: grid;
-    /* Named areas, not auto-flow: an item with a definite grid-row is placed BEFORE the auto-flow
-       items, so giving the buttons a row span sent them to column 1 and pushed the date right. */
-    grid-template-columns: minmax(0, 1fr) 132px 84px 262px;
-    column-gap: var(--s-4);
-    align-items: center;
-    padding: 0 var(--s-4);
-  }
-  .snaps-head {
-    grid-template-areas: "what tag size actions";
-    height: 34px;
-    background: rgba(var(--ink-rgb), .02);
-    border-bottom: 1px solid var(--line);
-    font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3);
-  }
-  .snaps-head > :nth-child(1) { grid-area: what; }
-  .snaps-head > :nth-child(2) { grid-area: tag; }
-  .snaps-head > :nth-child(3) { grid-area: size; text-align: right; }
-  .snap {
-    grid-template-areas:
-      "when tag size actions"
-      "what tag size actions";
-    row-gap: 2px;
-    padding-top: 10px;
-    padding-bottom: 10px;
-    background: transparent;
-    border-bottom: 1px solid var(--line);
-    transition: all var(--ease);
-  }
-  .snap:last-child { border-bottom: 0; }
-  .snap:hover { background: rgba(var(--ink-rgb), .035); }
-  /* The tick box sits in the row's left padding, not in the grid: the database backups list shares
-     these rows and has no box. */
-  .snaps.picks .snaps-head, .snaps.picks .snap { position: relative; padding-left: calc(var(--s-4) + 28px); }
-  .snap .pick { position: absolute; left: var(--s-4); top: 50%; transform: translateY(-50%); }
-  .snap[data-picked] { background: var(--lapis-fill); }
-  .snap-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0 8px; min-height: 30px; }
-  .snap-bar label { display: inline-flex; align-items: center; gap: 8px; font: var(--t-2)/1.3 var(--ui); color: var(--ink-2); cursor: pointer; }
-  .snap-bar .said { flex: 1 1 auto; font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); }
-  .snap-bar button { padding: 4px 10px; font-size: var(--t-2); flex: none; }
-  .hist-sum { margin: 0 0 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); }
-  .snap .when { grid-area: when; font: 500 var(--t-3)/1.4 var(--ui); color: var(--ink); }
-  .snap .what { grid-area: what; font: var(--t-1)/1.45 var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color var(--ease); }
-  .snap:hover .what { color: var(--ink-2); }
-  .snap .what .hint { font-family: var(--mono); font-size: var(--t-1); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
-  .snap .size { grid-area: size; font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; text-align: right; }
-  /* inline-block rather than flex: ::first-letter only applies to block containers, and the
-     scope names arrive lowercase ("plugins", "one file") but read as labels in sentence case. */
-  .snap .tag::first-letter { text-transform: uppercase; }
-  .snap .tag.unknown { background: none; border-color: transparent; color: var(--ink-3); font-weight: 400; }
-  .snap .tag {
-    grid-area: tag; justify-self: start;
-    display: inline-block;
-    font: 600 var(--t-1)/1 var(--ui); letter-spacing: .02em;
-    padding: 4px 9px; border-radius: 999px;
-    background: rgba(var(--ink-rgb), .04); color: var(--ink-2);
-    border: 1px solid var(--edge); white-space: nowrap;
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis;
-  }
-  .snap button { padding: 4px 10px; font-size: var(--t-2); }
-  .snap .why, .snap .items, .snaps-head > .h-why, .snaps-head > .h-items { display: none; font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .snap .items { font-family: var(--mono); text-align: right; }
-  /* Wide: why the snapshot was taken. Ultra: how much it holds. */
-  @container pane (min-width: 1280px) {
-    .snaps-head, .snap { grid-template-columns: minmax(0, 1fr) 132px 130px 84px 262px; }
-    .snaps-head { grid-template-areas: "what tag why size actions"; }
-    .snap { grid-template-areas: "when tag why size actions" "what tag why size actions"; }
-    .snap .why { display: block; grid-area: why; }
-    .snaps-head > .h-why { display: block; grid-area: why; font: inherit; color: inherit; }
-  }
-  @container pane (min-width: 2000px) {
-    .snaps-head, .snap { grid-template-columns: minmax(0, 1fr) 132px 130px 80px 84px 262px; }
-    .snaps-head { grid-template-areas: "what tag why items size actions"; }
-    .snap { grid-template-areas: "when tag why items size actions" "what tag why items size actions"; }
-    .snap .items { display: block; grid-area: items; }
-    .snaps-head > .h-items { display: block; grid-area: items; text-align: right; font: inherit; color: inherit; }
-  }
-  .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
-  .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
-  .snap .snap-warn { display: flex; gap: 6px; align-items: flex-start; font: var(--t-1)/1.45 var(--ui); color: var(--warn-ink, var(--ink)); white-space: normal; }
-  .snap .snap-warn svg { flex: none; width: 14px; height: 14px; margin-top: 2px; }
-  .snap[data-restoring] { background: var(--lapis-fill); }
-  .snap[data-restoring] .when { white-space: normal; }
-  .snap[data-locked] .snap-actions { opacity: 1; }
-  .snap-actions .icon-btn[data-tone="danger"]:hover:not(:disabled) { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
-  .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
-  .snap-note { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink); white-space: normal; }
-  details.leave-out > summary { padding-block: 8px; margin-block: -8px; cursor: pointer; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
-  details.leave-out[open] > summary { margin-bottom: 0; }
-  details.leave-out textarea { width: 100%; resize: vertical; font: var(--t-2)/1.5 var(--mono); }
 
   /* Activity: a day at a time under a heading, each day the Overview's feed - icon, what, who,
      when by the clock - with Undo in a last column where any line has one. Who is a chip in a
@@ -150,26 +51,6 @@
   :root[data-console-only] #srvNotice,
   :root[data-console-only] #bManage { display: none !important; }
   :root[data-console-only] main, :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
-  .steps { display: grid; gap: var(--s-2); }
-  .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 6px; }
-  .step {
-    counter-increment: step; display: grid; grid-template-columns: 22px 150px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2);
-    padding: 6px var(--s-2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
-  }
-  .step::before { content: counter(step); font: 600 var(--t-1)/1 var(--mono); color: var(--ink-3); text-align: center; }
-  .step > b { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); }
-  .step-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
-  .step-fields input:not([type="number"]) { flex: 1 1 160px; min-width: 0; }
-  .step-acts { display: flex; gap: 2px; }
-  /* The task form styles every label as a field's heading and every input at full width; these are
-     a sentence with a box in front. */
-  .task-form .steps label.check { display: flex; align-items: center; gap: 8px; font: 400 var(--t-2)/1.4 var(--ui); text-transform: none; letter-spacing: 0; color: var(--ink-2); }
-  .task-form .steps label.check input { width: auto; flex: none; margin: 0; }
-  @container pane (max-width: 560px) {
-    .step { grid-template-columns: 22px minmax(0, 1fr) auto; }
-    .step-fields { grid-column: 2 / -1; grid-row: 2; }
-    .step-acts { grid-column: 3; grid-row: 1; }
-  }
   /*
     The Overview's recent activity. A line says what happened and when, on one line, with the
     server and who did it under it only when there is more than one of either to tell apart. A run
@@ -219,7 +100,7 @@
   }
 
   /* The card. .card is the name for new ones; the older names keep their layouts and share this. */
-  .card, .section, .gauge, .task, .task-form {
+  .card, .section, .gauge {
     padding: var(--card-pad);
     border: 1px solid var(--line);
     border-radius: var(--card-radius);
@@ -227,10 +108,9 @@
     box-shadow: var(--shadow-sm);
   }
   /* Only a card that does something on its own answers the pointer. */
-  .card[data-interactive]:hover, .task:hover { border-color: var(--edge); }
+  .card[data-interactive]:hover { border-color: var(--edge); }
   .section { display: grid; gap: var(--s-3); }
   .section h3 { margin: 0; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
-  .where { margin: 0 0 10px; gap: 10px; }
   .mono-path { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 }

@@ -31,13 +31,7 @@
   }
   .pane-foot .hint { margin: 0; }
 
-  [data-backup-status]:empty { display: none; }
-
   @container pane (min-width: 860px) {
-    /* Backups: "now" and "automatic" are peers and sit side by side; the history below them is a
-       list of rows and wants the full width. */
-    #backupsBody { grid-template-columns: 1fr 1fr; align-items: start; }
-    #backupsBody > :not(.section) { grid-column: 1 / -1; }
     /* Performance: the two widgets share the row, so processor and memory can be read against
        each other at the same instant. */
     #performanceBody { grid-template-columns: 1fr 1fr; align-items: start; }
@@ -46,17 +40,12 @@
   }
   /*
     Ultra: split before stretch. A row stops reading as one line past about 1400px, so a pane that
-    has more room than that divides into a well and a companion instead of growing. Backups keeps
-    the history as the well, with Back up now and Automatic stacked beside it and the status line across both; Players
+    has more room than that divides into a well and a companion instead of growing. Players
     puts the chosen player beside the list; Settings shows the raw file beside the form; Stats lays
     its gauges two by two with the numbers of the range under each chart. The companion is a second
     column the lower tiers simply do not have, so nothing changes below 2000px.
   */
   @container pane (min-width: 2000px) {
-    #backupsBody { grid-template-columns: minmax(0, 1fr) clamp(420px, 36%, 900px); grid-auto-flow: row dense; gap: var(--s-5) var(--s-6); }
-    #backupsBody > .section { grid-column: 2; }
-    #backupsBody > [data-backup-history] { grid-column: 1; grid-row: span 3; }
-    #backupsBody > .bk-status { grid-column: 1 / -1; }
     #performanceBody { gap: var(--s-5); }
     /* The fourth cell of the two-by-two: uptime, start and sample count as a small table. */
     #performanceBody > .facts {

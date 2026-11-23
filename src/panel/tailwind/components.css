@@ -305,6 +305,8 @@
   }
   select.sl-input {
     padding-right: 34px;
+    /* with its look unset a select puts its text at the top: a line as tall as the box centres it */
+    line-height: 34px;
     cursor: pointer;
   }
   select.sl-input option {

@@ -64,6 +64,11 @@
 @source "../js/ui/22-plugins.js";
 @source "../js/ui/26-files.js";
 @source "../js/ui/27-editor.js";
+/* phase 8: Worlds, Backups (the server's and a database's), Schedule */
+@source "../js/ui/23-worlds.js";
+@source "../js/ui/25-server-list-look.js";
+@source "../js/ui/29-backups.js";
+@source "../js/ui/31-databases.js";
 /* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
    sources as plain words. Never built until the old rules are gone; the phase that removes an old
    one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.)
