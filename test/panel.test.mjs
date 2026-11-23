@@ -1282,3 +1282,21 @@ test('Add: a create that is running can be cancelled from its own button', () =>
     assert.match(html, /if \(\$\('#bPackCreate'\)\.dataset\.job\) return;/)
   })
 })
+
+test('Needs attention says each kind of problem once, worst first', () => {
+  const { groupAttention, nameList } = new Function(`${fnSource('nameList')}\n${fnSource('groupAttention')}
+    const openServerTool = () => {}; const turnOnBackups = () => {};
+    return { groupAttention, nameList }`)()
+  assert.equal(nameList(['A']), 'A')
+  assert.equal(nameList(['A', 'B', 'C']), 'A, B and C')
+  const backup = (name, never = true) => ({ key: 'backup|' + name, tone: 'warn', icon: 'archive', merge: 'backup', row: { name, label: name }, never, automatic: true, offer: 'Turn on.', title: name + ' t', text: 'x', actions: [] })
+  const crash = { key: 'crash|c', tone: 'fault', icon: 'alert', title: 'c crashed', text: '', actions: [] }
+  const out = groupAttention([backup('a'), backup('b'), crash])
+  // the crash is first, and the two backups are one line with one button for both
+  assert.deepEqual(out.map((i) => i.title), ['c crashed', '2 servers have never been backed up'])
+  assert.equal(out[1].actions[0].label, 'Turn on for both')
+  assert.equal(out[1].actions[1].items.length, 2)
+  assert.equal(groupAttention([backup('a'), backup('b', false), backup('c')])[0].title, '3 servers have no recent backup')
+  // one stays as it was, so its own wording and buttons are kept
+  assert.equal(groupAttention([backup('a')])[0].title, 'a t')
+})

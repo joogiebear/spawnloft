@@ -297,8 +297,6 @@
     of the same thing done back to back - eighteen backups deleted in a minute - is one line that
     opens to show each of them.
   */
-  .home-activity { display: grid; gap: var(--s-3); align-content: start; min-width: 0; container-type: inline-size; container-name: feed; }
-  .home-activity .hist-title { margin: 0; }
   .feed { display: grid; margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .feed > li { border-bottom: 1px solid var(--line-soft); }
   .feed > li:last-child { border-bottom: 0; }

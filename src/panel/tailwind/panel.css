@@ -58,6 +58,11 @@
 @source "../js/ui/03-tools.js";
 @source "../js/ui/06-server-tabs.js";
 @source "../js/ui/07-server-strip.js";
+/* phase 5: the Overview */
+@source "../js/ui/11-overview.js";
+@source "../js/ui/12-recent-activity.js";
+@source "../js/ui/13-needs-attention.js";
+@source "../js/ui/14-server-cards.js";
 /* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
    sources as plain words. Never built until the old rules are gone; the phase that removes an old
    one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.)

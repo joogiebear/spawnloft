@@ -64,53 +64,60 @@ const feed = { all: false };
 /**
  * The last few things done anywhere, newest first, a run of the same thing as one line. A line
  * opens that server's Activity, where the rest of its history and any Undo are; a server since
- * deleted has nowhere to open, and says so.
+ * deleted has nowhere to open, and says so. The server and the actor are said only where there is
+ * more than one to tell apart: one server and one person is eighteen repeats of "Survival" and
+ * "You" saying nothing.
  */
 function renderHomeActivity() {
   const entries = overview.activity || [];
   const box = $('#homeActList');
   $('#homeActivity').hidden = !entries.length;
-  const servers = new Set(entries.map((e) => e.server));
-  const actors = new Set(entries.map((e) => actorKey(e.by)));
-  // The server and the actor are said only where there is more than one to tell apart: one server
-  // and one person is eighteen repeats of "RoyalSkyblock" and "You" saying nothing.
-  const showServer = servers.size > 1;
-  const showWho = actors.size > 1;
+  const showServer = new Set(entries.map((e) => e.server)).size > 1;
+  const showWho = new Set(entries.map((e) => actorKey(e.by))).size > 1;
   const runs = groupActivity(entries);
   const shown = feed.all ? runs : runs.slice(0, FEED_SHOWN);
-  // Rebuilt only when what it says changes: an open run stays open across polls.
-  // Times are refreshed in place rather than keyed on, so a line under someone's focus survives the
-  // minute ticking over.
-  // A day label only where the lines cross a day: eight lines of "Today" would say it eight times
-  // over nothing. Keyed on the labels too, so the feed re-splits when midnight passes.
-  const days = shown.map((r) => activityDay(r.entries[0].at));
-  const split = new Set(days).size > 1;
-  const key = shown.map((r) => r.entries.map((e) => e.at).join(',')).join('|') + '|' + showServer + showWho + '|' + (split ? days.join(',') : '');
-  for (const t of box.querySelectorAll('time.act-when')) t.textContent = ago(t.dateTime) || stamp(t.dateTime);
+  // Rebuilt only when what it says changes; the times are refreshed in place, so a line under
+  // someone's focus survives the minute ticking over.
+  const key = shown.map((r) => r.entries.map((e) => e.at).join(',')).join('|') + '|' + showServer + showWho;
+  for (const t of box.querySelectorAll('time')) t.textContent = ago(t.dateTime) || stamp(t.dateTime);
   if (key !== feed.key) {
     feed.key = key;
-    const open = new Set(Array.from(box.querySelectorAll('details[open]')).map((d) => d.dataset.key));
-    box.textContent = '';
-    shown.forEach((run, i) => {
-      if (split && days[i] !== days[i - 1]) {
-        const day = el('li', 'feed-day');
-        day.textContent = days[i];
-        box.append(day);
-      }
-      box.append(feedItem(run, { showServer, showWho, open }));
-    });
+    box.replaceChildren(Kit.list(shown.map((run) => homeFeedRow(run, { showServer, showWho })), 'Recent activity'));
   }
   const more = $('#homeActMore');
+  const servers = new Set(entries.map((e) => e.server));
   const only = servers.size === 1 ? rowOf([...servers][0]) : null;
   if (only && !feed.all && runs.length > FEED_SHOWN) {
     more.hidden = false;
-    more.textContent = 'View all in ' + (only.label || only.name) + '\u2019s Activity';
+    more.textContent = 'All activity in ' + (only.label || only.name);
     more.onclick = () => openServerTool(only.name, 'activity');
   } else {
     more.hidden = runs.length <= FEED_SHOWN;
-    more.textContent = feed.all ? 'Show fewer' : 'View all ' + runs.length;
+    more.textContent = feed.all ? 'Show fewer' : 'Show all ' + runs.length;
     more.onclick = () => { feed.all = !feed.all; renderHomeActivity(); };
   }
+}
+
+/** One line of the Overview's feed: what was done, who by and where, and when. */
+function homeFeedRow(run, { showServer, showWho }) {
+  const e = run.entries[0];
+  const server = rowOf(e.server);
+  const said = runText(run);
+  const where = server ? (server.label || server.name) : e.server + ' (deleted)';
+  const sentence = said.verb + (said.detail ? ' ' + said.detail : '');
+  const meta = [e.ok === false ? (e.action === 'crash' ? 'Crash' : 'Failed') : '', showServer ? where : '', showWho ? activityActor(e.by).text : ''].filter(Boolean).join(' · ');
+  const when = Kit.h('time', { dateTime: e.at, title: new Date(e.at).toLocaleString(), text: ago(e.at) || stamp(e.at) });
+  const row = Kit.row({
+    lead: Kit.icon(activityIcon(e.action)),
+    title: sentence,
+    meta,
+    end: [when],
+    onClick: server ? () => openServerTool(server.name, 'activity') : null,
+  });
+  row.querySelector('.sl-row-title').title = sentence;
+  if (e.ok === false) row.querySelector('.sl-row-meta').classList.add('text-fault-ink');
+  if (server) row.title = 'Open ' + where + '’s activity';
+  return row;
 }
 
 function feedTime(iso) {
