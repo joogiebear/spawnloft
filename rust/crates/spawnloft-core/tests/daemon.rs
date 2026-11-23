@@ -123,19 +123,20 @@ impl Server {
 }
 
 impl Drop for Server {
-    /// Nothing outlives a failed test: whatever the state file still names is ended.
+    /// Nothing outlives a failed test: the CLI's own kill, which checks that a recorded pid is
+    /// still the process it names (Windows reuses pids within seconds, so a raw kill of a pid
+    /// from a finished test can hit another test's server).
     fn drop(&mut self) {
-        let st = self.state();
-        for k in ["javaPid", "daemonPid"] {
-            if let Some(pid) = st.get(k).and_then(serde_json::Value::as_u64) {
-                spawnloft_lib::util::kill_tree(pid as i32);
-            }
+        let out = self.run(&["status", "t", "--json"]);
+        if !out.stdout.contains("\"status\":\"stopped\"") {
+            let _ = self.run(&["kill", "t"]);
         }
     }
 }
 
 fn alive(pid: u32) -> bool {
-    spawnloft_lib::platform::pid_alive(pid)
+    // an exited process nobody has reaped yet (the daemon's parent is gone) counts as gone
+    spawnloft_lib::platform::pid_alive(pid) && !spawnloft_lib::platform::is_zombie(pid)
 }
 
 fn wait_until(what: &str, limit: Duration, mut done: impl FnMut() -> bool) {
@@ -182,7 +183,8 @@ fn a_stop_past_its_timeout_is_forced_and_said_so() {
     assert_eq!(out.code, Some(0), "stop: {out:?}\n{}", s.daemon_log());
     assert!(
         out.stdout.contains("did not shut down gracefully and was killed"),
-        "stop: {out:?}"
+        "stop: {out:?}\n{}",
+        s.daemon_log()
     );
     assert!(
         began.elapsed() < Duration::from_secs(20),
@@ -210,7 +212,11 @@ fn a_graceful_stop_waits_for_the_server_and_the_daemon() {
     let (java, daemon) = s.pids();
     let out = s.run(&["stop", "t"]);
     assert_eq!(out.code, Some(0), "stop: {out:?}");
-    assert!(out.stdout.contains("stopped (exit code 0)"), "stop: {out:?}");
+    assert!(
+        out.stdout.contains("stopped (exit code 0)"),
+        "stop: {out:?}\n{}",
+        s.daemon_log()
+    );
     assert!(
         !alive(java) && !alive(daemon),
         "left running: java {java} {}, daemon {daemon} {}",

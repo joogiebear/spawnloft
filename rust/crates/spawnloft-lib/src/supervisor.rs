@@ -695,14 +695,21 @@ fn wait_for_pid_exit(pid: Option<&Value>, timeout: f64) -> bool {
     if !js::truthy(pid) {
         return true;
     }
+    // an unreaped zombie has exited: a container's first process may never reap a daemon
+    let gone = || {
+        !control::pid_alive(pid)
+            || control::pid_of(pid)
+                .and_then(|p| u32::try_from(p).ok())
+                .is_some_and(crate::platform::is_zombie)
+    };
     let deadline = util::now() + timeout;
     while util::now() < deadline {
-        if !control::pid_alive(pid) {
+        if gone() {
             return true;
         }
         util::sleep(100.0);
     }
-    !control::pid_alive(pid)
+    gone()
 }
 
 /// `killTree(pid)`.
@@ -856,8 +863,17 @@ fn force_stop(layout: &Layout, name: &str) -> Result<Stopped, Failure> {
         && let Ok(Value::Object(res)) =
             control::control_request(&addr, name, &json!({ "op": "kill" }), 30000.0)
         && js::truthy(res.get("ok"))
-        && wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT)
     {
+        if wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT) {
+            return Ok(Stopped::of_reply(res));
+        }
+        // the server is gone (the daemon reaped it, so its pid may be another process's now):
+        // only the daemon that did not leave is ended
+        kill_tree(state.get("daemonPid"));
+        if !wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT) {
+            return Err(still_running(name, "supervisor process", state.get("daemonPid")));
+        }
+        control::clear_state(&sp);
         return Ok(Stopped::of_reply(res));
     }
     kill_tree(state.get("javaPid"));

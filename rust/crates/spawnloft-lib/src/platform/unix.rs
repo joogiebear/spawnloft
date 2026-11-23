@@ -373,6 +373,27 @@ pub fn signal_zero(pid: i32) -> bool {
     send(pid, 0) || std::io::Error::last_os_error().raw_os_error() == Some(1)
 }
 
+/// Whether `pid` has exited but not been reaped (Linux, from `/proc/<pid>/stat`; false
+/// elsewhere). A daemon reparented to a container's first process may never be reaped, and a
+/// zombie still answers `kill(pid, 0)`.
+pub fn is_zombie(pid: u32) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        std::fs::read_to_string(format!("/proc/{pid}/stat"))
+            .ok()
+            .and_then(|stat| {
+                stat.rfind(')')
+                    .and_then(|close| stat.get(close + 2..close + 3).map(|s| s == "Z"))
+            })
+            .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        false
+    }
+}
+
 /// Whether `pid` names a live process (EPERM counts: the pid is taken, just not ours).
 pub fn pid_alive(pid: u32) -> bool {
     let Ok(pid) = i32::try_from(pid) else {
