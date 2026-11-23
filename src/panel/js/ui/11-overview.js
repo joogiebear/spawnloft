@@ -6,6 +6,7 @@
  * there are none - the doors are the whole point of the screen when there is nothing.
  */
 function showHome() {
+  if (consoleOnly) { consoleGone(); return; }
   const any = state.rows.length > 0;
   show(any ? 'home' : 'empty');
   if (!any) {

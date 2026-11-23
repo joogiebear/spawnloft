@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="/assets/css/ui/20-section-intro.css">
 <link rel="stylesheet" href="/assets/css/ui/21-empty-pane.css">
 <link rel="stylesheet" href="/assets/css/ui/22-scheduled-tasks.css">
-<link rel="stylesheet" href="/assets/css/ui/23-console.css">
+<link rel="stylesheet" href="/assets/css/ui/23-menus.css">
 <link rel="stylesheet" href="/assets/css/ui/24-sheets.css">
 <link rel="stylesheet" href="/assets/css/ui/25-dialog.css">
 <link rel="stylesheet" href="/assets/css/ui/26-toasts.css">
@@ -75,6 +75,7 @@
   <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></symbol>
   <symbol id="i-dots" viewBox="0 0 16 16"><path d="M3.25 8h.5M7.75 8h.5M12.25 8h.5" stroke-width="2.5"/></symbol>
   <symbol id="i-caret" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 16 16"><path d="M8 2.5v11M3.5 9 8 13.5 12.5 9"/></symbol>
 
   <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
   <symbol id="i-panel" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z"/><path d="M6 3v10"/></symbol>
@@ -224,8 +225,8 @@
         rather than state - the jar, the RCON port, the world's name - live in Settings now; what
         stays here is what changes while you watch.
       -->
-      <div class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3 px-7 pt-5 pb-4 compact:px-5">
-        <span class="sl-tile sl-tile-lg" id="srvTile" aria-hidden="true"></span>
+      <div class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3 px-7 pt-5 pb-4 compact:px-5 popout:px-5 popout:py-3">
+        <span class="sl-tile sl-tile-lg popout:hidden" id="srvTile" aria-hidden="true"></span>
         <div class="grid min-w-0 max-w-full flex-[0_1_auto] gap-1.5">
           <div class="flex min-w-0 items-center gap-2.5">
             <h1 class="m-0 min-w-0 truncate type-page" id="srvName">—</h1>
@@ -236,7 +237,7 @@
           <div class="srv-meta" id="srvMeta"></div>
         </div>
         <!-- Live numbers only while it runs: a stopped server's header is who it is and Start. -->
-        <dl class="vitals" id="srvVitals"></dl>
+        <dl class="vitals popout:hidden" id="srvVitals"></dl>
         <div class="srv-actions">
           <button id="bRestart"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-restart"/></svg>Restart</button>
           <button id="bStop"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-stop"/></svg>Stop</button>
@@ -252,7 +253,7 @@
       </div>
 
       <div id="srvNotice"></div>
-      <div id="srvDiag"></div>
+      <div class="popout:hidden" id="srvDiag"></div>
 
       <!--
         The server's tools, as tabs under its header. Console first: it is where a server opens. A
@@ -280,60 +281,86 @@
         choice between the two.
       -->
       <div class="work" id="work">
-      <section class="console" id="paneConsole" role="tabpanel" aria-labelledby="tabConsole">
-        <div class="con-bar">
-          <span class="con-search">
-            <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
-            <input id="conSearch" placeholder="Filter the console" autocomplete="off" aria-label="Filter the console">
+      <section class="console @container/console" id="paneConsole" role="tabpanel" aria-labelledby="tabConsole">
+        <!--
+          What is shown, then how: the filter and the levels at the start, the view's own switches
+          and the one menu at the end. Saving, sharing and the diagnostics zip are one menu, so
+          the row fits one line at a 940px stage.
+        -->
+        <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line-soft px-5 py-2.5 compact:px-4" id="conBar">
+          <span class="sl-input-group min-w-36 flex-[0_1_260px]">
+            <span class="sl-input-lead" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg></span>
+            <input class="sl-input" type="search" id="conSearch" placeholder="Filter the console" autocomplete="off" spellcheck="false" aria-label="Filter the console">
           </span>
-          <span class="seg" role="group" aria-label="Filter by level">
-            <button data-lvl="all" aria-pressed="true">All</button>
-            <button data-lvl="warn">Warnings <b class="n" data-tone="warn" id="nWarn">0</b></button>
-            <button data-lvl="error">Errors <b class="n" data-tone="fault" id="nErr">0</b></button>
+          <span class="sl-seg" role="group" aria-label="Filter by level" id="conLevels">
+            <button type="button" data-lvl="all" aria-pressed="true">All</button>
+            <button type="button" data-lvl="warn" aria-pressed="false" title="Warnings and errors">Warnings <span class="sl-count" data-tone="warn" id="nWarn">0</span></button>
+            <button type="button" data-lvl="error" aria-pressed="false">Errors <span class="sl-count" data-tone="fault" id="nErr">0</span></button>
           </span>
-          <span class="grow"></span>
-          <span class="con-count" id="conCount"></span>
-          <span class="con-tools">
-          <button type="button" id="bPause" class="icon-btn" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
-          <button type="button" id="bWrap" class="icon-btn" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
-          <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
-          <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+          <span class="flex-1"></span>
+          <span class="whitespace-nowrap font-mono text-1 text-ink-3 tabular-nums @max-[900px]/console:hidden" id="conCount"></span>
+          <!-- how the log is shown; none of them touches the server -->
+          <span class="flex items-center gap-0.5" role="group" aria-label="View">
+            <button type="button" id="bPause" class="sl-btn sl-btn-ghost sl-btn-icon sl-btn-sm aria-pressed:bg-accent-wash aria-pressed:text-ink" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
+            <button type="button" id="bWrap" class="sl-btn sl-btn-ghost sl-btn-icon sl-btn-sm aria-pressed:bg-accent-wash aria-pressed:text-ink" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
+            <button type="button" id="bCopy" class="sl-btn sl-btn-ghost sl-btn-icon sl-btn-sm" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+            <button type="button" id="bPopConsole" class="sl-btn sl-btn-ghost sl-btn-icon sl-btn-sm" aria-label="Open in its own window" title="Open in its own window"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           </span>
-          <button type="button" id="bDiagZip"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg>Diagnostics</button>
-          <span class="menu-wrap" id="shareWrap">
-            <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
-            <div class="menu" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
-              <button role="menuitem" id="miExportFile" tabindex="-1">
-                <b>Save to a .log file</b>
-                <span>Keeps a copy beside this server's backups.</span>
+          <span class="sl-menu-wrap" id="shareWrap">
+            <button type="button" class="sl-btn" id="bExport" aria-label="Share log" title="Share log" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg><span class="@max-[900px]/console:hidden">Share log</span><svg class="sl-ico -ml-0.5 text-ink-3" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
+            <div class="sl-menu w-72 max-w-[min(360px,90vw)]" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
+              <button type="button" class="sl-menu-item" role="menuitem" id="miExportFile" tabindex="-1">
+                <span>Save a copy as a .log file</span>
+                <small>Into this server's exports folder, beside its backups.</small>
               </button>
-              <button role="menuitem" id="miExportShare" tabindex="-1">
-                <b>Upload to mclo.gs</b>
-                <span>Publishes a shareable link and opens it.</span>
+              <button type="button" class="sl-menu-item" role="menuitem" id="miExportShare" tabindex="-1" data-mc>
+                <span>Upload to mclo.gs</span>
+                <small>A public link to paste where you ask for help.</small>
               </button>
-              <div class="menu-sep" role="separator"></div>
-              <button role="menuitemcheckbox" id="bNums" aria-checked="false" tabindex="-1">
-                <b>Line numbers</b>
+              <button type="button" class="sl-menu-item" role="menuitem" id="bDiagZip" tabindex="-1" data-mc>
+                <span>Save a diagnostics zip</span>
+                <small>Logs and settings for a bug report. No passwords.</small>
               </button>
-              <button role="menuitem" id="bClear" tabindex="-1">
-                <b>Clear the view</b>
-                <span>The log file on disk is untouched.</span>
+              <div class="sl-menu-sep" role="separator" data-mc></div>
+              <button type="button" class="sl-menu-item flex-row items-center gap-2" role="menuitemcheckbox" id="bNums" aria-checked="false" tabindex="-1">
+                <svg class="sl-ico text-accent opacity-0 in-aria-checked:opacity-100" aria-hidden="true" focusable="false"><use href="#i-check"/></svg>
+                <span class="grid gap-0.5"><span>Line numbers</span><small class="type-meta text-ink-3">Counted from when this view opened.</small></span>
+              </button>
+              <button type="button" class="sl-menu-item flex-row items-center gap-2" role="menuitemcheckbox" id="bAloud" aria-checked="false" tabindex="-1">
+                <svg class="sl-ico text-accent opacity-0 in-aria-checked:opacity-100" aria-hidden="true" focusable="false"><use href="#i-check"/></svg>
+                <span class="grid gap-0.5"><span>Read new lines aloud</span><small class="type-meta text-ink-3">A screen reader says each line as it arrives.</small></span>
+              </button>
+              <div class="sl-menu-sep" role="separator"></div>
+              <button type="button" class="sl-menu-item" role="menuitem" id="bClear" tabindex="-1">
+                <span>Clear the view</span>
+                <small>The log file on disk is untouched.</small>
               </button>
             </div>
           </span>
         </div>
-        <div class="log-wrap">
-          <pre id="log" tabindex="0" role="log" aria-label="Server console"></pre>
-          <button class="jump" id="bJump" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-download"/></svg><span id="jumpLabel">Jump to latest</span></button>
+
+        <!-- the log, with the one line above it that says why it is not moving: paused, or stopped -->
+        <div class="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]" id="logWrap">
+          <div class="flex min-w-0 items-center gap-3 border-b border-line-soft bg-recess px-5 py-1.5 type-meta text-ink-2 compact:px-4" id="conNote" role="status" hidden>
+            <svg class="sl-ico shrink-0 text-ink-3" aria-hidden="true" focusable="false"><use href="#i-pause" data-note-icon/></svg>
+            <span class="min-w-0 flex-1 truncate" data-note-text></span>
+            <button type="button" class="sl-btn sl-btn-sm" data-note-action hidden></button>
+          </div>
+          <pre id="log" class="group/log m-0 min-h-0 overflow-auto bg-sunken pt-2.5 pb-3.5 font-mono text-3 leading-[1.6] text-console" tabindex="0" role="log" aria-live="off" aria-label="Server console"></pre>
+          <!-- nothing to show: why, and the one thing to do about it -->
+          <div class="pointer-events-none absolute inset-0 grid place-items-center p-5 *:pointer-events-auto" id="logState" hidden></div>
+          <button type="button" class="sl-btn sl-btn-sm absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-raised shadow-lg" id="bJump" hidden><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-arrow-down"/></svg><span id="jumpLabel">Jump to latest</span></button>
         </div>
 
-        <div class="cmd" id="cmdRow">
-          <label class="cmd-field">
-            <span class="prompt" aria-hidden="true">/</span>
-            <input id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" spellcheck="false" aria-label="Server command">
-          </label>
-          <button id="bSend" class="primary">Send</button>
-          <button id="bCmdStart" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start server</button>
+        <!-- The one box on this screen that takes typing, so it reads as a prompt with the slash inside
+             it. A command typed with its slash, as in the game, is sent without it. -->
+        <div class="flex items-center gap-2 border-t border-line-soft bg-recess px-5 py-3 compact:px-4" id="cmdRow">
+          <span class="sl-input-group min-w-0 flex-1">
+            <span class="sl-input-lead font-semibold text-accent in-has-disabled:text-ink-4" aria-hidden="true">/</span>
+            <input class="sl-input sl-input-mono h-10 bg-sunken disabled:border-dashed disabled:opacity-100" id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" spellcheck="false" aria-label="Server command" enterkeyhint="send">
+          </span>
+          <button type="button" class="sl-btn sl-btn-primary h-10" id="bSend">Send</button>
+          <button type="button" class="sl-btn sl-btn-primary h-10" id="bCmdStart" hidden><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start server</button>
         </div>
       </section>
 
