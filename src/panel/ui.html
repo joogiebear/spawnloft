@@ -341,7 +341,7 @@
 
         <!-- the log, with the one line above it that says why it is not moving: paused, or stopped -->
         <div class="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]" id="logWrap">
-          <div class="flex min-w-0 items-center gap-3 border-b border-line-soft bg-recess px-5 py-1.5 type-meta text-ink-2 compact:px-4" id="conNote" role="status" hidden>
+          <div class="flex min-w-0 items-center gap-3 border-b border-line-soft bg-recess px-5 py-1.5 type-meta text-ink-2 compact:px-4" id="conNote" hidden>
             <svg class="sl-ico shrink-0 text-ink-3" aria-hidden="true" focusable="false"><use href="#i-pause" data-note-icon/></svg>
             <span class="min-w-0 flex-1 truncate" data-note-text></span>
             <button type="button" class="sl-btn sl-btn-sm" data-note-action hidden></button>
@@ -355,8 +355,8 @@
         <!-- The one box on this screen that takes typing, so it reads as a prompt with the slash inside
              it. A command typed with its slash, as in the game, is sent without it. -->
         <div class="flex items-center gap-2 border-t border-line-soft bg-recess px-5 py-3 compact:px-4" id="cmdRow">
-          <span class="sl-input-group min-w-0 flex-1">
-            <span class="sl-input-lead font-semibold text-accent in-has-disabled:text-ink-4" aria-hidden="true">/</span>
+          <span class="group/cmd sl-input-group min-w-0 flex-1">
+            <span class="sl-input-lead font-semibold text-accent group-has-disabled/cmd:text-ink-4" aria-hidden="true">/</span>
             <input class="sl-input sl-input-mono h-10 bg-sunken disabled:border-dashed disabled:opacity-100" id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" spellcheck="false" aria-label="Server command" enterkeyhint="send">
           </span>
           <button type="button" class="sl-btn sl-btn-primary h-10" id="bSend">Send</button>

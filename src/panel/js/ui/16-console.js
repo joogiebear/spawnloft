@@ -187,6 +187,8 @@ function logStateFor(row, counts) {
   const { hasLines, shown } = counts;
   const label = row ? row.label || row.name : '';
   if (shown) return null;
+  // paused before anything was drawn: the line over the log says what is waiting
+  if (state.paused && state.lines.length) return null;
   if (hasLines) {
     return { icon: 'search', title: 'Nothing matches', text: 'No line shown has that in it. The log keeps the rest.', action: 'show-all' };
   }
@@ -223,7 +225,7 @@ function paintLogState(shown) {
     actions.push(Kit.button({ label: isDb(row) ? 'Start database' : 'Start server', icon: 'play', kind: 'primary', disabled: state.busy, onClick: () => $('#bStart').click() }));
   }
   const panel = Kit.empty({ icon: want.icon, title: want.title, text: want.text, actions });
-  panel.classList.add('log-empty', 'max-w-lg', 'p-0');
+  panel.classList.add('log-empty', 'max-w-[480px]', 'p-0');
   if (want.busy) {
     // the title already says it is working; the spinner is only the picture of it
     const spin = Kit.spinner();
@@ -238,6 +240,7 @@ function paintLogState(shown) {
 
 /** The search and the level back to everything. */
 function clearConsoleFilters() {
+  clearTimeout(searchTimer);
   $('#conSearch').value = '';
   state.search = '';
   setFilter('all');
@@ -294,7 +297,13 @@ function pushLine(text) {
     if (log.firstElementChild && log.firstElementChild.dataset.n === String(gone.n)) log.firstElementChild.remove();
   }
 
-  if (state.paused || !visible(entry)) { updateCount(); return; }
+  if (state.paused || !visible(entry)) {
+    // an empty view may now be empty for another reason: paused with lines waiting, or a filtered
+    // view the cap has just emptied
+    if (!log.childElementCount) paintLogState(0);
+    updateCount();
+    return;
+  }
 
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.append(makeLine(entry));

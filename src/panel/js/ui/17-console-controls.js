@@ -30,6 +30,8 @@ function setPaused(paused) {
   if (state.paused === paused) return;
   state.paused = paused;
   setPauseButton(paused);
+  // said once, here: the line over the log changes with every arriving line and is not announced
+  $('#live').textContent = paused ? 'Console paused. New lines wait until you resume.' : 'Console resumed.';
   if (paused) {
     state.pausedAt = state.lines.length;
     updateCount();

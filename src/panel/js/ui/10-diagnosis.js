@@ -193,6 +193,8 @@ function noticeBox({ tone, title, text, actions = [], dismiss }) {
 /** Switch to the console with the search set to the line a finding was read from. */
 function showLineInConsole(line) {
   showPane('console');
+  // a held line is one to show too
+  setPaused(false);
   // The timestamp prefix is per line and the match is a substring, so the message is enough.
   const needle = line.replace(/^\[[^\]]*\]:?\s*/, '').trim().slice(0, 80);
   const entry = needle && [...drawableLines()].reverse().find((e) => e.text.includes(needle));

@@ -6,7 +6,8 @@
  * there are none - the doors are the whole point of the screen when there is nothing.
  */
 function showHome() {
-  if (consoleOnly) { consoleGone(); return; }
+  // the console window: only a server that is really gone says so; one not yet selected waits
+  if (consoleOnly) { if (!rowOf(consoleOnly)) consoleGone(); return; }
   const any = state.rows.length > 0;
   show(any ? 'home' : 'empty');
   if (!any) {

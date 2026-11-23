@@ -475,6 +475,9 @@
   :is(.\*\:pointer-events-auto > *) {
     pointer-events: auto;
   }
+  :is(:where(.group\/cmd):has(:disabled) .group-has-disabled\/cmd\:text-ink-4) {
+    color: var(--ink-4);
+  }
   :is(:where(.group\/log)[data-nowrap] .group-data-nowrap\/log\:w-max) {
     width: max-content;
   }
@@ -514,9 +517,6 @@
   }
   .disabled\:opacity-100:disabled {
     opacity: 100%;
-  }
-  :where(:has(:disabled)) .in-has-disabled\:text-ink-4 {
-    color: var(--ink-4);
   }
   :where([aria-checked="true"]) .in-aria-checked\:opacity-100 {
     opacity: 100%;
