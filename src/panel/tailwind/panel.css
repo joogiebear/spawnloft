@@ -63,6 +63,12 @@
 @source "../js/ui/12-recent-activity.js";
 @source "../js/ui/13-needs-attention.js";
 @source "../js/ui/14-server-cards.js";
+/* phase 6: the console */
+@source "../js/ui/16-console.js";
+/* phase 7: Plugins and Mods, Files and the editor */
+@source "../js/ui/22-plugins.js";
+@source "../js/ui/26-files.js";
+@source "../js/ui/27-editor.js";
 /* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
    sources as plain words. Never built until the old rules are gone; the phase that removes an old
    one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.)
@@ -74,6 +80,8 @@
    everything inside the stage measures the stage or its pane. */
 @custom-variant compact (@media (max-width: 1199px));
 @custom-variant tight (@media (max-width: 840px));
+/* The console in a window of its own (/?console=<name>): the server's header shrinks to a line. */
+@custom-variant popout (:root[data-console-only] &);
 
 @theme inline {
   /* ---- colour -------------------------------------------------------------------------- */

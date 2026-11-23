@@ -3,7 +3,9 @@
 
 async function send() {
   const box = $('#cmd');
-  const line = box.value.trim();
+  // A command typed as in the game, "/say hi", goes to the console as "say hi": the slash is the
+  // prompt's, and the server's console takes commands without one.
+  const line = box.value.trim().replace(/^\/(?=\S)/, '');
   if (!state.current || !line) return;
   box.value = '';
   state.draft = '';
@@ -20,7 +22,8 @@ async function send() {
 
 $('#bSend').onclick = send;
 $('#cmd').onkeydown = (e) => {
-  if (e.key === 'Enter') { send(); return; }
+  // Enter that confirms a word in an input method (Chinese, Japanese, Korean) is not a send.
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { send(); return; }
   // Shell muscle memory: a console you type into should remember what you typed. What was being
   // typed when Up was first pressed is kept, and Down past the newest brings it back - the old
   // Down blanked the field, half-typed command and all.
