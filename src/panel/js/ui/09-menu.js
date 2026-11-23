@@ -157,7 +157,16 @@ function renderServer(row) {
   $('#bSend').hidden = startable;
   $('#bCmdStart').hidden = !startable;
   $('#bCmdStart').disabled = state.busy;
-  $('#cmd').placeholder = live ? 'Type a command — ↑ recalls' : 'Start the server to send commands';
+  const phase = consolePhase(row);
+  $('#cmd').placeholder = phase === 'stopping' ? 'Stopping…'
+    : phase === 'starting' ? 'Starting… commands can be sent once it is up'
+      : live ? 'Type a command — ↑ recalls' : 'Start the server to send commands';
+  // The diagnostics zip and mclo.gs read a Minecraft server's folder; a database has neither.
+  for (const el of $$('#exportMenu [data-mc]')) el.hidden = db;
+  $('#log').setAttribute('aria-label', db ? 'Database log' : 'Server console');
+  // the log says why it is empty, or that its lines are from before it stopped, as the state moves
+  paintLogState();
+  paintConNote();
 
   // The diagnoses are Minecraft's failure shapes; a database's console has its own.
   if (db) { $('#srvDiag').textContent = ''; diagKey = ''; } else loadDiagnosis(row);
