@@ -3673,6 +3673,7 @@ dependencies = [
 name = "spawnloft-fakes"
 version = "2.0.0-internal.0"
 dependencies = [
+ "ring",
  "serde_json",
  "spawnloft-lib",
 ]

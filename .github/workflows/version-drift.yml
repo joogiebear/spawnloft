@@ -1,0 +1,89 @@
+# Once a week: do Mojang's newest versions, Fabric's profile for the newest release, their asset
+# indexes and Mojang's Java runtime list still fit this SpawnLoft? A launch refuses what does not
+# (strict mode); this says so before someone presses Play. It also checks that the signed
+# harness list still verifies and every harness jar still downloads with its sha256, and Quilt,
+# Forge and NeoForge set up for the newest release (their newest and default builds) with an
+# installer, hosts and launch variables this SpawnLoft knows. A failure opens (or adds to) one issue,
+# "Mojang format drift", and the next green run closes it. A pull request that changes the check
+# or the launcher code it calls runs it too, without touching the issue.
+#
+# The check is spawnloft-fakes' version-drift binary (test-only, never shipped), which runs the
+# Rust launcher code (rust/crates/spawnloft-lib/src/client/) on what Mojang and the loaders publish.
+name: version-drift
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - rust/crates/spawnloft-fakes/src/bin/version-drift.rs
+      - tools/version-drift-baseline.json
+      - .github/workflows/version-drift.yml
+      - rust/crates/spawnloft-lib/src/client/version.rs
+      - rust/crates/spawnloft-lib/src/client/meta.rs
+      - rust/crates/spawnloft-lib/src/client/library.rs
+      - rust/crates/spawnloft-lib/src/client/fabric.rs
+      - rust/crates/spawnloft-lib/src/client/forge.rs
+      - rust/crates/spawnloft-lib/src/client/forge_install.rs
+      - rust/crates/spawnloft-lib/src/client/loaders.rs
+      - rust/crates/spawnloft-lib/src/client/runtime.rs
+      - rust/crates/spawnloft-lib/src/client/harness.rs
+      - rust/crates/spawnloft-lib/src/client/harness_index.rs
+      - rust/crates/spawnloft-lib/src/client/rules.rs
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # the check job's cache from v2 (rust-internal.yml), restored only: this workflow saves none
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build the drift check
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          cargo build --locked -p spawnloft-fakes --bin version-drift
+      - name: Check Mojang's formats, the loaders and the harness list
+        id: check
+        # the loaders' version files and libraries go to a data folder of the job's own
+        env:
+          SPAWNLOFT_DATA_ROOT: ${{ runner.temp }}/spawnloft-drift
+        run: rust/target/debug/version-drift --baseline tools/version-drift-baseline.json --report drift-report.md
+      - name: Open or update the drift issue
+        if: failure() && steps.check.outcome == 'failure' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "The [weekly drift check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found problems: a Mojang or mod loader format this SpawnLoft does not handle refuses a launch or a loader's set-up, and a harness list or jar problem means the harness is missing or stale for those versions."
+            echo
+            cat drift-report.md
+          } > issue.md
+          n=$(gh issue list --state open --search 'in:title "Mojang format drift"' --json number,title --jq '[.[] | select(.title == "Mojang format drift")][0].number // empty')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file issue.md
+          else
+            gh issue create --title "Mojang format drift" --body-file issue.md
+          fi
+      - name: Close the drift issue once green
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh issue list --state open --search 'in:title "Mojang format drift"' --json number,title --jq '[.[] | select(.title == "Mojang format drift")][0].number // empty')
+          if [ -n "$n" ]; then
+            gh issue close "$n" --comment "The [drift check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) is green again."
+          fi
