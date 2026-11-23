@@ -1330,3 +1330,38 @@ test('the console says why it is empty, holds paused lines, and sends a command 
   assert.match(html, /box\.value\.trim\(\)\.replace\(\/\^\\\/\(\?=\\S\)\/, ''\)/)
   assert.match(html, /e\.key === 'Enter' && !e\.isComposing/)
 })
+
+test('plugins know a result they have by where it came from, files sort with folders first, and both follow a start', () => {
+  const { isInstalledHit, projectPage, sortEntries } = lifted(['isInstalledHit', 'projectPage', 'sortEntries'])
+  const plugins = [
+    { name: 'Essentials', managed: true, source: 'modrinth', project: 'ess' },
+    { name: 'Dynmap', managed: false, source: null, project: null },
+  ]
+  // the listing's title is not the jar's name: matched by project
+  assert.equal(isInstalledHit({ id: 'ess', title: 'EssentialsX', source: 'modrinth' }, plugins), true)
+  assert.equal(isInstalledHit({ id: 'ess', title: 'EssentialsX', source: 'hangar' }, plugins), false)
+  // a jar added by hand is known only by its name
+  assert.equal(isInstalledHit({ id: 'dm', title: 'dynmap', source: 'modrinth' }, plugins), true)
+  assert.equal(isInstalledHit({ id: 'wg', title: 'WorldGuard', source: 'modrinth' }, plugins), false)
+
+  assert.equal(projectPage({ slug: 'chunky', source: 'modrinth' }, false), 'https://modrinth.com/plugin/chunky')
+  assert.equal(projectPage({ slug: 'sodium', source: 'modrinth' }, true), 'https://modrinth.com/mod/sodium')
+  assert.equal(projectPage({ slug: 'ViaVersion', author: 'ViaVersion', source: 'hangar' }, false), 'https://hangar.papermc.io/ViaVersion/ViaVersion')
+  assert.equal(projectPage({ slug: 'x', source: 'hangar' }, false), null)
+  assert.equal(projectPage({ source: 'modrinth' }, false), null)
+
+  const entries = [
+    { name: 'b.yml', type: 'file', size: 10, modified: '2026-01-02T00:00:00Z' },
+    { name: 'world', type: 'dir', modified: '2026-01-01T00:00:00Z' },
+    { name: 'a.jar', type: 'file', size: 900, modified: '2026-01-03T00:00:00Z' },
+    { name: 'logs', type: 'dir', modified: '2026-01-04T00:00:00Z' },
+  ]
+  const names = (list) => list.map((e) => e.name)
+  assert.equal(sortEntries(entries, null), entries)
+  assert.deepEqual(names(sortEntries(entries, { key: 'name', dir: 'asc' })), ['logs', 'world', 'a.jar', 'b.yml'])
+  assert.deepEqual(names(sortEntries(entries, { key: 'size', dir: 'desc' })), ['world', 'logs', 'a.jar', 'b.yml'])
+  assert.deepEqual(names(sortEntries(entries, { key: 'modified', dir: 'desc' })), ['logs', 'world', 'a.jar', 'b.yml'])
+
+  // a failed folder upload is one message at the end, not one per file
+  assert.match(fnSource('uploadFiles'), /failed\.push\(/)
+})

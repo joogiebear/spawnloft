@@ -27,7 +27,10 @@ function escHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-const tok = (cls, s) => s ? '<span class="hl-' + cls + '">' + escHtml(s) + '</span>' : '';
+/** The colour of each kind of word, as Tailwind classes (read from this file: panel.css @source). */
+const HL_CLASS = { key: 'text-accent-ink', str: 'text-live-ink', num: 'text-warn-ink', bool: 'text-warn-ink', com: 'text-ink-4 italic' };
+
+const tok = (cls, s) => s ? '<span class="' + HL_CLASS[cls] + '">' + escHtml(s) + '</span>' : '';
 
 function hlValue(v) {
   // The comment first: a " #" outside quotes ends the value.
@@ -122,6 +125,31 @@ const FILES_WRAP_KEY = 'spawnloft.files.wrap';
 let filesWrap = false;
 try { filesWrap = localStorage.getItem(FILES_WRAP_KEY) === '1'; } catch { /* stays off */ }
 
+/*
+  The editor's layers: a transparent textarea over a <pre> painted with the same text, and a third
+  <pre> under both where Find marks its matches. All three must lay text out identically, so they
+  share every font, padding and wrapping rule; wrapping and plain text are data attributes on the
+  box that holds them.
+*/
+const ED_LAYER = 'absolute inset-0 m-0 rounded-none border-0 px-4 py-3 [font:inherit] [letter-spacing:0] [tab-size:2] whitespace-pre [overflow-wrap:normal] break-normal group-data-wrap/code:whitespace-pre-wrap group-data-wrap/code:[overflow-wrap:anywhere]';
+// the match Find stands on is the one mark with a class (markMatches: class="now")
+const ED_MARKS = 'text-transparent [&_mark]:rounded-[2px] [&_mark]:bg-[rgba(var(--accent-rgb),.28)] [&_mark]:text-transparent [&_mark[class]]:bg-[rgba(var(--accent-rgb),.6)] [&_mark[class]]:outline [&_mark[class]]:outline-1 [&_mark[class]]:outline-accent';
+/** A small button in the editor's bars. */
+const edButton = (label, kind, title) => {
+  const b = Kit.button({ label, kind: kind || 'ghost', size: 'sm' });
+  // a switch (Wrap lines) shows that it is on
+  b.classList.add('aria-pressed:bg-accent-wash', 'aria-pressed:text-accent-ink');
+  if (title) b.title = title;
+  return b;
+};
+
+/** The row over a file: back to the list, the file's state, and what can be done with it. */
+function editorBar(...end) {
+  const back = Kit.button({ label: 'All files', icon: 'folder', kind: 'ghost', size: 'sm' });
+  const bar = Kit.h('div', { class: 'fm-bar flex min-w-0 flex-wrap items-center gap-2' }, back, Kit.h('span', { class: 'flex-1' }), ...end);
+  return { bar, back };
+}
+
 /** A picture, shown as it is: server-icon.png is the usual one. */
 function renderFileImage(row, view) {
   const body = $('#filesBody');
@@ -129,28 +157,18 @@ function renderFileImage(row, view) {
   const name = ed.path.split('/').pop();
   body.textContent = '';
   paneHead(body, 'file', name, ed.path);
-  const bar = document.createElement('div');
-  bar.className = 'fm-bar';
-  const back = iconButton('folder', 'All files', 'ghost');
-  const grow = document.createElement('span');
-  grow.className = 'grow';
-  const dl = iconButton('download', 'Download');
-  bar.append(back, grow, dl);
-  const frame = document.createElement('div');
-  frame.className = 'fm-image';
-  const img = document.createElement('img');
-  img.alt = name;
-  const said = document.createElement('div');
-  said.className = 'fm-foot hint';
-  said.setAttribute('role', 'status');
+  const dl = Kit.button({ label: 'Download', icon: 'download', size: 'sm' });
+  const { bar, back } = editorBar(dl);
+  const frame = Kit.h('div', { class: 'grid min-h-60 place-items-center overflow-auto rounded-sm border border-line bg-sunken p-5' });
+  const img = Kit.h('img', { alt: name, class: 'h-auto max-w-full shadow-[0_0_0_1px_var(--line)] [image-rendering:pixelated]' });
+  const said = Kit.h('p', { class: 'sl-hint', role: 'status' });
   img.onload = () => { said.textContent = img.naturalWidth + ' \u00d7 ' + img.naturalHeight + ' pixels'; };
   img.onerror = () => {
-    frame.textContent = '';
-    frame.append(emptyState('file', name + ' could not be shown: it is not a picture a browser can draw, or it is too big. Download it to look at it.'));
+    frame.replaceChildren(Kit.empty({ icon: 'file', title: name + ' could not be shown', text: 'It is not a picture a browser can draw, or it is too big. Download it to look at it.' }));
   };
   img.src = '/api/instances/' + encodeURIComponent(row.name) + '/files/image?path=' + encodeURIComponent(ed.path);
   frame.append(img);
-  body.append(bar, frame, said);
+  body.append(Kit.h('div', { class: 'grid w-full min-w-0 max-w-[1240px] gap-3' }, bar, frame, said));
   back.onclick = () => { view.editing = null; renderFiles({ force: true }); };
   dl.onclick = () => downloadPath(row, ed.path);
   requestAnimationFrame(() => back.focus({ preventScroll: true }));
@@ -168,78 +186,43 @@ function renderFileEditor(row, view) {
   const painted = lang !== 'plain' && ed.text.length <= HIGHLIGHT_MAX;
   body.textContent = '';
   paneHead(body, 'file', ed.path.split('/').pop(), ed.path);
+  // the page holds the editor's parts at the width the file list has
+  const page = Kit.h('div', { class: 'grid w-full min-w-0 max-w-[1240px] gap-2' });
+  body.append(page);
 
-  const bar = document.createElement('div');
-  bar.className = 'fm-bar';
-  const back = iconButton('folder', 'All files', 'ghost');
-  const dot = document.createElement('span');
-  dot.className = 'fm-dirty';
-  dot.title = 'Unsaved changes';
-  const grow = document.createElement('span');
-  grow.className = 'grow';
-  const reload = document.createElement('button');
-  reload.type = 'button';
-  reload.className = 'ghost';
-  reload.textContent = 'Reload';
-  const dl = iconButton('download', 'Download');
-  const save = document.createElement('button');
-  save.type = 'button';
-  save.className = 'primary';
-  save.textContent = 'Save';
-  bar.append(back, dot, grow, reload, dl, save);
+  const dot = Kit.h('span', { class: 'flex items-center gap-1.5 text-2 text-ink-3' }, Kit.dot({ tone: 'accent' }), 'Not saved');
+  const reload = edButton('Reload', 'ghost', 'Read the file again from disk');
+  const dl = Kit.button({ label: 'Download', icon: 'download', kind: 'ghost', size: 'sm' });
+  const save = Kit.button({ label: 'Save', kind: 'primary', size: 'sm' });
+  const { bar, back } = editorBar(dot, reload, dl, save);
   save.hidden = readOnly;
-  body.append(bar);
-  if (readOnly) {
-    const partial = document.createElement('div');
-    partial.className = 'hint';
-    partial.style.marginBottom = 'var(--s-2)';
-    partial.textContent = tailWords(ed.tail);
-    body.append(partial);
-  }
+  page.append(bar);
+  if (readOnly) page.append(Kit.h('p', { class: 'sl-hint', text: tailWords(ed.tail) }));
 
   // ---- find, and wrap -----------------------------------------------------------
-  const findRow = document.createElement('div');
-  findRow.className = 'fm-find';
-  findRow.setAttribute('role', 'search');
-  const q = document.createElement('input');
-  q.type = 'search';
-  q.placeholder = 'Find in this file';
+  const q = Kit.h('input', { class: 'sl-input', type: 'search', placeholder: 'Find in this file', autocomplete: 'off', spellcheck: false });
   q.setAttribute('aria-label', 'Find in this file');
   q.dataset.kept = '1';
-  const found = document.createElement('span');
-  found.className = 'said';
-  found.setAttribute('role', 'status');
-  const prev = document.createElement('button');
-  prev.type = 'button';
-  prev.className = 'ghost';
-  prev.textContent = 'Previous';
-  const next = document.createElement('button');
-  next.type = 'button';
-  next.className = 'ghost';
-  next.textContent = 'Next';
-  const findGrow = document.createElement('span');
-  findGrow.className = 'grow';
-  const wrapBtn = document.createElement('button');
-  wrapBtn.type = 'button';
-  wrapBtn.className = 'ghost';
-  wrapBtn.textContent = 'Wrap lines';
-  wrapBtn.title = 'Fold long lines at the edge, so nothing runs off to the right';
-  findRow.append(q, prev, next, found, findGrow, wrapBtn);
-  body.append(findRow);
+  const found = Kit.h('span', { class: 'min-w-[6em] text-2 text-ink-3', role: 'status' });
+  const prev = edButton('Previous');
+  const next = edButton('Next');
+  const wrapBtn = edButton('Wrap lines', 'ghost', 'Fold long lines at the edge, so nothing runs off to the right');
+  const findRow = Kit.h('div', { class: 'fm-find flex min-w-0 flex-wrap items-center gap-2', role: 'search' },
+    Kit.h('span', { class: 'sl-input-group min-w-36 flex-[0_1_260px]' }, Kit.h('span', { class: 'sl-input-lead', 'aria-hidden': 'true' }, Kit.icon('search')), q),
+    prev, next, found, Kit.h('span', { class: 'flex-1' }), wrapBtn);
+  page.append(findRow);
 
-  const box = document.createElement('div');
-  box.className = 'fm-editor';
-  const gutter = document.createElement('div');
-  gutter.className = 'fm-gutter';
-  gutter.setAttribute('aria-hidden', 'true');
-  const code = document.createElement('div');
-  code.className = 'fm-code' + (painted ? '' : ' plain');
-  const pre = document.createElement('pre');
-  pre.setAttribute('aria-hidden', 'true');
-  const marks = document.createElement('pre');
-  marks.className = 'fm-marks';
-  marks.setAttribute('aria-hidden', 'true');
-  const ta = document.createElement('textarea');
+  const gutter = Kit.h('div', {
+    class: 'fm-gutter min-w-[3.5em] overflow-hidden border-r border-line-soft py-3 pr-2 pl-3 text-right whitespace-pre text-ink-4 select-none group-data-nogutter/ed:hidden',
+    'aria-hidden': 'true',
+  });
+  const code = Kit.h('div', { class: 'fm-code group/code relative min-w-0' });
+  if (!painted) code.dataset.plain = '';
+  const pre = Kit.h('pre', { class: ED_LAYER + ' pointer-events-none overflow-hidden text-ink group-data-plain/code:hidden', 'aria-hidden': 'true' });
+  const marks = Kit.h('pre', { class: 'fm-marks pointer-events-none overflow-hidden ' + ED_LAYER + ' ' + ED_MARKS, 'aria-hidden': 'true' });
+  const ta = Kit.h('textarea', {
+    class: ED_LAYER + ' h-full min-h-0 w-full resize-none overflow-auto bg-transparent p-0 px-4 py-3 text-transparent caret-ink shadow-none outline-none selection:bg-[rgba(var(--accent-rgb),.3)] selection:text-transparent focus:bg-transparent focus:shadow-none focus:outline-none group-data-plain/code:text-ink group-data-plain/code:selection:text-ink group-data-wrap/code:overflow-x-hidden group-data-wrap/code:overflow-y-scroll',
+  });
   ta.spellcheck = false;
   ta.wrap = 'off';
   ta.readOnly = readOnly;
@@ -248,18 +231,19 @@ function renderFileEditor(row, view) {
   ta.value = ed.text;
   // matches first, so they are painted under the text
   code.append(marks, pre, ta);
-  box.append(gutter, code);
-  body.append(box);
+  const box = Kit.h('div', {
+    class: 'fm-editor group/ed grid h-[360px] grid-cols-[auto_minmax(0,1fr)] overflow-hidden rounded-sm border border-line bg-sunken [font:var(--t-3)/1.6_var(--mono)] shadow-[inset_0_1px_2px_rgba(0,0,0,.35)] focus-within:border-accent-edge focus-within:outline-[length:var(--ring-width)] focus-within:-outline-offset-1 focus-within:outline-[var(--ring-color)] focus-within:outline-solid data-nogutter:grid-cols-[minmax(0,1fr)]',
+  }, gutter, code);
+  page.append(box);
 
-  const foot = document.createElement('div');
-  foot.className = 'fm-foot hint';
-  const where = document.createElement('span');
-  const how = document.createElement('span');
-  how.textContent = readOnly
-    ? 'Read only  ·  Ctrl+F finds'
-    : LANG_NAMES[lang] + '  ·  Ctrl+S saves  ·  Ctrl+F finds  ·  Tab indents with spaces; Esc, then Tab, moves on';
-  foot.append(where, how);
-  body.append(foot);
+  const where = Kit.h('span');
+  const how = Kit.h('span', {
+    text: readOnly
+      ? 'Read only  \u00b7  ' + FILES_MOD + 'F finds'
+      : LANG_NAMES[lang] + '  \u00b7  ' + FILES_MOD + 'S saves  \u00b7  ' + FILES_MOD + 'F finds  \u00b7  Tab indents with spaces; Esc, then Tab, moves on',
+  });
+  const foot = Kit.h('div', { class: 'fm-foot flex flex-wrap justify-between gap-x-4 gap-y-2 text-2 text-ink-3' }, where, how);
+  page.append(foot);
 
   let lines = -1;
   const paint = () => {
@@ -274,6 +258,7 @@ function renderFileEditor(row, view) {
     if (painted) pre.innerHTML = ta.value.split('\n').map((l) => highlightLine(l, lang)).join('\n') + '\n ';
     const dirty = ta.value !== ed.original;
     dot.hidden = !dirty;
+    dot.setAttribute('aria-hidden', String(!dirty));
     save.disabled = !dirty;
   };
   const sync = () => {
@@ -296,8 +281,8 @@ function renderFileEditor(row, view) {
     pre.style.right = marks.style.right = bar;
   };
   const setWrap = (on) => {
-    code.classList.toggle('wrap', on);
-    box.classList.toggle('nogutter', on || (readOnly && !ed.tail.whole));
+    code.toggleAttribute('data-wrap', on);
+    box.toggleAttribute('data-nogutter', on || (readOnly && !ed.tail.whole));
     ta.wrap = on ? 'soft' : 'off';
     wrapBtn.setAttribute('aria-pressed', String(on));
     layout();
@@ -471,30 +456,63 @@ function renderFileEditor(row, view) {
   };
   dl.onclick = () => downloadPath(row, ed.path);
 
+  /** The caret to the start of a line, scrolled to: where a save's complaint points. */
+  const goToLine = (n) => {
+    const lines = ta.value.split('\n');
+    if (!(n >= 1 && n <= lines.length)) return;
+    const at = lines.slice(0, n - 1).reduce((sum, l) => sum + l.length + 1, 0);
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(at, at + lines[n - 1].length);
+    const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+    ta.scrollTop = Math.max(0, (n - 1) * lineHeight - ta.clientHeight / 2);
+    sync();
+    caret();
+  };
+
   const write = async (force) => {
     // the end of a file, or a picture, is not the file: there is nothing here to save over it
     if (readOnly) return;
-    save.disabled = true;
-    save.textContent = 'Saving…';
+    busy(save, true, 'Saving\u2026');
     try {
       const out = await post(base + '/write', { path: ed.path, text: ta.value, version: ed.version, force: force });
       ed.version = out.version;
       ed.original = ta.value;
       ed.text = ta.value;
-      toast('Saved ' + ed.path.split('/').pop() + (out.snapshot ? '. The previous version is in Backups' : '')
+      toast('Saved ' + ed.path.split('/').pop() + (out.snapshot ? '. The previous version is in Backups, and Activity can undo the change' : '')
         + (out.appliesOnRestart ? '; reload the plugin or restart the server to use it.' : '.'), 'good');
     } catch (e) {
       if (e.code === 'format') {
+        // the complaint names a line where it can: the caret goes there, and stays if not saved
+        const line = Number((/\bline (\d+)/i.exec(e.message) || [])[1]);
+        if (line) goToLine(line);
         const ok = await ask({ title: 'Save it with a mistake in it?', text: e.message + '. Whatever reads this file may refuse to load it.', confirmLabel: 'Save anyway', danger: true });
-        if (ok) { save.textContent = 'Save'; return write(true); }
+        if (ok) { busy(save, false); return write(true); }
+        if (line) goToLine(line);
       } else if (e.code === 'changed') {
-        const ok = await ask({ title: ed.path.split('/').pop() + ' changed on disk', text: e.message + ' Reloading discards what you typed here; copy it first if you need it.', confirmLabel: 'Reload it', danger: true });
-        if (ok) { await openFile(row, view, ed.path); return; }
+        // Two ways on, and neither loses anything without saying so: saving over it keeps a copy
+        // of what is there now, as every save does.
+        const got = await ask({
+          title: ed.path.split('/').pop() + ' changed on disk',
+          text: 'Something else changed it after it was opened here.',
+          choices: [
+            { value: 'mine', label: 'Save mine over it', hint: 'What is on disk now is copied to Backups first.' },
+            { value: 'theirs', label: 'Reload it', hint: 'What you typed here is lost.' },
+          ],
+          confirmLabel: 'Go on',
+        });
+        if (got && got.choice === 'theirs') { await openFile(row, view, ed.path); return; }
+        if (got && got.choice === 'mine') {
+          try {
+            const now = await api(base + '/read?path=' + encodeURIComponent(ed.path));
+            if (now.version) { ed.version = now.version; busy(save, false); return write(force); }
+            toast('It could not be read again to save over it: ' + (now.reason === 'large' ? 'it is now too big to edit here.' : 'it is no longer text.'), 'bad');
+          } catch (e2) { toast(e2.message, 'bad'); }
+        }
       } else {
         toast(e.message, 'bad');
       }
     }
-    save.textContent = 'Save';
+    busy(save, false);
     paint();
   };
   save.onclick = () => write(false);
