@@ -789,9 +789,31 @@ pub fn stop(layout: &Layout, by: &Actor, name: &str, timeout: f64) -> Result<Sto
     if !js::truthy(res.get("ok")) {
         return Err(Failure::user(error_or(&res, "stop failed")));
     }
-    wait_for_pid_exit(state.get("daemonPid"), 15000.0);
+    // the server is down; a daemon that does not leave after it would answer the next start as
+    // "still shutting down", so it is ended here, and a failure to end it is reported
+    if !wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT) {
+        kill_tree(state.get("daemonPid"));
+        if !wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT) {
+            return Err(Failure::user(format!(
+                "\"{name}\" stopped, but its supervisor process (pid {}) did not exit",
+                text(state.get("daemonPid"))
+            )));
+        }
+    }
     activity::record_by(&roots(layout), by, name, "stop", None, None, true);
     Ok(Stopped::of_reply(res))
+}
+
+/// How long `stop` and `kill` wait for a process they ended to be gone.
+const DAEMON_EXIT_WAIT: f64 = 15000.0;
+
+/// The error for a kill that left a process running: the state file stays, so the server is
+/// still shown as running (or orphaned) and the kill can be tried again.
+fn still_running(name: &str, what: &str, pid: Option<&Value>) -> Failure {
+    Failure::user(format!(
+        "\"{name}\" could not be killed: its {what} (pid {}) is still running",
+        text(pid)
+    ))
 }
 
 /// `res.error || fallback`.
@@ -822,23 +844,30 @@ fn force_stop(layout: &Layout, name: &str) -> Result<Stopped, Failure> {
     let state = state.unwrap_or_default();
     if status == Status::Orphaned {
         kill_tree(state.get("javaPid"));
-        wait_for_pid_exit(state.get("javaPid"), 15000.0);
+        if !wait_for_pid_exit(state.get("javaPid"), DAEMON_EXIT_WAIT) {
+            return Err(still_running(name, "server process", state.get("javaPid")));
+        }
         control::clear_state(&sp);
         return Ok(Stopped::forced("orphan"));
     }
-    // the daemon first, so it can clean up; the pids when the channel cannot be reached
+    // the daemon first, so it can clean up; the pids when the channel cannot be reached, when
+    // the daemon's kill left the server running, or when the daemon does not leave after it
     if let Ok(addr) = control_addr(layout, name)
         && let Ok(Value::Object(res)) =
             control::control_request(&addr, name, &json!({ "op": "kill" }), 30000.0)
         && js::truthy(res.get("ok"))
+        && wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT)
     {
-        wait_for_pid_exit(state.get("daemonPid"), 15000.0);
         return Ok(Stopped::of_reply(res));
     }
     kill_tree(state.get("javaPid"));
     kill_tree(state.get("daemonPid"));
-    wait_for_pid_exit(state.get("javaPid"), 15000.0);
-    wait_for_pid_exit(state.get("daemonPid"), 15000.0);
+    if !wait_for_pid_exit(state.get("javaPid"), DAEMON_EXIT_WAIT) {
+        return Err(still_running(name, "server process", state.get("javaPid")));
+    }
+    if !wait_for_pid_exit(state.get("daemonPid"), DAEMON_EXIT_WAIT) {
+        return Err(still_running(name, "supervisor process", state.get("daemonPid")));
+    }
     control::clear_state(&sp);
     Ok(Stopped::forced("viaPid"))
 }
