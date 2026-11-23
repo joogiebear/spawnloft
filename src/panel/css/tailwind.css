@@ -846,7 +846,7 @@
     border: 1px solid var(--line);
     border-radius: var(--card-radius);
   }
-  .sl-list > .sl-row + .sl-row, .sl-list > li + li {
+  .sl-list > .sl-row + .sl-row, .sl-list > [role="listitem"] + [role="listitem"], .sl-list > li + li {
     border-top: 1px solid var(--line-faint);
   }
   .sl-row {
@@ -1112,6 +1112,10 @@
   .sl-menu-item:hover, .sl-menu-item:focus-visible {
     background: var(--hover-hi);
     outline: none;
+  }
+  .sl-menu-item:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -2px;
   }
   .sl-menu-item[data-tone="fault"] {
     color: var(--fault-ink);
@@ -1426,10 +1430,12 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .sl-spinner, .sl-btn[aria-busy="true"]::before {
-      animation-duration: 2s;
+    .sl-spinner, .sl-btn[aria-busy="true"]::before, .sl-dot[data-busy], .sl-skeleton {
+      animation: none;
     }
-    .sl-dot[data-busy], .sl-skeleton, .sl-progress:not([aria-valuenow])::after {
+    .sl-progress:not([aria-valuenow])::after {
+      width: 100%;
+      opacity: 0.4;
       animation: none;
     }
   }

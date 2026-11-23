@@ -18,9 +18,12 @@ const Kit = (() => {
       else if (key === 'text') el.textContent = value;
       else if (key === 'dataset') Object.assign(el.dataset, value);
       else if (key === 'style' && typeof value === 'object') Object.assign(el.style, value);
-      else if (key.startsWith('on') && typeof value === 'function') el.addEventListener(key.slice(2), value);
-      else if (key in el && typeof value !== 'string') el[key] = value;
-      else el.setAttribute(key, value === true ? '' : String(value));
+      else if (key.startsWith('on')) {
+        // Only a function: a string here would become an inline handler, which is code from data.
+        if (typeof value === 'function') el.addEventListener(key.slice(2), value);
+      } else if (key in el && typeof value !== 'string') el[key] = value;
+      // aria-* and data-* read "true"; a bare attribute (disabled, hidden) is present or not.
+      else el.setAttribute(key, value === true ? (/^(aria|data)-/.test(key) ? 'true' : '') : String(value));
     }
     for (const child of children.flat(Infinity)) {
       if (child == null || child === false) continue;
@@ -49,6 +52,7 @@ const Kit = (() => {
    */
   function button({ label, icon: glyph, kind = 'secondary', size = 'md', title, onClick, type = 'button', disabled, id, pressed } = {}) {
     const iconOnly = !label;
+    if (iconOnly && !title) console.warn('Kit.button: an icon button needs a title to be named');
     const el = h('button', {
       type,
       id,
@@ -66,7 +70,8 @@ const Kit = (() => {
   function busy(el, on) {
     if (on) {
       el.setAttribute('aria-busy', 'true');
-      el.dataset.wasDisabled = el.disabled ? '1' : '';
+      // Twice in a row must not record the first call's own disabling.
+      if (!('wasDisabled' in el.dataset)) el.dataset.wasDisabled = el.disabled ? '1' : '';
       el.disabled = true;
     } else {
       el.removeAttribute('aria-busy');
@@ -159,7 +164,7 @@ const Kit = (() => {
   function segmented({ label, options, value, onChange } = {}) {
     const el = h('span', { class: 'sl-seg', role: 'group', 'aria-label': label });
     const draw = (picked) => {
-      for (const b of el.children) b.setAttribute('aria-pressed', String(b.dataset.value === picked));
+      for (const b of el.children) b.setAttribute('aria-pressed', String(b.dataset.value === String(picked)));
     };
     for (const o of options) {
       el.append(h('button', {
@@ -262,8 +267,10 @@ const Kit = (() => {
 
   /** Rows in a box. */
   function list(rows, label) {
-    return h('div', { class: 'sl-list', role: label ? 'list' : null, 'aria-label': label || null },
-      rows.map((r) => { if (label) r.setAttribute('role', 'listitem'); return r; }));
+    // A row that is a button or a link keeps its own role: the list item wraps it.
+    if (!label) return h('div', { class: 'sl-list' }, rows);
+    return h('div', { class: 'sl-list', role: 'list', 'aria-label': label },
+      rows.map((r) => (r.matches('button, a') ? h('div', { role: 'listitem' }, r) : (r.setAttribute('role', 'listitem'), r))));
   }
 
   /** columns: [{ key, label, num }]; rows: [{ key: text or element }]. */
@@ -288,7 +295,12 @@ const Kit = (() => {
       onclick: () => choose(item.id, true),
     }, item.icon ? icon(item.icon) : null, item.label, item.count ? count(item.count, item.tone) : null));
     el.append(...buttons);
+    if (panel) panel.setAttribute('role', 'tabpanel');
     function draw(id) {
+      // Something always holds the Tab stop: an id that matches nothing falls back to the first tab.
+      const visible = buttons.filter((b) => !b.hidden);
+      if (!visible.some((b) => b.dataset.tab === String(id))) id = visible[0] ? visible[0].dataset.tab : id;
+      id = String(id);
       for (const b of buttons) {
         const on = b.dataset.tab === id;
         b.setAttribute('aria-selected', String(on));
@@ -384,6 +396,7 @@ const Kit = (() => {
     opener.addEventListener('click', () => (list.hidden ? open() : close(true)));
     list.addEventListener('keydown', (e) => {
       const all = entries();
+      if (!all.length && e.key !== 'Escape' && e.key !== 'Tab') return;
       const at = all.indexOf(document.activeElement);
       let to = null;
       if (e.key === 'ArrowDown') to = all[(at + 1) % all.length];
@@ -402,7 +415,7 @@ const Kit = (() => {
 
   /**
    * A dialog: { title, body (elements or text), actions: [buttons], sheet }. Returned closed; call
-   * .showModal(). A button with value="cancel" in the actions closes it.
+   * .showModal(). The head's close button closes it, as does Escape.
    */
   function dialog({ title, body, actions, sheet, label } = {}) {
     const titleId = nextId('sl-dialog');

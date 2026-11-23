@@ -758,6 +758,7 @@
     border-radius: var(--card-radius);
   }
   .sl-list > .sl-row + .sl-row,
+  .sl-list > [role="listitem"] + [role="listitem"],
   .sl-list > li + li {
     border-top: 1px solid var(--line-faint);
   }
@@ -1048,6 +1049,11 @@
   .sl-menu-item:focus-visible {
     background: var(--hover-hi);
     outline: none;
+  }
+  /* The keyboard's place has to read apart from where the pointer happens to rest. */
+  .sl-menu-item:focus-visible {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -2px;
   }
   .sl-menu-item[data-tone="fault"] {
     color: var(--fault-ink);
@@ -1389,14 +1395,21 @@
       transform: translateX(290%);
     }
   }
+  /*
+    Reduced motion means none here, as the legacy sheets already make it on every page that loads
+    them: a still spinner beside aria-busy still says "working". An indeterminate bar cannot stand
+    still at a width, which would read as "this far done", so it fills dimmed instead.
+  */
   @media (prefers-reduced-motion: reduce) {
     .sl-spinner,
-    .sl-btn[aria-busy="true"]::before {
-      animation-duration: 2s;
-    }
+    .sl-btn[aria-busy="true"]::before,
     .sl-dot[data-busy],
-    .sl-skeleton,
+    .sl-skeleton {
+      animation: none;
+    }
     .sl-progress:not([aria-valuenow])::after {
+      width: 100%;
+      opacity: 0.4;
       animation: none;
     }
   }
