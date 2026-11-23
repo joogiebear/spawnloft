@@ -186,8 +186,6 @@ async function renderPlugins(opts) {
     return;
   }
   if (body.dataset.for !== row.name) return;
-  // what the page was drawn for, so a start or a stop can redraw it (followRunState)
-  body.dataset.running = data.running ? '1' : '';
   body.textContent = '';
   const page = Kit.h('div', { class: PLUG_PAGE });
   body.append(page);
@@ -631,7 +629,7 @@ async function renderPlugins(opts) {
     const off = !p.enabled;
     const tile = Kit.tile({ name: p.name, key: p.name, size: 'sm' });
     tile.textContent = monogram(p.name);
-    tile.classList.add('text-1', 'tracking-wide');
+    tile.classList.add('text-1');
     if (off) tile.classList.add('opacity-55');
 
     // Where it came from and the jar's own name, in mono, wherever the name above is not already

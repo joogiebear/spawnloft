@@ -131,12 +131,14 @@ try { filesWrap = localStorage.getItem(FILES_WRAP_KEY) === '1'; } catch { /* sta
   share every font, padding and wrapping rule; wrapping and plain text are data attributes on the
   box that holds them.
 */
-const ED_LAYER = 'absolute inset-0 m-0 rounded-none border-0 px-4 py-3 [font:inherit] tracking-normal [tab-size:2] whitespace-pre [overflow-wrap:normal] break-normal group-data-wrap/code:whitespace-pre-wrap group-data-wrap/code:[overflow-wrap:anywhere]';
+const ED_LAYER = 'absolute inset-0 m-0 rounded-none border-0 px-4 py-3 [font:inherit] [letter-spacing:0] [tab-size:2] whitespace-pre [overflow-wrap:normal] break-normal group-data-wrap/code:whitespace-pre-wrap group-data-wrap/code:[overflow-wrap:anywhere]';
 // the match Find stands on is the one mark with a class (markMatches: class="now")
 const ED_MARKS = 'text-transparent [&_mark]:rounded-[2px] [&_mark]:bg-[rgba(var(--accent-rgb),.28)] [&_mark]:text-transparent [&_mark[class]]:bg-[rgba(var(--accent-rgb),.6)] [&_mark[class]]:outline [&_mark[class]]:outline-1 [&_mark[class]]:outline-accent';
 /** A small button in the editor's bars. */
 const edButton = (label, kind, title) => {
   const b = Kit.button({ label, kind: kind || 'ghost', size: 'sm' });
+  // a switch (Wrap lines) shows that it is on
+  b.classList.add('aria-pressed:bg-accent-wash', 'aria-pressed:text-accent-ink');
   if (title) b.title = title;
   return b;
 };
@@ -503,6 +505,7 @@ function renderFileEditor(row, view) {
           try {
             const now = await api(base + '/read?path=' + encodeURIComponent(ed.path));
             if (now.version) { ed.version = now.version; busy(save, false); return write(force); }
+            toast('It could not be read again to save over it: ' + (now.reason === 'large' ? 'it is now too big to edit here.' : 'it is no longer text.'), 'bad');
           } catch (e2) { toast(e2.message, 'bad'); }
         }
       } else {

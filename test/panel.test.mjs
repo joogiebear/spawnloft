@@ -1352,9 +1352,6 @@ test('plugins know a result they have by where it came from, files sort with fol
   assert.deepEqual(names(sortEntries(entries, { key: 'size', dir: 'desc' })), ['world', 'logs', 'a.jar', 'b.yml'])
   assert.deepEqual(names(sortEntries(entries, { key: 'modified', dir: 'desc' })), ['logs', 'world', 'a.jar', 'b.yml'])
 
-  // a pane drawn before a start or a stop is drawn again after it
-  assert.match(html, /followRunState\(row\);/)
-  assert.match(fnSource('followRunState'), /body\.dataset\.running === up/)
   // a failed folder upload is one message at the end, not one per file
   assert.match(fnSource('uploadFiles'), /failed\.push\(/)
 })

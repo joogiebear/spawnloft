@@ -167,8 +167,6 @@ function renderServer(row) {
   // the log says why it is empty, or that its lines are from before it stopped, as the state moves
   paintLogState();
   paintConNote();
-  // Plugins and Files, drawn while it ran or did not, follow it starting or stopping
-  followRunState(row);
 
   // The diagnoses are Minecraft's failure shapes; a database's console has its own.
   if (db) { $('#srvDiag').textContent = ''; diagKey = ''; } else loadDiagnosis(row);

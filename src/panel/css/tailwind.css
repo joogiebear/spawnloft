@@ -628,6 +628,9 @@
     font: var(--type-page);
     letter-spacing: var(--track-display);
   }
+  .\[letter-spacing\:0\] {
+    letter-spacing: 0;
+  }
   .break-normal {
     overflow-wrap: normal;
     word-break: normal;
@@ -637,9 +640,6 @@
   }
   .break-words {
     overflow-wrap: break-word;
-  }
-  .whitespace-normal {
-    white-space: normal;
   }
   .whitespace-nowrap {
     white-space: nowrap;
@@ -938,6 +938,9 @@
   }
   .aria-pressed\:bg-accent-wash[aria-pressed="true"] {
     background-color: var(--lapis-wash);
+  }
+  .aria-pressed\:text-accent-ink[aria-pressed="true"] {
+    color: var(--lapis-ink);
   }
   .aria-pressed\:text-ink[aria-pressed="true"] {
     color: var(--ink);

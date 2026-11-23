@@ -217,7 +217,7 @@ const FILES_MOD = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAge
 const FILES_PAGE = 'grid w-full min-w-0 max-w-[1240px] gap-3';
 const FILES_CELL = 'border-b border-line-faint px-3 py-0 align-middle group-last/row:border-b-0';
 /** A button drawn as its words only: the old stylesheet's border, fill and lift taken off. */
-const FILES_BARE = 'min-h-0 rounded-sm border-0 bg-transparent px-0 shadow-none whitespace-normal hover:transform-none';
+const FILES_BARE = 'min-h-0 rounded-sm border-0 bg-transparent px-0 shadow-none hover:transform-none';
 const FILES_HEAD = 'h-9 border-b border-line px-3 text-left align-middle type-label text-ink-3 whitespace-nowrap';
 
 async function renderFiles(opts) {
@@ -249,8 +249,6 @@ async function renderFiles(opts) {
   }
   if (body.dataset.for !== row.name || view.editing) return;
   const running = data.running;
-  // what the page was drawn for, so a start or a stop can redraw it (followRunState)
-  body.dataset.running = running ? '1' : '';
   const entries = sortEntries(view.query ? data.results : data.entries, view.sort);
   for (const p of [...view.selected]) if (!entries.some((e) => e.path === p)) view.selected.delete(p);
   // the control that had the focus, found again on the redrawn page by what it is for
@@ -278,7 +276,7 @@ async function renderFiles(opts) {
   const crumb = (label, dir, current) => {
     const b = Kit.h('button', {
       type: 'button',
-      class: FILES_BARE + ' min-w-0 truncate px-1.5 py-1 font-mono text-3 leading-[1.4] hover:bg-hover hover:text-ink focus-visible:focus-ring ' + (current ? 'font-semibold text-ink' : 'font-normal text-ink-2'),
+      class: FILES_BARE + ' block min-w-0 max-w-full truncate px-1.5 py-1 font-mono text-3 leading-[1.4] hover:bg-hover hover:text-ink focus-visible:focus-ring ' + (current ? 'font-semibold text-ink' : 'font-normal text-ink-2'),
       text: label,
       onclick: () => go(dir),
     });
@@ -328,6 +326,8 @@ async function renderFiles(opts) {
       { label: 'Open in ' + FILE_MANAGER, onSelect: () => revealHere() },
     ],
   });
+  // Escape in the menu closes the menu, not the whole tool (the page's Escape closes a tool)
+  more.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !more.querySelector('[role="menu"]').hidden) e.stopPropagation(); }, true);
   page.append(Kit.h('div', { class: 'fm-bar flex min-w-0 flex-wrap items-center gap-2' },
     crumbs,
     Kit.h('span', { class: 'sl-input-group min-w-36 flex-[0_1_240px]' }, Kit.h('span', { class: 'sl-input-lead', 'aria-hidden': 'true' }, Kit.icon('search')), search),
@@ -506,7 +506,7 @@ async function renderFiles(opts) {
     if (on) th.setAttribute('aria-sort', view.sort.dir === 'desc' ? 'descending' : 'ascending');
     th.append(Kit.h('button', {
       type: 'button',
-      class: FILES_BARE + ' inline-flex items-center gap-1 [font:inherit] uppercase tracking-[inherit] hover:bg-transparent hover:text-ink focus-visible:focus-ring ' + (on ? 'text-ink-2' : ''),
+      class: FILES_BARE + ' inline-flex items-center gap-1 [font:inherit] uppercase tracking-[inherit] hover:bg-transparent hover:text-ink focus-visible:focus-ring ' + (on ? 'text-ink-2' : 'text-ink-3'),
       onclick: () => { view.sort = { key, dir: on && view.sort.dir !== 'desc' ? 'desc' : 'asc' }; again(); },
     }, label, on ? Kit.h('span', { 'aria-hidden': 'true', text: view.sort.dir === 'desc' ? '↓' : '↑' }) : null));
     return th;
@@ -673,25 +673,6 @@ async function renderFiles(opts) {
       await uploadFiles(row, view, found);
       again();
     };
-  }
-}
-
-/**
- * A tool page drawn while the server was running, or stopped, says the other once the state moves
- * on: "In use" marks and "takes effect the next time it starts" were left as they were (X1). The
- * one on screen is drawn again, unless someone is in the middle of something on it; one that is
- * not is drawn when it is next opened.
- */
-function followRunState(row) {
-  if (!row || row.name !== state.current) return;
-  const up = row.status === 'running' || row.status === 'stopping' ? '1' : '';
-  for (const [tool, id, render] of [['plugins', '#pluginsBody', renderPlugins], ['files', '#filesBody', renderFiles]]) {
-    const body = $(id);
-    if (body.dataset.for !== row.name || !('running' in body.dataset) || body.dataset.running === up) continue;
-    body.dataset.running = up;
-    const busyHere = body.querySelector('[data-holding], [aria-busy="true"]') || (tool === 'files' && filesStateFor(row.name).editing);
-    if (toolView.tool === tool && !busyHere) render({ force: true });
-    else if (toolView.tool !== tool) body.dataset.for = '';
   }
 }
 
@@ -902,7 +883,7 @@ async function deleteFiles(row, view, paths, entries) {
     const out = await post(base + '/delete', { paths: paths });
     note.remove();
     view.selected.clear();
-    const done = toast('Deleted ' + what + '. A copy is in Backups.', 'good');
+    const done = toast('Deleted ' + what + '. A copy is in Backups.', 'good', { stay: true });
     // The quickest way back, and one that works while the server runs, which Restore does not.
     if (out && out.snapshot) {
       toastAction(done, 'Undo', async () => {
