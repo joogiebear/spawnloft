@@ -8,11 +8,14 @@
 
    Three rules hold this together:
 
-   1. The panel's tokens are the theme. Tailwind's own palette, type sizes, radii, shadows and
-      breakpoints are switched off below and replaced by the names in css/tokens.css, so a class
-      can only ask for a value the panel already has. The tokens stay in tokens.css, are not
-      copied here, and the two colour schemes stay what they are: one attribute on <html> that
-      swaps variables. No class changes with the scheme.
+   1. The panel's tokens are the theme. Tailwind's own palette, type sizes, fonts, radii, shadows,
+      animations and breakpoints are switched off below and replaced by the names in
+      css/tokens.css, so a colour, a size or a corner can only be one the panel already has.
+      (Tailwind's line heights, weights and easings stay, spacing is any step of the four-pixel
+      grid, and a value in square brackets is still possible: review catches those, not the
+      tool.) The tokens stay in tokens.css, are not copied here, and the two colour schemes stay
+      what they are: one attribute on <html> that swaps variables. No class changes with the
+      scheme.
 
    2. The hand-written stylesheets are one cascade layer, `legacy`, below Tailwind's components
       and utilities. A class from here therefore wins over any old rule on the same element,
@@ -137,7 +140,12 @@
   --shadow-*: initial;
   --inset-shadow-*: initial;
   --drop-shadow-*: initial;
+  --text-shadow-*: initial;
   --blur-*: initial;
+  /* Tailwind writes its @keyframes outside every layer, where they would replace an old sheet's
+     keyframes of the same name (`spin` is one). An animation is added here by name when a
+     component needs it. */
+  --animate-*: initial;
 
   /* every hover in the panel moves at --ease (200ms ease-in-out) */
   --default-transition-duration: 200ms;
@@ -151,7 +159,8 @@
   /* ---- the density tiers --------------------------------------------------------------- */
   /* Container sizes, as the old `@container pane (min-width: ...)` rules use them: mark the
      scrolling pane `@container/pane` and write `@wide/pane:grid-cols-2`. Window breakpoints are
-     off: the panel lays out by the width of the pane, never of the window. */
+     off: the panel lays out by the width of the pane, never of the window. The old rules use 560
+     as `max-width: 560px`; `@max-narrow/pane:` is "under 560", one pixel apart from that. */
   --container-*: initial;
   --container-narrow: 560px;
   --container-wide: 1280px;
@@ -198,7 +207,8 @@
 }
 
 /* Depth: the panel's shadows are whole (each carries its own lit top edge), so they are set as
-   they are rather than built up from Tailwind's parts. */
+   they are rather than built up from Tailwind's parts. That means they do not combine with
+   ring-*, inset-ring-* or a shadow colour on the same element: the later rule wins. */
 @utility shadow-sm {
   box-shadow: var(--shadow-sm);
 }

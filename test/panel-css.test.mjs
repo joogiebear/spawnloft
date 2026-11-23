@@ -61,12 +61,38 @@ function styleRules(nodes, out = []) {
   return out
 }
 
+// the names of every @keyframes, wherever it is nested
+function keyframes(nodes, out = []) {
+  for (const node of nodes) {
+    const m = /^@(?:-webkit-)?keyframes\s+(\S+)/.exec(node.prelude)
+    if (m) out.push(m[1])
+    else keyframes(node.children, out)
+  }
+  return out
+}
+
+// declarations in the style rules of a sheet: what is left of a rule's block once its nested
+// blocks are taken out, split at `;`
+function declarations(css) {
+  let src = bare(css).replace(/@(?:-webkit-)?keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, ' ')
+  let n = 0
+  for (;;) {
+    let hit = false
+    src = src.replace(/\{([^{}]*)\}/g, (_, body) => { hit = true; n += body.split(';').filter((d) => d.includes(':')).length; return ' ' })
+    if (!hit) return n
+  }
+}
+
 const classesIn = (selectors) => new Set(selectors.flatMap((s) =>
   [...s.matchAll(/\.((?:\\.|[A-Za-z0-9_-])+)/g)].map((m) => m[1].replace(/\\(.)/g, '$1'))))
 
 test('each page loads the tokens, then the Tailwind file, then its own stylesheets', () => {
   for (const file of ['ui.html', 'launcher.html', 'setup.html']) {
-    const links = [...read(file).matchAll(/<link rel="stylesheet" href="\/assets\/([^"]+)">/g)].map((m) => m[1])
+    const page = read(file).replace(/<!--[\s\S]*?-->/g, '')
+    const links = [...page.matchAll(/<link rel="stylesheet" href="\/assets\/([^"]+)">/g)].map((m) => m[1])
+    // every stylesheet a page has is one of those tags: none spelled another way, none inline
+    assert.equal((page.match(/<link\b[^>]*stylesheet/gi) || []).length, links.length, `${file}: a stylesheet link not written as <link rel="stylesheet" href="/assets/...">`)
+    assert.ok(!/<style\b/i.test(page), `${file}: a <style> block would sit outside the layers`)
     // the Tailwind file declares the layer order, so it has to come before the first old sheet
     assert.deepEqual(links.slice(0, 2), ['css/tokens.css', 'css/tailwind.css'], file)
     assert.ok(links.length > 2, `${file} loads no stylesheet of its own`)
@@ -87,9 +113,13 @@ test('the built Tailwind file declares the layer order before anything else', ()
 test('every hand-written stylesheet is one `legacy` layer; the tokens are in no layer', () => {
   assert.ok(legacySheets().length >= 3)
   for (const name of legacySheets()) {
-    const top = blocks(read(name))
+    const css = bare(read(name))
+    const top = blocks(css)
     assert.deepEqual(top.map((b) => b.prelude), ['@layer legacy'],
       `${name}: everything in it belongs inside one \`@layer legacy { ... }\`, so a Tailwind class always wins over an old rule`)
+    // and nothing beside the block: an @import or an @layer statement has no braces to be seen by
+    assert.equal(css.slice(0, css.indexOf('{')).trim(), '@layer legacy', `${name}: something stands before \`@layer legacy {\``)
+    assert.equal(css.slice(css.lastIndexOf('}') + 1).trim(), '', `${name}: something stands after the layer's closing brace`)
   }
   // unlayered, so a token always wins over anything a layer might say about the same name
   assert.ok(!/@layer\b/.test(bare(read('css', 'tokens.css'))), 'css/tokens.css stays outside the layers')
@@ -103,10 +133,26 @@ test('no class is defined both by Tailwind and by a hand-written stylesheet', ()
   }
 })
 
+test('no animation is defined both by Tailwind and by a hand-written stylesheet', () => {
+  // Tailwind writes @keyframes outside the layers, so its copy would replace an old one of the same name
+  const tailwind = new Set(keyframes(blocks(read('css', 'tailwind.css'))))
+  for (const name of legacySheets()) {
+    const both = keyframes(blocks(read(name))).filter((k) => tailwind.has(k))
+    assert.deepEqual(both, [], `${name} and css/tailwind.css both define @keyframes ${both[0]}`)
+  }
+})
+
 test('the hand-written stylesheets only shrink', () => {
   const file = path.join(panel, 'tailwind', 'legacy-rules.json')
-  const recorded = JSON.parse(fs.readFileSync(file, 'utf8')).rules
+  const record = JSON.parse(fs.readFileSync(file, 'utf8'))
+  const recorded = record.rules
   const now = legacySheets().reduce((n, name) => n + styleRules(blocks(read(name))).length, 0)
+  // a rule can also grow without the count of rules moving, so the declarations are counted too
+  const lines = legacySheets().reduce((n, name) => n + declarations(read(name)), 0)
+  assert.ok(lines <= record.declarations,
+    `the old stylesheets have ${lines} declarations and src/panel/tailwind/legacy-rules.json records ${record.declarations}. New styles are written with Tailwind classes (src/panel/tailwind/panel.css); the old sheets only lose them.`)
+  assert.equal(lines, record.declarations,
+    `the old stylesheets are down to ${lines} declarations: record that in src/panel/tailwind/legacy-rules.json (it says ${record.declarations})`)
   assert.ok(now <= recorded,
     `the old stylesheets have ${now} rules and src/panel/tailwind/legacy-rules.json records ${recorded}. New styles are written with Tailwind classes (src/panel/tailwind/panel.css); the old sheets only lose rules.`)
   assert.equal(now, recorded,

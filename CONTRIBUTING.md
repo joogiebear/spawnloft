@@ -64,7 +64,7 @@ it; the existing files show the shape.
 
 **Styling the panel.** New styles are Tailwind classes on the panel's own tokens
 (`src/panel/tailwind/panel.css` maps them and says how the pieces fit); the hand-written
-stylesheets in `src/panel/css/` are being emptied page by page and only ever lose rules. After
+stylesheets in `src/panel/css/` are being emptied page by page: add nothing to them. After
 using a class that is not yet in `src/panel/css/tailwind.css`, or naming a new file with
 `@source`, run `node tools/panel-css.mjs` and commit the built file with your change. The tool
 fetches Tailwind's standalone program once (about 100 MB, into `.cache/`), at the version and

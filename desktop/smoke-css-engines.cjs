@@ -99,6 +99,8 @@ async function main() {
       method,
       headers: { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
+      // a driver that never answers must not hold the job until its time runs out
+      signal: AbortSignal.timeout(60000),
     })
     const out = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(`${method} ${url}: ${res.status} ${JSON.stringify(out.value || out).slice(0, 400)}`)
@@ -128,6 +130,9 @@ async function main() {
     assert.equal(title, 'probe: pass', `the probe did not pass in ${engine} (title: ${JSON.stringify(title)})`)
     assert.ok(/^ok {3}/m.test(result) && !/^FAIL/m.test(result), 'the probe listed its checks, none failed')
     console.log(`PASS: Tailwind's output draws as the panel expects in ${engine}`)
+  } catch (error) {
+    if (said) console.error(`--- ${driver} said ---\n${said}`)
+    throw error
   } finally {
     if (session) await wd('DELETE', `/session/${session}`).catch(() => {})
     child.kill()
@@ -135,4 +140,5 @@ async function main() {
   }
 }
 
-main().catch((error) => { console.error(error.stack || error.message); process.exit(1) })
+// exit by hand either way: a driver's child or a kept-alive socket must not keep the step open
+main().then(() => process.exit(0), (error) => { console.error(error.stack || error.message); process.exit(1) })

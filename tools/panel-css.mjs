@@ -5,8 +5,9 @@
 // developer's machine and in one CI job; it is never part of a package, and Tailwind is not a
 // dependency of anything that ships. It uses Tailwind's standalone program, one file with no
 // Node or npm behind it, at the version and sha256 pinned in tools/tailwind-pin.json. The
-// program is fetched once into .cache/tailwind/ and its sha256 is checked before every run,
-// so a file that is not the pinned release is never executed.
+// program is fetched once into .cache/tailwind/. Before every run its bytes are read, their
+// sha256 is checked against the pin, and those same bytes are written to a private temporary
+// folder and run from there, so what runs is what was checked.
 //
 //   node tools/panel-css.mjs                    build src/panel/css/tailwind.css
 //   node tools/panel-css.mjs --check            fail if the committed file is not what a build gives
@@ -28,20 +29,25 @@ const pin = JSON.parse(fs.readFileSync(path.join(root, 'tools', 'tailwind-pin.js
 
 const fail = (message) => { console.error(`panel-css: ${message}`); process.exit(1) }
 
-const sha256 = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
-// The pinned program for this machine, fetched if it is not there yet, checked every time.
+// The pinned program for this machine, fetched if it is not there yet: its checked bytes.
 async function program() {
   const key = `${process.platform}-${process.arch}`
   const entry = pin.programs[key]
   if (!entry) fail(`no pinned Tailwind program for ${key} (tools/tailwind-pin.json has ${Object.keys(pin.programs).join(', ')})`)
+  // the pin's words become a folder, a file name and a URL: only the shapes those can have
+  if (!/^\d+\.\d+\.\d+$/.test(pin.version) || !/^tailwindcss-[a-z0-9-]+(\.exe)?$/.test(entry.file) || !/^[0-9a-f]{64}$/.test(entry.sha256)
+    || pin.release !== `https://github.com/tailwindlabs/tailwindcss/releases/download/v${pin.version}/`) {
+    fail('tools/tailwind-pin.json is not a version, a Tailwind release URL for it, a file name and a sha256')
+  }
   const dir = path.join(root, '.cache', 'tailwind', pin.version)
   const file = path.join(dir, entry.file)
   if (!fs.existsSync(file)) {
     const url = pin.release + entry.file
     console.error(`panel-css: fetching Tailwind ${pin.version} (${entry.file}, about 100 MB), once`)
     let res
-    try { res = await fetch(url, { redirect: 'follow' }) } catch (e) {
+    try { res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10 * 60 * 1000) }) } catch (e) {
       fail(`could not fetch ${url}: ${e.cause?.message || e.message}\n  Download it another way and put it at ${file}; it is checked before it runs.`)
     }
     if (!res.ok) fail(`${url} answered ${res.status}`)
@@ -49,28 +55,31 @@ async function program() {
     // written beside its final name and moved only once it is whole and checked, so a stopped
     // download is never taken for the program
     const part = `${file}.${process.pid}.part`
-    fs.writeFileSync(part, Buffer.from(await res.arrayBuffer()))
-    const got = sha256(part)
-    if (got !== entry.sha256) {
-      fs.rmSync(part, { force: true })
-      fail(`${url} is not the pinned file: sha256 ${got}, expected ${entry.sha256}. Nothing was run.`)
-    }
-    fs.chmodSync(part, 0o755)
+    let body
+    try { body = Buffer.from(await res.arrayBuffer()) } catch (e) { fail(`the download of ${url} stopped: ${e.cause?.message || e.message}`) }
+    const got = sha256(body)
+    if (got !== entry.sha256) fail(`${url} is not the pinned file: sha256 ${got}, expected ${entry.sha256}. Nothing was kept or run.`)
+    fs.writeFileSync(part, body)
     fs.renameSync(part, file)
   }
-  const got = sha256(file)
+  const bytes = fs.readFileSync(file)
+  const got = sha256(bytes)
   if (got !== entry.sha256) {
     fail(`${file} is not the pinned Tailwind ${pin.version}: sha256 ${got}, expected ${entry.sha256}. Nothing was run. Delete it and run this again.`)
   }
-  return file
+  return { bytes, name: entry.file }
 }
 
 // One build. The output is plain (not minified) so a change to it reads in a diff, and has LF
 // line ends on every system so the committed copy is the same bytes wherever it was built.
 async function build(input, output) {
-  const exe = await program()
+  const { bytes, name } = await program()
+  // mkdtemp makes the folder for this user alone (0700)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'panel-css-'))
   try {
+    // the checked bytes themselves are what runs, not whatever is at the cache path by then
+    const exe = path.join(tmp, name)
+    fs.writeFileSync(exe, bytes, { mode: 0o700 })
     const out = path.join(tmp, 'out.css')
     const run = spawnSync(exe, ['--input', input, '--output', out], { cwd: path.dirname(input), encoding: 'utf8' })
     if (run.error) fail(`could not run ${exe}: ${run.error.message}`)

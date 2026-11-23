@@ -37,7 +37,7 @@ Policy (agreed 2026-11-05, kept by the 2026-11-08 Rust + Tauri plan):
 standalone program, one self-contained executable from the Tailwind Labs release on GitHub, with
 no Node or npm behind it. `tools/tailwind-pin.json` pins the version and the sha256 of the
 program for each system, copied from that release's `sha256sums.txt`; `tools/panel-css.mjs`
-checks the file against the pin before every run and runs nothing that does not match. It runs
+checks the program's bytes against the pin before every run and runs those checked bytes, nothing else. It runs
 on a developer's machine and in the `panel-css` CI job. The built stylesheet is committed, so the
 Rust build, the installers and the packages never run Tailwind or fetch it, and what ships is
 plain CSS that can be read in the diff. To move the pin: change the version, the release URL and

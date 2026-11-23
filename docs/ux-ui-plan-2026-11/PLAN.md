@@ -307,12 +307,13 @@ Tailwind 4.3.5 is wired in, with no visible change. What later phases need to kn
   standalone program is pinned by version and sha256 in `tools/tailwind-pin.json` and checked
   before every run. The `panel-css` CI job rebuilds on Linux, Windows and macOS and fails on a
   stale file.
-- **Theme.** Every class resolves to a panel token: colours (`bg-surface`, `text-ink-2`,
+- **Theme.** Colours, sizes, fonts, radii and shadows resolve only to panel tokens: colours (`bg-surface`, `text-ink-2`,
   `border-line`, `text-accent`, `bg-primary`, `text-warn-ink`, ...), the seven sizes (`text-1` to
   `text-7`), the type roles (`type-page`, `type-section`, `type-card`, `type-body`, `type-meta`,
   `type-label`, `type-mono`), radii (`rounded-xs` to `rounded-lg`), shadows (`shadow-sm`,
   `shadow-md`, `shadow-lg`, `shadow-lift`), and the four-pixel spacing grid (`p-4` is 16px).
-  Tailwind's own palette, sizes and window breakpoints are off. The density tiers are container
+  Tailwind's own palette, sizes, animations and window breakpoints are off; its line heights,
+  weights and easings remain. The density tiers are container
   variants: mark the pane `@container/pane`, then `@wide/pane:` (1280) and `@ultra/pane:` (2000).
 - **Layers.** Every hand-written stylesheet is now inside `@layer legacy`, below Tailwind's
   layers. A Tailwind class always wins over an old rule on the same element; an element with no
@@ -322,9 +323,10 @@ Tailwind 4.3.5 is wired in, with no visible change. What later phases need to kn
   because it takes any word in a file as a possible class. A phase adds its files to that list.
   None is listed yet, so the built file is empty apart from the layer order.
 - **Guards** (`test/panel-css.test.mjs`): the page link order, the `legacy` wrapper on every old
-  sheet, no class defined on both sides (today `grid`, `grow`, `inline` and `sr-only` are old
+  sheet, no class or animation name defined on both sides (today `grid`, `grow`, `inline` and `sr-only` are old
   class names, so the phase that first needs one of those removes or renames the old rule), and
-  the count of old rules, 1,338 across the three pages, which may only go down.
+  the count of old rules and declarations (1,338 and 4,662 across the three pages), which may
+  only go down.
 - **Preflight is off.** Tailwind's reset would change pages that have not been redesigned.
   Phase 3 decides when it comes in; until then `border` works without it, and headings and
   lists keep browser margins unless a class says otherwise.
