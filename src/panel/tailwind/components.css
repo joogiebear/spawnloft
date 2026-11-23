@@ -555,6 +555,11 @@
   .sl-dot[data-tone="accent"] {
     background: var(--lapis);
   }
+  /* Stopped: a ring, so it differs from running in shape as well as colour. */
+  .sl-dot[data-hollow] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--ink-3);
+  }
   /* Starting and stopping: the same dot, breathing. */
   .sl-dot[data-busy] {
     animation: sl-breathe 1.4s ease-in-out infinite;
@@ -992,6 +997,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .sl-nav-meta[data-fault] {
+    color: var(--fault-ink);
+  }
   .sl-nav-head {
     display: flex;
     align-items: center;
@@ -1005,6 +1013,73 @@
   }
   .sl-nav-head > :first-child {
     flex: 1 1 auto;
+  }
+
+  /* ---- the sidebar ------------------------------------------------------------------- */
+  /* The panel's own: Overview, Play, then the servers and databases as nav items. Under 1200px
+     of window it folds to a rail of icons and tiles; each row's title is its tooltip. */
+  .sl-side {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--chrome);
+    border-right: 1px solid var(--line-soft);
+  }
+  .sl-side-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    padding: var(--s-3) var(--s-2);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .sl-side .sl-nav-item {
+    position: relative;
+    flex: none;
+  }
+  .sl-side .sl-nav-head > .sl-btn {
+    margin-right: -6px;
+  }
+  @media (max-width: 1199px) {
+    .sl-side-nav {
+      padding: var(--s-2) 6px;
+    }
+    .sl-side .sl-nav-item {
+      justify-content: center;
+      min-height: 40px;
+      padding: 0;
+    }
+    .sl-side .sl-nav-item-rich {
+      min-height: 44px;
+    }
+    .sl-side .sl-nav-item > .sl-nav-name,
+    .sl-side .sl-nav-text,
+    .sl-side .sl-nav-head > span {
+      display: none;
+    }
+    /* the dot sits on the tile's corner, ringed in the rail's colour so it reads apart from it */
+    .sl-side .sl-nav-item > .sl-dot {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      box-shadow: 0 0 0 2px var(--chrome);
+    }
+    .sl-side .sl-nav-item > .sl-dot[data-hollow] {
+      background: var(--chrome);
+      box-shadow: inset 0 0 0 1.5px var(--ink-3), 0 0 0 2px var(--chrome);
+    }
+    /* the headings fold to the rule between the groups; the + stays */
+    .sl-side .sl-nav-head {
+      justify-content: center;
+      margin: var(--s-2) 0 0;
+      padding: var(--s-2) 0 0;
+      border-top: 1px solid var(--line);
+    }
+    .sl-side .sl-nav-head > .sl-btn {
+      margin-right: 0;
+    }
   }
 
   /* ---- menu -------------------------------------------------------------------------- */

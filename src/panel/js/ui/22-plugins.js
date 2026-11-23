@@ -28,10 +28,10 @@ function saveUpdates(name, map) {
   } catch { /* a badge that cannot remember is a badge that waits for the next check */ }
 }
 
-/** The count on the dock's Plugins button, and the same number in its name for a screen reader. */
+/** The count on the Plugins tab, and the same number in its name for a screen reader. */
 function renderDockBadge() {
   const button = $('#tabPlugins');
-  const badge = button.querySelector('.dock-badge');
+  const badge = button.querySelector('[data-badge]');
   const map = state.current && !isDb(rowOf(state.current)) ? cachedUpdates(state.current) : null;
   const n = map ? Object.keys(map).length : 0;
   badge.hidden = !n;

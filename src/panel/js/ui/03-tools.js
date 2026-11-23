@@ -2,7 +2,7 @@
 // ------------------------------------------------------------------ tools ----
 
 /**
- * The tools a server has, beside the console in the sidebar.
+ * The tools a server has, as tabs under its header beside the console's.
  *
  * <p>Each opens in the console's place - one thing at a time, and on a wide window the console keeps
  * a column of its own. The console keeps streaming either way: its lines are appended to an element
@@ -46,7 +46,7 @@ const paneId = (tool) => 'pane' + tool[0].toUpperCase() + tool.slice(1);
 const dockId = (tool) => 'tab' + tool[0].toUpperCase() + tool.slice(1);
 
 function toolLabel(tool) {
-  return tool === 'plugins' ? $('#tabPlugins .lbl').textContent : TOOL_NAMES[tool];
+  return tool === 'plugins' ? $('#tabPlugins [data-label]').textContent : TOOL_NAMES[tool];
 }
 
 /** Open a tool in the console's place, or close it and show the console (tool null). */
@@ -59,13 +59,11 @@ function setTool(tool) {
   const work = $('#work');
   work.toggleAttribute('data-tool', Boolean(toolView.tool));
   $('#toolPanel').hidden = !toolView.tool;
-  $('#conMini').hidden = !toolView.tool;
-  $('#tabConsole').setAttribute('aria-current', toolView.tool ? 'false' : 'page');
-  for (const b of $$('.dock [data-pane]')) b.setAttribute('aria-expanded', String(b.dataset.pane === toolView.tool));
+  markToolTabs();
+  updateConsoleBadge();
   for (const el of $$('.tool .pane')) el.toggleAttribute('data-active', Boolean(toolView.tool) && el.id === paneId(toolView.tool));
 
   const t = toolView.tool;
-  if (t) $('#toolTitle').textContent = toolLabel(t);
   if (t === 'settings') renderServerSettings();
   if (t === 'backups') renderBackupsTool();
   // Read afresh each time they are opened, unless a half-filled form is waiting there: who is
@@ -82,9 +80,7 @@ function setTool(tool) {
   // for as long as the app is open.
   if (t !== 'performance') stopPerfPolling();
 
-  if (toolView.tool) {
-    updateConMini();
-  } else if (state.atBottom) {
+  if (!toolView.tool && state.atBottom) {
     // Scroll position is not kept while a pre is hidden, so the console has to be put back where
     // it was - and "at the bottom" is where it was for anyone who had not scrolled up.
     const log = $('#log');
@@ -103,33 +99,64 @@ function showPane(pane) {
   setTool(pane);
 }
 
-// Pressing the open tool's row again closes it; the console comes back.
-for (const b of $$('.dock [data-pane]')) {
-  b.onclick = () => {
-    const tool = b.dataset.pane;
-    setTool(toolView.tool === tool ? null : tool);
-  };
+/** Select the tab of what is showing, and leave the one Tab stop on it. */
+function markToolTabs() {
+  const on = toolView.tool ? dockId(toolView.tool) : 'tabConsole';
+  for (const b of $$('#dock [role="tab"]')) {
+    const picked = b.id === on;
+    b.setAttribute('aria-selected', String(picked));
+    if (!$('#dock').contains(document.activeElement)) b.tabIndex = picked ? 0 : -1;
+  }
+  if (toolView.tool) $('#toolPanel').setAttribute('aria-labelledby', on);
 }
+
+for (const b of $$('#dock [data-pane]')) b.onclick = () => setTool(b.dataset.pane);
 $('#tabConsole').onclick = () => setTool(null);
 
+/*
+  One Tab stop for the row. Left and Right move along the tabs that are showing, Home and End jump
+  to the ends, and Enter or Space opens the one with focus: a tool reads from the disk as it opens,
+  so walking past five of them must not open five.
+*/
+$('#dock').addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const tabs = $$('#dock [role="tab"]').filter((b) => !b.hidden);
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  let to = null;
+  if (e.key === 'ArrowRight') to = tabs[(i + 1) % tabs.length];
+  else if (e.key === 'ArrowLeft') to = tabs[(i - 1 + tabs.length) % tabs.length];
+  else if (e.key === 'Home') to = tabs[0];
+  else if (e.key === 'End') to = tabs[tabs.length - 1];
+  else return;
+  e.preventDefault();
+  for (const b of tabs) b.tabIndex = b === to ? 0 : -1;
+  to.focus();
+});
+// Leaving the row puts the Tab stop back on the tab that is selected.
+$('#dock').addEventListener('focusout', (e) => {
+  if ($('#dock').contains(e.relatedTarget)) return;
+  for (const b of $$('#dock [role="tab"]')) b.tabIndex = b.getAttribute('aria-selected') === 'true' ? 0 : -1;
+});
+
+/** Escape inside a tool: back to the console, with focus on the tab that opened the tool. */
 function closeTool() {
   const was = toolView.tool;
   rowMenu.close(false);
   setTool(null);
-  // Focus goes back to the button that opened it, not to the top of the page with the panel gone.
   if (was) $('#' + dockId(was))?.focus();
 }
 
-$('#toolClose').onclick = closeTool;
-$('#conMini').onclick = () => setTool(null);
-$('#conMini').title = 'Back to the console';
-
-/** The console's one line while a tool fills its space: its newest line and how many errors. */
-function updateConMini() {
-  if (!toolView.tool) return;
-  const last = state.lines.length ? state.lines[state.lines.length - 1].text : '';
-  $('#conMiniLast').textContent = last;
-  $('#conMiniErr').textContent = levelCounts.error
-    ? levelCounts.error + (levelCounts.error === 1 ? ' error' : ' errors') : '';
+/**
+ * While a tool has the console's place, the Console tab carries the number of errors it has
+ * logged, so a server going wrong behind a plugin list is still seen. Its name says it too.
+ */
+function updateConsoleBadge() {
+  const tab = $('#tabConsole');
+  const badge = tab.querySelector('[data-badge]');
+  const n = toolView.tool ? levelCounts.error : 0;
+  badge.hidden = !n;
+  badge.textContent = n ? String(n) : '';
+  if (n) tab.setAttribute('aria-label', 'Console, ' + n + (n === 1 ? ' error' : ' errors'));
+  else tab.removeAttribute('aria-label');
 }
-

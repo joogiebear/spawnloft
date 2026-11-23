@@ -3,34 +3,16 @@
   /* ---- server view ------------------------------------------------------ */
 
   /*
-    Strip, notice, diagnosis, then the work. Full bleed: the header and the dock are the frame, and
-    a rounded card inside them would be a frame inside a frame.
+    Header, notice, diagnosis, the tools' tabs, then the work. Full bleed: the header and the tabs
+    are the frame, and a rounded card inside them would be a frame inside a frame.
   */
   .server {
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
     grid-template-columns: minmax(0, 1fr);
     background: var(--void);
     min-width: 0;
   }
 
-  /*
-    Who, how it is doing, and the verbs, on one line. Wraps rather than overflowing: at the app's
-    900px minimum the name, three vitals and the buttons only just fit, and a long name must push
-    the vitals down rather than the Stop button off the edge.
-  */
-  .srv-strip {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-3) var(--s-5);
-    padding: var(--s-4) var(--s-5) var(--s-4) var(--s-6);
-    border-bottom: 1px solid var(--line-soft);
-    min-width: 0;
-  }
-  .srv-title { display: grid; gap: 6px; min-width: 0; flex: 0 1 auto; max-width: 100%; }
-  .srv-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .srv-name h1 { margin: 0; font: 650 26px/1.15 var(--display); letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .srv-id { font: var(--t-2)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
   .srv-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
   .srv-meta .dot { color: var(--ink-4); }
 
@@ -94,7 +76,6 @@
   .vital .meter i { display: block; height: 100%; background: var(--lapis); border-radius: 999px; }
   .vital .meter[data-tone="warn"] i { background: var(--warn); }
   .vital .meter[data-tone="fault"] i { background: var(--fault); }
-  .vitals-off { grid-column: 1 / -2; align-self: center; margin: 0; font: var(--t-3)/1.4 var(--ui); color: var(--ink-3); }
   .vital .ok { color: var(--live); width: 14px; height: 14px; }
 
   /* Start and Stop are the verbs; the rest are behind the menu. One primary button at a time. */
@@ -105,21 +86,12 @@
     TPS is the one that goes: it is also in the Stats tool, with its history, one click away.
   */
   @container stage (max-width: 1024px) {
-    .srv-strip { gap: var(--s-3) var(--s-4); }
     .vitals { grid-template-columns: repeat(3, minmax(0, 1fr)); flex-basis: 290px; gap: var(--s-3); padding-left: var(--s-4); }
     .vital[data-v="tps"] { display: none; }
   }
   @container stage (max-width: 784px) {
     /* The vitals take their own row under the name; the divider between them would be a stray line. */
     .vitals { border-left: 0; padding-left: 0; flex-basis: 100%; }
-  }
-
-  @media (max-height: 700px) {
-    .side .stab, .side .dock button { height: var(--hit); }
-    /* The strip is the tallest fixed block; on a short window it is what the tool panes pay for. */
-    .srv-strip { padding-top: var(--s-3); padding-bottom: var(--s-3); gap: var(--s-2) var(--s-5); }
-    .srv-name h1 { font-size: var(--t-6); }
-    .srv-title { gap: 3px; }
   }
 
   /*

@@ -264,10 +264,9 @@
   .mc-motd { color: #aaa; overflow-wrap: anywhere; }
 
   :root[data-console-only] header,
-  :root[data-console-only] .side,
-  :root[data-console-only] .dock,
+  :root[data-console-only] #side,
+  :root[data-console-only] #dockRow,
   :root[data-console-only] #toolPanel,
-  :root[data-console-only] #conMini,
   :root[data-console-only] #bPopConsole,
   :root[data-console-only] #srvNotice,
   :root[data-console-only] #bManage { display: none !important; }

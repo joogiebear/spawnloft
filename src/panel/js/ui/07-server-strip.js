@@ -1,7 +1,6 @@
 'use strict';
 // ------------------------------------------------------------ server strip ---
 
-/** The state as a pill in its own tones. "Starting…" is the panel's word: the core says running. */
 /**
  * A server's state in a word and a tone. "Starting…" is the panel's word, said while a start it
  * asked for is under way: the core says running as soon as the process exists.
@@ -35,14 +34,46 @@ function describeState(row, acting) {
   return { text, tone, since };
 }
 
+/** The state as a pill: its word, and a dot that says it again in shape and tone. */
 function renderStatePill(row) {
   const st = $('#srvState');
   const said = describeState(row, state.acting);
-  st.textContent = said.text;
-  if (said.tone) st.dataset.tone = said.tone;
-  else delete st.dataset.tone;
-  if (said.since) st.dataset.since = String(said.since);
-  else delete st.dataset.since;
+  const words = st.querySelector('[data-state-text]');
+  const dot = st.querySelector('.sl-dot');
+  words.textContent = said.text;
+  for (const el of [st, dot]) {
+    if (said.tone) el.dataset.tone = said.tone;
+    else delete el.dataset.tone;
+  }
+  dot.toggleAttribute('data-busy', said.tone === 'warn' && Boolean(state.acting));
+  dot.toggleAttribute('data-hollow', !said.tone && row.status === 'stopped');
+  // The uptime ticker (15-server-tools.js) rewrites the words each second from this.
+  if (said.since) words.dataset.since = String(said.since);
+  else delete words.dataset.since;
+}
+
+/**
+ * The server's face beside its name, the same as its row in the sidebar: its own icon when it has
+ * one, its initial on its colour when not, and a database's glyph.
+ */
+function renderServerTile(row) {
+  const tile = $('#srvTile');
+  const said = row.name + '|' + (row.label || '');
+  if (tile.dataset.said === said) return;
+  tile.dataset.said = said;
+  const db = isDb(row);
+  const face = Kit.tile({
+    name: row.label || row.name, key: row.name, size: 'lg',
+    icon: db ? (row.engineKind === 'redis' ? 'cache' : 'database') : null,
+  });
+  tile.dataset.tone = face.dataset.tone;
+  tile.replaceChildren(...face.childNodes);
+  if (!db) {
+    const img = new Image();
+    img.alt = '';
+    img.onload = () => { if (tile.dataset.said === said) tile.replaceChildren(img); };
+    img.src = '/api/instances/' + encodeURIComponent(row.name) + '/icon';
+  }
 }
 
 const FILE_MANAGER = panelPlatform === 'darwin' ? 'Finder' : panelPlatform === 'win32' ? 'Explorer' : 'your file manager';

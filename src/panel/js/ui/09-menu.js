@@ -95,8 +95,8 @@ function renderServer(row) {
   // table does not know - a page loaded before it answered - reads as plugins, which is what
   // every server was before there were mod loaders.
   const content = (softwareById[row.loader ?? 'paper'] || softwareById.paper).content;
-  $('#tabPlugins .lbl').textContent = content === 'mods' ? 'Mods' : 'Plugins';
-  if (toolView.tool === 'plugins') $('#toolTitle').textContent = toolLabel('plugins');
+  $('#tabPlugins [data-label]').textContent = content === 'mods' ? 'Mods' : 'Plugins';
+  renderServerTile(row);
   renderDockBadge();
 
   renderStatePill(row);
@@ -105,7 +105,7 @@ function renderServer(row) {
 
   // A database has two of the seven tools. The ones that do not apply are hidden rather than left
   // to open a blank panel.
-  for (const b of $$('.dock [data-pane]')) b.hidden = db && !DB_TOOLS.has(b.dataset.pane);
+  for (const b of $$('#dock [data-pane]')) b.hidden = db && !DB_TOOLS.has(b.dataset.pane);
 
   $('#srvOffline').hidden = row.onlineMode !== false;
 

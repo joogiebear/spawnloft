@@ -149,7 +149,7 @@ function pushLine(text) {
   const entry = { text: text, level: levelOf(text, prev), n: ++state.seq };
   state.lines.push(entry);
   if (raisesLevel(entry)) levelCounts[entry.level]++;
-  updateConMini();
+  updateConsoleBadge();
 
   // A busy server writes thousands of lines a minute. Without a ceiling the panel keeps a DOM node
   // per line until the window stops responding - a bug that only appears after someone has left it
@@ -182,7 +182,7 @@ function clearLines() {
   state.seq = 0;
   levelCounts.warn = 0;
   levelCounts.error = 0;
-  updateConMini();
+  updateConsoleBadge();
 }
 
 function stopStream() {

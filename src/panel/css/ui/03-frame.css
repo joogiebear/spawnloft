@@ -1,27 +1,10 @@
 /* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
 @layer legacy {
-  /* ---- the frame: header, server tabs --------------------------------------- */
+  /* ---- the frame ---------------------------------------------------------- */
 
-  /*
-    The header, the server strip's tabs and the tool dock are the frame around the work, in
-    --chrome, one step below the page so what is being worked on sits forward of it.
-  */
-  body.play-modal > header, body.play-modal .side { opacity: .4; transition: opacity .15s; }
-  header {
-    display: flex;
-    align-items: center;
-    gap: var(--s-3);
-    padding: 0 var(--s-4) 0 var(--s-5);
-    height: 52px;
-    background: var(--chrome);
-    border-bottom: 1px solid var(--line-soft);
-    position: relative;
-    z-index: 5;
-  }
-  header > .brand, header > button { align-self: center; }
-  .brand { display: flex; align-items: center; gap: 10px; flex: none; }
-  .brand svg { display: block; }
-  .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
+  /* The header and the sidebar are Tailwind classes and .sl-side (ui.html, components.css). While
+     the Play page's setup sheet is open they are out of reach, and look it. */
+  body.play-modal > header, body.play-modal #side { opacity: .4; transition: opacity .15s; }
   .grow { flex: 1; }
 
   /* A button that is only a glyph. Every one of them carries an aria-label saying what it does. */

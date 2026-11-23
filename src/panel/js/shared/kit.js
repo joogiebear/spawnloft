@@ -182,10 +182,14 @@ const Kit = (() => {
     return h('span', { class: 'sl-pill', dataset: tone ? { tone } : null }, dot({ tone, busy: working }), text);
   }
 
-  /** A state as a dot. With a label it is announced; without, it is decoration beside words. */
-  function dot({ tone, label, busy: working } = {}) {
+  /**
+   * A state as a dot. With a label it is announced; without, it is decoration beside words.
+   * hollow is a ring: stopped, so that stopped and running differ in shape and not only in colour.
+   */
+  function dot({ tone, label, busy: working, hollow } = {}) {
     const el = h('span', { class: 'sl-dot', dataset: tone ? { tone } : null });
     if (working) el.dataset.busy = '';
+    if (hollow) el.dataset.hollow = '';
     if (label) { el.setAttribute('role', 'img'); el.setAttribute('aria-label', label); } else el.setAttribute('aria-hidden', 'true');
     return el;
   }
