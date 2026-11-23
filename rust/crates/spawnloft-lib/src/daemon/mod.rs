@@ -50,6 +50,12 @@ const EXIT_DELAY: Duration = Duration::from_millis(250);
 const RECENT_BYTES: usize = 32_768;
 const READY_TAIL: usize = 4096;
 
+/// Test hook (a `test-hooks` build only): `SPAWNLOFT_TEST_KILL_SKIP=1` makes the daemon's kill
+/// send nothing, so a test can play a server that outlives it.
+fn kill_is_skipped() -> bool {
+    cfg!(feature = "test-hooks") && std::env::var_os("SPAWNLOFT_TEST_KILL_SKIP").is_some_and(|v| v == "1")
+}
+
 /// What threads tell the main loop.
 #[derive(Debug)]
 pub enum Event {
@@ -367,6 +373,11 @@ impl Daemon {
         state.insert("daemonExe".into(), json!(own_exe()));
         insert_start_time(&mut state);
         state.insert("javaExe".into(), json!(basename(&program.cmd)));
+        // the child's creation time, which outlasts an exec: a `java` that is a wrapper script
+        // running the real one under another name is still known by it (the name rule is not)
+        if let Some(t) = pid.and_then(crate::procid::start_time) {
+            state.insert("javaStartTime".into(), json!(t.to_string()));
+        }
         state.insert("startedAt".into(), json!(time::now_ms()));
         if let Some(dir) = inst.get("dir") {
             state.insert("dir".into(), dir.clone());
@@ -559,8 +570,29 @@ impl Daemon {
     fn force_kill(&self) {
         if let Some(r) = &self.running {
             self.log.line("force killing");
+            if kill_is_skipped() {
+                self.log.line("test hook: the kill was not sent");
+                return;
+            }
             r.tree.kill();
         }
+    }
+
+    /// The answer to a kill, or a forced stop, whose wait ran out with the server still running.
+    /// It is never "ok": the caller must not report the server stopped while it holds the port
+    /// and the world.
+    fn kill_timed_out(&self) -> Value {
+        let pid = self
+            .running
+            .as_ref()
+            .map(|r| r.child.id().to_string())
+            .unwrap_or_else(|| "unknown".into());
+        let why = format!(
+            "the server process (pid {pid}) was still running {} s after it was killed",
+            KILL_WAIT.as_secs()
+        );
+        self.log.line(&why);
+        json!({ "ok": false, "forced": true, "error": why })
     }
 
     fn on_exit(&mut self, status: ExitStatus) {
@@ -1022,8 +1054,14 @@ impl Daemon {
                     forced,
                 } if now >= deadline => {
                     if forced {
-                        let code = self.last_exit.0;
-                        self.answer(reply, json!({ "ok": true, "forced": true, "code": code }));
+                        // an exit answers the waiter in on_exit's shut_down, so a forced stop
+                        // still waiting here is one whose server outlived the kill
+                        let answer = if self.running.is_some() {
+                            self.kill_timed_out()
+                        } else {
+                            json!({ "ok": true, "forced": true, "code": self.last_exit.0 })
+                        };
+                        self.answer(reply, answer);
                     } else {
                         self.log.line("graceful stop timed out");
                         self.force_kill();
@@ -1035,8 +1073,12 @@ impl Daemon {
                     }
                 }
                 Waiter::Kill { reply, deadline } if now >= deadline => {
-                    let code = self.last_exit.0;
-                    self.answer(reply, json!({ "ok": true, "code": code, "forced": true }));
+                    let answer = if self.running.is_some() {
+                        self.kill_timed_out()
+                    } else {
+                        json!({ "ok": true, "code": self.last_exit.0, "forced": true })
+                    };
+                    self.answer(reply, answer);
                 }
                 other => keep.push(other),
             }

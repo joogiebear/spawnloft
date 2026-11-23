@@ -576,6 +576,11 @@ pub fn signal_zero(pid: i32) -> bool {
     pid_alive(pid as u32)
 }
 
+/// Unix only: a Windows process that has exited is gone, whoever holds a handle to it.
+pub fn is_zombie(_pid: u32) -> bool {
+    false
+}
+
 pub fn pid_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;

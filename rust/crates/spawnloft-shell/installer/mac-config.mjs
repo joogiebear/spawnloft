@@ -67,7 +67,8 @@ const overlay = {
     createUpdaterArtifacts: true,
     ...(icon ? { icon } : {}),
     macOS: {
-      minimumSystemVersion: '11.0',
+      // macOS 13: the panel's container queries and :has() want its WebKit (README: macOS 13+)
+      minimumSystemVersion: '13.0',
       hardenedRuntime: true,
     },
     resources: {

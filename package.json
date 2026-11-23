@@ -1,6 +1,6 @@
 {
   "name": "spawnloft",
-  "version": "1.6.0-beta.2",
+  "version": "2.0.0-beta.1",
   "private": true,
   "repository": "github:joogiebear/spawnloft",
   "description": "SpawnLoft's tests and tools: the core is Rust (rust/), and Node runs only the bot host, the tests and the build tools",
