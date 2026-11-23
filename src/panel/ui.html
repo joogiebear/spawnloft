@@ -198,7 +198,9 @@
           <div class="sl-banner-actions"><button type="button" class="sl-btn sl-btn-sm" id="homeFailRetry">Try again</button></div>
         </div>
         <!-- One banner for each kind of thing that needs someone, built by renderAttention. -->
-        <section class="flex flex-col gap-3" id="homeAttention" aria-label="Needs attention" hidden></section>
+        <section class="flex flex-col gap-3" id="homeAttention" aria-labelledby="attTitle" hidden>
+          <h2 class="sl-sr" id="attTitle">Needs attention</h2>
+        </section>
         <div class="flex flex-wrap items-start gap-6">
           <div class="flex min-w-0 flex-[999_1_560px] flex-col gap-6">
             <section class="flex flex-col gap-3" aria-labelledby="homeSrvTitle">

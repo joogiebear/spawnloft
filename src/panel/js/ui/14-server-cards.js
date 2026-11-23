@@ -62,6 +62,7 @@ function buildHomeCard(name) {
   const nameButton = Kit.h('button', { type: 'button', class: 'sl-btn sl-btn-link block min-w-0 max-w-full truncate text-ink', onclick: () => select(name) });
   const pill = statePill();
   const meta = Kit.h('div', { class: 'm-0 flex min-w-0 flex-wrap items-center gap-x-1.5 type-meta text-ink-3' });
+  const noteSlot = Kit.h('span', { class: 'contents' });
   const act = Kit.button({ label: 'Start', onClick: () => cardAct(name) });
   const play = Kit.button({ label: 'Play', onClick: () => playClient(rowOf(name)) });
   const open = Kit.button({ label: 'Open', onClick: () => select(name) });
@@ -72,11 +73,11 @@ function buildHomeCard(name) {
     Kit.h('div', { class: 'sl-card-head' },
       tileSlot,
       Kit.h('div', { class: 'min-w-0 flex-[1_1_240px]' },
-        Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1' }, Kit.h('h2', { class: 'm-0 min-w-0 max-w-full' }, nameButton), pill),
-        meta),
+        Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1' }, Kit.h('h3', { class: 'm-0 min-w-0 max-w-full' }, nameButton), pill),
+        meta, noteSlot),
       Kit.h('div', { class: 'flex flex-wrap gap-2' }, act, play, open)),
     stats, links);
-  card.parts = { tileSlot, nameButton, pill, meta, act, play, open, stats, links };
+  card.parts = { tileSlot, nameButton, pill, meta, noteSlot, act, play, open, stats, links };
   return card;
 }
 
@@ -136,7 +137,7 @@ function setVerb(button, label, busy, disabled, name) {
 }
 
 function updateHomeCard(card, row) {
-  const { tileSlot, nameButton, pill, meta, act, play, open, stats, links } = card.parts;
+  const { tileSlot, nameButton, pill, meta, noteSlot, act, play, open, stats, links } = card.parts;
   const name = row.label || row.name;
   const acting = overview.acting[row.name];
   const live = row.status === 'running' || row.status === 'stopping';
@@ -172,15 +173,18 @@ function updateHomeCard(card, row) {
     else if (crashedNow(row)) note = { tone: 'fault', text: 'Crashed, open the console to see why' };
     else if (row.stoppedAt && !acting) note = { text: 'Stopped ' + (ago(new Date(row.stoppedAt).toISOString()) || 'just now') };
   }
-  const metaKey = JSON.stringify([what, addr, shared.map((d) => d.name), note && note.text]);
+  const metaKey = JSON.stringify([what, addr, shared.map((d) => d.name)]);
   if (meta.dataset.said !== metaKey) {
     meta.dataset.said = metaKey;
     meta.textContent = '';
     meta.append(what, Kit.h('span', { 'aria-hidden': 'true', text: '·' }), addr ? addrButton(addr) : 'port not known yet');
     if (shared.length) meta.append(Kit.h('span', { 'aria-hidden': 'true', text: '·' }), (shared.length === 1 ? 'Shared database ' : 'Shared databases ') + shared.map((d) => d.label || d.name).join(', '));
-    if (note) {
-      meta.append(Kit.h('span', { 'aria-hidden': 'true', text: '·' }), Kit.h('span', { class: note.tone === 'fault' ? 'text-fault-ink' : '', text: note.text }));
-    }
+  }
+  // The note is apart from the address, so "Stopped 5m ago" ticking over never rebuilds the button.
+  const noteKey = note ? note.tone + '|' + note.text : '';
+  if (noteSlot.dataset.said !== noteKey) {
+    noteSlot.dataset.said = noteKey;
+    noteSlot.replaceChildren(...(note ? [Kit.h('span', { 'aria-hidden': 'true', text: '·' }), Kit.h('span', { class: note.tone === 'fault' ? 'text-fault-ink' : '', text: note.text })] : []));
   }
 
   const verb = cardVerb(row);
@@ -235,13 +239,16 @@ function renderHomeCards() {
   // The ones that are running first: they are what is happening; the rest are a list to start from.
   const ordered = state.rows.map((row, i) => ({ row, i, rank: row.status === 'running' || row.status === 'stopping' ? 0 : 1 }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i).map((x) => x.row);
+  // Moving a card takes focus off whatever inside it had it: put it back.
+  const focused = box.contains(document.activeElement) ? document.activeElement : null;
   ordered.forEach((row, i) => {
     seen.add(row.name);
-    let card = box.querySelector('[data-name="' + CSS.escape(row.name) + '"]');
+    let card = box.querySelector(':scope > [data-name="' + CSS.escape(row.name) + '"]');
     if (!card) card = buildHomeCard(row.name);
     updateHomeCard(card, row);
     if (box.children[i] !== card) box.insertBefore(card, box.children[i] || null);
   });
+  if (focused && focused.isConnected && document.activeElement !== focused) focused.focus();
   for (const card of Array.from(box.children)) if (!seen.has(card.dataset.name)) card.remove();
 }
 

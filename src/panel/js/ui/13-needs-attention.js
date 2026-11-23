@@ -222,13 +222,13 @@ function renderAttention() {
   const key = items.map((i) => i.key + '|' + i.title).join('\n');
   if (key === overview.attention) {
     items.forEach((item, i) => {
-      const body = box.children[i] && box.children[i].querySelector('.sl-banner-body');
+      const body = box.children[i + 1] && box.children[i + 1].querySelector('.sl-banner-body');
       if (body && body.textContent !== item.text) body.textContent = item.text;
     });
     return;
   }
   overview.attention = key;
-  box.textContent = '';
+  box.replaceChildren(box.querySelector('#attTitle'));
   for (const item of items) {
     const banner = Kit.banner({ tone: item.tone === 'accent' ? undefined : item.tone, icon: item.icon, title: item.title, text: item.text, actions: item.actions.map(attentionAction) });
     // Said in words as well as in colour: the glyph is decoration to a screen reader.
