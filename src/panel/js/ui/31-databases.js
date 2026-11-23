@@ -538,7 +538,7 @@ async function renderDatabaseSettings(row) {
   };
 
   // the notice that it is not answering, kept in step with each poll (paintDbReach)
-  const reach = h('div', { dataset: { dbReach: '' } });
+  const reach = h('div', { class: 'empty:hidden', dataset: { dbReach: '' } });
   const page = h('div', { class: 'grid grid-cols-1 items-start gap-6 @wide/pane:grid-cols-2' });
   body.append(reach, page);
   paintDbReach(row);
@@ -555,7 +555,7 @@ async function renderDatabaseSettings(row) {
     screenshot or screen share carries. Copy fetches it without showing it.
   */
   const who = row.engineKind === 'redis' ? 'Password' : 'Admin login';
-  const masked = h('span', { class: 'font-mono tracking-widest text-ink-3', text: '•'.repeat(8), 'aria-label': 'Hidden' });
+  const masked = h('span', { class: 'font-mono tracking-label text-ink-3', text: '•'.repeat(8), 'aria-label': 'Hidden' });
   const reveal = Kit.button({ label: 'Show', icon: 'eye', size: 'sm' });
   reveal.setAttribute('aria-expanded', 'false');
   reveal.setAttribute('aria-label', 'Show the ' + who.toLowerCase());

@@ -449,6 +449,10 @@
     --tw-tracking: var(--track-display);
     letter-spacing: var(--track-display);
   }
+  .tracking-label {
+    --tw-tracking: var(--track-label);
+    letter-spacing: var(--track-label);
+  }
   .type-page {
     font: var(--type-page);
     letter-spacing: var(--track-display);
@@ -523,6 +527,9 @@
   .last\:border-b-0:last-child {
     border-bottom-style: var(--tw-border-style);
     border-bottom-width: 0px;
+  }
+  .empty\:hidden:empty {
+    display: none;
   }
   @media (hover: hover) {
     .hover\:underline:hover {
@@ -634,7 +641,7 @@
   .\[\&\[data-changed\]_\.sl-input\]\:border-accent-edge[data-changed] .sl-input {
     border-color: var(--lapis-edge);
   }
-  .\[\&\[data-changed\]_\.sl-switch\]\:border-accent-edge[data-changed] .sl-switch {
+  .\[\&\[data-changed\]_\.sl-switch\:not\(\:checked\)\]\:border-accent-edge[data-changed] .sl-switch:not(:checked) {
     border-color: var(--lapis-edge);
   }
 }

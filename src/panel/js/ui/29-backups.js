@@ -1196,6 +1196,12 @@ async function renderServerSettings() {
 /** The one ResizeObserver the settings form keeps on its pane; replaced when the form is rebuilt. */
 let settingsPaneWatch = null;
 
+/** A setting's value as its field holds it. A yes/no reads as Minecraft reads it: TRUE is true. */
+function fieldText(f) {
+  if (f.value == null) return '';
+  return f.type === 'bool' ? String(f.value).trim().toLowerCase() : String(f.value);
+}
+
 async function buildServerSettings(row, body) {
   body.dataset.for = row.name;
   paneLoading(body);
@@ -1242,7 +1248,7 @@ async function buildServerSettings(row, body) {
     const b = el('button', 'sl-nav-item w-auto justify-between @min-[761px]/pane:w-full');
     b.type = 'button';
     b.dataset.section = key;
-    const word = el('span', 'sl-nav-name');
+    const word = el('span', 'sl-nav-name whitespace-normal');
     word.textContent = title;
     const dot = Kit.dot({ tone: 'accent' });
     dot.hidden = true;
@@ -1333,7 +1339,7 @@ async function buildServerSettings(row, body) {
   const entries = [];
   const addRow = (section, { id, label, help, control, entry }) => {
     // A changed row's box wears the accent edge, so what Save would write is visible at a glance.
-    const line = el('div', 'grid grid-cols-1 items-start gap-x-5 gap-y-2 border-b border-line-faint py-3 last:border-b-0 @min-[761px]/pane:grid-cols-[minmax(0,1fr)_280px] [&[data-changed]_.sl-input]:border-accent-edge [&[data-changed]_.sl-switch]:border-accent-edge');
+    const line = el('div', 'grid grid-cols-1 items-start gap-x-5 gap-y-2 border-b border-line-faint py-3 last:border-b-0 @min-[761px]/pane:grid-cols-[minmax(0,1fr)_280px] [&[data-changed]_.sl-input]:border-accent-edge [&[data-changed]_.sl-switch:not(:checked)]:border-accent-edge');
     const left = el('div', 'flex min-w-0 flex-col gap-1');
     const title = el('div', 'flex flex-wrap items-center gap-x-2 gap-y-1');
     const lab = el('label', 'cursor-pointer type-body font-strong text-ink');
@@ -1378,14 +1384,16 @@ async function buildServerSettings(row, body) {
     if (f.type === 'bool') {
       // A switch, read and written as the file's own words: its value is "true" or "false", so
       // everything that compares or saves a field treats it as it treats a text box.
-      box = Kit.toggle({ label: f.label, checked: String(f.value) === 'true' });
-      box.querySelector('.sl-choice-text').classList.add('sl-sr');
+      // The row's label names it; the switch's own words would be read out a second time.
+      // The file's words in any case: Minecraft reads TRUE as true.
+      box = Kit.toggle({ label: f.label, checked: String(f.value).trim().toLowerCase() === 'true' });
+      box.querySelector('.sl-choice-text').remove();
       box.classList.add('self-start', 'min-h-8');
       input = box.querySelector('input');
       Object.defineProperty(input, 'value', {
         configurable: true,
         get() { return this.checked ? 'true' : 'false'; },
-        set(v) { this.checked = String(v) === 'true'; },
+        set(v) { this.checked = String(v).trim().toLowerCase() === 'true'; },
       });
     } else if (f.type === 'enum') {
       input = el('select', 'sl-input');
@@ -1410,7 +1418,7 @@ async function buildServerSettings(row, body) {
       input.autocomplete = 'off';
     }
     input.id = 'p_' + f.key;
-    const c = { input, original: f.value == null ? '' : String(f.value), set: Boolean(f.set) };
+    const c = { input, original: fieldText(f), set: Boolean(f.set) };
     controls.set(f.key, c);
     // A number field's own min and max only stop the spinner; typed, 5000 players went through to
     // Save. The range is said under the field as it is typed, and Save waits for it.
@@ -1507,7 +1515,7 @@ async function buildServerSettings(row, body) {
   // route, not a reason for a second button on the screen.
   const crash = sectionFor('crash', { title: 'If it crashes', blurb: 'What SpawnLoft does when the server dies without being asked to.' });
   const arToggle = Kit.toggle({ label: 'Restart it automatically', checked: mine.autoRestart });
-  arToggle.querySelector('.sl-choice-text').classList.add('sl-sr');
+  arToggle.querySelector('.sl-choice-text').remove();
   arToggle.classList.add('self-start', 'min-h-8');
   const arSwitch = arToggle.querySelector('input');
   arSwitch.id = 's_autorestart';
@@ -1924,7 +1932,9 @@ async function buildServerSettings(row, body) {
     // The bar is there only while there is something to save: with nothing changed it was three
     // disabled buttons and a sentence saying so, on every visit.
     bar.hidden = !n && !saving;
-    barCount.textContent = n + (n === 1 ? ' unsaved change' : ' unsaved changes');
+    // said only when it changes: a status line rewritten on every key is read out on every key
+    const counted = n + (n === 1 ? ' unsaved change' : ' unsaved changes');
+    if (barCount.textContent !== counted) barCount.textContent = counted;
     barWhen.textContent = invalid ? 'Fix the field marked in red to save.' : waiting.needsRestart ? applyWhen : 'In force as soon as it is saved.';
     discard.disabled = saving || !n;
     save.disabled = saving || !n || invalid;
@@ -1954,7 +1964,7 @@ async function buildServerSettings(row, body) {
         const out = await post(base + '/props', props);
         for (const f of out.fields) {
           const c = controls.get(f.key);
-          if (c) { c.original = f.value == null ? '' : String(f.value); c.set = Boolean(f.set); }
+          if (c) { c.original = fieldText(f); c.set = Boolean(f.set); }
         }
         // left out by the server: this form was drawn before the server's version changed
         for (const g of out.ignored || []) {
@@ -2045,7 +2055,7 @@ async function buildServerSettings(row, body) {
     for (const f of fresh.fields) {
       const c = controls.get(f.key);
       if (!c) continue;
-      const value = f.value == null ? '' : String(f.value);
+      const value = fieldText(f);
       if (c.input.value.trim() === c.original) c.input.value = value;
       c.original = value;
       c.set = Boolean(f.set);
