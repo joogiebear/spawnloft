@@ -742,8 +742,10 @@ FunctionEnd
 ;
 ; Push <file>, Push <text>, Call SpawnLoftFileHas, Pop: "1" when a line of <file> among its first
 ; 16 holds <text>, else "0". How a folder is known for SpawnLoft's own by what is in its marker,
-; not by the marker's name alone (spawnloft-core port/maintenance.rs reads the same).
-Function SpawnLoftFileHas
+; not by the marker's name alone (spawnloft-core port/maintenance.rs reads the same). Defined
+; twice, as SpawnLoftFileHas and un.SpawnLoftFileHas: uninstall code may only call un. functions.
+!macro SPAWNLOFT_FILE_HAS_FUNCTION UN
+Function ${UN}SpawnLoftFileHas
   Exch $R1 ; text
   Exch
   Exch $R2 ; file
@@ -778,19 +780,23 @@ Function SpawnLoftFileHas
   Pop $R2
   Exch $R1
 FunctionEnd
+!macroend
+!insertmacro SPAWNLOFT_FILE_HAS_FUNCTION ""
+!insertmacro SPAWNLOFT_FILE_HAS_FUNCTION "un."
 
-!macro SPAWNLOFT_REMOVE_NODE
+; UN is "" in Section Install and "un." in Section Uninstall
+!macro SPAWNLOFT_REMOVE_NODE UN
   ; only folders SpawnLoft wrote: a runtime.json record naming node-<ver>/ (stage-runtime.mjs),
   ; an mcctl.mjs that says it is the SpawnLoft command line. The install folder can be one the
   ; person chose, and another app's resources\core or resources\runtime is not ours
   StrCpy $R6 0
   Push "$INSTDIR\resources\runtime\runtime.json"
   Push '"exe": "node-'
-  Call SpawnLoftFileHas
+  Call ${UN}SpawnLoftFileHas
   Pop $R4
   Push "$INSTDIR\resources\core\mcctl.mjs"
   Push "the SpawnLoft command line"
-  Call SpawnLoftFileHas
+  Call ${UN}SpawnLoftFileHas
   Pop $R5
   ${If} $R4 == "1"
     ClearErrors
@@ -1242,7 +1248,7 @@ Section Install
   RMDir /r "$INSTDIR\resources\bin\staging"
   ; and the Node runtime and Node core of a 2.0 build before C10, now that `handover stop` has run
   ; and this build is in place
-  !insertmacro SPAWNLOFT_REMOVE_NODE
+  !insertmacro SPAWNLOFT_REMOVE_NODE ""
 
   ; SPAWNLOFT: `spawnloft` in a new terminal (spawnloft-lib user_path.rs). A new install and the
   ; 1.x handover put resources\bin on the user PATH; a 2.x update leaves the PATH as the user has
@@ -1432,7 +1438,7 @@ Section Uninstall
   ; SPAWNLOFT: core binaries moved aside by updates, and the Node runtime and Node core of a 2.0
   ; build before C10, once nothing runs them
   !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
-  !insertmacro SPAWNLOFT_REMOVE_NODE
+  !insertmacro SPAWNLOFT_REMOVE_NODE "un."
   RMDir /r "$INSTDIR\resources\bin\staging"
 
   {{#each resources_ancestors}}
