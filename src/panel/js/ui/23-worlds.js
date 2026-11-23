@@ -1,6 +1,51 @@
 'use strict';
 // ----------------------------------------------------------------- worlds ---
 
+/** A world's extra dimension as a person says it: "Nether", "The End". */
+function dimensionWord(dim) {
+  const d = String(dim).replace(/^_/, '');
+  if (d === 'nether') return 'Nether';
+  if (d === 'the_end') return 'The End';
+  return capital(d.replace(/_/g, ' '));
+}
+
+/** "Nether and The End", for a sentence. */
+function dimensionsWords(dims) {
+  const words = (dims || []).map(dimensionWord);
+  return words.length > 1 ? words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1] : words.join('');
+}
+
+/**
+ * A world's name as the core takes it, checked as it is typed: the rule is the one the core
+ * applies, said under the field rather than in a refusal that calls the world an "instance".
+ */
+function worldNameProblem(name) {
+  const text = String(name).trim();
+  if (!text) return 'Give it a name.';
+  if (text.length > 32) return 'Up to 32 characters.';
+  if (!/^[A-Za-z0-9_-]+$/.test(text)) return 'Letters, numbers, - and _ only: no spaces.';
+  return null;
+}
+
+/**
+ * A path as pasted: Windows' "Copy as path" puts quotes around it. A relative path would be read
+ * from wherever SpawnLoft runs, which is never what was meant.
+ */
+function importSource(raw) {
+  let text = String(raw).trim();
+  if (/^(["']).*\1$/.test(text)) text = text.slice(1, -1).trim();
+  if (!text) return { problem: 'Paste the path to a zip, a tar.gz or a folder, or choose one.' };
+  if (/^~/.test(text)) return { problem: 'Write the full path: ~ for your home folder is not understood here.' };
+  if (!/^(\/|[A-Za-z]:[\\/]|\\\\)/.test(text)) return { problem: 'Paste the full path, from the drive or / onwards.' };
+  return { path: text };
+}
+
+/** A world name guessed from what was chosen: its file name, made into a name the core takes. */
+function worldNameFrom(picked) {
+  const last = String(picked).split(/[\\/]/).filter(Boolean).pop() || '';
+  return last.replace(/\.(zip|tar\.gz|tgz)$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+}
+
 /**
  * What the instance holds, switched, imported, exported, deleted.
  *
@@ -28,188 +73,102 @@ async function renderWorlds(opts) {
   if (body.dataset.for !== row.name) return;
   body.textContent = '';
   paneHead(body, 'map', 'Worlds',
-    'Every world this server holds. Import a downloaded map, export one to share, choose which one runs.');
+    'Every world this server holds. Choose which one runs, export one to share, or import a downloaded map.');
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/worlds';
   const again = () => renderWorlds({ force: true });
+  const { h } = Kit;
+  const page = h('div', { class: 'flex flex-col gap-6' });
+  body.append(page);
 
-  const how = document.createElement('div');
-  how.className = 'hint';
-  how.textContent = data.running
-    ? 'The server is running: importing works now; switching, deleting and exporting the active world need it stopped.'
-    : 'Switching worlds takes effect the next time the server starts.';
-  body.append(how);
-  // Said here because this is where a second world arrives: every one of them is backed up.
-  const covered = document.createElement('div');
-  covered.className = 'hint';
-  covered.textContent = 'Standard, Worlds only and automatic backups cover every world listed here, not only the active one.';
-  body.append(covered);
-
-  // ---- import ----------------------------------------------------------------
-  const add = document.createElement('div');
-  add.className = 'section';
-  const addTitle = document.createElement('h3');
-  addTitle.textContent = 'Import a world';
-  const srcRow = document.createElement('div');
-  srcRow.className = 'row';
-  const src = document.createElement('input');
-  src.className = 'mono';
-  src.spellcheck = false;
-  src.autocomplete = 'off';
-  src.placeholder = examplePath(panelPlatform, 'map') + ' — a zip, tar.gz, or a folder';
-  src.setAttribute('aria-label', 'Where the world is: the path to a zip, a tar.gz or a folder');
-  src.style.flex = '1 1 260px';
-  const browse = document.createElement('button');
-  browse.type = 'button';
-  browse.textContent = 'Browse…';
-  browse.hidden = !desktop || !desktop.pickFile;
-  srcRow.append(src, browse);
-  const nameRow = document.createElement('div');
-  nameRow.className = 'row';
-  const wname = document.createElement('input');
-  wname.placeholder = 'Name it — letters, numbers, dash, underscore';
-  wname.setAttribute('aria-label', 'A name for the world: letters, numbers, dash, underscore');
-  wname.autocomplete = 'off';
-  wname.spellcheck = false;
-  wname.style.maxWidth = '260px';
-  const go = iconButton('plus', 'Import', 'primary');
-  nameRow.append(wname, go);
-  const addNote = document.createElement('div');
-  addNote.className = 'hint';
-  addNote.textContent = 'Never overwrites: the world arrives as a new entry here, and nothing changes '
-    + 'until you make it the active one. The world inside the archive is found wherever it is nested.';
-  add.append(addTitle, srcRow, nameRow, addNote);
-  body.append(add);
-
-  if (!browse.hidden) {
-    browse.onclick = async () => {
-      const picked = await desktop.pickFile('Choose a world archive or folder');
-      if (!picked) return;
-      src.value = picked;
-      if (!wname.value.trim()) {
-        const guess = picked.split(/[\\/]/).filter(Boolean).pop() || '';
-        wname.value = guess.replace(/\.(zip|tar\.gz|tgz)$/i, '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 32);
-      }
-    };
+  // What needs the server stopped, said once, before any button that is off because of it.
+  if (data.running) {
+    page.append(Kit.banner({
+      icon: 'map',
+      title: 'The server is running',
+      text: 'Importing works now. Switching worlds, deleting one, and exporting the one in use need it stopped.',
+    }));
   }
-
-  go.onclick = async () => {
-    const source = src.value.trim();
-    const name = wname.value.trim();
-    if (!source || !name) { toast('A source and a name are both needed.', 'bad'); return; }
-    go.disabled = true;
-    go.dataset.holding = '1'; // not redrawn mid-import: a fresh page would offer Import again
-    go.textContent = 'Importing…';
-    try {
-      const out = await post(base + '/import', { source: source, name: name });
-      toast('Imported ' + out.name + ' (' + out.sizeHuman
-        + (out.dimensions.length ? ', with ' + out.dimensions.join(' and ') : '') + ').', 'good');
-      await again();
-    } catch (e) {
-      toast(e.message, 'bad');
-      go.disabled = false;
-      delete go.dataset.holding;
-      go.textContent = 'Import';
-    }
-  };
 
   // ---- the worlds ------------------------------------------------------------
-  const listTitle = document.createElement('h3');
-  listTitle.className = 'hist-title';
-  listTitle.textContent = 'Worlds (' + data.worlds.length + ')';
-  body.append(listTitle);
-
-  if (!data.worlds.length) {
-    body.append(emptyState('map', 'No worlds yet. The server generates one on its first start, '
-      + 'or import a downloaded map above.'));
-    return;
-  }
-  const list = document.createElement('div');
-  list.className = 'people';
-  for (const w of data.worlds) list.append(worldRow(w));
-  body.append(list);
+  // The list comes first: on a server with one world, the import form above it filled the screen
+  // before the world itself was seen.
+  const listHead = h('div', { class: 'flex flex-wrap items-baseline gap-x-3 gap-y-1' },
+    h('h2', { class: 'm-0 type-section text-ink', text: 'Worlds' }),
+    h('span', { class: 'type-meta text-ink-3', text: data.worlds.length ? String(data.worlds.length) : '' }),
+    // said here because this is where a second world arrives
+    h('span', { class: 'type-meta text-ink-3 basis-full', text: 'Backups cover every world listed here, not only the one in use.' }));
+  page.append(h('section', { class: 'flex flex-col gap-3', 'aria-label': 'Worlds' }, listHead,
+    data.worlds.length
+      ? Kit.list(data.worlds.map(worldRow), 'Worlds')
+      : Kit.empty({ icon: 'map', title: 'No worlds yet', text: 'The server makes one the first time it starts. Or import a downloaded map below.' })));
 
   function worldRow(w) {
-    const el = document.createElement('div');
-    el.className = 'who';
-    if (w.active) el.setAttribute('data-online', '');
-    const mark = document.createElement('div');
-    mark.className = 'face face-mark';
-    mark.append(icon('map'));
+    const mark = h('span', { class: 'sl-tile', 'aria-hidden': 'true', dataset: { tone: 'plain' } }, Kit.icon('map'));
+    const title = h('span', { class: 'flex flex-wrap items-center gap-2' },
+      h('span', { class: 'sl-row-title', text: w.name }),
+      w.active ? Kit.pill({ text: 'In use', tone: 'live' }) : null,
+      ...w.dimensions.map((d) => h('span', { class: 'sl-pill', text: dimensionWord(d) })));
+    const meta = h('span', { class: 'sl-row-meta whitespace-normal' },
+      w.sizeHuman + (w.active ? ' · The world the server loads. Make another one active to delete this one.' : ''));
 
-    const nm = document.createElement('div');
-    nm.className = 'w-name';
-    const who = document.createElement('span');
-    who.textContent = w.name;
-    nm.append(who);
-    if (w.active) {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.dataset.tone = 'on';
-      pill.textContent = 'Active';
-      nm.append(pill);
+    const buttons = [];
+    let use = null;
+    let drop = null;
+    if (!w.active) {
+      use = Kit.button({ label: 'Use this world', size: 'sm' });
+      use.disabled = data.running;
+      if (data.running) use.title = 'Stop the server first';
+      use.setAttribute('aria-label', 'Use ' + w.name);
+      buttons.push(use);
     }
-    for (const d of w.dimensions) {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.textContent = d.replace('the_', 'the ');
-      nm.append(pill);
-    }
-
-    const meta = document.createElement('div');
-    meta.className = 'w-meta';
-    meta.textContent = w.sizeHuman;
-
-    const acts = document.createElement('div');
-    acts.className = 'w-acts';
-    const use = document.createElement('button');
-    use.textContent = 'Set active';
-    use.hidden = w.active;
-    use.disabled = data.running;
-    if (data.running) use.title = 'Stop the server first';
-    const exp = iconButton('archive', 'Export');
+    const exp = Kit.button({ label: 'Export', icon: 'download', size: 'sm' });
+    exp.setAttribute('aria-label', 'Export ' + w.name);
     exp.disabled = w.active && data.running;
-    if (exp.disabled) exp.title = 'The running server is saving into this world - stop it first, or take a backup';
-    const drop = iconButton('trash', 'Delete', 'danger');
-    drop.hidden = w.active;
-    drop.disabled = data.running;
-    if (data.running) drop.title = 'Stop the server first';
-    acts.append(use, exp, drop);
-    el.append(mark, nm, meta, acts);
+    if (exp.disabled) exp.title = 'The running server is saving into this world. Stop it first, or take a backup.';
+    buttons.push(exp);
+    if (!w.active) {
+      drop = Kit.button({ icon: 'trash', kind: 'ghost', size: 'sm', title: 'Delete ' + w.name });
+      drop.disabled = data.running;
+      if (data.running) drop.title = 'Stop the server first';
+      buttons.push(drop);
+    }
+    const el = h('div', { class: 'sl-row', dataset: { world: w.name } },
+      mark, h('span', { class: 'sl-row-main' }, title, meta), h('span', { class: 'sl-row-end' }, buttons));
 
-    const busy = (on) => { for (const b of acts.children) b.disabled = on; };
+    // Kit.busy remembers what each button was before, so one that was off because the server runs
+    // stays off when the request fails.
+    const busy = (on, which) => { for (const b of buttons) Kit.busy(b, on); if (!on && which) which.focus(); };
 
-    use.onclick = async () => {
+    if (use) use.onclick = async () => {
       busy(true);
       try {
         await post(base + '/activate', { name: w.name });
-        toast(w.name + ' is now the active world. Takes effect on the next start.', 'good');
+        toast(w.name + ' is now the world in use. It loads the next time the server starts.', 'good');
         await refresh();
         await again();
       } catch (e) {
         toast(e.message, 'bad');
-        busy(false);
+        busy(false, use);
       }
     };
 
     exp.onclick = async () => {
       busy(true);
-      exp.textContent = 'Exporting…';
       try {
         const out = await post(base + '/export', { name: w.name });
-        toast('Exported to ' + out.file + ' (' + out.sizeHuman + ').', 'good');
+        toast('Exported ' + w.name + ' to ' + out.file + ' (' + out.sizeHuman + ').', 'good', { stay: true });
         await again();
       } catch (e) {
         toast(e.message, 'bad');
-        busy(false);
-        exp.textContent = 'Export';
+        busy(false, exp);
       }
     };
 
-    drop.onclick = async () => {
+    if (drop) drop.onclick = async () => {
       const ok = await ask({
-        title: 'Delete the world "' + w.name + '"?',
-        text: (w.dimensions.length ? 'Its ' + w.dimensions.join(' and ') + ' go with it. ' : '')
+        title: 'Delete the world “' + w.name + '”?',
+        text: (w.dimensions.length ? 'Its ' + dimensionsWords(w.dimensions) + ' go with it. ' : '')
           + 'A copy is kept first, so Backups can put it back.',
         confirmLabel: 'Delete world',
         danger: true,
@@ -224,23 +183,112 @@ async function renderWorlds(opts) {
         } catch (e) {
           if (e.code !== 'large') throw e;
           const sure = await ask({
-            title: 'Delete "' + w.name + '" without a copy?',
+            title: 'Delete “' + w.name + '” without a copy?',
             text: e.message + '. Deleted without one, the only way back is a backup that already holds it. Export it first if there is any doubt.',
             confirmLabel: 'Delete for good',
             danger: true,
             typeToConfirm: w.name,
           });
-          if (!sure) { busy(false); return; }
+          if (!sure) { busy(false, drop); return; }
           out = await post(base + '/delete', { name: w.name, withoutCopy: true });
         }
-        toast('Deleted ' + out.removed.join(', ') + '.' + (out.snapshot ? ' A copy is in Backups.' : ''), 'good');
+        toast('Deleted ' + w.name + (w.dimensions.length ? ', with its ' + dimensionsWords(w.dimensions) : '') + '.'
+          + (out.snapshot ? ' A copy is in Backups.' : ''), 'good');
         await again();
       } catch (e) {
         toast(e.message, 'bad');
-        busy(false);
+        busy(false, drop);
       }
     };
     return el;
   }
-}
 
+  // ---- import ----------------------------------------------------------------
+  const src = Kit.input({ mono: true, placeholder: examplePath(panelPlatform, 'map') });
+  const pickers = [];
+  if (desktop && desktop.pickFile) {
+    const zip = Kit.button({ label: 'Choose a file…', size: 'sm' });
+    zip.onclick = async () => chosen(await desktop.pickFile('Choose a world archive (a zip or a tar.gz)'));
+    pickers.push(zip);
+  }
+  if (desktop && desktop.pickFolder) {
+    const folder = Kit.button({ label: 'Choose a folder…', size: 'sm' });
+    folder.onclick = async () => chosen(await desktop.pickFolder('Choose a world folder (a singleplayer save works)'));
+    pickers.push(folder);
+  }
+  const srcField = Kit.field({
+    label: 'Where it is',
+    control: pickers.length ? h('div', { class: 'flex flex-wrap items-center gap-2' }, h('span', { class: 'flex-1 basis-64 min-w-0' }, src), pickers) : src,
+    hint: 'A zip, a tar.gz or a folder. The world inside is found wherever it is nested.',
+  });
+  const wname = Kit.input({ placeholder: 'season-2-map' });
+  const nameField = Kit.field({ label: 'Name', control: wname, hint: 'Letters, numbers, - and _ only, up to 32.' });
+  const makeActive = Kit.checkbox({
+    label: 'Make it the world in use',
+    note: data.running ? 'Stop the server first to switch worlds.' : 'It loads the next time the server starts.',
+    disabled: data.running,
+  });
+  const go = Kit.button({ label: 'Import', icon: 'plus', kind: 'primary' });
+  const importCard = Kit.card({ label: 'Import a world' },
+    h('div', null,
+      h('h2', { class: 'm-0 type-card text-ink', text: 'Import a world' }),
+      h('p', { class: 'sl-hint mt-1', text: 'Never overwrites: it arrives as a new world here, and nothing changes until you make it the one in use.' })),
+    srcField,
+    h('div', { class: 'max-w-80' }, nameField),
+    makeActive,
+    h('div', null, go));
+  page.append(importCard);
+
+  function chosen(picked) {
+    if (!picked) return;
+    src.value = picked;
+    srcField.setError(null);
+    if (!wname.value.trim()) { wname.value = worldNameFrom(picked); nameField.setError(null); }
+  }
+  src.addEventListener('input', () => srcField.setError(null));
+  wname.addEventListener('input', () => nameField.setError(wname.value.trim() ? worldNameProblem(wname.value) : null));
+
+  go.onclick = async () => {
+    const source = importSource(src.value);
+    const nameProblem = worldNameProblem(wname.value);
+    srcField.setError(source.problem || null);
+    nameField.setError(nameProblem);
+    if (source.problem) { src.focus(); return; }
+    if (nameProblem) { wname.focus(); return; }
+    const name = wname.value.trim();
+    const activate = makeActive.querySelector('input').checked;
+    Kit.busy(go, true);
+    go.dataset.holding = '1'; // not redrawn mid-import: a fresh page would offer Import again
+    let out;
+    try {
+      out = await post(base + '/import', { source: source.path, name });
+    } catch (e) {
+      // a refusal about the name is said at the name, anything else at the path
+      if (/name/i.test(e.message) && !/nothing at|level\.dat/i.test(e.message)) nameField.setError(e.message);
+      else srcField.setError(e.message);
+      Kit.busy(go, false);
+      delete go.dataset.holding;
+      return;
+    }
+    // The world is here now. Making it the one in use can still be refused (the server started
+    // meanwhile, say): that is said on its own, and the import stands.
+    let used = false;
+    if (activate) {
+      try { await post(base + '/activate', { name: out.name }); used = true; } catch (e) {
+        toast('Imported ' + out.name + ', but it is not the world in use: ' + e.message, 'bad', { stay: true });
+      }
+    }
+    if (!activate || used) {
+      toast('Imported ' + out.name + ' (' + out.sizeHuman
+        + (out.dimensions.length ? ', with ' + dimensionsWords(out.dimensions) : '') + ')'
+        + (used ? '. It loads the next time the server starts.' : '.'), 'good');
+    }
+    src.value = '';
+    wname.value = '';
+    if (used) await refresh();
+    await again();
+    // the new world, where the list put it
+    const added = $('#worldsBody [data-world="' + CSS.escape(out.name) + '"] button');
+    if (added) added.focus();
+  };
+}
