@@ -1,0 +1,22 @@
+{
+  "loggingIds": [
+    "client-1.21.2.xml"
+  ],
+  "nativesClassifiers": [
+    "natives-linux",
+    "natives-macos",
+    "natives-macos-arm64",
+    "natives-windows",
+    "natives-windows-arm64"
+  ],
+  "runtimePlatforms": [
+    "gamecore",
+    "linux",
+    "linux-i386",
+    "mac-os",
+    "mac-os-arm64",
+    "windows-arm64",
+    "windows-x64",
+    "windows-x86"
+  ]
+}

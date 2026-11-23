@@ -17,6 +17,10 @@ spawnloft-lib.workspace = true
 # already in the tree through spawnloft-lib
 serde_json = "1.0.154"
 
+[dev-dependencies]
+# version-drift's tests sign harness lists of their own; already in the tree through spawnloft-lib
+ring = "0.17.14"
+
 # Test-only: reads and writes zips through spawnloft-lib's zip module, for the zip-fuzz job of
 # rust-internal.yml.
 [[bin]]
@@ -48,3 +52,9 @@ path = "src/bin/fake-java.rs"
 [[bin]]
 name = "fake-mariadb"
 path = "src/bin/fake-mariadb.rs"
+
+# Test-only: the weekly check that Mojang's formats, the mod loaders and the signed harness list
+# still fit the launcher code (version-drift.yml); ported from tools/check-version-drift.mjs.
+[[bin]]
+name = "version-drift"
+path = "src/bin/version-drift.rs"
