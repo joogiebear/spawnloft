@@ -259,8 +259,8 @@
         tool takes the console's place; from 1600px the console keeps a column beside it. The arrow
         keys move along the tabs and Enter or Space opens one, since opening reads from the disk.
       -->
-      <div class="overflow-x-auto border-b border-line-soft px-5" id="dockRow">
-        <div class="sl-tabs flex-nowrap compact:[&>.sl-tab>.sl-ico]:hidden" id="dock" role="tablist" aria-label="Server tools">
+      <div class="@container overflow-x-auto overflow-y-hidden px-5 shadow-[inset_0_-1px_0_var(--line-soft)]" id="dockRow">
+        <div class="sl-tabs flex-nowrap [&>.sl-tab]:after:bottom-0 @max-[1080px]:[&>.sl-tab>.sl-ico]:hidden" id="dock" role="tablist" aria-label="Server tools">
           <button type="button" role="tab" class="sl-tab" id="tabConsole" aria-selected="true" aria-controls="paneConsole"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-terminal"/></svg><span data-label>Console</span><span class="sl-count" data-tone="fault" data-badge hidden></span></button>
           <button type="button" role="tab" class="sl-tab" id="tabPlugins" data-pane="plugins" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span data-label>Plugins</span><span class="sl-count" data-tone="accent" data-badge hidden></span></button>
           <button type="button" role="tab" class="sl-tab" id="tabFiles" data-pane="files" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span data-label>Files</span></button>

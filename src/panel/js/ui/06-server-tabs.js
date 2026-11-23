@@ -18,14 +18,56 @@ function buildTab(row) {
     Kit.h('span', { class: 'sl-nav-text' }, Kit.h('span', { class: 'sl-nav-name' }), Kit.h('span', { class: 'sl-nav-meta' })),
     Kit.dot());
   if (db) el.dataset.kind = 'database';
-  else {
-    const img = new Image();
-    img.alt = '';
-    img.onload = () => { face.textContent = ''; face.append(img); };
-    img.src = '/api/instances/' + encodeURIComponent(row.name) + '/icon';
-  }
+  else withServerIcon(row.name, (src) => face.replaceChildren(iconImage(src)));
   el.onclick = () => openServer(el.dataset.name);
   return el;
+}
+
+/*
+  A server's own icon, asked for once per server and shared by its sidebar row and its header: a
+  server without one answers 404, and that should be one request, not one per switch. Change icon
+  and Remove icon call refreshServerIcon, which asks again and redraws both.
+*/
+const serverIcons = new Map();
+let iconAsk = 0;
+
+function withServerIcon(name, use) {
+  let known = serverIcons.get(name);
+  if (!known) {
+    known = { src: undefined, waiting: [] };
+    serverIcons.set(name, known);
+    const img = new Image();
+    img.onload = () => { known.src = img.src; for (const fn of known.waiting.splice(0)) fn(known.src); };
+    img.onerror = () => { known.src = null; known.waiting.length = 0; };
+    // the number makes a new address after a change, so the browser cannot answer from memory
+    img.src = '/api/instances/' + encodeURIComponent(name) + '/icon?v=' + iconAsk;
+  }
+  if (known.src) use(known.src);
+  else if (known.src === undefined) known.waiting.push(use);
+}
+
+function iconImage(src) {
+  const img = new Image();
+  img.alt = '';
+  img.src = src;
+  return img;
+}
+
+function refreshServerIcon(name) {
+  serverIcons.delete(name);
+  iconAsk++;
+  const row = rowOf(name);
+  const el = $('#list [data-name="' + CSS.escape(name) + '"]');
+  if (row && el) {
+    const face = Kit.tile({ name: row.label || row.name, key: row.name, size: 'sm' });
+    el.querySelector('.sl-tile').replaceWith(face);
+    withServerIcon(name, (src) => face.replaceChildren(iconImage(src)));
+  }
+  const tile = $('#srvTile');
+  if (row && tile.dataset.said && tile.dataset.said.startsWith(name + '|')) {
+    delete tile.dataset.said;
+    renderServerTile(row);
+  }
 }
 
 /** The state of a row as a dot: its tone, whether it breathes, and hollow for stopped. */

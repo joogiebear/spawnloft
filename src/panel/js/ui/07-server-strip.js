@@ -45,7 +45,7 @@ function renderStatePill(row) {
     if (said.tone) el.dataset.tone = said.tone;
     else delete el.dataset.tone;
   }
-  dot.toggleAttribute('data-busy', said.tone === 'warn' && Boolean(state.acting));
+  dot.toggleAttribute('data-busy', said.tone === 'warn' && (Boolean(state.acting) || row.status === 'stopping'));
   dot.toggleAttribute('data-hollow', !said.tone && row.status === 'stopped');
   // The uptime ticker (15-server-tools.js) rewrites the words each second from this.
   if (said.since) words.dataset.since = String(said.since);
@@ -68,12 +68,7 @@ function renderServerTile(row) {
   });
   tile.dataset.tone = face.dataset.tone;
   tile.replaceChildren(...face.childNodes);
-  if (!db) {
-    const img = new Image();
-    img.alt = '';
-    img.onload = () => { if (tile.dataset.said === said) tile.replaceChildren(img); };
-    img.src = '/api/instances/' + encodeURIComponent(row.name) + '/icon';
-  }
+  if (!db) withServerIcon(row.name, (src) => { if (tile.dataset.said === said) tile.replaceChildren(iconImage(src)); });
 }
 
 const FILE_MANAGER = panelPlatform === 'darwin' ? 'Finder' : panelPlatform === 'win32' ? 'Explorer' : 'your file manager';

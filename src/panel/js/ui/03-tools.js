@@ -105,7 +105,7 @@ function markToolTabs() {
   for (const b of $$('#dock [role="tab"]')) {
     const picked = b.id === on;
     b.setAttribute('aria-selected', String(picked));
-    if (!$('#dock').contains(document.activeElement)) b.tabIndex = picked ? 0 : -1;
+    b.tabIndex = picked ? 0 : -1;
   }
   if (toolView.tool) $('#toolPanel').setAttribute('aria-labelledby', on);
 }
@@ -139,12 +139,12 @@ $('#dock').addEventListener('focusout', (e) => {
   for (const b of $$('#dock [role="tab"]')) b.tabIndex = b.getAttribute('aria-selected') === 'true' ? 0 : -1;
 });
 
-/** Escape inside a tool: back to the console, with focus on the tab that opened the tool. */
+/** Escape inside a tool: back to the console, with focus on its tab, where the Tab stop is. */
 function closeTool() {
   const was = toolView.tool;
   rowMenu.close(false);
   setTool(null);
-  if (was) $('#' + dockId(was))?.focus();
+  if (was) $('#tabConsole').focus();
 }
 
 /**
@@ -155,6 +155,8 @@ function updateConsoleBadge() {
   const tab = $('#tabConsole');
   const badge = tab.querySelector('[data-badge]');
   const n = toolView.tool ? levelCounts.error : 0;
+  // called for every console line: nothing to do while the console is what is showing
+  if (!n && badge.hidden) return;
   badge.hidden = !n;
   badge.textContent = n ? String(n) : '';
   if (n) tab.setAttribute('aria-label', 'Console, ' + n + (n === 1 ? ' error' : ' errors'));

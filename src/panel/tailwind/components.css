@@ -1042,6 +1042,11 @@
   .sl-side .sl-nav-head > .sl-btn {
     margin-right: -6px;
   }
+  /* New server, while the Add sheet is what is open */
+  .sl-side .sl-nav-head > .sl-btn[aria-current="page"] {
+    background: var(--raised);
+    color: var(--ink);
+  }
   @media (max-width: 1199px) {
     .sl-side-nav {
       padding: var(--s-2) 6px;

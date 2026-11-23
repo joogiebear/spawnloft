@@ -2,6 +2,9 @@
 @layer properties;
 @layer theme, base, legacy, components, utilities;
 @layer utilities {
+  .\@container {
+    container-type: inline-size;
+  }
   .relative {
     position: relative;
   }
@@ -145,6 +148,9 @@
   .overflow-x-auto {
     overflow-x: auto;
   }
+  .overflow-y-hidden {
+    overflow-y: hidden;
+  }
   .rounded-lg {
     border-radius: var(--r-lg);
   }
@@ -243,6 +249,10 @@
   .text-ink-4 {
     color: var(--ink-4);
   }
+  .shadow-\[inset_0_-1px_0_var\(--line-soft\)\] {
+    --tw-shadow: inset 0 -1px 0 var(--tw-shadow-color, var(--line-soft));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
   .type-body {
     font: var(--type-body);
   }
@@ -277,8 +287,12 @@
   .\[\&\>\*\]\:flex-\[1_1_360px\] > * {
     flex: 1 1 360px;
   }
-  @media (max-width: 1199px) {
-    .compact\:\[\&\>\.sl-tab\>\.sl-ico\]\:hidden > .sl-tab > .sl-ico {
+  .\[\&\>\.sl-tab\]\:after\:bottom-0 > .sl-tab::after {
+    content: var(--tw-content);
+    bottom: 0px;
+  }
+  @container (width < 1080px) {
+    .\@max-\[1080px\]\:\[\&\>\.sl-tab\>\.sl-ico\]\:hidden > .sl-tab > .sl-ico {
       display: none;
     }
   }
@@ -1214,6 +1228,10 @@
   .sl-side .sl-nav-head > .sl-btn {
     margin-right: -6px;
   }
+  .sl-side .sl-nav-head > .sl-btn[aria-current="page"] {
+    background: var(--raised);
+    color: var(--ink);
+  }
   @media (max-width: 1199px) {
     .sl-side-nav {
       padding: var(--s-2) 6px;
@@ -1628,12 +1646,97 @@
   syntax: "*";
   inherits: false;
 }
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-content {
+  syntax: "*";
+  initial-value: "";
+  inherits: false;
+}
 @layer properties {
   @supports ((-webkit-hyphens: none) and (not (margin-trim: block))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
     *, ::before, ::after, ::backdrop {
       --tw-border-style: solid;
       --tw-font-weight: initial;
       --tw-tracking: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
+      --tw-ring-color: initial;
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-content: "";
     }
   }
 }

@@ -145,6 +145,7 @@ function serverListPreview(row, input) {
       delete img.dataset.none;
       img.onerror = () => { img.onerror = null; img.src = blank; img.dataset.none = ''; };
       loadIcon();
+      refreshServerIcon(row.name);
     } catch (e) {
       toast(e.message || 'That image could not be read.', 'bad');
     }
@@ -154,6 +155,7 @@ function serverListPreview(row, input) {
       await post('/instances/' + encodeURIComponent(row.name) + '/icon/remove');
       img.src = blank;
       img.dataset.none = '';
+      refreshServerIcon(row.name);
       toast('Icon removed.', 'good');
     } catch (e) { toast(e.message, 'bad'); }
   };
