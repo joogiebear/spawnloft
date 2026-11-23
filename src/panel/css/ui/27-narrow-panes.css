@@ -1,0 +1,30 @@
+  /* ---- narrow panes, last so these actually win ------------------------------ */
+
+  /*
+    Placed at the end of the sheet deliberately. A @container block adds no specificity of its own,
+    so `.who` inside one and `.who` outside it are the same weight and source order decides.
+
+    Narrow panes stack their actions under the content: a grid track sized `auto` is filled to its
+    max-content before a minmax(0,1fr) track gets anything, so buttons that refuse to wrap left the
+    name column a few pixels wide. Below this width the buttons get their own row.
+  */
+  @container pane (max-width: 600px) {
+    .who {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: "face name" "face meta" "acts acts";
+    }
+    .who .w-acts { justify-content: flex-start; margin-top: 6px; opacity: 1; }
+
+    .snaps-head { display: none; }
+    .snap {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "when size" "what tag" "actions actions";
+    }
+    .snap .snap-actions { justify-content: flex-start; margin-top: 6px; opacity: 1; }
+    .snap .tag { justify-self: end; }
+
+    /* The automatic-backup line is a flex row of six controls; without this the interval select
+       squeezed to 30px and stopped being able to show "Daily at 03:00". */
+    .gauge .row, .section .row { flex-wrap: wrap; }
+  }
+

@@ -1,0 +1,88 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>SpawnLoft setup</title>
+
+<script src="/assets/js/setup/00-theme.js"></script>
+
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/setup.css">
+
+<form class="card" id="form">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" width="22" height="22" aria-hidden="true">
+      <polygon points="8,20 32,8 56,20 32,32" fill="#5f85ef"/>
+      <polygon points="8,20 32,32 32,54 8,42" fill="#3a55b4"/>
+      <polygon points="56,20 32,32 32,54 56,42" fill="#24357a"/>
+      <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="#cfe0ff"/>
+    </svg>
+    <b>SpawnLoft</b>
+    <ol class="steps" aria-label="Getting started">
+      <li aria-current="step"><span class="dot">1</span>Choose folders</li>
+      <li><span class="dot">2</span>Open the panel</li>
+    </ol>
+  </div>
+
+  <!--
+    Issue #1: the installer used to ask for a location and then this screen asked again. The
+    installer no longer asks - the program goes where Windows puts programs - so this is the only
+    location question there is, and it says out loud which one it is. "Install location" was the
+    exact wording that made the two read as the same question asked twice.
+  -->
+  <h1>Where should SpawnLoft keep your servers?</h1>
+  <p class="sub">
+    Worlds, downloaded server jars and backups go here. <b>Not the program itself</b> — that is
+    already installed. You can move this later from Settings.
+  </p>
+
+  <div>
+    <label class="fieldlabel" for="root">Data folder</label>
+    <div class="pathrow">
+      <input type="text" id="root" spellcheck="false" autocomplete="off">
+      <button type="button" id="pickRoot">Browse…</button>
+    </div>
+    <div class="hint">A fresh server takes about 300 MB. Worlds grow from there.</div>
+  </div>
+
+  <label class="toggle" for="separate">
+    <input type="checkbox" id="separate">
+    <b>Put servers on a different drive</b>
+    <span class="why">
+      Worlds and backups are the parts that grow. Turn this on if they should live somewhere with
+      more room than the folder above.
+    </span>
+  </label>
+
+  <div id="serversBlock" hidden>
+    <label class="fieldlabel" for="servers">Servers folder</label>
+    <div class="pathrow">
+      <input type="text" id="servers" spellcheck="false" autocomplete="off">
+      <button type="button" id="pickServers">Browse…</button>
+    </div>
+    <div class="hint">Jars, backups and settings stay in the data folder above.</div>
+  </div>
+
+  <!--
+    Java is the one prerequisite SpawnLoft cannot supply. Checked here, before anything is downloaded,
+    because finding out at the first press of Start - after setup and a fifty-megabyte download -
+    is the difference between a missing dependency and a broken application.
+  -->
+  <div class="check" id="javaCheck" data-state="pending">
+    <span class="lamp"></span>
+    <b id="javaTitle">Checking for Java…</b>
+    <span class="why" id="javaWhy">Minecraft servers run on Java. SpawnLoft needs one installed.</span>
+    <span class="acts">
+      <button type="button" class="sm" id="javaGet" hidden>Get Java</button>
+      <button type="button" class="sm" id="javaAgain" hidden>Check again</button>
+    </span>
+  </div>
+
+  <div class="err" id="err" hidden></div>
+
+  <footer>
+    <span class="hint" id="note"></span>
+    <button type="submit" class="primary" id="go">Continue</button>
+  </footer>
+</form>
+
+<script src="/assets/js/setup/01-setup.js"></script>

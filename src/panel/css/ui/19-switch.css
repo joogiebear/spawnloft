@@ -1,0 +1,41 @@
+  /* ---- a switch, for things that are on or off ------------------------------ */
+
+  /*
+    A checkbox says "tick this to agree". A switch says "this is on now", which is what an automatic
+    backup actually is. Same input underneath, so it keeps its label, its focus ring and its
+    keyboard behaviour.
+  */
+  input.switch {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 34px; height: 20px;
+    padding: 0;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--sunken);
+    border: 1px solid var(--edge);
+    position: relative;
+    cursor: pointer;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .4);
+    transition: all var(--ease);
+  }
+  input.switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--ink-2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .15);
+    transition: all var(--ease);
+  }
+  input.switch:checked { background: linear-gradient(180deg, var(--switch-top), var(--lapis-dim)); border-color: var(--lapis-edge); }
+  input.switch:checked::after { transform: translateX(14px); background: var(--control-mark); }
+  input.switch:disabled { opacity: .45; cursor: default; }
+  /*
+    Stated explicitly: the switch is an input, and the field rule draws its ring inside the border,
+    which on a 20px switch is a ring around nothing.
+  */
+  :root input.switch:focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); }
+

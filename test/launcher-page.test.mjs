@@ -1,11 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import { pageSource } from './page-source.mjs'
 
-// The launcher page (src/launcher.html), like the panel, is one document with no build step. Its
+// The launcher page (src/panel/launcher.html and its scripts), like the panel, has no build step. Its
 // pure helpers are lifted out by name (the same way test/panel.test.mjs does it) and the rest is
 // checked as text: the script compiles, nothing parses markup, and the CSP is there.
-const html = fs.readFileSync(new URL('../src/launcher.html', import.meta.url), 'utf8')
+const html = pageSource('launcher.html')
 
 function constSource(name) {
   const m = new RegExp(`^ *const ${name} = .*$`, 'm').exec(html)
@@ -51,6 +52,8 @@ test('the launcher page carries a Content-Security-Policy that keeps it on the p
   assert.ok(m, 'no CSP meta')
   const csp = Object.fromEntries(m[1].split(';').map((d) => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]))
   assert.deepEqual(csp['default-src'], ["'self'"])
+  // every script is a file the panel serves, so none may be inline
+  assert.deepEqual(csp['script-src'], ["'self'"])
   assert.deepEqual(csp['connect-src'], ["'self'"])
   assert.deepEqual(csp['object-src'], ["'none'"])
   assert.deepEqual(csp['base-uri'], ["'none'"])
@@ -1184,7 +1187,7 @@ test('good news goes by itself, a menu closes when focus leaves it, and the pane
   assert.match(html, /const FLASH_MS = 8000/)
   assert.match(fnSource('pollOnce'), /FLASH_MS && !document\.activeElement\?\.closest\?\.\('\.notice'\)/)
   assert.match(fnSource('tellPanel'), /modal: Boolean\(S\.sheet && !S\.down\)/)
-  const ui = fs.readFileSync(new URL('../src/ui.html', import.meta.url), 'utf8')
+  const ui = pageSource('ui.html')
   assert.match(ui, /lockBehindPlay\.on = d\.modal === true/)
   // the lock follows the Play page: leaving it, or a new page in the frame, lets go
   {

@@ -1,11 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import { pageSource } from './page-source.mjs'
 
-// The panel is one document with no build step, so its logic cannot be imported. The pure
-// functions are lifted out of the source by name instead (a const is one line, a function runs to
+// The panel's scripts are plain scripts sharing one scope, with no build step, so their logic cannot
+// be imported. The pure functions are lifted by name out of the page put back together
+// (test/page-source.mjs) instead (a const is one line, a function runs to
 // its balanced closing brace) and throw if the file is reshaped, rather than testing nothing.
-const html = fs.readFileSync(new URL('../src/ui.html', import.meta.url), 'utf8')
+const html = pageSource('ui.html')
 
 function constSource(name) {
   const m = new RegExp(`^const ${name} = .*$`, 'm').exec(html)
@@ -182,10 +184,10 @@ test('the memory graph ceiling accepts both units and refuses junk', () => {
   assert.equal(memoryCeilingMb(''), null)
 })
 
-// The design tokens are deliberately duplicated between the panel and the setup wizard (change
-// both or neither). verify-build checks this only in a packaged build; this catches a half-edit sooner.
+// The pages share one token file (src/panel/css/tokens.css); this catches a page that stops
+// loading it, or brings back a copy of its own that has drifted.
 function tokensOf(file, website = false) {
-  const src = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
+  const src = pageSource(file)
   const block = (website ? /:root\[data-theme="spawnloft"\]\s*\{([\s\S]*?)\n {2}\}/ : /:root\s*\{([\s\S]*?)\n {2}\}/).exec(src)
   assert.ok(block, `no :root block in ${file}`)
   const map = {}
@@ -195,16 +197,16 @@ function tokensOf(file, website = false) {
 }
 
 test('the panel and the setup wizard share one token block, values included', () => {
-  assert.deepEqual(tokensOf('../src/ui.html'), tokensOf('../src/setup.html'))
+  assert.deepEqual(tokensOf('ui.html'), tokensOf('setup.html'))
 })
 
 test('the website palette stays consistent between the panel and setup wizard', () => {
-  assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../src/setup.html', true))
+  assert.deepEqual(tokensOf('ui.html', true), tokensOf('setup.html', true))
 })
 
 test('the game launcher carries the same token block as the panel, both palettes', () => {
-  assert.deepEqual(tokensOf('../src/launcher.html'), tokensOf('../src/ui.html'))
-  assert.deepEqual(tokensOf('../src/launcher.html', true), tokensOf('../src/ui.html', true))
+  assert.deepEqual(tokensOf('launcher.html'), tokensOf('ui.html'))
+  assert.deepEqual(tokensOf('launcher.html', true), tokensOf('ui.html', true))
 })
 
 test('the overview feed folds a run of the same thing into one line, and only a run', () => {
@@ -675,7 +677,7 @@ test('the Java chip asks again once Java may have been installed', () => {
 })
 
 test('the first-run Java row says what was found', () => {
-  const setup = fs.readFileSync(new URL('../src/setup.html', import.meta.url), 'utf8')
+  const setup = pageSource('setup.html')
   const at = setup.indexOf('function javaWords(')
   assert.ok(at > 0)
   let depth = 0, end = -1

@@ -1,0 +1,49 @@
+  /* ---- empty state ------------------------------------------------------ */
+
+  .empty {
+    place-content: center;
+    justify-items: center;
+    text-align: center;
+    padding: var(--s-7);
+    /* The one screen with room to spare wears the brand's own geometry: a faint isometric grid
+       at the mark's 2:1 pitch, lit from above. Working screens stay plain. */
+    background:
+      linear-gradient(180deg, rgba(var(--accent-rgb), .06), transparent 46%),
+      repeating-linear-gradient(63.43deg, rgba(var(--ink-rgb), .018) 0 1px, transparent 1px 56px),
+      repeating-linear-gradient(-63.43deg, rgba(var(--ink-rgb), .018) 0 1px, transparent 1px 56px),
+      var(--void);
+    overflow: auto;
+  }
+  .empty .mark { opacity: .95; margin-bottom: 28px; filter: drop-shadow(0 0 32px rgba(var(--accent-rgb), .4)); }
+  .empty h1 { font: 650 var(--t-7)/1.15 var(--display); margin: 0 0 12px; letter-spacing: -.028em; }
+  .empty p.lede { color: var(--ink-2); margin: 0 0 32px; max-width: 48ch; font-size: var(--t-4); line-height: 1.6; }
+
+  .doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: var(--s-3); max-width: 660px; width: 100%; }
+  /* Three doors in the Feedback sheet, which is wide enough for a row of three; capped at two
+     they left one on a line of its own. */
+  #vFeedback .doors { max-width: none; }
+  .door {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    text-align: left;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 20px;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    white-space: normal;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--ease);
+  }
+  .door:hover {
+    border-color: var(--lapis-edge);
+    background: var(--door-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .door b { font: 600 var(--t-4)/1.3 var(--ui); letter-spacing: -.005em; }
+  .door span { font-size: var(--t-3); color: var(--ink-3); line-height: 1.5; }
+

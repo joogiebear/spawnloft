@@ -473,9 +473,9 @@ banner artwork partner sites embed lives there too, under `public/banner/`.
 spawnloft ui        # starts the panel on 127.0.0.1:8770 and signs your browser in to it
 ```
 
-One HTML file, served by `spawnloft-core`'s own HTTP server. No framework, no build step, no npm packages —
-the panel that ships is the file in `src/ui.html`, compiled into the binary, and it works offline
-because nothing is fetched from anywhere.
+One HTML page with its stylesheets and plain scripts beside it, served by `spawnloft-core`'s own HTTP
+server. No framework, no build step, no npm packages — the panel that ships is the files in `src/panel/`,
+compiled into the binary, and it works offline because nothing is fetched from anywhere.
 
 The same page runs in a browser tab and inside the desktop app. `window.spawnloftDesktop` exists only in
 the desktop app, and everything that depends on it is additive: a Browse button beside a path field, a

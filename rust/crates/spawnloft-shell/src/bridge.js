@@ -34,7 +34,7 @@
     openMicrosoftLogin: (url) => call('open_microsoft_login', { url: String(url ?? '') }),
     // brings this window forward: the sign-in happened in the browser, which is now on top
     focusWindow: () => call('focus_window'),
-    // the first-run wizard (src/setup.html at /setup), answered by the panel itself
+    // the first-run wizard (src/panel/setup.html at /setup), answered by the panel itself
     getSetup: async () => (await getJson('/api/setup')).body,
     checkJava: async () => (await getJson('/api/setup/java')).body,
     saveSetup: async (choice) => {

@@ -56,8 +56,28 @@ pub fn page_setup(panel: &Panel) -> Reply {
             ("X-Frame-Options", "DENY"),
             ("Content-Security-Policy", "frame-ancestors 'none'"),
         ],
-        pages::setup(appearance::read_theme()),
+        pages::setup(),
     )
+}
+
+/// `/assets/<name>`: a stylesheet or a script of the three pages, behind the same sign-in as the
+/// pages (the listener checks it before any route). Only the names compiled in are answered
+/// (`pages::asset`). Each start of the desktop app is a new port, so a new origin, and a cached
+/// copy would never be asked for again: nothing is cached. `nosniff` holds the browser to the type
+/// given, so a script is only ever run as a script and a stylesheet only applied as one.
+pub fn asset(name: &str) -> Reply {
+    let Some((kind, body)) = pages::asset(name, appearance::read_theme) else {
+        return Reply::not_found();
+    };
+    Reply::Bytes {
+        status: 200,
+        headers: vec![
+            ("Content-Type".into(), kind.into()),
+            ("X-Content-Type-Options".into(), "nosniff".into()),
+            ("Cache-Control".into(), "no-store".into()),
+        ],
+        body: body.into_bytes(),
+    }
 }
 
 /// `/api/setup...`: the first-run wizard's calls.

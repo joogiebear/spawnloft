@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
+import { pageSource } from './page-source.mjs'
 
 // The pages' "session ended" notice (rust/PANEL-AUTH-DESIGN.md 3.4). ui.html and launcher.html
 // hold one block of script word for word; it is run here against stand-ins for fetch, EventSource
@@ -10,13 +10,11 @@ const START = '// ---- session ended'
 const END = '// ---- end session ended ----'
 
 function block(file) {
-  const html = fs.readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+  const html = pageSource(file)
   const from = html.indexOf(START)
   const to = html.indexOf(END)
   assert.ok(from > 0 && to > from, `${file} holds the block`)
-  const text = html.slice(from, to + END.length)
-  // the launcher's copy is indented one level inside its script
-  return file === 'launcher.html' ? text.split('\n').map((line) => line.replace(/^ {2}/, '')).join('\n') : text
+  return html.slice(from, to + END.length)
 }
 
 test('ui.html and launcher.html hold the same block', () => {
@@ -25,7 +23,7 @@ test('ui.html and launcher.html hold the same block', () => {
 
 test('the block comes before the page\'s first request', () => {
   for (const file of ['ui.html', 'launcher.html']) {
-    const html = fs.readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+    const html = pageSource(file)
     const at = html.indexOf(START)
     for (const call of ['fetch(', 'new EventSource(']) {
       const first = html.indexOf(call, html.indexOf(END))
