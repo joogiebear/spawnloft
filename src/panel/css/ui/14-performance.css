@@ -26,7 +26,7 @@
     font: var(--t-2)/1.5 var(--ui);
     color: var(--ink-3);
   }
-  .chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .chart .gridline { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
   .chart .line { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
   .chart .area { stroke: none; opacity: .14; }
   /* Under a chart on an Ultra pane: the range's numbers, so the line never has to be read off by eye. */

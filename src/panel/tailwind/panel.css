@@ -53,10 +53,10 @@
 /* ---- files that use classes from here (rule 3) ------------------------------------------ */
 @source "../components.html";
 @source "../js/components/gallery.js";
-/* Old stylesheets still define these four classes (test/panel-css.test.mjs), and the words turn
-   up in sources as plain words (the `grid` icon). Never built until the old rules are gone; the
-   phase that removes an old one takes its name off this line. */
-@source not inline("grid grow inline sr-only");
+/* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
+   sources as plain words. Never built until the old rules are gone; the phase that removes an old
+   one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.) */
+@source not inline("grow inline sr-only");
 
 @theme inline {
   /* ---- colour -------------------------------------------------------------------------- */

@@ -215,8 +215,15 @@ test('a step for one side only is refused outside a self-test', async () => {
   }
 })
 
-test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two, C5\'s three and C9\'s two, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 23)
+test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two, C5\'s three, C9\'s two and the UX overhaul\'s one, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 24)
+  // the default theme: only an answer from before the first save is evened out
+  const before = (theme) => 'GET /api/appearance\n  200\n{\n "theme": "' + theme + '"\n}\n\n'
+  const save = 'POST /api/appearance\n  200\n{\n "ok": true\n}\n\n'
+  const refused = 'POST /api/appearance\n  403\n{\n "error": "x"\n}\n\n'
+  assert.equal(applyDeclared(before('classic') + refused + before('classic'), 'ui'), applyDeclared(before('spawnloft') + refused + before('spawnloft'), 'ui'))
+  assert.notEqual(applyDeclared(save + before('classic'), 'ui'), applyDeclared(save + before('spawnloft'), 'ui'), 'after a save the theme is compared')
+  assert.equal(applyDeclared(before('classic'), 'list'), before('classic'), 'only the panel')
   for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
   // doctor's node line and root go; everything else stays
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'

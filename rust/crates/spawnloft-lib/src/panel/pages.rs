@@ -306,6 +306,7 @@ mod tests {
         assert!(COMPONENTS.contains(SPRITE_MARK));
         assert!(!page.contains(SPRITE_MARK));
         assert!(page.contains("<symbol id=\"i-play\""));
-        assert!(page.contains("</svg>\n<main"));
+        // a Windows checkout may hold the page with CRLF line ends
+        assert!(page.replace("\r\n", "\n").contains("</svg>\n<main"));
     }
 }

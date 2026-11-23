@@ -457,9 +457,12 @@ export function recordOf(side, neutral) {
 // A record with the scenario's normalize rules run over its text again.
 function renormalized(record, extra) {
   const even = (t) => typeof t === 'string' ? normalizeText(t, extra) : t
+  // a declared difference added since the record was frozen is applied to it here, as it was
+  // applied to the side that ran
+  const late = (t, s) => typeof t === 'string' && Array.isArray(s.args) ? applyDeclared(t, s.args[0], { lateOnly: true }) : t
   return {
     ...record,
-    steps: record.steps.map(s => ({ ...s, stdout: even(s.stdout), stderr: even(s.stderr) })),
+    steps: record.steps.map(s => ({ ...s, stdout: late(even(s.stdout), s), stderr: late(even(s.stderr), s) })),
     tree: Object.fromEntries(Object.entries(record.tree).map(([p, e]) => [p, e && typeof e.text === 'string' ? { ...e, text: even(e.text) } : e])),
   }
 }
