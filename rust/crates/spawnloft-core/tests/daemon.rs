@@ -36,19 +36,23 @@ fn fake_java() -> &'static Path {
 /// A data root with one server, `t`, whose java is fake-java.
 struct Server {
     root: TempDir,
+    /// unique per test: a Windows control pipe is named for the server alone
+    /// (`\\.\pipe\mcctl-<name>`), so tests running at once need names of their own
+    name: String,
     envs: Vec<(String, String)>,
 }
 
 impl Server {
     fn new(label: &str, port: u16, auto_restart: bool) -> Server {
         let root = TempDir::new(label);
-        let dir = root.path().join("instances").join("t");
+        let name = format!("{label}-{}", std::process::id());
+        let dir = root.path().join("instances").join(&name);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("eula.txt"), "eula=true\n").unwrap();
         std::fs::write(dir.join("server.jar"), "").unwrap();
         let registry = serde_json::json!({
             "version": 1,
-            "instances": { "t": {
+            "instances": { (name.clone()): {
                 "dir": dir.to_string_lossy(),
                 "jar": "server.jar",
                 "java": fake_java().to_string_lossy(),
@@ -61,6 +65,7 @@ impl Server {
         std::fs::write(root.path().join("instances.json"), registry.to_string()).unwrap();
         Server {
             root,
+            name,
             envs: Vec::new(),
         }
     }
@@ -71,7 +76,7 @@ impl Server {
     }
 
     fn dir(&self) -> PathBuf {
-        self.root.path().join("instances").join("t")
+        self.root.path().join("instances").join(&self.name)
     }
 
     fn run(&self, args: &[&str]) -> Ran {
@@ -90,7 +95,8 @@ impl Server {
     }
 
     fn state(&self) -> serde_json::Value {
-        let text = std::fs::read_to_string(self.root.path().join("run/t/state.json")).unwrap_or_default();
+        let text = std::fs::read_to_string(self.root.path().join("run").join(&self.name).join("state.json"))
+            .unwrap_or_default();
         serde_json::from_str(&text).unwrap_or(serde_json::Value::Null)
     }
 
@@ -105,18 +111,19 @@ impl Server {
     }
 
     fn daemon_log(&self) -> String {
-        std::fs::read_to_string(self.root.path().join("run/t/daemon.log")).unwrap_or_default()
+        std::fs::read_to_string(self.root.path().join("run").join(&self.name).join("daemon.log"))
+            .unwrap_or_default()
     }
 
     fn status(&self) -> String {
-        let out = self.run(&["status", "t", "--json"]);
+        let out = self.run(&["status", &self.name, "--json"]);
         let v: serde_json::Value =
             serde_json::from_str(out.stdout.trim()).unwrap_or_else(|_| panic!("status: {out:?}"));
         v["data"]["status"].as_str().unwrap_or_default().to_string()
     }
 
     fn start(&self) {
-        let out = self.run(&["start", "t"]);
+        let out = self.run(&["start", &self.name]);
         assert_eq!(out.code, Some(0), "start: {out:?}\n{}", self.daemon_log());
         assert!(out.stdout.contains("Ready"), "start: {out:?}");
     }
@@ -127,9 +134,9 @@ impl Drop for Server {
     /// still the process it names (Windows reuses pids within seconds, so a raw kill of a pid
     /// from a finished test can hit another test's server).
     fn drop(&mut self) {
-        let out = self.run(&["status", "t", "--json"]);
+        let out = self.run(&["status", &self.name, "--json"]);
         if !out.stdout.contains("\"status\":\"stopped\"") {
-            let _ = self.run(&["kill", "t"]);
+            let _ = self.run(&["kill", &self.name]);
         }
     }
 }
@@ -153,7 +160,7 @@ fn kill_ends_the_server_and_its_daemon_before_it_answers() {
     s.start();
     let (java, daemon) = s.pids();
     assert!(alive(java) && alive(daemon));
-    let out = s.run(&["kill", "t"]);
+    let out = s.run(&["kill", &s.name]);
     assert_eq!(out.code, Some(0), "kill: {out:?}");
     assert!(out.stdout.contains("force-killed"), "kill: {out:?}");
     // the check the parity rig could not make on Windows (its daemonGone is a no-op there):
@@ -179,7 +186,7 @@ fn a_stop_past_its_timeout_is_forced_and_said_so() {
     // the server that holds its stop for as long as this file is there
     std::fs::write(s.dir().join("ignore-stop"), "").unwrap();
     let began = Instant::now();
-    let out = s.run(&["stop", "t", "--timeout", "1"]);
+    let out = s.run(&["stop", &s.name, "--timeout", "1"]);
     assert_eq!(out.code, Some(0), "stop: {out:?}\n{}", s.daemon_log());
     assert!(
         out.stdout.contains("did not shut down gracefully and was killed"),
@@ -210,7 +217,7 @@ fn a_graceful_stop_waits_for_the_server_and_the_daemon() {
     let s = Server::new("daemon-stop", 45_731, false);
     s.start();
     let (java, daemon) = s.pids();
-    let out = s.run(&["stop", "t"]);
+    let out = s.run(&["stop", &s.name]);
     assert_eq!(out.code, Some(0), "stop: {out:?}");
     assert!(
         out.stdout.contains("stopped (exit code 0)"),
@@ -236,7 +243,7 @@ fn a_crash_loop_is_restarted_then_given_up_on() {
     let s = Server::new("daemon-crash-loop", 45_741, true)
         .env("FAKE_JAVA_FAIL", "start")
         .env("SPAWNLOFT_RESTART_DELAY_MS", "200");
-    let out = s.run(&["start", "t"]);
+    let out = s.run(&["start", &s.name]);
     assert_ne!(
         out.code,
         Some(0),
@@ -272,7 +279,7 @@ fn a_kill_the_server_outlives_is_not_reported_done_by_the_daemon() {
     let s = Server::new("daemon-kill-outlived", 45_751, false).env("SPAWNLOFT_TEST_KILL_SKIP", "1");
     s.start();
     let (java, daemon) = s.pids();
-    let out = s.run(&["kill", "t"]);
+    let out = s.run(&["kill", &s.name]);
     assert_eq!(out.code, Some(0), "kill: {out:?}\n{}", s.daemon_log());
     let log = s.daemon_log();
     assert!(log.contains("test hook: the kill was not sent"), "{log}");
@@ -302,12 +309,12 @@ fn a_java_that_is_a_wrapper_script_still_reads_running() {
     std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
     let registry = std::fs::read_to_string(s.root.path().join("instances.json")).unwrap();
     let mut v: serde_json::Value = serde_json::from_str(&registry).unwrap();
-    v["instances"]["t"]["java"] = serde_json::json!(wrapper.to_string_lossy());
+    v["instances"][&s.name]["java"] = serde_json::json!(wrapper.to_string_lossy());
     std::fs::write(s.root.path().join("instances.json"), v.to_string()).unwrap();
     s.start();
     // the exec has happened by the time the server printed its ready line
     assert_eq!(s.status(), "running", "{}", s.state());
-    let out = s.run(&["stop", "t"]);
+    let out = s.run(&["stop", &s.name]);
     assert_eq!(out.code, Some(0), "stop: {out:?}");
     assert_eq!(s.status(), "stopped");
 }
