@@ -33,6 +33,17 @@ Policy (agreed 2026-11-05, kept by the 2026-11-08 Rust + Tauri plan):
 
 ## Outside the workspace
 
+**Tailwind (a build tool, never shipped).** `src/panel/css/tailwind.css` is built by Tailwind's
+standalone program, one self-contained executable from the Tailwind Labs release on GitHub, with
+no Node or npm behind it. `tools/tailwind-pin.json` pins the version and the sha256 of the
+program for each system, copied from that release's `sha256sums.txt`; `tools/panel-css.mjs`
+checks the program's bytes against the pin before every run and runs those checked bytes, nothing else. It runs
+on a developer's machine and in the `panel-css` CI job. The built stylesheet is committed, so the
+Rust build, the installers and the packages never run Tailwind or fetch it, and what ships is
+plain CSS that can be read in the diff. To move the pin: change the version, the release URL and
+every sha256 in one commit, run `node tools/panel-css.mjs`, and commit the rebuilt stylesheet
+with it; the review is of the CSS that changed.
+
 `rust/fuzz` (the cargo-fuzz targets) is its own workspace with its own `Cargo.lock`, built only
 on a pinned nightly in the `zip-fuzz` CI job and never shipped. It adds `libfuzzer-sys` (the
 rust-fuzz project, the harness cargo-fuzz is built around) and what that brings (`arbitrary`,

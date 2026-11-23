@@ -297,3 +297,41 @@ Two refinements to the phase table, from writing that brief:
 - **Phase 2 changes one line of the pull request template.** It says "no build step introduced".
   Tailwind's stylesheet build is a build step for developers and CI (never in a package), so the
   line should say what is still true: no runtime dependencies, and nothing a package has to build.
+
+## 12. Phase 2 as built (2026-11-23)
+
+Tailwind 4.3.5 is wired in, with no visible change. What later phases need to know:
+
+- **Build.** `node tools/panel-css.mjs` turns `src/panel/tailwind/panel.css` into
+  `src/panel/css/tailwind.css`, which is committed and served like any other panel file. The
+  standalone program is pinned by version and sha256 in `tools/tailwind-pin.json` and checked
+  before every run. The `panel-css` CI job rebuilds on Linux, Windows and macOS and fails on a
+  stale file.
+- **Theme.** Colours, sizes, fonts, radii and shadows resolve only to panel tokens: colours (`bg-surface`, `text-ink-2`,
+  `border-line`, `text-accent`, `bg-primary`, `text-warn-ink`, ...), the seven sizes (`text-1` to
+  `text-7`), the type roles (`type-page`, `type-section`, `type-card`, `type-body`, `type-meta`,
+  `type-label`, `type-mono`), radii (`rounded-xs` to `rounded-lg`), shadows (`shadow-sm`,
+  `shadow-md`, `shadow-lg`, `shadow-lift`), and the four-pixel spacing grid (`p-4` is 16px).
+  Tailwind's own palette, sizes, animations and window breakpoints are off; its line heights,
+  weights and easings remain. The density tiers are container
+  variants: mark the pane `@container/pane`, then `@wide/pane:` (1280) and `@ultra/pane:` (2000).
+- **Layers.** Every hand-written stylesheet is now inside `@layer legacy`, below Tailwind's
+  layers. A Tailwind class always wins over an old rule on the same element; an element with no
+  Tailwind class is drawn as before. An old `!important` still wins (that is how layers work),
+  so `[hidden]` keeps hiding.
+- **Sources.** Tailwind reads class names only from files listed with `@source` in `panel.css`,
+  because it takes any word in a file as a possible class. A phase adds its files to that list.
+  None is listed yet, so the built file is empty apart from the layer order.
+- **Guards** (`test/panel-css.test.mjs`): the page link order, the `legacy` wrapper on every old
+  sheet, no class or animation name defined on both sides (today `grid`, `grow`, `inline` and `sr-only` are old
+  class names, so the phase that first needs one of those removes or renames the old rule), and
+  the count of old rules and declarations (1,338 and 4,662 across the three pages), which may
+  only go down.
+- **Preflight is off.** Tailwind's reset would change pages that have not been redesigned.
+  Phase 3 decides when it comes in; until then `border` works without it, and headings and
+  lists keep browser margins unless a class says otherwise.
+- **Engines** (condition 6). A self-checking probe page built from the same input passes in
+  Chromium, WebKitGTK, Edge on Windows and Safari on macOS, in CI on every pull request. Edge and
+  Safari are the engines behind WebView2 and WKWebView, not the SpawnLoft window itself; the
+  Linux window itself is checked for the layer order and that the old sheets still draw. Windows and macOS windows on real hardware stay on the
+  phase 14 list.

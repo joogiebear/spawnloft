@@ -19,8 +19,10 @@ cannot be merged.
   probably needs a smaller feature — the zip reader and the YAML-lite and TOML-lite in
   `spawnloft-lib` exist for exactly this reason. Node.js is a tool for the tests and the release
   scripts, and for test players on a user's machine (`BOTS.md`).
-- **No build step for the pages.** The panel, the launcher and the wizard are single HTML files in
-  `src/`, compiled into the binary as they are.
+- **Nothing a package has to build for the pages.** The panel, the launcher and the wizard are
+  HTML pages with their stylesheets and plain scripts in `src/panel/`, compiled into the binary as
+  they are. One stylesheet is written by a tool and committed: `src/panel/css/tailwind.css`, from
+  `src/panel/tailwind/panel.css` (see "Styling the panel" below).
 - **Honesty over polish.** Errors name what went wrong and the way out. Nothing is
   silently capped, silently skipped, or silently retried.
 - **Comments say why, not what.** Write one when a line is the way it is for a reason the code
@@ -59,6 +61,16 @@ Tests live in `test/` and `rust/`, and run on every push and pull request, on Wi
 Linux. All count: each platform has a scheduler, a control channel and a process table of
 its own, and code that only runs there. New behaviour that has a pure core should come with tests for
 it; the existing files show the shape.
+
+**Styling the panel.** New styles are Tailwind classes on the panel's own tokens
+(`src/panel/tailwind/panel.css` maps them and says how the pieces fit); the hand-written
+stylesheets in `src/panel/css/` are being emptied page by page: add nothing to them. After
+using a class that is not yet in `src/panel/css/tailwind.css`, or naming a new file with
+`@source`, run `node tools/panel-css.mjs` and commit the built file with your change. The tool
+fetches Tailwind's standalone program once (about 100 MB, into `.cache/`), at the version and
+sha256 pinned in `tools/tailwind-pin.json`; it needs no npm package. CI runs
+`node tools/panel-css.mjs --check` and fails when the committed file is stale, and
+`test/panel-css.test.mjs` keeps the two kinds of stylesheet apart.
 
 One rule that is easy to break without noticing: **nothing slow while the panel's request
 threads hold something shared.** The panel serves each request on its own thread, so a

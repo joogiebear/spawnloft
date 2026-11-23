@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- controls --------------------------------------------------------- */
 
   /*
@@ -175,3 +177,4 @@
   }
   .seg button:hover:not([aria-pressed="true"]), .filters button:hover:not([aria-pressed="true"]), .ranges button:hover:not([aria-pressed="true"]) { color: var(--ink); background: var(--hover); border-color: transparent; transform: none; }
 
+}

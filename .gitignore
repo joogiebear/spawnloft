@@ -31,3 +31,6 @@ CLAUDE.local.md
 
 # Local editor launch config, with machine-specific paths
 .claude/
+
+# The pinned Tailwind program, fetched by tools/panel-css.mjs
+/.cache/

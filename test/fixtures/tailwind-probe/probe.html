@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<meta charset="utf-8">
+<title>probe: running</title>
+<!-- The order the panel's pages use: tokens, the built Tailwind file, then the old stylesheets. -->
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="probe.out.css">
+<style>
+  /* stands in for a hand-written panel stylesheet: one layer, declared below Tailwind's */
+  @layer legacy {
+    #layers .old-box { padding: 3px; color: rgb(1, 2, 3); }
+    [hidden] { display: none !important; }
+  }
+</style>
+<body class="bg-void text-ink font-ui text-4">
+  <div id="card" class="bg-surface border border-line rounded-lg p-5 shadow-md"></div>
+  <div id="wash" class="bg-live/15"></div>
+  <div id="pane" class="@container/pane">
+    <div id="grid" class="grid grid-cols-1 @wide/pane:grid-cols-2 @ultra/pane:grid-cols-3 gap-4">
+      <div></div><div></div><div></div>
+    </div>
+  </div>
+  <div id="layers">
+    <div id="old" class="old-box"></div>
+    <div id="new" class="old-box p-4 text-accent"></div>
+    <div id="gone" class="flex" hidden></div>
+  </div>
+  <p id="label" class="type-label text-ink-3">Label</p>
+  <h1 id="title" class="type-page">Title</h1>
+  <button id="btn" class="h-8 px-3 rounded-sm bg-primary text-on-primary hover:bg-primary-hover focus-visible:focus-ring">Go</button>
+  <a id="moves" class="transition-colors">link</a>
+  <div id="made"></div>
+  <pre id="result"></pre>
+  <script src="probe.js"></script>
+</body>
+</html>

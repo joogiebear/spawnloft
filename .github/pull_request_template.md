@@ -8,4 +8,4 @@
 
 - [ ] `npm test` passes
 - [ ] Commit messages carry conventional prefixes (`feat:`, `fix:`, ...)
-- [ ] No runtime dependencies added, no build step introduced
+- [ ] No runtime dependencies added, and nothing a package has to build (if a panel page uses a new Tailwind class: `node tools/panel-css.mjs`, and commit `src/panel/css/tailwind.css`)

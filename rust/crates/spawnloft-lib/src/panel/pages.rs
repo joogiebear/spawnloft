@@ -183,6 +183,15 @@ mod tests {
                 asked += 1;
             }
             assert!(asked >= 2);
+            // the built Tailwind file (tools/panel-css.mjs) declares the cascade layers, so it
+            // comes straight after the tokens and before the page's own stylesheets
+            let first: Vec<&str> = page
+                .split("<link rel=\"stylesheet\" href=\"/assets/")
+                .skip(1)
+                .take(2)
+                .map(|piece| &piece[..piece.find('"').unwrap()])
+                .collect();
+            assert_eq!(first, ["css/tokens.css", "css/tailwind.css"]);
             // no script left in the page itself: the launcher's policy allows none
             assert!(!page.contains("<script>"));
             assert!(!page.contains("<style>"));

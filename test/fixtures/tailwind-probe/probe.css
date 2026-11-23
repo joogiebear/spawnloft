@@ -1,0 +1,5 @@
+/* The panel's Tailwind input, built over this folder's probe page instead of the panel's own
+   files (desktop/smoke-css-engines.cjs). Never shipped. */
+@import "../../../src/panel/tailwind/panel.css";
+@source "./probe.html";
+@source "./probe.js";

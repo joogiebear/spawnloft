@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
 
 
   /* ---- base ------------------------------------------------------------------ */
@@ -334,3 +336,4 @@
     .sheet { padding: var(--s-4); }
   }
   @media (prefers-reduced-motion: reduce) { .sk, .waiting .spin { animation: none; } button, .switch::after { transition: none; } }
+}

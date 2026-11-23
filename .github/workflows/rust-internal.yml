@@ -371,6 +371,47 @@ jobs:
           npm test
           npm --prefix desktop test
 
+  panel-css:
+    # The panel's Tailwind stylesheet (src/panel/css/tailwind.css) is built by a pinned program
+    # and committed (tools/panel-css.mjs, rust/SUPPLY-CHAIN.md). This is the one job that runs
+    # that program: it fails when the committed file is not what a build gives, on each system a
+    # developer builds it on, and then loads a probe page built from the same input in the web
+    # engine a SpawnLoft window uses there: WebKitGTK on Linux, Edge (the Chromium WebView2 is
+    # built from) on Windows, Safari (the WebKit of WKWebView) on macOS.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            engine: webkitgtk
+          - runner: windows-latest
+            engine: edge
+          - runner: macos-15
+            engine: safari
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: The committed stylesheet is what the pinned Tailwind builds
+        run: node tools/panel-css.mjs --check
+      - name: Build the probe page's stylesheet from the same input
+        run: node tools/panel-css.mjs build test/fixtures/tailwind-probe/probe.css "$RUNNER_TEMP/tailwind-probe/probe.out.css"
+      - name: Install WebKitGTK's driver and a display (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y webkit2gtk-driver xvfb
+      - name: Allow Safari to be driven (macOS)
+        if: runner.os == 'macOS'
+        run: sudo safaridriver --enable
+      - name: The probe in this system's web engine
+        run: |
+          run=""
+          [ "$RUNNER_OS" = "Linux" ] && run="xvfb-run -a"
+          $run node desktop/smoke-css-engines.cjs "${{ matrix.engine }}" "$RUNNER_TEMP/tailwind-probe/probe.out.css"
+
   panel-smoke:
     # The panel in a real browser on each platform (desktop/smoke-panel.cjs): signing in through
     # `spawnloft ui`, the console, live performance charts, backups, the file editor, the console

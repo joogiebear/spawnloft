@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- sheets: add a server, settings ----------------------------------- */
 
   .sheet { align-content: start; background: var(--void); overflow: auto; }
@@ -36,3 +38,4 @@
   .kv dt { font: 650 var(--t-1)/1.6 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
   .kv dd { margin: 0; font: var(--t-3)/1.6 var(--mono); color: var(--ink); word-break: break-all; }
 
+}

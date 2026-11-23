@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
 
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -200,3 +202,4 @@
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
     .lamp::after { opacity: .45; }
   }
+}
