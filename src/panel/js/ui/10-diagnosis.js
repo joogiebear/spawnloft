@@ -193,12 +193,29 @@ function noticeBox({ tone, title, text, actions = [], dismiss }) {
 /** Switch to the console with the search set to the line a finding was read from. */
 function showLineInConsole(line) {
   showPane('console');
-  setFilter('all');
-  const search = $('#conSearch');
-  // The timestamp prefix is per line and the search is a substring, so the message is enough.
-  search.value = line.replace(/^\[[^\]]*\]:?\s*/, '').trim().slice(0, 80);
-  search.dispatchEvent(new Event('input'));
-  search.focus();
+  // a held line is one to show too
+  setPaused(false);
+  // The timestamp prefix is per line and the match is a substring, so the message is enough.
+  const needle = line.replace(/^\[[^\]]*\]:?\s*/, '').trim().slice(0, 80);
+  const entry = needle && [...drawableLines()].reverse().find((e) => e.text.includes(needle));
+  if (!entry) {
+    // not in the view (cleared, or older than it keeps): the filter finds whatever is left of it
+    setFilter('all');
+    const search = $('#conSearch');
+    search.value = needle;
+    search.dispatchEvent(new Event('input'));
+    search.focus();
+    return;
+  }
+  // The line in its place, with what led up to it above: a filter would show it alone.
+  if (!visible(entry)) clearConsoleFilters();
+  const el = $('#log').querySelector('[data-n="' + entry.n + '"]');
+  if (!el) return;
+  state.atBottom = false;
+  el.scrollIntoView({ block: 'center' });
+  el.classList.add(...LINE_FOUND);
+  setTimeout(() => el.classList.remove(...LINE_FOUND), 2400);
+  paintJump();
 }
 
 /*

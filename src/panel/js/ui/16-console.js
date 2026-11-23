@@ -38,11 +38,32 @@ function levelOf(text, previous) {
 // still there; it just stops competing with what you are reading.
 const PREFIX_RE = /^(\[[^\]]*\](?:\s*\[[^\]]*\])?:?\s*)/;
 
+/*
+  How a line is drawn. The level is a rail in the gutter and a wash behind the line, not the colour
+  of the whole line: a rail scans as well at a glance, and every line keeps full contrast. #log
+  carries data-nowrap and data-nums, and the lines read them through the group.
+*/
+const LINE_CLASS = 'ln block border-l-[length:var(--spine)] border-l-transparent pr-5 pl-4 whitespace-pre-wrap break-words '
+  + 'hover:bg-hover group-data-nowrap/log:w-max group-data-nowrap/log:min-w-full group-data-nowrap/log:break-normal '
+  + 'group-data-nowrap/log:whitespace-pre group-data-nums/log:grid group-data-nums/log:grid-cols-[max-content_minmax(0,1fr)]';
+const LEVEL_CLASS = {
+  info: '',
+  warn: 'warn border-l-warn bg-warn-wash hover:bg-warn-wash',
+  error: 'error border-l-fault bg-fault-wash hover:bg-fault-wash',
+  sys: 'sys border-l-accent text-ink-2',
+};
+const PREFIX_CLASS = { info: 'text-ink-4', warn: 'text-warn-ink', error: 'text-fault-ink', sys: 'text-accent' };
+const NUM_CLASS = 'num hidden min-w-[4ch] pr-3 text-right text-ink-3 select-none group-data-nums/log:block';
+const MARK_CLASS = 'rounded-xs bg-warn-edge text-warn-ink';
+// a line someone was sent to ("Show in console"), ringed for a moment
+const LINE_FOUND = ['outline', 'outline-2', '-outline-offset-2', 'outline-accent'];
+
 function makeLine(entry) {
   const div = document.createElement('div');
-  div.className = 'ln' + (entry.level === 'info' ? '' : ' ' + entry.level);
+  div.className = LINE_CLASS + (LEVEL_CLASS[entry.level] ? ' ' + LEVEL_CLASS[entry.level] : '');
+  div.dataset.n = entry.n;
   const num = document.createElement('span');
-  num.className = 'num';
+  num.className = NUM_CLASS;
   num.textContent = entry.n;
   div.append(num);
   const txt = document.createElement('span');
@@ -51,7 +72,7 @@ function makeLine(entry) {
   const prefix = pm ? pm[1] : '';
   if (prefix) {
     const s = document.createElement('span');
-    s.className = 'pre';
+    s.className = PREFIX_CLASS[entry.level] || PREFIX_CLASS.info;
     s.textContent = prefix;
     txt.append(s);
   }
@@ -72,6 +93,7 @@ function appendSearched(parent, text) {
     if (hit === -1) break;
     if (hit > at) parent.append(document.createTextNode(text.slice(at, hit)));
     const mark = document.createElement('mark');
+    mark.className = MARK_CLASS;
     mark.textContent = text.slice(hit, hit + needle.length);
     parent.append(mark);
     at = hit + needle.length;
@@ -86,6 +108,11 @@ function visible(entry) {
   return true;
 }
 
+/** The lines the view may draw: while paused, only those that had arrived when it was paused. */
+function drawableLines() {
+  return state.paused ? state.lines.slice(0, state.pausedAt) : state.lines;
+}
+
 /*
   How many warnings and errors the console holds, beside the filters that would show them.
   Counted by the line that raises one, not by every line of its stack trace: "Errors 1" for a
@@ -97,13 +124,126 @@ const raisesLevel = (entry) => (entry.level === 'warn' || entry.level === 'error
 function updateCount(shown) {
   $('#nWarn').textContent = String(levelCounts.warn);
   $('#nErr').textContent = String(levelCounts.error);
-  const total = state.lines.length;
-  const count = shown == null ? state.lines.filter(visible).length : shown;
+  const lines = drawableLines();
+  const total = lines.length;
+  const count = shown == null ? lines.filter(visible).length : shown;
   const filtered = state.filter !== 'all' || Boolean(state.search);
-  const held = state.paused ? total - state.pausedAt : 0;
-  let text = filtered ? count + ' of ' + total + ' lines' : total + (total === 1 ? ' line' : ' lines');
-  if (held > 0) text = held + ' held \u00b7 ' + text;
-  $('#conCount').textContent = text;
+  $('#conCount').textContent = filtered ? count + ' of ' + total + ' lines' : total + (total === 1 ? ' line' : ' lines');
+  paintConNote();
+}
+
+/**
+ * The line over the log that says why it is not moving. Paused comes first: it is the reader's
+ * own doing and the one they can undo. Otherwise a server that is not running says that the lines
+ * are from before it stopped, so old lines are never read as live ones.
+ */
+function paintConNote() {
+  const note = $('#conNote');
+  const row = rowOf(state.current);
+  const text = note.querySelector('[data-note-text]');
+  const action = note.querySelector('[data-note-action]');
+  const glyph = note.querySelector('[data-note-icon]');
+  let words = null;
+  let act = null;
+  if (state.paused) {
+    const held = state.lines.length - state.pausedAt;
+    words = held > 0 ? 'Paused · ' + held.toLocaleString() + (held === 1 ? ' new line' : ' new lines') + ' waiting' : 'Paused · new lines wait until you resume';
+    act = { label: 'Resume', run: () => setPaused(false) };
+    glyph.setAttribute('href', '#i-pause');
+  } else if (row && !isDb(row) && state.lines.length && ['stopped', 'crashed'].includes(consolePhase(row))) {
+    const crashed = consolePhase(row) === 'crashed';
+    words = crashed ? 'Crashed · these are the last lines it wrote' : 'Stopped · these lines are from its last run';
+    glyph.setAttribute('href', crashed ? '#i-alert' : '#i-stop');
+  }
+  // drawn only when it changes: this runs for every console line
+  const key = words + '|' + (act ? act.label : '');
+  if (note.dataset.key === key) return;
+  note.dataset.key = key;
+  note.hidden = !words;
+  text.textContent = words || '';
+  action.hidden = !act;
+  action.textContent = act ? act.label : '';
+  action.onclick = act ? act.run : null;
+}
+
+/**
+ * Where the selected server is, in the console's words. "starting" is the panel's own: the core
+ * says running as soon as the process exists, so it is a Start this panel asked for and has not
+ * heard back from yet, as describeState says it in the header.
+ */
+function consolePhase(row) {
+  if (!row) return null;
+  if (state.acting === 'start' || state.acting === 'restart') return 'starting';
+  if (state.acting === 'stop' || row.status === 'stopping') return 'stopping';
+  if (crashedNow(row)) return 'crashed';
+  return row.status;
+}
+
+/**
+ * Nothing to show, said once and in the middle of the log rather than as one grey line at its
+ * top: why there is nothing, and the one thing to do about it.
+ */
+function logStateFor(row, counts) {
+  const { hasLines, shown } = counts;
+  const label = row ? row.label || row.name : '';
+  if (shown) return null;
+  // paused before anything was drawn: the line over the log says what is waiting
+  if (state.paused && state.lines.length) return null;
+  if (hasLines) {
+    return { icon: 'search', title: 'Nothing matches', text: 'No line shown has that in it. The log keeps the rest.', action: 'show-all' };
+  }
+  if (!row) return null;
+  if (isDb(row) && row.external) return { icon: 'database', title: 'This database runs elsewhere', text: 'Its log is on the machine it runs on, not here.' };
+  const status = consolePhase(row);
+  if (status === 'starting') return { icon: 'terminal', busy: true, title: 'Starting ' + label + '…', text: 'Its first lines appear here in a moment.' };
+  if (status === 'stopping') return { icon: 'terminal', busy: true, title: 'Stopping ' + label + '…', text: 'It is saving the world and closing down.' };
+  if (status === 'running') {
+    return state.cleared
+      ? { icon: 'terminal', title: 'Cleared', text: 'New lines appear here as ' + label + ' writes them. The log file on disk is untouched.' }
+      : { icon: 'terminal', title: 'Nothing written yet', text: 'New lines appear here as ' + label + ' writes them.' };
+  }
+  if (isDb(row)) return { icon: 'database', title: label + ' is stopped', text: 'Start the database and its log appears here as it runs.', action: 'start' };
+  if (status === 'crashed') return { icon: 'alert', title: label + ' crashed', text: 'Start it again and its console appears here. Crash reports are in Files, under crash-reports.', action: 'start' };
+  return { icon: 'terminal', title: label + ' is stopped', text: 'Start it and its console appears here as it runs. Commands can be sent once it is up.', action: 'start' };
+}
+
+function paintLogState(shown) {
+  const box = $('#logState');
+  const row = rowOf(state.current);
+  if (shown == null) shown = $('#log').childElementCount;
+  const want = logStateFor(row, { hasLines: drawableLines().length > 0, shown });
+  const key = want ? [want.title, want.text, want.action, state.busy].join('|') : '';
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.textContent = '';
+  box.hidden = !want;
+  if (!want) return;
+  const actions = [];
+  if (want.action === 'show-all') {
+    actions.push(Kit.button({ label: 'Show everything', onClick: () => { clearConsoleFilters(); $('#conSearch').focus(); } }));
+  } else if (want.action === 'start' && !(row && row.external)) {
+    actions.push(Kit.button({ label: isDb(row) ? 'Start database' : 'Start server', icon: 'play', kind: 'primary', disabled: state.busy, onClick: () => $('#bStart').click() }));
+  }
+  const panel = Kit.empty({ icon: want.icon, title: want.title, text: want.text, actions });
+  panel.classList.add('log-empty', 'max-w-[480px]', 'p-0');
+  if (want.busy) {
+    // the title already says it is working; the spinner is only the picture of it
+    const spin = Kit.spinner();
+    spin.removeAttribute('role');
+    spin.removeAttribute('aria-label');
+    spin.setAttribute('aria-hidden', 'true');
+    spin.classList.add('mb-2');
+    panel.querySelector('.sl-ico')?.replaceWith(spin);
+  }
+  box.append(panel);
+}
+
+/** The search and the level back to everything. */
+function clearConsoleFilters() {
+  clearTimeout(searchTimer);
+  $('#conSearch').value = '';
+  state.search = '';
+  setFilter('all');
 }
 
 function renderLog() {
@@ -111,23 +251,13 @@ function renderLog() {
   log.textContent = '';
   const frag = document.createDocumentFragment();
   let shown = 0;
-  for (const entry of state.lines) {
+  for (const entry of drawableLines()) {
     if (!visible(entry)) continue;
     frag.append(makeLine(entry));
     shown++;
   }
   log.append(frag);
-  if (!shown) {
-    const p = document.createElement('div');
-    p.className = 'log-empty';
-    const row = rowOf(state.current);
-    p.textContent = state.lines.length
-      ? 'Nothing matches. Clear the search or the level filter to see the rest.'
-      : row && isDb(row) && row.external ? 'This database runs elsewhere, so its log is on that machine, not here.'
-        : row && isDb(row) ? 'No output yet. Start the database and its log appears here as it runs.'
-          : 'No console output yet. Start the server and it appears here as it runs.';
-    log.append(p);
-  }
+  paintLogState(shown);
   updateCount(shown);
   if (state.atBottom) log.scrollTop = log.scrollHeight;
 }
@@ -150,6 +280,7 @@ function pushLine(text) {
   state.lines.push(entry);
   if (raisesLevel(entry)) levelCounts[entry.level]++;
   updateConsoleBadge();
+  state.cleared = false;
 
   // A busy server writes thousands of lines a minute. Without a ceiling the panel keeps a DOM node
   // per line until the window stops responding - a bug that only appears after someone has left it
@@ -157,21 +288,26 @@ function pushLine(text) {
   const log = $('#log');
   while (state.lines.length > MAX_LINES) {
     const gone = state.lines.shift();
-    if (raisesLevel(gone)) levelCounts[gone.level]--;
-    if (state.pausedAt > 0) state.pausedAt--;
-    // Only drop a node if that line had one. With a filter on, most lines never reached the DOM.
-    if (visible(gone)) {
-      const first = log.firstElementChild;
-      if (first && !first.classList.contains('log-empty')) first.remove();
+    if (raisesLevel(gone)) {
+      levelCounts[gone.level]--;
+      if (gone.level === 'error' && state.errorsSeen > 0) state.errorsSeen--;
     }
+    if (state.pausedAt > 0) state.pausedAt--;
+    // Only drop a node if that line had one: with a filter on, most lines never reached the DOM.
+    if (log.firstElementChild && log.firstElementChild.dataset.n === String(gone.n)) log.firstElementChild.remove();
   }
 
-  if (state.paused || !visible(entry)) { updateCount(); return; }
+  if (state.paused || !visible(entry)) {
+    // an empty view may now be empty for another reason: paused with lines waiting, or a filtered
+    // view the cap has just emptied
+    if (!log.childElementCount) paintLogState(0);
+    updateCount();
+    return;
+  }
 
-  const placeholder = log.querySelector('.log-empty');
-  if (placeholder) placeholder.remove();
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.append(makeLine(entry));
+  if (!$('#logState').hidden) paintLogState();
   if (atBottom) log.scrollTop = log.scrollHeight;
   else { state.unseen++; paintJump(); }
   updateCount();
@@ -180,6 +316,8 @@ function pushLine(text) {
 function clearLines() {
   state.lines = [];
   state.seq = 0;
+  state.cleared = false;
+  state.errorsSeen = 0;
   levelCounts.warn = 0;
   levelCounts.error = 0;
   updateConsoleBadge();
@@ -221,6 +359,7 @@ function select(name, { discard = false, then = null } = {}) {
   state.paused = false;
   state.pausedAt = 0;
   state.atBottom = true;
+  state.errorsSeen = 0;
   if (!state.histories.has(name)) state.histories.set(name, []);
   state.history = state.histories.get(name);
   state.histAt = state.history.length;

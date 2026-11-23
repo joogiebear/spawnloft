@@ -3,48 +3,53 @@
 
 function setFilter(level) {
   state.filter = level;
-  for (const b of $$('.seg [data-lvl]')) b.setAttribute('aria-pressed', String(b.dataset.lvl === level));
+  for (const b of $$('#conLevels [data-lvl]')) b.setAttribute('aria-pressed', String(b.dataset.lvl === level));
   renderLog();
 }
 
-for (const b of $$('.seg [data-lvl]')) b.onclick = () => setFilter(b.dataset.lvl);
+for (const b of $$('#conLevels [data-lvl]')) b.onclick = () => setFilter(b.dataset.lvl);
 
 let searchTimer = null;
 $('#conSearch').oninput = (e) => {
   const value = e.target.value;
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { state.search = value.trim(); renderLog(); }, 120);
+  // the box's own clear button empties it at once, and that should show at once
+  searchTimer = setTimeout(() => { state.search = value.trim(); renderLog(); }, value ? 120 : 0);
 };
 
-/** The pause button is an icon; its name and its glyph say which it will do next. */
+/*
+  Pause is a toggle: its name stays "Pause" and only its pressed state changes, so a screen reader
+  hears "Pause, pressed" rather than "Resume, pressed". The line over the log says it is paused,
+  how much is waiting, and offers Resume.
+*/
 function setPauseButton(paused) {
-  const b = $('#bPause');
-  const label = paused ? 'Resume' : 'Pause';
-  b.setAttribute('aria-pressed', String(paused));
-  b.setAttribute('aria-label', label);
-  b.title = label;
-  b.querySelector('use').setAttribute('href', paused ? '#i-play' : '#i-pause');
+  $('#bPause').setAttribute('aria-pressed', String(paused));
 }
 
-$('#bPause').onclick = () => {
-  state.paused = !state.paused;
-  setPauseButton(state.paused);
-  if (state.paused) {
+function setPaused(paused) {
+  if (state.paused === paused) return;
+  state.paused = paused;
+  setPauseButton(paused);
+  // said once, here: the line over the log changes with every arriving line and is not announced
+  $('#live').textContent = paused ? 'Console paused. New lines wait until you resume.' : 'Console resumed.';
+  if (paused) {
     state.pausedAt = state.lines.length;
+    updateCount();
   } else {
     state.pausedAt = 0;
     state.atBottom = true;
     renderLog();
   }
-  updateCount();
-};
+}
+
+$('#bPause').onclick = () => setPaused(!state.paused);
 
 // Wrapped by default: unwrapped, the first line of every JVM start ran off the edge mid-flag.
 // Remembered either way, like line numbers.
 const WRAP_KEY = 'mcctl.wrap';
 function setWrap(on, { remember = true } = {}) {
   state.wrap = on;
-  $('#log').classList.toggle('nowrap', !on);
+  $('#log').toggleAttribute('data-nowrap', !on);
   $('#bWrap').setAttribute('aria-pressed', String(on));
   if (remember) try { localStorage.setItem(WRAP_KEY, on ? '1' : '0'); } catch {}
 }
@@ -56,7 +61,7 @@ setWrap(wrapSaved !== '0', { remember: false });
 const NUMS_KEY = 'mcctl.nums';
 function setNums(on, { remember = true } = {}) {
   state.nums = on;
-  $('#log').classList.toggle('nums', on);
+  $('#log').toggleAttribute('data-nums', on);
   $('#bNums').setAttribute('aria-checked', String(on));
   if (!remember) return;
   try { localStorage.setItem(NUMS_KEY, on ? '1' : '0'); } catch {}
@@ -66,8 +71,22 @@ $('#bNums').onclick = () => { setNums(!state.nums); shareMenu.close({ refocus: t
 
 try { setNums(localStorage.getItem(NUMS_KEY) === '1', { remember: false }); } catch {}
 
+/*
+  A busy server writes many lines a second, and a log that announces each one talks over
+  everything else. Off by default: the log is read where a reader moves in it. On, new lines are
+  announced as they arrive. Remembered, like line numbers.
+*/
+const ALOUD_KEY = 'spawnloft.console-aloud';
+function setAloud(on, { remember = true } = {}) {
+  $('#log').setAttribute('aria-live', on ? 'polite' : 'off');
+  $('#bAloud').setAttribute('aria-checked', String(on));
+  if (remember) try { localStorage.setItem(ALOUD_KEY, on ? '1' : '0'); } catch {}
+}
+$('#bAloud').onclick = () => { setAloud($('#bAloud').getAttribute('aria-checked') !== 'true'); shareMenu.close({ refocus: true }); };
+try { setAloud(localStorage.getItem(ALOUD_KEY) === '1', { remember: false }); } catch {}
+
 $('#bCopy').onclick = async () => {
-  const shown = state.lines.filter(visible);
+  const shown = drawableLines().filter(visible);
   if (!shown.length) { toast('Nothing to copy.', 'bad'); return; }
   const text = shown.map((l) => l.text).join('\n');
   try {
@@ -95,6 +114,7 @@ $('#bClear').onclick = () => {
   clearLines();
   state.pausedAt = 0;
   state.atBottom = true;
+  state.cleared = true;
   renderLog();
   toast('Console view cleared. The log file on disk is untouched.');
 };
@@ -108,9 +128,9 @@ $('#bClear').onclick = () => {
  * it opens, for a menu whose items depend on the server's state.
  */
 function bindMenu(button, menu, { build } = {}) {
-  const wrap = button.closest('.menu-wrap');
+  const wrap = button.closest('.menu-wrap, .sl-menu-wrap');
   let open = false;
-  const items = () => Array.from(menu.querySelectorAll('[role^="menuitem"]')).filter((b) => !b.disabled);
+  const items = () => Array.from(menu.querySelectorAll('[role^="menuitem"]')).filter((b) => !b.disabled && !b.hidden);
 
   const close = ({ refocus = false } = {}) => {
     if (!open) return;
@@ -166,6 +186,11 @@ function bindMenu(button, menu, { build } = {}) {
 const shareMenu = bindMenu($('#bExport'), $('#exportMenu'));
 const moreMenu = bindMenu($('#bManage'), $('#moreMenu'), { build: buildMoreMenu });
 
+/** A verb on a toast that stays: Copy path, Open. Put after its words. */
+function toastAction(el, label, run) {
+  el.querySelector('div').append(' ', Kit.button({ label, kind: 'link', onClick: run }));
+}
+
 function consolePath(verb) {
   return '/instances/' + encodeURIComponent(state.current) + '/console/' + verb;
 }
@@ -177,8 +202,10 @@ $('#miExportFile').onclick = async () => {
   try {
     const out = await post(consolePath('export'));
     note.remove();
-    toast('Exported ' + out.lines.toLocaleString() + (out.lines === 1 ? ' line' : ' lines')
-      + ' to ' + out.file + ' (' + out.sizeHuman + ').', 'good');
+    // Kept until dismissed, with the path one click from the clipboard: the file is the point.
+    const el = toast('Saved ' + out.lines.toLocaleString() + (out.lines === 1 ? ' line' : ' lines')
+      + ' (' + out.sizeHuman + ') to ' + out.file, 'good', { stay: true });
+    toastAction(el, 'Copy path', () => copyText(out.file, 'the path'));
   } catch (err) {
     note.remove();
     toast(err.message, 'bad');
@@ -186,6 +213,7 @@ $('#miExportFile').onclick = async () => {
 };
 
 $('#bDiagZip').onclick = async () => {
+  shareMenu.close({ refocus: true });
   if (!state.current) { toast('Select a server first.', 'bad'); return; }
   const btn = $('#bDiagZip');
   btn.disabled = true;
@@ -219,22 +247,24 @@ $('#miExportShare').onclick = async () => {
     // Only what is documented. mclo.gs's own policy promises IP removal, best effort, and
     // deletion 90 days after the log was last opened - nothing about player names or paths.
     // spawnloft takes the account name out of paths itself before sending; the rest goes as is.
-    text: 'The log is published at a public link that anyone holding it can read. Before sending, '
-      + 'SpawnLoft replaces your account name in file paths. mclo.gs removes IP addresses on its side, '
-      + 'best effort, and deletes the log 90 days after it was last opened. Player names, plugin '
-      + 'output and everything else stay in - read it over first. The delete token is kept in '
-      + 'run/mclogs.json so the log can be taken down later.',
-    confirmLabel: 'Upload and open',
+    text: 'Anyone with the link can read it, until mclo.gs deletes it 90 days after it was last opened. '
+      + 'SpawnLoft takes your account name out of file paths, and mclo.gs tries to remove IP addresses. '
+      + 'Player names, chat and plugin messages stay in, so read it over first. '
+      + 'The whole log is sent, not only the lines shown.',
+    confirmLabel: 'Upload and copy the link',
   });
   if (!ok) return;
   const note = toast('Uploading to mclo.gs…');
   try {
     const out = await post(consolePath('share'));
     note.remove();
-    openOutside(out.url);
-    toast(out.trimmed
-      ? 'Uploaded the last ' + out.lines.toLocaleString() + ' lines — ' + out.url
-      : 'Uploaded — ' + out.url, 'good', { stay: true });
+    // Pasting it somewhere is the point, so it goes on the clipboard and stays on screen.
+    let copied = false;
+    try { await navigator.clipboard.writeText(out.url); copied = true; } catch { /* Copy link below */ }
+    const el = toast((out.trimmed ? 'Uploaded the last ' + out.lines.toLocaleString() + ' lines' : 'Uploaded')
+      + (copied ? '. Link copied: ' : ': ') + out.url, 'good', { stay: true });
+    toastAction(el, 'Open', () => openOutside(out.url));
+    toastAction(el, 'Copy link', () => copyText(out.url, 'the link'));
   } catch (err) {
     note.remove();
     toast(err.message, 'bad');
