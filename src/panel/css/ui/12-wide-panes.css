@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- panes that use the width they are given ------------------------------- */
 
   /* Settings: one card per group, flowing into as many columns as fit. Cards in a row share a
@@ -67,3 +69,4 @@
   /* .row wraps rather than crushing its controls when the pane is narrow. */
   .row { flex-wrap: wrap; }
 
+}

@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- dialog ------------------------------------------------------------ */
 
   dialog {
@@ -84,3 +86,4 @@
   .choice b { font-size: var(--t-3); font-weight: 600; }
   .choice span { font-size: var(--t-3); color: var(--ink-3); line-height: 1.5; }
 
+}

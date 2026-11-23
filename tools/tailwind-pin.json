@@ -1,0 +1,12 @@
+{
+  "note": "The standalone Tailwind program that builds src/panel/css/tailwind.css (tools/panel-css.mjs). The sha256 values are from sha256sums.txt of the release named here; rust/SUPPLY-CHAIN.md says how to move the pin.",
+  "version": "4.3.5",
+  "release": "https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.5/",
+  "programs": {
+    "linux-x64": { "file": "tailwindcss-linux-x64", "sha256": "e47695cee3f0d90623a91f3939b08bdee610eb5ad99340adff9d4145b284d6cc" },
+    "linux-arm64": { "file": "tailwindcss-linux-arm64", "sha256": "ffcd0d21dbd7c605dc12743ff0c0b47debc963c86b399674084c1c8f2c96ecad" },
+    "darwin-arm64": { "file": "tailwindcss-macos-arm64", "sha256": "f3f4f5d1727e2b693b8f1c9a1492b5dd87008c86ea286bee1589cb458e6235fc" },
+    "darwin-x64": { "file": "tailwindcss-macos-x64", "sha256": "a63702686a3ed048b3135d84a73be49ea9d47f880c9b20e54b3ef60934ad8cdf" },
+    "win32-x64": { "file": "tailwindcss-windows-x64.exe", "sha256": "2803583268c53f4713e89943e211081fddb186c0a4a7d07b5c342c6ae853ec95" }
+  }
+}

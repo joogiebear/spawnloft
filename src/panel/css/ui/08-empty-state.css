@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- empty state ------------------------------------------------------ */
 
   .empty {
@@ -47,3 +49,4 @@
   .door b { font: 600 var(--t-4)/1.3 var(--ui); letter-spacing: -.005em; }
   .door span { font-size: var(--t-3); color: var(--ink-3); line-height: 1.5; }
 
+}

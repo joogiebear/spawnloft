@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
 
   :root[data-theme="spawnloft"] ::selection { background: var(--lapis); color: var(--void); }
   :root[data-theme="spawnloft"] select {
@@ -37,3 +39,4 @@
   /* Two tiles need about 260px each; under that the picker is one column, whatever the window. */
   @container picker (max-width: 540px) { .theme-options { grid-template-columns: minmax(0, 1fr); } }
 
+}

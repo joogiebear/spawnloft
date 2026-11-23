@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- console ---------------------------------------------------------- */
 
   .con-bar { display: flex; align-items: center; gap: 6px; padding: 10px var(--s-3) 10px var(--s-5); border-bottom: 1px solid var(--line-soft); flex-wrap: wrap; }
@@ -131,3 +133,4 @@
   .cmd-field:has(input:disabled) .prompt { color: var(--ink-4); }
   .cmd button { height: 40px; }
 
+}

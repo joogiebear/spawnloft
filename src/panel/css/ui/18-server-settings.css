@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- server settings: a form, its sections listed beside it -------------- */
 
   /*
@@ -110,3 +112,4 @@
     .set-row { grid-template-columns: minmax(0, 1fr); }
   }
 
+}

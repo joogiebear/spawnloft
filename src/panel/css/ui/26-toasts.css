@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- toasts ------------------------------------------------------------ */
 
   #toasts { position: fixed; right: 18px; bottom: 64px; display: grid; gap: 8px; z-index: 40; justify-items: end; }
@@ -69,3 +71,4 @@
     }
     .lamp::after { opacity: .45; }
   }
+}

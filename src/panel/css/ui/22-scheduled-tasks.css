@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- scheduled tasks ---------------------------------------------------- */
 
   /* Task cards tile sideways before they stack. The edit form keeps the full row; a form in a
@@ -72,3 +74,4 @@
 
   .hist-title { margin: 0 0 8px; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
 
+}

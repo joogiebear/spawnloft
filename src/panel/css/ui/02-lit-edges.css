@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- a lit edge means something here is wrong ------------------------------ */
 
   /*
@@ -64,3 +66,4 @@
      the control's own corners, so this sets no radius. */
   :root :focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); transition-property: none; }
 
+}

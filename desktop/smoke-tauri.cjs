@@ -151,6 +151,13 @@ async function main() {
     // nobody without a credential gets an answer
     assert.equal(await pageGet('/api/setup'), 200, 'the window is signed in')
     assert.equal(await js('return document.cookie'), '', 'the session cookie is HttpOnly')
+    // the window's web view took the Tailwind file and its layer order: the old stylesheets are
+    // one `legacy` layer under it, and still draw the page (test/panel-css.test.mjs has the rules)
+    assert.deepEqual(
+      await js('return Array.from(document.styleSheets).slice(0, 2).map(function (s) { return s.href ? new URL(s.href).pathname : "" })'),
+      ['/assets/css/tokens.css', '/assets/css/tailwind.css'], 'the page loads the tokens, then the Tailwind file')
+    assert.equal(await js('var r = document.styleSheets[2].cssRules; return r.length === 1 && r[0].name === "legacy" ? "legacy" : String(r.length)'), 'legacy', 'the first old stylesheet is one legacy layer')
+    assert.equal(await js('return getComputedStyle(document.querySelector("header")).display'), 'flex', 'a rule inside the legacy layer draws')
     for (const route of ['/api/instances', '/api/setup', '/api/update', '/api/client/launcher']) {
       const res = await fetch(`http://127.0.0.1:${panel.port}${route}`)
       assert.equal(res.status, 401, `${route} without a credential`)

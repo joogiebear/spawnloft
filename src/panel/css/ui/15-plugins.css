@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- plugins: the reference layout for a tool ------------------------------ */
 
   /*
@@ -79,3 +81,4 @@
   .plug-acts .row-acts { display: inline-flex; gap: 2px; }
   .plug[data-off] .plug-name, .plug[data-off] .plug-tile { opacity: .55; }
 
+}

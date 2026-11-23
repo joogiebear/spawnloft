@@ -4,3 +4,7 @@
 /src/bot-host/*.json text eol=lf
 # The loaders' captured files: manifest.json names each by the sha1 of its bytes, as published.
 /test/fixtures/client/loaders/** -text
+# The built Tailwind stylesheet and its input: CI compares the committed file with a fresh build, byte for byte.
+/src/panel/css/tailwind.css text eol=lf
+/src/panel/tailwind/** text eol=lf
+/test/fixtures/tailwind-probe/** text eol=lf

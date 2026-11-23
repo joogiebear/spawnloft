@@ -1,0 +1,216 @@
+/* ==========================================================================
+   The Tailwind input for the panel's three pages (ui.html, launcher.html, setup.html).
+
+   `node tools/panel-css.mjs` builds this into src/panel/css/tailwind.css with the pinned
+   standalone Tailwind program (tools/tailwind-pin.json). The built file is committed and is what
+   the Rust panel compiles in and serves; nothing here runs in a package or on a user's machine.
+   CI rebuilds it and fails when the committed copy is stale.
+
+   Three rules hold this together:
+
+   1. The panel's tokens are the theme. Tailwind's own palette, type sizes, radii, shadows and
+      breakpoints are switched off below and replaced by the names in css/tokens.css, so a class
+      can only ask for a value the panel already has. The tokens stay in tokens.css, are not
+      copied here, and the two colour schemes stay what they are: one attribute on <html> that
+      swaps variables. No class changes with the scheme.
+
+   2. The hand-written stylesheets are one cascade layer, `legacy`, below Tailwind's components
+      and utilities. A class from here therefore wins over any old rule on the same element,
+      whatever that rule's selector, and an element that carries no class from here is drawn
+      exactly as before. The one exception is by design of layers: an old `!important` still
+      beats a class from here, even an important one, so `[hidden]` keeps hiding and the
+      reduced-motion rule keeps stopping motion. A page moves here when it is redesigned, and its
+      old rules are deleted in the same pull request (test/panel-css.test.mjs counts them; the
+      number only goes down).
+
+   3. Only the files named with @source below are read for class names. Tailwind takes any word
+      in a file it reads as a possible class, and the panel's scripts are full of words such as
+      `filter`, `table` and `hidden`, so a file is listed when it starts using classes from here
+      and not before. A class cannot be defined both here and in an old stylesheet: the same
+      test stops that.
+
+   Preflight (Tailwind's reset) is left out on purpose. The old pages rely on browser defaults it
+   would remove; it can come in when the last old rule has gone.
+   ========================================================================== */
+
+/* The layer order, declared before anything else is loaded: each page links the built file
+   straight after tokens.css and before its own stylesheets. */
+@layer theme, base, legacy, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+/* ---- files that use classes from here (rule 3) ------------------------------------------ */
+/* none yet: phase 3 of docs/ux-ui-plan-2026-11/PLAN.md adds the shared components */
+
+@theme inline {
+  /* ---- colour -------------------------------------------------------------------------- */
+  --color-*: initial;
+  /* planes, back to front */
+  --color-sunken: var(--sunken);
+  --color-void: var(--void);
+  --color-chrome: var(--chrome);
+  --color-recess: var(--recess);
+  --color-surface: var(--surface);
+  --color-surface-hi: var(--surface-hi);
+  --color-raised: var(--raised);
+  --color-raised-hi: var(--raised-hi);
+  --color-hover: var(--hover);
+  --color-hover-hi: var(--hover-hi);
+  --color-backdrop: var(--dialog-backdrop);
+  /* rules */
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-faint: var(--line-faint);
+  --color-edge: var(--edge);
+  /* text */
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-console: var(--console-ink);
+  /* the accent: lapis in Classic, lime in SpawnLoft. Named for its job, not its colour. */
+  --color-accent: var(--lapis);
+  --color-accent-dim: var(--lapis-dim);
+  --color-accent-ink: var(--lapis-ink);
+  --color-accent-edge: var(--lapis-edge);
+  --color-accent-fill: var(--lapis-fill);
+  --color-accent-wash: var(--lapis-wash);
+  /* the primary button */
+  --color-primary: var(--primary-top);
+  --color-primary-hover: var(--primary-hover-top);
+  --color-primary-edge: var(--primary-edge);
+  --color-on-primary: var(--primary-ink);
+  /* server state: the same in both schemes */
+  --color-live: var(--live);
+  --color-live-ink: var(--live-ink);
+  --color-live-edge: var(--live-edge);
+  --color-live-fill: var(--live-fill);
+  --color-live-wash: var(--live-wash);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-edge: var(--warn-edge);
+  --color-warn-wash: var(--warn-wash);
+  --color-fault: var(--fault);
+  --color-fault-ink: var(--fault-ink);
+  --color-fault-edge: var(--fault-edge);
+  --color-fault-fill: var(--fault-fill);
+  --color-fault-wash: var(--fault-wash);
+  --color-idle: var(--idle);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* ---- type ---------------------------------------------------------------------------- */
+  /* the seven sizes: text-1 (11px) to text-7 (32px). For a title, a label or body text, use a
+     role below (type-page, type-label, ...) rather than a size and a weight. */
+  --text-*: initial;
+  --text-1: var(--t-1);
+  --text-2: var(--t-2);
+  --text-3: var(--t-3);
+  --text-4: var(--t-4);
+  --text-5: var(--t-5);
+  --text-6: var(--t-6);
+  --text-7: var(--t-7);
+
+  --font-*: initial;
+  --font-ui: var(--ui);
+  --font-display: var(--display);
+  --font-mono: var(--mono);
+
+  /* the panel's emphasis weight sits between Tailwind's semibold (600) and bold (700) */
+  --font-weight-strong: 650;
+
+  --tracking-*: initial;
+  --tracking-display: var(--track-display);
+  --tracking-label: var(--track-label);
+
+  /* ---- shape, depth, motion ------------------------------------------------------------ */
+  --radius-*: initial;
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r);
+  --radius-lg: var(--r-lg);
+  --radius-full: 999px;
+
+  /* depth is the shadow-* classes at the end of this file: the tokens are whole shadows under
+     names Tailwind's own theme also uses, so they are not repeated here */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --blur-*: initial;
+
+  /* every hover in the panel moves at --ease (200ms ease-in-out) */
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: ease-in-out;
+
+  /* ---- space and size ------------------------------------------------------------------ */
+  /* One step is the four-pixel grid the --s-* tokens sit on: p-1 to p-5 are --s-1 to --s-5,
+     p-7 is --s-6 (28px) and p-10 is --s-7 (40px). h-8 is --hit, the smallest pointer target. */
+  --spacing: 4px;
+
+  /* ---- the density tiers --------------------------------------------------------------- */
+  /* Container sizes, as the old `@container pane (min-width: ...)` rules use them: mark the
+     scrolling pane `@container/pane` and write `@wide/pane:grid-cols-2`. Window breakpoints are
+     off: the panel lays out by the width of the pane, never of the window. */
+  --container-*: initial;
+  --container-narrow: 560px;
+  --container-wide: 1280px;
+  --container-ultra: 2000px;
+  --breakpoint-*: initial;
+}
+
+/* ---- type roles ---------------------------------------------------------------------------
+   A role is size, weight, line height and family together (tokens.css), so a title is one
+   class rather than four. */
+@utility type-display {
+  font: var(--type-display);
+  letter-spacing: var(--track-display);
+}
+@utility type-page {
+  font: var(--type-page);
+  letter-spacing: var(--track-display);
+}
+@utility type-section {
+  font: var(--type-section);
+}
+@utility type-card {
+  font: var(--type-card);
+}
+@utility type-body {
+  font: var(--type-body);
+}
+@utility type-meta {
+  font: var(--type-meta);
+}
+@utility type-label {
+  font: var(--type-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+@utility type-mono {
+  font: var(--type-mono);
+}
+
+/* The one focus ring (tokens.css: --ring-width, --ring-offset, --ring-color). */
+@utility focus-ring {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+}
+
+/* Depth: the panel's shadows are whole (each carries its own lit top edge), so they are set as
+   they are rather than built up from Tailwind's parts. */
+@utility shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+@utility shadow-md {
+  box-shadow: var(--shadow-md);
+}
+@utility shadow-lg {
+  box-shadow: var(--shadow-lg);
+}
+@utility shadow-lift {
+  box-shadow: var(--lift);
+}
+@utility shadow-lift-strong {
+  box-shadow: var(--lift-strong);
+}

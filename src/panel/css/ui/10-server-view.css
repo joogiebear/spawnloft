@@ -1,3 +1,5 @@
+/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
+@layer legacy {
   /* ---- server view ------------------------------------------------------ */
 
   /*
@@ -135,3 +137,4 @@
   .notice.fault { background: var(--fault-wash); color: var(--fault-ink); }
   .notice b { font-weight: 600; white-space: nowrap; }
 
+}
