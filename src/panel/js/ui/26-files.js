@@ -149,25 +149,14 @@ const rowMenu = (() => {
     if (owner === button) { close(true); return; }
     close(false);
     owner = button;
-    menu = document.createElement('div');
-    menu.className = 'menu row-menu';
-    menu.setAttribute('role', 'menu');
-    menu.setAttribute('aria-label', button.getAttribute('aria-label') || 'Actions');
+    menu = Kit.h('div', { class: 'sl-menu fixed z-60', role: 'menu', 'aria-label': button.getAttribute('aria-label') || 'Actions' });
     for (const item of items) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('role', 'menuitem');
-      b.tabIndex = -1;
+      const b = Kit.h('button', {
+        type: 'button', role: 'menuitem', class: 'sl-menu-item', tabindex: '-1',
+        dataset: item.danger ? { tone: 'fault' } : null,
+        'aria-disabled': item.disabled ? 'true' : null,
+      }, Kit.h('span', { text: item.label }), item.hint ? Kit.h('small', { text: item.hint }) : null);
       b.disabled = Boolean(item.disabled);
-      if (item.danger) b.dataset.tone = 'danger';
-      const title = document.createElement('b');
-      title.textContent = item.label;
-      b.append(title);
-      if (item.hint) {
-        const hint = document.createElement('span');
-        hint.textContent = item.hint;
-        b.append(hint);
-      }
       b.onclick = () => { close(true); run(item.id); };
       menu.append(b);
     }
@@ -198,6 +187,39 @@ const rowMenu = (() => {
   return { open, close };
 })();
 
+/** The file SpawnLoft keeps in plugins/ (or mods/) to know what it installed and from where. */
+const isPluginStore = (p) => /^(plugins|mods)\/\.mcctl-plugins\.json$/.test(p);
+
+/** The order a listing is shown in: folders first, then by the column chosen. */
+function sortEntries(entries, sort) {
+  if (!sort || !sort.key) return entries;
+  const dir = sort.dir === 'desc' ? -1 : 1;
+  const value = (e) => (sort.key === 'size' ? (e.type === 'dir' ? -1 : e.size || 0)
+    : sort.key === 'modified' ? new Date(e.modified).getTime() || 0
+      : String(e.name || e.path).toLowerCase());
+  return [...entries].sort((a, b) => {
+    const fa = a.type === 'dir' ? 0 : 1;
+    const fb = b.type === 'dir' ? 0 : 1;
+    if (fa !== fb) return fa - fb;
+    const va = value(a);
+    const vb = value(b);
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  });
+}
+
+/** The modifier key as this keyboard has it, for the words under the editor. */
+const FILES_MOD = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '') ? '⌘' : 'Ctrl+';
+
+/*
+  The Files page is drawn with Tailwind classes, read from this file (panel.css @source). The list
+  stops at a width it reads at, so a file's name and its date are not a screen apart (U9).
+*/
+const FILES_PAGE = 'grid w-full min-w-0 max-w-[1240px] gap-3';
+const FILES_CELL = 'border-b border-line-faint px-3 py-0 align-middle group-last/row:border-b-0';
+/** A button drawn as its words only: the old stylesheet's border, fill and lift taken off. */
+const FILES_BARE = 'min-h-0 rounded-sm border-0 bg-transparent px-0 shadow-none hover:transform-none';
+const FILES_HEAD = 'h-9 border-b border-line px-3 text-left align-middle type-label text-ink-3 whitespace-nowrap';
+
 async function renderFiles(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -227,52 +249,51 @@ async function renderFiles(opts) {
   }
   if (body.dataset.for !== row.name || view.editing) return;
   const running = data.running;
-  const entries = view.query ? data.results : data.entries;
+  const entries = sortEntries(view.query ? data.results : data.entries, view.sort);
   for (const p of [...view.selected]) if (!entries.some((e) => e.path === p)) view.selected.delete(p);
+  // the control that had the focus, found again on the redrawn page by what it is for
+  const had = document.activeElement && body.contains(document.activeElement) ? document.activeElement.dataset.focusKey : null;
 
   rowMenu.close(false);
   body.textContent = '';
   paneHead(body, 'folder', 'Files',
-    'Everything in this server’s folder. An edit, a replaced file or a delete keeps a copy first, which Backups can put back.');
+    'Everything in this server’s folder. An edit, a replaced file or a delete keeps a copy first, which Backups or Activity can put back.');
+  const page = Kit.h('div', { class: FILES_PAGE });
+  body.append(page);
   const again = () => renderFiles({ force: true });
   const go = (dir) => { view.dir = dir; view.query = ''; view.selected.clear(); again(); };
 
   if (running) {
-    const how = document.createElement('div');
-    how.className = 'hint';
-    how.textContent = 'The server is running: files it holds open (the active world, its jar, the plugins it loaded) are marked In use and cannot be moved, replaced or deleted until it stops. '
-      + 'They can still be read and edited; a changed config applies when the plugin reloads or the server restarts.';
-    body.append(how);
+    page.append(Kit.h('p', {
+      class: 'sl-hint',
+      text: 'The server is running: files it holds open (the active world, its jar, the plugins it loaded) are marked In use and cannot be moved, replaced or deleted until it stops. '
+        + 'They can still be read and edited; a changed config applies when the plugin reloads or the server restarts.',
+    }));
   }
 
   // ---- where, and what to do here -----------------------------------------------
-  const bar = document.createElement('div');
-  bar.className = 'fm-bar';
-  const crumbs = document.createElement('nav');
-  crumbs.className = 'fm-crumbs';
-  crumbs.setAttribute('aria-label', 'Folder');
   const parts = view.dir ? view.dir.split('/') : [];
   const crumb = (label, dir, current) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'ghost';
-    b.textContent = label;
+    const b = Kit.h('button', {
+      type: 'button',
+      class: FILES_BARE + ' block min-w-0 max-w-full truncate px-1.5 py-1 font-mono text-3 leading-[1.4] hover:bg-hover hover:text-ink focus-visible:focus-ring ' + (current ? 'font-semibold text-ink' : 'font-normal text-ink-2'),
+      text: label,
+      onclick: () => go(dir),
+    });
     if (current) b.setAttribute('aria-current', 'location');
-    b.onclick = () => go(dir);
     return b;
   };
+  const crumbs = Kit.h('nav', { class: 'fm-crumbs flex min-w-0 flex-[1_1_260px] flex-wrap items-center gap-0.5', 'aria-label': 'Folder' });
   crumbs.append(crumb(row.label || row.name, '', !parts.length && !view.query));
   parts.forEach((p, i) => {
-    const sep = document.createElement('span');
-    sep.className = 'sep';
-    sep.textContent = '/';
-    crumbs.append(sep, crumb(p, parts.slice(0, i + 1).join('/'), i === parts.length - 1 && !view.query));
+    // the slashes are drawn, not read: the crumbs are a list of places already
+    crumbs.append(Kit.h('span', { class: 'text-ink-4', 'aria-hidden': 'true', text: '/' }), crumb(p, parts.slice(0, i + 1).join('/'), i === parts.length - 1 && !view.query));
   });
 
-  const search = document.createElement('input');
-  search.type = 'search';
-  search.className = 'fm-search';
-  search.placeholder = view.dir ? 'Find in this folder' : 'Find a file';
+  const search = Kit.h('input', {
+    class: 'sl-input fm-search', type: 'search', autocomplete: 'off', spellcheck: false,
+    placeholder: view.dir ? 'Find in this folder' : 'Find a file',
+  });
   search.setAttribute('aria-label', 'Find files by name');
   search.value = view.query;
   search.dataset.kept = '1';
@@ -288,24 +309,31 @@ async function renderFiles(opts) {
   };
   search.onsearch = () => { if (!search.value && view.query) { view.query = ''; again(); } };
 
-  // Upload is what this toolbar is for most; the rest are there when wanted, at a lower voice.
-  const newFile = iconButton('file', 'New file', 'ghost');
-  const newFolder = iconButton('folder', 'New folder', 'ghost');
-  const upload = iconButton('upload', 'Upload files', 'primary');
-  const uploadDir = iconButton('folder', 'Upload a folder');
-  const reveal = iconButton('external', 'Open in ' + FILE_MANAGER, 'ghost');
-  const picker = document.createElement('input');
-  picker.type = 'file';
-  picker.multiple = true;
-  picker.hidden = true;
-  const dirPicker = document.createElement('input');
-  dirPicker.type = 'file';
+  // Upload is what this toolbar is for most; making things and the file manager are one press
+  // further, in a menu, and each glyph means one thing.
+  const upload = Kit.button({ label: 'Upload', icon: 'upload', kind: 'primary' });
+  upload.title = 'Upload files into ' + (view.dir || 'the server folder');
+  const picker = Kit.h('input', { type: 'file', multiple: true, hidden: true });
+  const dirPicker = Kit.h('input', { type: 'file', hidden: true });
   dirPicker.webkitdirectory = true;
-  dirPicker.hidden = true;
-  bar.append(crumbs, search, newFile, newFolder, upload, uploadDir, reveal, picker, dirPicker);
-  body.append(bar);
+    const more = Kit.menu({
+    label: 'New', icon: 'plus', kind: 'secondary',
+    items: [
+      { label: 'New file', note: 'An empty file, opened to write in.', onSelect: () => makeFile() },
+      { label: 'New folder', onSelect: () => makeFolder() },
+      'sep',
+      { label: 'Upload a folder', note: 'A whole folder, with what is inside it.', onSelect: () => dirPicker.click() },
+      { label: 'Open in ' + FILE_MANAGER, onSelect: () => revealHere() },
+    ],
+  });
+  // Escape in the menu closes the menu, not the whole tool (the page's Escape closes a tool)
+  more.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !more.querySelector('[role="menu"]').hidden) e.stopPropagation(); }, true);
+  page.append(Kit.h('div', { class: 'fm-bar flex min-w-0 flex-wrap items-center gap-2' },
+    crumbs,
+    Kit.h('span', { class: 'sl-input-group min-w-36 flex-[0_1_240px]' }, Kit.h('span', { class: 'sl-input-lead', 'aria-hidden': 'true' }, Kit.icon('search')), search),
+    more, upload, picker, dirPicker));
 
-  newFile.onclick = async () => {
+  const makeFile = async () => {
     const got = await ask({
       title: 'New file in ' + (view.dir || 'the server folder'),
       input: { label: 'Name', placeholder: 'config.yml', required: true },
@@ -316,7 +344,7 @@ async function renderFiles(opts) {
     view.editing = { path: got.out.path, text: '', original: '', version: got.out.version };
     again();
   };
-  newFolder.onclick = async () => {
+  const makeFolder = async () => {
     const got = await ask({
       title: 'New folder in ' + (view.dir || 'the server folder'),
       input: { label: 'Name', required: true },
@@ -327,7 +355,6 @@ async function renderFiles(opts) {
   };
   upload.onclick = () => picker.click();
   picker.onchange = () => { uploadFiles(row, view, [...picker.files].map((f) => ({ file: f, name: f.name }))).then(again); picker.value = ''; };
-  uploadDir.onclick = () => dirPicker.click();
   dirPicker.onchange = () => {
     // webkitRelativePath is "Folder/sub/file": the folder's own name is kept, as a drop keeps it.
     const picked = [...dirPicker.files].map((f) => ({ file: f, name: f.webkitRelativePath || f.name }));
@@ -335,7 +362,7 @@ async function renderFiles(opts) {
     if (!picked.length) { toast('Nothing to upload: the folder is empty.', 'bad'); return; }
     uploadFiles(row, view, picked).then(again);
   };
-  reveal.onclick = async () => {
+  const revealHere = async () => {
     try { await post('/instances/' + encodeURIComponent(row.name) + '/reveal', { folder: view.dir }); }
     catch (e) { toast(e.message, 'bad'); }
   };
@@ -376,125 +403,145 @@ async function renderFiles(opts) {
     again();
   };
   const unzipOne = async (path, button) => {
-    if (button) button.disabled = true;
+    if (button) busy(button, true);
+    const note = button ? null : toast('Unpacking ' + path.split('/').pop() + '…');
     try {
       const out = await post(base + '/extract', { path });
+      note?.remove();
       toast('Unpacked into ' + out.path + '.', 'good');
       go(out.path);
-    } catch (e) { toast(e.message, 'bad'); if (button) button.disabled = false; }
+    } catch (e) { note?.remove(); toast(e.message, 'bad'); if (button) busy(button, false); }
   };
   const heldWords = (e) => e.name + ' is in use by the running server, so it cannot be renamed, moved or deleted until the server stops.';
 
   // ---- what is selected -------------------------------------------------------
+  // Always the same height, ticked or not, so the first tick does not push the list down under
+  // the pointer that is about to tick the next row.
   const sel = [...view.selected];
   const selEntries = entries.filter((e) => view.selected.has(e.path));
-  if (sel.length) {
-    const acts = document.createElement('div');
-    acts.className = 'fm-sel';
-    const count = document.createElement('b');
-    count.textContent = sel.length + ' selected';
-    const dl = iconButton('download', 'Download');
-    dl.hidden = sel.length !== 1;
-    const rename = iconButton('pencil', 'Rename');
-    rename.hidden = sel.length !== 1;
-    const move = iconButton('folder', 'Move');
-    move.hidden = sel.length !== 1;
-    const zip = iconButton('archive', 'Zip');
-    const unzip = iconButton('archive', 'Unzip');
-    unzip.hidden = !(sel.length === 1 && selEntries[0] && selEntries[0].type === 'file' && ARCHIVE_RE.test(sel[0]));
-    const del = iconButton('trash', 'Delete', 'danger');
-    const busy = selEntries.filter((e) => e.inUse);
-    // said beside the buttons: a button that is off cannot take focus to show a tip
-    const whyOff = document.createElement('span');
-    whyOff.className = 'hint';
-    whyOff.hidden = !busy.length;
-    if (busy.length) {
-      del.disabled = true;
-      rename.disabled = true;
-      move.disabled = true;
-      whyOff.textContent = heldWords(busy[0]);
-    }
-    const clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'ghost';
-    clear.textContent = 'Clear';
-    acts.append(count, dl, rename, move, zip, unzip, del, clear, whyOff);
-    body.append(acts);
+  if (entries.length) {
+    const acts = Kit.h('div', {
+      class: 'fm-sel flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-md border px-3 py-1 '
+        + (sel.length ? 'border-accent-edge bg-accent-wash' : 'border-transparent'),
+    });
+    page.append(acts);
+    if (!sel.length) {
+      acts.append(Kit.h('span', { class: 'text-2 text-ink-3', text: 'Tick rows to act on several at once. On a row, F2 renames and Delete deletes; Shift and a click ticks a run of rows.' }));
+    } else {
+      const one = sel.length === 1;
+      const dl = Kit.button({ label: 'Download', icon: 'download', size: 'sm' });
+      const rename = Kit.button({ label: 'Rename', icon: 'pencil', size: 'sm' });
+      const move = Kit.button({ label: 'Move', icon: 'folder', size: 'sm' });
+      const zip = Kit.button({ label: 'Zip', icon: 'archive', size: 'sm' });
+      const unzip = Kit.button({ label: 'Unzip', icon: 'folder', size: 'sm' });
+      const del = Kit.button({ label: 'Delete', icon: 'trash', kind: 'danger', size: 'sm' });
+      dl.hidden = rename.hidden = move.hidden = !one;
+      unzip.hidden = !(one && selEntries[0] && selEntries[0].type === 'file' && ARCHIVE_RE.test(sel[0]));
+      const clear = Kit.button({ label: 'Clear', kind: 'ghost', size: 'sm' });
+      // said beside the buttons: a button that is off cannot take focus to show a tip
+      const whyOff = Kit.h('span', { class: 'basis-full text-2 text-ink-3' });
+      const held = selEntries.filter((e) => e.inUse);
+      const folders = new Set(sel.map((p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')));
+      if (held.length) {
+        del.disabled = rename.disabled = move.disabled = true;
+        whyOff.textContent = heldWords(held[0]);
+      } else if (folders.size > 1) {
+        // a search ticks files from many folders; an archive is made of one folder's things
+        zip.disabled = true;
+        whyOff.textContent = 'Zip takes things from one folder at a time.';
+      }
+      whyOff.hidden = !whyOff.textContent;
+      acts.append(Kit.h('b', { class: 'mr-1 text-2 font-semibold text-ink', text: sel.length + ' selected' }), dl, rename, move, zip, unzip, del, clear, whyOff);
 
-    clear.onclick = () => { view.selected.clear(); again(); };
-    dl.onclick = () => downloadPath(row, sel[0]);
-    rename.onclick = () => renameOne(sel[0]);
-    move.onclick = () => moveOne(sel[0]);
-    zip.onclick = async () => {
-      const first = sel[0].split('/').pop();
-      const got = await ask({
-        title: 'Zip ' + (sel.length === 1 ? first : sel.length + ' items'),
-        input: { label: 'Archive name', value: (sel.length === 1 ? first.replace(/\.[^.]+$/, '') : 'archive') + '.zip', required: true },
-        confirmLabel: 'Zip',
-        submit: ({ text }) => post(base + '/archive', { paths: sel, name: text }),
-      });
-      if (!got) return;
-      toast('Made ' + got.out.path + ' (' + fileSize(got.out.size) + ').', 'good', { stay: true });
-      view.selected.clear();
-      again();
-    };
-    unzip.onclick = () => unzipOne(sel[0], unzip);
-    del.onclick = () => deleteFiles(row, view, sel, entries).then(again);
+      clear.onclick = () => { view.selected.clear(); again(); };
+      dl.onclick = () => downloadPath(row, sel[0]);
+      rename.onclick = () => renameOne(sel[0]);
+      move.onclick = () => moveOne(sel[0]);
+      zip.onclick = async () => {
+        const first = sel[0].split('/').pop();
+        const got = await ask({
+          title: 'Zip ' + (one ? first : sel.length + ' items'),
+          input: { label: 'Archive name', value: (one ? first.replace(/\.[^.]+$/, '') : 'archive') + '.zip', required: true },
+          confirmLabel: 'Zip',
+          submit: ({ text }) => post(base + '/archive', { paths: sel, name: text }),
+        });
+        if (!got) return;
+        toast('Made ' + got.out.path + ' (' + fileSize(got.out.size) + ').', 'good', { stay: true });
+        view.selected.clear();
+        again();
+      };
+      unzip.onclick = () => unzipOne(sel[0], unzip);
+      del.onclick = () => deleteFiles(row, view, sel, entries).then(again);
+    }
   }
 
   // ---- the listing ------------------------------------------------------------
   if (view.query) {
-    const t = document.createElement('h3');
-    t.className = 'hist-title';
-    t.textContent = entries.length + (data.truncated ? '+' : '') + ' named like “' + view.query + '”';
-    body.append(t);
+    page.append(Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-2' },
+      Kit.h('h3', { class: 'type-label m-0 text-ink-3', text: entries.length + (data.truncated ? '+' : '') + ' named like “' + view.query + '”' }),
+      Kit.button({ label: 'Back to ' + (view.dir || row.label || row.name), kind: 'ghost', size: 'sm', onClick: () => { view.query = ''; view.selected.clear(); again(); } })));
   }
-  const list = document.createElement('div');
-  list.className = 'fm-list';
-  list.setAttribute('role', 'table');
-  list.setAttribute('aria-label', 'Files');
-  const head = document.createElement('div');
-  head.className = 'fm-row fm-head';
-  head.setAttribute('role', 'row');
-  const all = document.createElement('input');
-  all.type = 'checkbox';
-  all.setAttribute('aria-label', 'Select all');
-  all.checked = entries.length > 0 && entries.every((e) => view.selected.has(e.path));
+  if (!entries.length) {
+    page.append(Kit.h('div', { class: 'sl-card' }, view.query
+      ? Kit.empty({ icon: 'search', title: 'Nothing here is named like that', text: 'The search looks at names, in this folder and the ones inside it.' })
+      : Kit.empty({
+        icon: 'folder', title: 'This folder is empty', text: 'Drop files or whole folders here, or upload them.',
+        actions: [Kit.button({ label: 'Upload', icon: 'upload', kind: 'primary', onClick: () => picker.click() }), view.dir ? Kit.button({ label: 'Up one folder', onClick: () => go(parts.slice(0, -1).join('/')) }) : null].filter(Boolean),
+      })));
+    bindDrop();
+    return;
+  }
+
+  // A real table: a screen reader reads a row with its column names.
+  const table = Kit.h('table', { class: 'fm-list w-full table-fixed border-collapse text-3' });
+  table.append(Kit.h('caption', { class: 'sl-sr', text: 'Files in ' + (view.dir || 'the server folder') }));
+  const all = Kit.h('input', { type: 'checkbox', class: 'sl-check m-0', 'aria-label': 'Select all' });
+  all.checked = entries.every((e) => view.selected.has(e.path));
+  all.indeterminate = !all.checked && entries.some((e) => view.selected.has(e.path));
   all.onchange = () => { if (all.checked) for (const e of entries) view.selected.add(e.path); else view.selected.clear(); again(); };
-  for (const [cls, text] of [['fm-name', 'Name'], ['fm-kind', 'Kind'], ['fm-size', 'Size'], ['fm-when', 'Modified']]) {
-    const c = document.createElement('span');
-    c.className = cls;
-    c.setAttribute('role', 'columnheader');
-    c.textContent = text;
-    head.append(c);
-  }
-  head.prepend(all);
-  list.append(head);
+  // a column header sorts by itself; pressed again, the other way
+  const sortHead = (key, label, extra) => {
+    const on = view.sort && view.sort.key === key;
+    const th = Kit.h('th', { scope: 'col', class: FILES_HEAD + ' ' + (extra || '') });
+    if (on) th.setAttribute('aria-sort', view.sort.dir === 'desc' ? 'descending' : 'ascending');
+    th.append(Kit.h('button', {
+      type: 'button',
+      class: FILES_BARE + ' inline-flex items-center gap-1 [font:inherit] uppercase tracking-[inherit] hover:bg-transparent hover:text-ink focus-visible:focus-ring ' + (on ? 'text-ink-2' : 'text-ink-3'),
+      onclick: () => { view.sort = { key, dir: on && view.sort.dir !== 'desc' ? 'desc' : 'asc' }; again(); },
+    }, label, on ? Kit.h('span', { 'aria-hidden': 'true', text: view.sort.dir === 'desc' ? '↓' : '↑' }) : null));
+    return th;
+  };
+  table.append(Kit.h('thead', null, Kit.h('tr', { class: 'fm-row fm-head' },
+    Kit.h('th', { scope: 'col', class: FILES_HEAD + ' w-11 pl-3 pr-0' }, Kit.h('label', { class: 'grid size-8 cursor-pointer place-items-center' }, all)),
+    sortHead('name', 'Name'),
+    Kit.h('th', { scope: 'col', class: FILES_HEAD + ' hidden w-28 @min-[1100px]/pane:table-cell', text: 'Kind' }),
+    sortHead('size', 'Size', 'w-24 text-right'),
+    sortHead('modified', 'Modified', 'hidden w-40 text-right @min-[640px]/pane:table-cell @min-[1800px]/pane:w-56'),
+    Kit.h('th', { scope: 'col', class: FILES_HEAD + ' w-12 px-0' }, Kit.h('span', { class: 'sl-sr', text: 'Actions' })))));
+  const tbody = Kit.h('tbody');
+  table.append(tbody);
+  page.append(Kit.h('div', { class: 'fm-wrap min-w-0 overflow-hidden rounded-md border border-line bg-surface' }, table));
+
+  const cell = (extra, ...kids) => Kit.h('td', { class: FILES_CELL + ' ' + (extra || '') }, ...kids);
 
   if (view.dir && !view.query) {
-    const up = document.createElement('div');
-    up.className = 'fm-row';
-    up.setAttribute('role', 'row');
-    const spacer = document.createElement('span');
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'fm-name fm-open';
-    b.append(icon('folder'), document.createTextNode('..'));
-    b.setAttribute('aria-label', 'Up one folder');
-    b.onclick = () => go(parts.slice(0, -1).join('/'));
-    up.append(spacer, b);
-    list.append(up);
+    const b = Kit.h('button', {
+      type: 'button',
+      class: FILES_BARE + ' fm-name fm-open flex min-w-0 items-center gap-2 py-2 font-normal leading-[1.4] hover:bg-transparent font-mono text-2 text-ink hover:text-accent-ink focus-visible:focus-ring',
+      'aria-label': 'Up one folder',
+      onclick: () => go(parts.slice(0, -1).join('/')),
+      dataset: { focusKey: 'up' },
+    }, Kit.icon('folder', 'text-ink-3'), '..');
+    tbody.append(Kit.h('tr', { class: 'fm-row group/row hover:bg-hover' }, cell(), cell('', b), cell('hidden @min-[1100px]/pane:table-cell'), cell(), cell('hidden @min-[640px]/pane:table-cell'), cell()));
   }
 
   for (const e of entries) {
-    const line = document.createElement('div');
-    line.className = 'fm-row';
-    line.setAttribute('role', 'row');
-    if (view.selected.has(e.path)) line.setAttribute('data-selected', '');
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = view.selected.has(e.path);
-    box.setAttribute('aria-label', 'Select ' + e.name);
+    const picked = view.selected.has(e.path);
+    const line = Kit.h('tr', { class: 'fm-row group/row ' + (picked ? 'bg-accent-wash' : 'hover:bg-hover') });
+    if (picked) line.dataset.selected = '';
+    // The whole cell is the box's label, so the target is the row's height and not 16 pixels.
+    const box = Kit.h('input', { type: 'checkbox', class: 'sl-check m-0', 'aria-label': 'Select ' + e.name, dataset: { focusKey: 'tick:' + e.path } });
+    box.checked = picked;
     // Shift and a click ticks, or unticks, everything from the last box used to this one.
     // Shift and a click would also pick the page's text between the two rows
     line.addEventListener('mousedown', (ev) => { if (ev.shiftKey) ev.preventDefault(); });
@@ -506,51 +553,45 @@ async function renderFiles(opts) {
       view.anchor = e.path;
       again();
     };
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'fm-name fm-open';
-    open.append(icon(e.type === 'dir' ? 'folder' : 'file'));
-    const nm = document.createElement('span');
-    nm.textContent = view.query ? e.path : e.name;
+    const opens = e.type === 'dir' || e.type === 'file';
+    const open = Kit.h('button', {
+      type: 'button',
+      class: FILES_BARE + ' fm-name fm-open flex min-w-0 max-w-full items-center gap-2 py-2 font-normal leading-[1.4] hover:bg-transparent text-left font-mono text-2 focus-visible:focus-ring '
+        + (opens ? 'text-ink hover:text-accent-ink' : 'cursor-default text-ink-3'),
+      dataset: { focusKey: 'open:' + e.path },
+    }, Kit.icon(e.type === 'dir' ? 'folder' : 'file', 'flex-none text-ink-3'), Kit.h('span', { class: 'truncate', text: view.query ? e.path : e.name }));
     // The row truncates a long name; the whole path is a pointer away.
     open.title = e.path;
-    open.append(nm);
-    if (e.inUse) {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.dataset.tone = 'on';
-      pill.textContent = 'In use';
-      pill.title = 'The running server holds this. Stop it to move, replace or delete it.';
-      open.append(pill);
-    }
+    if (e.inUse) open.append(Kit.pill({ text: 'In use', tone: 'live' }));
+    if (isPluginStore(e.path)) open.append(Kit.h('span', { class: 'flex-none font-ui text-1 text-ink-3', text: 'SpawnLoft’s list of what it installed' }));
     if (e.type === 'link') open.title = 'A link that leads outside the server folder';
-    const kind = document.createElement('span');
-    kind.className = 'fm-kind';
-    kind.textContent = fileKind(e);
-    const size = document.createElement('span');
-    size.className = 'fm-size';
+    if (!opens) open.setAttribute('aria-disabled', 'true');
     // A folder's size would mean walking it on every listing; a dash says "not counted", where a
     // blank cell read as a missing value.
-    size.textContent = e.type === 'dir' ? '—' : fileSize(e.size);
-    const when = document.createElement('span');
-    when.className = 'fm-when';
-    const whenShort = document.createElement('span');
-    whenShort.className = 'short';
-    whenShort.textContent = stamp(e.modified);
-    const whenLong = document.createElement('span');
-    whenLong.className = 'long';
-    whenLong.textContent = STAMP_YEAR.format(new Date(e.modified));
-    when.append(whenShort, whenLong);
-    when.title = whenLong.textContent;
-    line.append(box, open, kind, size, when);
-    list.append(line);
+    const when = Kit.h('span', { class: 'whitespace-nowrap tabular-nums text-2 text-ink-3' },
+      Kit.h('span', { class: '@min-[1800px]/pane:hidden', text: stamp(e.modified) }),
+      Kit.h('span', { class: 'hidden @min-[1800px]/pane:inline', text: STAMP_YEAR.format(new Date(e.modified)) }));
+    when.title = STAMP_YEAR.format(new Date(e.modified));
+    line.append(
+      cell('pl-3 pr-0', Kit.h('label', { class: 'grid size-8 cursor-pointer place-items-center' }, box)),
+      cell('', open),
+      cell('hidden truncate text-2 text-ink-3 @min-[1100px]/pane:table-cell', isPluginStore(e.path) ? 'SpawnLoft' : fileKind(e)),
+      cell('fm-size text-right font-mono text-2 text-ink-2 whitespace-nowrap', e.type === 'dir' ? '—' : fileSize(e.size)),
+      cell('hidden text-right @min-[640px]/pane:table-cell', when));
+    tbody.append(line);
 
     const openIt = () => {
       if (e.type === 'dir') go(e.path);
       else if (e.type === 'file') openFile(row, view, e.path);
+      // said, rather than a button that does nothing
+      else toast(e.type === 'link' ? e.name + ' is a link to somewhere outside the server folder, so it is not opened here.' : e.name + ' is not a file or a folder, so there is nothing to open.');
     };
     open.onclick = openIt;
     const actions = fileRowActions(e);
+    if (isPluginStore(e.path)) {
+      // deleting it forgets where every plugin came from: each one becomes "added by hand"
+      for (const a of actions) if (a.id === 'delete' && !a.disabled) a.hint = 'SpawnLoft would no longer know where its plugins came from.';
+    }
     const act = (id) => {
       if (id === 'open') openIt();
       else if (id === 'rename') renameOne(e.path);
@@ -559,17 +600,17 @@ async function renderFiles(opts) {
       else if (id === 'unzip') unzipOne(e.path, null);
       else if (id === 'delete') deleteFiles(row, view, [e.path], entries).then(again);
     };
+    const last = cell('pr-1.5 text-right');
+    line.append(last);
     if (actions.length > 1) {
-      const more = document.createElement('button');
-      more.type = 'button';
-      more.className = 'icon-btn fm-more';
-      more.append(icon('dots'));
+      const more = Kit.button({ icon: 'dots', kind: 'ghost', size: 'sm', title: e.inUse ? 'Actions' : 'Rename, move, download, delete' });
+      more.classList.add('fm-more', 'opacity-60', 'group-hover/row:opacity-100', 'group-focus-within/row:opacity-100', 'aria-expanded:opacity-100');
       more.setAttribute('aria-label', 'Actions for ' + e.name);
       more.setAttribute('aria-haspopup', 'menu');
       more.setAttribute('aria-expanded', 'false');
-      more.title = e.inUse ? 'Actions' : 'Rename, move, download, delete';
+      more.dataset.focusKey = 'more:' + e.path;
       more.onclick = () => rowMenu.open(more, actions, act);
-      line.append(more);
+      last.append(more);
       // F2 renames and Delete deletes the row that holds the focus, as a file manager does
       line.addEventListener('keydown', (ev) => {
         const key = rowKey(ev);
@@ -588,52 +629,51 @@ async function renderFiles(opts) {
       });
     }
   }
-  if (!entries.length) {
-    body.append(list);
-    body.append(emptyState(view.query ? 'search' : 'folder', view.query
-      ? 'Nothing here is named like that.'
-      : 'This folder is empty. Drop files or folders here, or use Upload.'));
-  } else {
-    body.append(list);
+
+  page.append(Kit.h('p', { class: 'sl-hint', text: 'Drop files or whole folders onto this list to upload them here.' }));
+  bindDrop();
+  // focus back where it was before the redraw: a tick or an open does not drop it to the page
+  if (had) body.querySelector('[data-focus-key="' + CSS.escape(had) + '"]')?.focus({ preventScroll: true });
+
+  /** Files dragged in from the desktop land in the folder on screen. */
+  function bindDrop() {
+    const pane = body.closest('.pane');
+    pane.ondragover = (ev) => {
+      if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+      // With a file open in the editor there is no list to drop onto, and these handlers belong to
+      // the server whose list was drawn last, which may not be the one on screen now. Either way the
+      // page-wide guard refuses the drop.
+      if (state.current !== row.name || filesStateFor(row.name).editing) return;
+      ev.preventDefault();
+      pane.setAttribute('data-drop', '');
+      page.classList.add('outline-2', 'outline-dashed', 'outline-offset-4', 'outline-accent-edge', 'rounded-md');
+    };
+    const undrop = () => {
+      pane.removeAttribute('data-drop');
+      page.classList.remove('outline-2', 'outline-dashed', 'outline-offset-4', 'outline-accent-edge', 'rounded-md');
+    };
+    pane.ondragleave = (ev) => { if (!pane.contains(ev.relatedTarget)) undrop(); };
+    pane.ondrop = async (ev) => {
+      undrop();
+      if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+      // before anything else: the browser's own answer to a dropped file is to open it over the panel
+      ev.preventDefault();
+      if (state.current !== row.name || filesStateFor(row.name).editing) return;
+      // The entries must be taken before the first await: the browser empties the drop's item list
+      // once the event handler has returned.
+      const roots = [...ev.dataTransfer.items]
+        .filter((it) => it.kind === 'file')
+        .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null) || it.getAsFile());
+      const fallback = [...ev.dataTransfer.files];
+      const found = roots.some((r) => r) ? await collectDropped(roots) : fallback.map((f) => ({ file: f, name: f.name }));
+      if (!found.length) {
+        toast('Nothing to upload: the folder is empty.', 'bad');
+        return;
+      }
+      await uploadFiles(row, view, found);
+      again();
+    };
   }
-
-  const note = document.createElement('div');
-  note.className = 'hint';
-  note.textContent = 'Drop files or whole folders onto this list to upload them here. On a row, F2 renames and Delete deletes; Shift and a click ticks a run of rows.';
-  body.append(note);
-
-  // Files dragged in from the desktop land in the folder on screen.
-  const pane = body.closest('.pane');
-  pane.ondragover = (ev) => {
-    if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
-    // With a file open in the editor there is no list to drop onto, and these handlers belong to
-    // the server whose list was drawn last, which may not be the one on screen now. Either way the
-    // page-wide guard refuses the drop.
-    if (state.current !== row.name || filesStateFor(row.name).editing) return;
-    ev.preventDefault();
-    pane.setAttribute('data-drop', '');
-  };
-  pane.ondragleave = (ev) => { if (!pane.contains(ev.relatedTarget)) pane.removeAttribute('data-drop'); };
-  pane.ondrop = async (ev) => {
-    pane.removeAttribute('data-drop');
-    if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
-    // before anything else: the browser's own answer to a dropped file is to open it over the panel
-    ev.preventDefault();
-    if (state.current !== row.name || filesStateFor(row.name).editing) return;
-    // The entries must be taken before the first await: the browser empties the drop's item list
-    // once the event handler has returned.
-    const roots = [...ev.dataTransfer.items]
-      .filter((it) => it.kind === 'file')
-      .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null) || it.getAsFile());
-    const fallback = [...ev.dataTransfer.files];
-    const found = roots.some((r) => r) ? await collectDropped(roots) : fallback.map((f) => ({ file: f, name: f.name }));
-    if (!found.length) {
-      toast('Nothing to upload: the folder is empty.', 'bad');
-      return;
-    }
-    await uploadFiles(row, view, found);
-    again();
-  };
 }
 
 /** Every file under what was dropped, each with its path inside the dropped folder. */
@@ -732,6 +772,8 @@ async function uploadFiles(row, view, list) {
   };
   let done = 0;
   const exists = [];
+  // Said once at the end: a full disk under a folder of 300 files is one message, not 300.
+  const failed = [];
   for (const it of list) {
     if (cancelled) break;
     at++;
@@ -743,14 +785,15 @@ async function uploadFiles(row, view, list) {
       sent += it.file.size || 0;
     } catch (e) {
       if (cancelled) break;
-      toast(it.name + ': ' + e.message, 'bad');
+      failed.push({ name: it.name, why: e.message });
     }
   }
   // One question for the lot, so a folder dropped over an older copy of itself is not a hundred prompts.
   if (exists.length && !cancelled) {
     const ok = await ask({
       title: exists.length === 1 ? 'Replace ' + exists[0].name + '?' : 'Replace ' + exists.length + ' files?',
-      text: (exists.length === 1 ? exists[0].name + ' is' : exists.length + ' of the files are') + ' already in ' + where
+      text: (exists.length === 1 ? exists[0].name + ' is already in ' + where
+        : exists.slice(0, 5).map((it) => it.name).join(', ') + (exists.length > 5 ? ' and ' + (exists.length - 5) + ' more' : '') + ' are already in ' + where)
         + '. What is there now is copied to Backups first.',
       confirmLabel: 'Replace',
       danger: true,
@@ -767,12 +810,18 @@ async function uploadFiles(row, view, list) {
           sent += it.file.size || 0;
         } catch (e) {
           if (cancelled) break;
-          toast(it.name + ': ' + e.message, 'bad');
+          failed.push({ name: it.name, why: e.message });
         }
       }
     }
   }
   note.remove();
+  if (failed.length === 1) toast(failed[0].name + ': ' + failed[0].why, 'bad');
+  else if (failed.length) {
+    const why = [...new Set(failed.map((f) => f.why))];
+    toast(failed.length + ' of ' + list.length + ' files were not uploaded, among them ' + failed.slice(0, 3).map((f) => f.name).join(', ')
+      + '. ' + (why.length === 1 ? why[0] : 'The first reason: ' + why[0]), 'bad');
+  }
   if (cancelled) {
     toast('Upload stopped. ' + (done ? (done === 1 ? '1 file is' : done + ' files are') + ' already in ' + where + '.' : 'Nothing was uploaded.'), done ? '' : 'good');
     return;
@@ -828,11 +877,26 @@ async function deleteFiles(row, view, paths, entries) {
     typeToConfirm: confirm.typeToConfirm || undefined,
   });
   if (!ok) return;
+  // A copy of a big folder takes a while: something on screen says what is happening meanwhile.
+  const note = toast('Keeping a copy of ' + what + ', then deleting\u2026');
   try {
-    await post(base + '/delete', { paths: paths });
+    const out = await post(base + '/delete', { paths: paths });
+    note.remove();
     view.selected.clear();
-    toast('Deleted ' + what + '. A copy is in Backups.', 'good');
+    const done = toast('Deleted ' + what + '. A copy is in Backups.', 'good', { stay: true });
+    // The quickest way back, and one that works while the server runs, which Restore does not.
+    if (out && out.snapshot) {
+      toastAction(done, 'Undo', async () => {
+        done.remove();
+        try {
+          await post('/instances/' + encodeURIComponent(row.name) + '/activity/undo', { snapshot: out.snapshot });
+          toast('Put back ' + what + '.', 'good');
+          if ($('#filesBody').dataset.for === row.name && !filesStateFor(row.name).editing) renderFiles({ force: true });
+        } catch (e) { toast(e.message, 'bad'); }
+      });
+    }
   } catch (e) {
+    note.remove();
     if (e.code !== 'large') { toast(e.message, 'bad'); return; }
     const sure = await ask({
       title: 'Delete ' + what + ' without a copy?',
