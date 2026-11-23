@@ -84,7 +84,10 @@ pub fn asset(name: &str, theme: fn() -> &'static str) -> Option<(&'static str, S
         .and_then(|dir| std::fs::read_to_string(dir.join(name)).ok())
         .unwrap_or_else(|| embedded.to_string());
     if name == SETUP_THEME_SCRIPT {
-        return Some((kind, text.replacen(THEME_ASKED, &crate::jsjson::quote(theme()), 1)));
+        return Some((
+            kind,
+            text.replacen(THEME_ASKED, &crate::jsjson::quote(theme()), 1),
+        ));
     }
     Some((kind, text))
 }
@@ -168,7 +171,10 @@ mod tests {
         on_disk.sort();
         let table: Vec<String> = ASSETS.iter().map(|(n, _)| n.to_string()).collect();
         assert_eq!(table, on_disk);
-        assert!(ASSETS.windows(2).all(|w| w[0].0 < w[1].0), "sorted, for binary_search");
+        assert!(
+            ASSETS.windows(2).all(|w| w[0].0 < w[1].0),
+            "sorted, for binary_search"
+        );
         for page in [UI, LAUNCHER, SETUP] {
             let mut asked = 0;
             for piece in page.split("/assets/").skip(1) {

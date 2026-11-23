@@ -75,6 +75,8 @@ pub fn asset(name: &str) -> Reply {
             ("Content-Type".into(), kind.into()),
             ("X-Content-Type-Options".into(), "nosniff".into()),
             ("Cache-Control".into(), "no-store".into()),
+            // the sign-in already keeps other sites out; this says so to the browser as well
+            ("Cross-Origin-Resource-Policy".into(), "same-origin".into()),
         ],
         body: body.into_bytes(),
     }

@@ -1082,10 +1082,17 @@ mod tests {
         assert!(css.contains("X-Content-Type-Options: nosniff\r\n"), "{css}");
         assert!(css.contains("Cache-Control: no-store\r\n"), "{css}");
         assert_eq!(css.matches("Cache-Control").count(), 1, "{css}");
+        assert!(
+            css.contains("Cross-Origin-Resource-Policy: same-origin\r\n"),
+            "{css}"
+        );
         assert!(body_of(&css).contains(":root {"), "{css}");
         let js = ask("GET /assets/js/shared/session.js");
         assert!(js.starts_with("HTTP/1.1 200"), "{js}");
-        assert!(js.contains("Content-Type: text/javascript; charset=utf-8\r\n"), "{js}");
+        assert!(
+            js.contains("Content-Type: text/javascript; charset=utf-8\r\n"),
+            "{js}"
+        );
         let head = ask("HEAD /assets/js/shared/session.js");
         assert!(head.starts_with("HTTP/1.1 200"), "{head}");
         assert_eq!(body_of(&head), "", "{head}");

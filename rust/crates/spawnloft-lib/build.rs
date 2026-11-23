@@ -75,7 +75,14 @@ fn panel_assets() {
             .collect();
         entries.sort();
         for path in entries {
-            if path.is_dir() {
+            // a link could loop, or pull in a file from outside the checkout
+            let meta = std::fs::symlink_metadata(&path).expect("symlink_metadata");
+            assert!(
+                !meta.file_type().is_symlink(),
+                "{}: a link is not taken into the panel; put the file itself there",
+                path.display()
+            );
+            if meta.is_dir() {
                 walk(&path, base, out);
                 continue;
             }
@@ -94,7 +101,9 @@ fn panel_assets() {
             assert!(
                 name.split('/').all(|seg| !seg.is_empty()
                     && !seg.starts_with('.')
-                    && seg.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.')),
+                    && seg
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.')),
                 "src/panel/{name}: an asset name is lower-case letters, digits, `-` and `.` only"
             );
             out.push((name, path));
@@ -107,7 +116,10 @@ fn panel_assets() {
     assets.sort();
     let mut table = String::from("&[\n");
     for (name, path) in &assets {
-        table.push_str(&format!("    ({name:?}, include_str!({:?})),\n", path.display().to_string()));
+        table.push_str(&format!(
+            "    ({name:?}, include_str!({:?})),\n",
+            path.display().to_string()
+        ));
     }
     table.push_str("]\n");
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR")).join("panel_assets.rs");
