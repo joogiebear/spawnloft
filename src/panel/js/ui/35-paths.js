@@ -3,7 +3,7 @@
 
 let themeSaving = false;
 function showTheme(theme) {
-  const selected = theme === 'spawnloft' ? 'spawnloft' : 'classic';
+  const selected = theme === 'classic' ? 'classic' : 'spawnloft';
   document.documentElement.dataset.theme = selected;
   $$('input[name="appTheme"]').forEach(input => { input.checked = input.value === selected; });
   // The Play page is its own document, served with the theme saved at the time it loaded; it

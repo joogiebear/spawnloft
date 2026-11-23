@@ -747,7 +747,9 @@ fn panel_window<'a, R: Runtime>(
     let nav = app.clone();
     let nav_label = label.to_string();
     let opener = app.clone();
-    let theme_bg = tauri::window::Color(0x0c, 0x0e, 0x14, 0xff);
+    // the default look's page colour (--void in src/panel/css/tokens.css), so the window does not
+    // flash another colour before the panel draws
+    let theme_bg = tauri::window::Color(0x09, 0x0d, 0x0d, 0xff);
     WebviewWindowBuilder::new(app, label, url)
         .title("SpawnLoft")
         .background_color(theme_bg)

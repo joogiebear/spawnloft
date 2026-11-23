@@ -44,6 +44,16 @@ plain CSS that can be read in the diff. To move the pin: change the version, the
 every sha256 in one commit, run `node tools/panel-css.mjs`, and commit the rebuilt stylesheet
 with it; the review is of the CSS that changed.
 
+**The panel's typefaces (shipped, as data).** `src/panel/fonts/` holds Bricolage Grotesque,
+Inter and JetBrains Mono as variable WOFF2 files, the Latin and Latin Extended subsets that
+Google Fonts serves for each (fetched 2026-11-23: Bricolage Grotesque v9, Inter v20, JetBrains
+Mono v24). They are compiled into the core like the stylesheets and served at `/assets/fonts/`;
+nothing is fetched at run time. All three are under the SIL Open Font License 1.1, whose text
+sits beside them (`OFL-*.txt`), and each file also carries its copyright and licence in its own
+name table. They are data a browser engine reads, not code, but a font file is parsed by that
+engine, so a change to one is reviewed like a dependency: from the same source, with the reason
+in the commit.
+
 `rust/fuzz` (the cargo-fuzz targets) is its own workspace with its own `Cargo.lock`, built only
 on a pinned nightly in the `zip-fuzz` CI job and never shipped. It adds `libfuzzer-sys` (the
 rust-fuzz project, the harness cargo-fuzz is built around) and what that brings (`arbitrary`,

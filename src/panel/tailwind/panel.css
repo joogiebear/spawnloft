@@ -32,8 +32,11 @@
       and not before. A class cannot be defined both here and in an old stylesheet: the same
       test stops that.
 
-   Preflight (Tailwind's reset) is left out on purpose. The old pages rely on browser defaults it
-   would remove; it can come in when the last old rule has gone.
+   Preflight (Tailwind's reset) is left out on purpose, and stays out until the last old rule
+   has gone (phase 14 of the plan; decided in phase 3). The old pages rely on browser defaults it
+   would remove, and it is one unlayered-looking switch for every element of every page at once,
+   which is the opposite of moving page by page. The shared blocks (components.css) do not need
+   it: each one starts from `all: unset` or sets what it relies on.
    ========================================================================== */
 
 /* The layer order, declared before anything else is loaded: each page links the built file
@@ -43,8 +46,17 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 
+/* ---- the shared building blocks ------------------------------------------------------------ */
+/* `sl-` classes in the components layer, always built (they are not read from the sources). */
+@import "./components.css";
+
 /* ---- files that use classes from here (rule 3) ------------------------------------------ */
-/* none yet: phase 3 of docs/ux-ui-plan-2026-11/PLAN.md adds the shared components */
+@source "../components.html";
+@source "../js/components/gallery.js";
+/* Old stylesheets still define these four classes (test/panel-css.test.mjs), and the words turn
+   up in sources as plain words (the `grid` icon). Never built until the old rules are gone; the
+   phase that removes an old one takes its name off this line. */
+@source not inline("grid grow inline sr-only");
 
 @theme inline {
   /* ---- colour -------------------------------------------------------------------------- */

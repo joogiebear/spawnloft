@@ -58,16 +58,17 @@ fn main() {
     }
 }
 
-/// The panel's stylesheets and scripts (`src/panel/css`, `src/panel/js`), compiled in as a table
-/// of exact names (`panel/pages.rs`): the `/assets/` route answers those names and nothing else.
-/// Only `.css` and `.js` files are taken; the names are plain path segments of lower-case
-/// letters, digits, `-` and `.`, so a file that would need escaping or could read as a different
-/// path stops the build instead.
+/// The panel's stylesheets, scripts and bundled typefaces (`src/panel/css`, `src/panel/js`,
+/// `src/panel/fonts`), compiled in as a table of exact names (`panel/pages.rs`): the `/assets/`
+/// route answers those names and nothing else. Only `.css` and `.js` files are taken from the
+/// first two and only `.woff2` from the third (the licences beside the fonts stay in the
+/// checkout); the names are plain path segments of lower-case letters, digits, `-` and `.`, so a
+/// file that would need escaping or could read as a different path stops the build instead.
 fn panel_assets() {
     use std::path::{Path, PathBuf};
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
     let root = manifest.join("../../../src/panel");
-    fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, PathBuf)>) {
+    fn walk(dir: &Path, base: &Path, kinds: &[&str], out: &mut Vec<(String, PathBuf)>) {
         println!("cargo:rerun-if-changed={}", dir.display());
         let mut entries: Vec<_> = std::fs::read_dir(dir)
             .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
@@ -83,11 +84,11 @@ fn panel_assets() {
                 path.display()
             );
             if meta.is_dir() {
-                walk(&path, base, out);
+                walk(&path, base, kinds, out);
                 continue;
             }
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if ext != "css" && ext != "js" {
+            if !kinds.contains(&ext) {
                 continue;
             }
             println!("cargo:rerun-if-changed={}", path.display());
@@ -110,14 +111,18 @@ fn panel_assets() {
         }
     }
     let mut assets = Vec::new();
-    for top in ["css", "js"] {
-        walk(&root.join(top), &root, &mut assets);
+    for (top, kinds) in [
+        ("css", &["css"][..]),
+        ("js", &["js"][..]),
+        ("fonts", &["woff2"][..]),
+    ] {
+        walk(&root.join(top), &root, kinds, &mut assets);
     }
     assets.sort();
     let mut table = String::from("&[\n");
     for (name, path) in &assets {
         table.push_str(&format!(
-            "    ({name:?}, include_str!({:?})),\n",
+            "    ({name:?}, include_bytes!({:?}).as_slice()),\n",
             path.display().to_string()
         ));
     }

@@ -60,7 +60,7 @@ pub fn page_setup(panel: &Panel) -> Reply {
     )
 }
 
-/// `/assets/<name>`: a stylesheet or a script of the three pages, behind the same sign-in as the
+/// `/assets/<name>`: a stylesheet, a script or a typeface of the pages, behind the same sign-in as the
 /// pages (the listener checks it before any route). Only the names compiled in are answered
 /// (`pages::asset`). Each start of the desktop app is a new port, so a new origin, and a cached
 /// copy would never be asked for again: nothing is cached. `nosniff` holds the browser to the type
@@ -78,7 +78,23 @@ pub fn asset(name: &str) -> Reply {
             // the sign-in already keeps other sites out; this says so to the browser as well
             ("Cross-Origin-Resource-Policy".into(), "same-origin".into()),
         ],
-        body: body.into_bytes(),
+        body,
+    }
+}
+
+/// `/components`: every shared building block in every state. A development build only
+/// (`pages::components`); everywhere else it is not there, like any unknown path.
+pub fn page_components() -> Reply {
+    match pages::components(appearance::read_theme()) {
+        Some(page) => Reply::html(
+            200,
+            &[
+                ("X-Frame-Options", "DENY"),
+                ("Content-Security-Policy", "frame-ancestors 'none'"),
+            ],
+            page,
+        ),
+        None => Reply::not_found(),
     }
 }
 

@@ -46,6 +46,9 @@ fn chain(panel: &Panel, layout: &Layout, req: &mut Request) -> Result<Routed, Fa
     if req.path == "/setup" {
         return reply(basics::page_setup(panel));
     }
+    if req.path == "/components" {
+        return reply(basics::page_components());
+    }
     // the pages' stylesheets and scripts, to read and nothing else
     if let Some(name) = req.path.strip_prefix("/assets/") {
         if !get && req.method != "HEAD" {
