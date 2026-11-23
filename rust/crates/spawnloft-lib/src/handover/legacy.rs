@@ -255,7 +255,7 @@ pub fn read_state_files(data_root: &Path) -> Result<Vec<Listed>, OwnRead> {
                     "daemonExe",
                     procid::parse_start_time(st.get("daemonStartTime")),
                 );
-                let java_up = up(j, "javaExe", None);
+                let java_up = up(j, "javaExe", procid::parse_start_time(st.get("javaStartTime")));
                 (
                     reconcile(
                         st.get("running").and_then(Value::as_bool).unwrap_or(false),

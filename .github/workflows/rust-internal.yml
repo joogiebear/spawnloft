@@ -185,6 +185,9 @@ jobs:
       - name: The library's tests with the test hooks on
         working-directory: rust
         run: cargo test --locked -p spawnloft-lib --features test-hooks
+      - name: The daemon's end-to-end tests with the test hooks on (a kill the server outlives)
+        working-directory: rust
+        run: cargo test --locked -p spawnloft-core --features test-hooks --test daemon
       - name: The parity rig
         env:
           TMPDIR: ${{ runner.temp }}

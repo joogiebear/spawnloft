@@ -18,6 +18,9 @@ const VOLATILE = [
   [/\b(pid)([ =:]+)\d+/gi, '$1$2<pid>'],
   // the Rust daemon's own start time as the system reports it (a state file's daemonStartTime)
   [/"(daemonStartTime)"(\s*):(\s*)"\d+"/g, '"$1"$2:$3"<start-time>"'],
+  // the server process's start time (javaStartTime), which only 2.0's daemon writes since
+  // 2026-11-23: dropped, so records frozen before it still match
+  [/,(\s*)"javaStartTime"(\s*):(\s*)"\d+"/g, ''],
   // a lock's token (src/util.mjs tryLock)
   [/"(token)"(\s*):(\s*)"[^"]*"/g, '"$1"$2:$3"<token>"'],
   // milliseconds since 1970 under a key that names a time (startedAt, at, mtime, ...)

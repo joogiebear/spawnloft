@@ -254,7 +254,7 @@ pub fn read_state(state_file: &Path) -> Result<(Status, Option<Map<String, Value
         _ => Map::new(),
     };
     let daemon_up = same(&state, "daemonPid", "daemonExe", Some("daemonStartTime"));
-    let java_up = same(&state, "javaPid", "javaExe", None);
+    let java_up = same(&state, "javaPid", "javaExe", Some("javaStartTime"));
     let running = js::truthy(state.get("running"));
     let status = match (running, daemon_up, java_up) {
         (true, true, true) => Status::Running,

@@ -1,6 +1,6 @@
 {
   "name": "spawnloft-desktop",
-  "version": "1.6.0-beta.2",
+  "version": "2.0.0-beta.1",
   "private": true,
   "description": "SpawnLoft's release, packaging and smoke tooling for the 2.0 desktop app (the Tauri shell in rust/crates/spawnloft-shell)",
   "scripts": {
