@@ -10,11 +10,14 @@
     lines.push((ok ? 'ok   ' : 'FAIL ') + name + (seen === undefined ? '' : '  [' + seen + ']'))
   }
   function css(id, prop) { return getComputedStyle(document.getElementById(id)).getPropertyValue(prop).trim() }
-  // an engine may write a colour as rgb(), rgba() or color(srgb ...): compare by painting it
+  // an engine may write a colour as rgb(), rgba() or color(srgb ...): let the same engine
+  // write the expected one too, on a spare element, and compare the two computed values
+  var spare = document.createElement('span')
+  document.body.appendChild(spare)
   function rgba(colour) {
-    var c = document.createElement('canvas'); c.width = c.height = 1
-    var g = c.getContext('2d'); g.clearRect(0, 0, 1, 1); g.fillStyle = colour; g.fillRect(0, 0, 1, 1)
-    return Array.prototype.join.call(g.getImageData(0, 0, 1, 1).data, ',')
+    spare.style.color = ''
+    spare.style.color = colour
+    return getComputedStyle(spare).color
   }
   function columns() { return css('grid', 'grid-template-columns').split(' ').filter(Boolean).length }
   var root = document.documentElement
@@ -46,8 +49,8 @@
     check('a transition takes the panel\'s 200ms', css('moves', 'transition-duration').split(',')[0].trim() === '0.2s', css('moves', 'transition-duration'))
 
     // 3. a see-through colour (color-mix, with a solid fallback before it)
-    var wash = rgba(css('wash', 'background-color')).split(',')
-    check('bg-live/15 is see-through green', Number(wash[3]) > 20 && Number(wash[3]) < 60 && Number(wash[1]) > Number(wash[0]), wash.join(','))
+    var wash = rgba(css('wash', 'background-color'))
+    check('bg-live/15 is see-through green', wash === rgba('color-mix(in oklab, #4ade80 15%, transparent)') && wash !== rgba('#4ade80') && wash !== rgba('transparent'), wash)
 
     // 4. the density tiers, as container queries on the pane
     var pane = document.getElementById('pane')
