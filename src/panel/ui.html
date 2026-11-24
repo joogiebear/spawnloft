@@ -209,7 +209,7 @@
         rather than state - the jar, the RCON port, the world's name - live in Settings now; what
         stays here is what changes while you watch.
       -->
-      <div class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3 px-7 pt-5 pb-4 compact:px-5 popout:px-5 popout:py-3">
+      <div class="row-start-1 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3 px-7 pt-5 pb-4 compact:px-5 popout:px-5 popout:py-3">
         <span class="sl-tile sl-tile-lg popout:hidden" id="srvTile" aria-hidden="true"></span>
         <div class="grid min-w-0 max-w-full flex-[0_1_auto] gap-1.5">
           <div class="flex min-w-0 items-center gap-2.5">
@@ -239,15 +239,15 @@
         </div>
       </div>
 
-      <div class="flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4 popout:hidden!" id="srvNotice"></div>
-      <div class="popout:hidden flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4" id="srvDiag"></div>
+      <div class="row-start-2 flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4 popout:hidden!" id="srvNotice"></div>
+      <div class="row-start-3 popout:hidden flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4" id="srvDiag"></div>
 
       <!--
         The server's tools, as tabs under its header. Console first: it is where a server opens. A
         tool takes the console's place; from 1600px the console keeps a column beside it. The arrow
         keys move along the tabs and Enter or Space opens one, since opening reads from the disk.
       -->
-      <div class="@container overflow-x-auto overflow-y-hidden popout:hidden! px-5 shadow-[inset_0_-1px_0_var(--line-soft)]" id="dockRow">
+      <div class="row-start-4 @container overflow-x-auto overflow-y-hidden popout:hidden! px-5 shadow-[inset_0_-1px_0_var(--line-soft)]" id="dockRow">
         <div class="sl-tabs flex-nowrap [&>.sl-tab]:after:bottom-0 @max-[1080px]:[&>.sl-tab>.sl-ico]:hidden" id="dock" role="tablist" aria-label="Server tools">
           <button type="button" role="tab" class="sl-tab" id="tabConsole" aria-selected="true" aria-controls="paneConsole"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-terminal"/></svg><span data-label>Console</span><span class="sl-count" data-tone="fault" data-badge hidden></span></button>
           <button type="button" role="tab" class="sl-tab" id="tabPlugins" data-pane="plugins" aria-selected="false" aria-controls="toolPanel" tabindex="-1"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span data-label>Plugins</span><span class="sl-count" data-tone="accent" data-badge hidden></span></button>
@@ -269,7 +269,7 @@
       -->
       <!-- One thing at a time: the console, or the tool that took its place. From a 1600px window
            there is room for both, and the console keeps a column on the right. -->
-      <div class="group/work relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] min-[1600px]:data-tool:grid-cols-[minmax(0,1fr)_clamp(520px,38%,1400px)] popout:grid-cols-[minmax(0,1fr)]!" id="work">
+      <div class="row-start-5 group/work relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] min-[1600px]:data-tool:grid-cols-[minmax(0,1fr)_clamp(520px,38%,1400px)] popout:grid-cols-[minmax(0,1fr)]!" id="work">
       <section class="console @container/console col-start-1 row-start-1 grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] group-data-tool/work:hidden min-[1600px]:group-data-tool/work:col-start-2 min-[1600px]:group-data-tool/work:grid min-[1600px]:group-data-tool/work:border-l min-[1600px]:group-data-tool/work:border-line-soft" id="paneConsole" role="tabpanel" aria-labelledby="tabConsole">
         <!--
           What is shown, then how: the filter and the levels at the start, the view's own switches
@@ -379,7 +379,7 @@
           <div class="pane pane-scroll hidden min-h-0 min-w-0 [grid-area:1/1] content-start overflow-auto @container/pane focus:outline-none data-active:grid" id="paneScheduler" tabindex="-1">
             <div class="grid content-start grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4 pb-5" id="schedulerBody"></div>
           </div>
-          <div class="pane pane-scroll hidden min-h-0 min-w-0 [grid-area:1/1] content-start overflow-auto @container/pane focus:outline-none data-active:grid" id="paneSettings" tabindex="-1">
+          <div class="pane pane-scroll hidden min-h-0 min-w-0 [grid-area:1/1] grid-rows-[1fr] overflow-auto [scrollbar-gutter:stable] @container/pane focus:outline-none data-active:grid" id="paneSettings" tabindex="-1">
             <div class="grid content-start grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4 pb-5" id="settingsBody"></div>
           </div>
         </div>
@@ -656,7 +656,7 @@
         <h1 class="m-0 flex-1 type-page">Feedback</h1>
         <button type="button" class="sl-btn sl-btn-ghost" id="bFbClose">Close</button>
       </div>
-      <div class="mx-auto grid w-full max-w-[840px] gap-5 px-5 pt-7 pb-10">
+      <div class="mx-auto grid w-full max-w-[840px] content-start gap-5 px-5 pt-7 pb-10">
         <p class="type-meta m-0 text-ink-3">
           SpawnLoft is in beta and reports are read. Every door opens GitHub in your browser; nothing
           is sent from here on its own.
@@ -685,12 +685,12 @@
     </div>
 
     <!-- ============ settings ============================================= -->
-    <div class="view sheet hidden min-h-0 content-start overflow-auto bg-void focus:outline-none data-active:grid" id="vSettings">
+    <div class="view sheet hidden min-h-0 grid-rows-[auto_1fr] overflow-auto bg-void [scrollbar-gutter:stable] focus:outline-none data-active:grid" id="vSettings">
       <div class="flex items-center gap-3 border-b border-line-soft px-7 py-5">
         <h1 class="m-0 flex-1 type-page">Preferences</h1>
         <button type="button" class="sl-btn sl-btn-ghost" id="bSetClose">Close</button>
       </div>
-      <div class="mx-auto grid w-full max-w-[840px] gap-5 px-5 pt-7 pb-10">
+      <div class="mx-auto grid w-full max-w-[840px] content-start gap-5 px-5 pt-7 pb-10">
         <!-- Appearance is one local preference, so it stays a small labelled choice. The previews
              are fixed pictures of both schemes, whichever one the page is in. -->
         <fieldset class="@container/picker m-0 min-w-0 border-0 border-b border-line p-0 pb-5">

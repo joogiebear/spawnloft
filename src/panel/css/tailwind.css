@@ -160,6 +160,12 @@
   .row-start-3 {
     grid-row-start: 3;
   }
+  .row-start-4 {
+    grid-row-start: 4;
+  }
+  .row-start-5 {
+    grid-row-start: 5;
+  }
   .container {
     width: 100%;
   }
@@ -759,6 +765,9 @@
   .resize-y {
     resize: vertical;
   }
+  .\[scrollbar-gutter\:stable\] {
+    scrollbar-gutter: stable;
+  }
   .list-none {
     list-style-type: none;
   }
@@ -812,6 +821,12 @@
   }
   .grid-cols-\[repeat\(auto-fit\,minmax\(238px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fit,minmax(238px,1fr));
+  }
+  .grid-rows-\[1fr\] {
+    grid-template-rows: 1fr;
+  }
+  .grid-rows-\[auto_1fr\] {
+    grid-template-rows: auto 1fr;
   }
   .grid-rows-\[auto_auto_auto_auto_minmax\(0\,1fr\)\] {
     grid-template-rows: auto auto auto auto minmax(0,1fr);
