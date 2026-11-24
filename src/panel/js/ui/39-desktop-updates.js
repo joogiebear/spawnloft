@@ -31,8 +31,8 @@ if (desktop && typeof desktop.appInfo === 'function') {
     b.textContent = 'Check for updates';
     b.title = '';
     b.disabled = false;
-    b.classList.add('ghost');
-    b.classList.remove('primary');
+    b.classList.add('sl-btn-ghost');
+    b.classList.remove('sl-btn-primary');
   };
 
   desktop.onUpdate((kind, data) => {
@@ -63,8 +63,8 @@ if (desktop && typeof desktop.appInfo === 'function') {
       b.title = 'SpawnLoft ' + data.version + ' is ready — restart to switch to it';
       b.disabled = false;
       // The one moment this button is worth looking at, so it stops being a ghost.
-      b.classList.remove('ghost');
-      b.classList.add('primary');
+      b.classList.remove('sl-btn-ghost');
+      b.classList.add('sl-btn-primary');
     } else if (kind === 'error') {
       idle();
       // A machine that is offline should not raise a toast every six hours about a check nobody

@@ -165,11 +165,16 @@ function copyWords(text, what, secret) {
     : { title: 'Copy ' + text, label: 'Copy ' + what + ' ' + text, said: text };
 }
 
+// An address is a button because the only thing anyone does with it is paste it somewhere. Quiet
+// until pointed at; the glyph turns to a tick for a moment once it is copied.
+const ADDR_COPY = 'group/addr relative -mx-1.5 -my-0.5 inline-flex min-h-[26px] cursor-pointer items-center gap-[5px] rounded-xs border border-transparent bg-transparent px-1.5 py-0.5 font-mono text-2 leading-[1.4] text-ink-2 transition-colors hover:border-line hover:bg-hover hover:text-ink';
+const ADDR_ICON = 'size-3 text-ink-3 group-hover/addr:text-ink group-data-copied/addr:text-live';
+
 function addrButton(text, what = 'address', secret = false) {
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'addr-copy';
-  b.append(document.createTextNode(text), icon('copy'));
+  b.className = ADDR_COPY;
+  b.append(document.createTextNode(text), Kit.icon('copy', ADDR_ICON));
   const words = copyWords(text, what, secret);
   b.title = words.title;
   b.setAttribute('aria-label', words.label);
@@ -260,7 +265,8 @@ function joinLead(info, status) {
 function joinButton(row) {
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'addr-copy join-how';
+  // beside the address: words, so not in the address's typeface
+  b.className = ADDR_COPY + ' font-ui underline underline-offset-2';
   b.textContent = 'How friends join';
   b.onclick = async (ev) => {
     ev.stopPropagation();
@@ -272,14 +278,14 @@ function joinButton(row) {
     }
     const now = rowOf(row.name) || row;
     const list = document.createElement('dl');
-    list.className = 'join-ways';
+    list.className = 'm-0 [&>dt]:mt-4 [&>dt]:text-3 [&>dt]:leading-[1.3] [&>dt]:font-semibold [&>dt]:text-ink [&>dd]:m-0 [&>dd]:mt-0.5 [&>dd]:grid [&>dd]:justify-items-start [&>dd]:gap-0.5 [&_button]:my-0 [&_button]:text-3 [&_button]:text-ink';
     for (const way of joinWays(info)) {
       const dt = document.createElement('dt');
       dt.textContent = way.who;
       const dd = document.createElement('dd');
       for (const address of way.addresses) dd.append(addrButton(address));
       const note = document.createElement('p');
-      note.className = 'hint';
+      note.className = 'sl-hint';
       note.textContent = way.note;
       dd.append(note);
       list.append(dt, dd);

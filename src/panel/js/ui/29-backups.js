@@ -1858,7 +1858,8 @@ async function buildServerSettings(row, body) {
     heading: that nothing here reaches a running server until it starts again. Save and restart is
     offered only while the server is running; stopped, Save is the primary button.
   */
-  const bar = el('div', 'pane-foot flex flex-wrap items-center gap-x-3 gap-y-2');
+  // stuck to the bottom of the scroller, the way the title sticks to the top
+  const bar = el('div', 'pane-foot sticky bottom-0 z-1 -mx-5 -mb-5 mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-raised px-5 py-3');
   bar.setAttribute('role', 'region');
   bar.setAttribute('aria-label', 'Unsaved settings');
   const barDot = Kit.dot({ tone: 'accent' });

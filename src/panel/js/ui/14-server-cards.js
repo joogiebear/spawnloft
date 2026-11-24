@@ -271,12 +271,14 @@ function lostContact(on) {
   if (existing) return;
   const bar = document.createElement('div');
   bar.id = 'lostBanner';
-  bar.className = 'banner';
+  // above everything, not in a toast that scrolls away
+  bar.className = 'flex items-center gap-3 border-b border-fault-edge bg-fault-wash px-5 py-2 text-3 text-fault-ink';
   bar.setAttribute('role', 'alert');
   const b = document.createElement('b');
+  b.className = 'font-semibold';
   b.textContent = 'Lost contact with SpawnLoft.';
   const text = document.createElement('span');
-  text.className = 'grow';
+  text.className = 'flex-1';
   text.textContent = ' The panel process has stopped or is not answering, so nothing shown here is current. '
     + 'Your servers are separate processes and keep running.';
   bar.append(b, text);

@@ -132,7 +132,7 @@ function renderMeta(row) {
   parts.forEach((p, i) => {
     if (i) {
       const dot = document.createElement('span');
-      dot.className = 'dot';
+      dot.className = 'text-ink-4';
       dot.setAttribute('aria-hidden', 'true');
       dot.textContent = '·';
       meta.append(dot);

@@ -30,8 +30,8 @@ async function watchCoreUpdate() {
   if (!words) return;
   b.textContent = words.label;
   b.title = words.title;
-  b.classList.remove('ghost');
-  b.classList.add('primary');
+  b.classList.remove('sl-btn-ghost');
+  b.classList.add('sl-btn-primary');
   b.onclick = () => {
     if (state.view !== 'settings') openSheet('settings', renderSettings);
     // the section is filled in by a request of its own
@@ -78,22 +78,20 @@ function updRenderOffer(st, installing) {
   const p = st.pending;
   box.hidden = !p;
   if (!p) return;
-  const lead = updEl('div', null);
+  const lead = updEl('div', 'text-3');
   const title = updEl('b', null, p.rollback
     ? 'SpawnLoft ' + p.version + ' is ready to reinstall'
     : 'SpawnLoft ' + p.version + ' is available');
-  lead.append(title, updEl('span', 'hint', st.downloaded
+  lead.append(title, updEl('span', 'type-meta text-ink-3', st.downloaded
     ? ' - downloaded and verified, ready to install.'
     : ' - verified; it downloads when you install.'));
   box.append(lead);
   if (p.notes) {
-    const d = updEl('details', null);
-    d.style.margin = '6px 0';
-    d.append(updEl('summary', null, 'What changed'), updEl('pre', 'hint', p.notes));
-    d.lastChild.style.whiteSpace = 'pre-wrap';
+    const d = updEl('details', 'my-1.5');
+    d.append(updEl('summary', 'cursor-pointer text-3 font-semibold text-ink-2', 'What changed'), updEl('pre', 'sl-hint mt-2 mb-0 whitespace-pre-wrap', p.notes));
     box.append(d);
   }
-  const go = updEl('button', null, installing ? 'Installing...' : (p.rollback ? 'Reinstall and restart' : 'Install and restart'));
+  const go = updEl('button', 'sl-btn sl-btn-primary', installing ? 'Installing...' : (p.rollback ? 'Reinstall and restart' : 'Install and restart'));
   go.type = 'button';
   go.disabled = Boolean(installing);
   go.onclick = async () => {
@@ -123,7 +121,7 @@ function updRenderHold(st) {
   box.textContent = '';
   box.hidden = !st.hold;
   if (!st.hold) return;
-  const b = updEl('button', 'ghost', 'Resume updates');
+  const b = updEl('button', 'sl-btn sl-btn-sm', 'Resume updates');
   b.type = 'button';
   b.onclick = async () => {
     try { await updJson('/hold', 'DELETE'); await renderCoreUpdates(); } catch (e) { toast(e.message, 'bad'); }
@@ -137,12 +135,11 @@ async function updLoadRollbacks() {
   try {
     const data = await updJson('/rollbacks');
     box.textContent = '';
-    if (!data.releases.length) { box.append(updEl('p', 'hint', 'No older version is available.')); return; }
+    if (!data.releases.length) { box.append(updEl('p', 'sl-hint', 'No older version is available.')); return; }
     for (const r of data.releases) {
-      const row = updEl('div', null);
-      row.style.cssText = 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:4px 0';
-      const name = updEl('b', null, r.version);
-      const btn = updEl('button', 'ghost', 'Reinstall');
+      const row = updEl('div', 'my-1 flex flex-wrap items-baseline gap-2.5');
+      const name = updEl('b', 'text-3', r.version);
+      const btn = updEl('button', 'sl-btn sl-btn-ghost sl-btn-sm', 'Reinstall');
       btn.type = 'button';
       btn.disabled = !r.allowed;
       btn.onclick = async () => {
@@ -158,12 +155,12 @@ async function updLoadRollbacks() {
         } catch (e) { toast(e.message, 'bad'); }
       };
       row.append(name, btn);
-      if (!r.allowed) row.append(updEl('span', 'hint', r.reason || 'This version cannot read your data.'));
+      if (!r.allowed) row.append(updEl('span', 'sl-hint', r.reason || 'This version cannot read your data.'));
       box.append(row);
     }
   } catch (e) {
     box.textContent = '';
-    box.append(updEl('p', 'hint', 'Could not list versions: ' + e.message));
+    box.append(updEl('p', 'sl-hint', 'Could not list versions: ' + e.message));
   }
 }
 

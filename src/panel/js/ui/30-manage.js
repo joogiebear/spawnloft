@@ -33,8 +33,7 @@ async function editServer(row) {
   $('#dlgTypeWrap').hidden = true;
 
   const form = document.createElement('div');
-  form.style.display = 'grid';
-  form.style.gap = '12px';
+  form.className = 'grid gap-3';
   const fields = [
     ['Name', 'edLabel', row.label || '', 'text'],
     ['Folder and command name', 'edName', row.name, 'text'],
@@ -43,14 +42,15 @@ async function editServer(row) {
   ];
   for (const f of fields) {
     const wrap = document.createElement('div');
-    wrap.className = 'field';
+    wrap.className = 'sl-field';
     const l = document.createElement('label');
+    l.className = 'sl-label';
     l.setAttribute('for', f[1]);
     l.textContent = f[0];
     const i = document.createElement('input');
     i.id = f[1];
     i.type = f[3];
-    i.className = 'mono';
+    i.className = 'sl-input sl-input-mono';
     i.value = f[2];
     i.autocomplete = 'off';
     wrap.append(l, i);
@@ -60,7 +60,7 @@ async function editServer(row) {
 
   const ok = $('#dlgOk');
   ok.textContent = 'Save changes';
-  ok.className = 'primary';
+  ok.className = 'sl-btn sl-btn-primary';
   ok.disabled = false;
   // The <dialog> is shared, so anything ask() may have hidden has to be put back.
   $('#dlgCancel').hidden = false;

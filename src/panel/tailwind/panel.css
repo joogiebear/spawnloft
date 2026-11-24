@@ -91,6 +91,15 @@
 @source "../js/ui/34-from-modpack.js";
 @source "../js/ui/37-versions.js";
 @source "../setup.html";
+/* phase 14: the rest of the panel's scripts that draw anything */
+@source "../js/ui/02-chrome.js";
+@source "../js/ui/08-vitals.js";
+@source "../js/ui/09-menu.js";
+@source "../js/ui/19-server-properties.js";
+@source "../js/ui/30-manage.js";
+@source "../js/ui/35-paths.js";
+@source "../js/ui/39-desktop-updates.js";
+@source "../js/ui/41-handover.js";
 /* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
    sources as plain words. Never built until the old rules are gone; the phase that removes an old
    one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.)

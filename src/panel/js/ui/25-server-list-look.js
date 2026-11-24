@@ -51,9 +51,9 @@ function mcText(raw) {
 
 function serverListPreview(row, input) {
   const wrap = document.createElement('div');
-  wrap.className = 'mc-look';
+  wrap.className = 'mt-2 grid gap-2';
   const palette = document.createElement('div');
-  palette.className = 'mc-palette';
+  palette.className = 'flex flex-wrap gap-[3px]';
   palette.setAttribute('role', 'group');
   palette.setAttribute('aria-label', 'Insert a colour or style');
   const insert = (code) => {
@@ -66,7 +66,7 @@ function serverListPreview(row, input) {
   for (const [code, hex] of Object.entries(MC_COLOURS)) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'mc-swatch';
+    b.className = 'size-[18px] cursor-pointer rounded-[3px] border border-[rgba(255,255,255,.25)] p-0 hover:outline-2 hover:outline-accent-edge';
     b.style.background = hex;
     b.title = 'Colour \u00a7' + code;
     b.setAttribute('aria-label', 'Colour ' + code);
@@ -76,7 +76,7 @@ function serverListPreview(row, input) {
   for (const [code, label, glyph] of [['l', 'Bold', 'B'], ['o', 'Italic', 'I'], ['n', 'Underline', 'U'], ['m', 'Strikethrough', 'S'], ['r', 'Reset', '\u21ba']]) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'mc-style';
+    b.className = 'sl-btn sl-btn-sm h-[18px] w-[22px] p-0 font-mono text-1 leading-none font-bold';
     b.textContent = glyph;
     b.title = label + ' (\u00a7' + code + ')';
     b.setAttribute('aria-label', label);
@@ -85,10 +85,11 @@ function serverListPreview(row, input) {
   }
 
   const card = document.createElement('div');
-  card.className = 'mc-entry';
+  // the game's own multiplayer list, so its own colours: black, white and grey, not the panel's
+  card.className = 'flex max-w-[460px] items-start gap-2.5 rounded-[2px] border border-[#2a2a2a] bg-[#0b0b0b] p-1.5';
   card.setAttribute('aria-label', 'How it looks in the multiplayer list');
   const img = document.createElement('img');
-  img.className = 'mc-icon';
+  img.className = 'size-16 flex-none bg-[#222] [image-rendering:pixelated]';
   img.alt = '';
   img.width = 64;
   img.height = 64;
@@ -98,12 +99,12 @@ function serverListPreview(row, input) {
   img.onerror = () => { img.onerror = null; img.src = blank; img.dataset.none = ''; };
   loadIcon();
   const text = document.createElement('div');
-  text.className = 'mc-text';
+  text.className = 'min-w-0 pt-0.5 font-mono text-[13px] leading-[1.35]';
   const title = document.createElement('div');
-  title.className = 'mc-name';
+  title.className = 'text-[#fff]';
   title.textContent = row.label || row.name;
   const lines = document.createElement('div');
-  lines.className = 'mc-motd';
+  lines.className = 'text-[#aaa] [overflow-wrap:anywhere]';
   text.append(title, lines);
   card.append(img, text);
   const draw = () => { lines.textContent = ''; lines.append(mcText(input.value)); };
@@ -111,18 +112,15 @@ function serverListPreview(row, input) {
   draw();
 
   const iconRow = document.createElement('div');
-  iconRow.className = 'row';
+  iconRow.className = 'flex flex-wrap items-center gap-2';
   const pick = document.createElement('input');
   pick.type = 'file';
   pick.accept = 'image/*';
   pick.hidden = true;
-  const change = iconButton('upload', 'Change icon', 'ghost');
-  const remove = document.createElement('button');
-  remove.type = 'button';
-  remove.className = 'ghost';
-  remove.textContent = 'Remove icon';
+  const change = Kit.button({ label: 'Change icon', icon: 'upload', kind: 'ghost' });
+  const remove = Kit.button({ label: 'Remove icon', kind: 'ghost' });
   const iconNote = document.createElement('span');
-  iconNote.className = 'hint';
+  iconNote.className = 'sl-hint';
   iconNote.textContent = 'Any image; it is cut to a square and scaled to 64 by 64. Saved at once.';
   iconRow.append(change, remove, iconNote, pick);
   change.onclick = () => pick.click();

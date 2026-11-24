@@ -43,6 +43,32 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A control starts as plain text in the page's type, as Tailwind's own reset has it: what a
+     button or a field looks like is its block's business (sl-btn, sl-input, sl-check, ...), and
+     a control with no block shows up in review as the bare words it is, not as the operating
+     system's grey box. */
+  button,
+  input,
+  select,
+  textarea,
+  optgroup {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+  button {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    text-align: inherit;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
   /* Focus is visible on everything, not just buttons. A control panel is operated in a hurry,
      and losing the caret is losing your place. :root lifts it over a block's own transition,
      which otherwise faded the ring in and showed nothing on a quick Tab. The ring follows the

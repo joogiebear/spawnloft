@@ -95,6 +95,8 @@ function renderSettings() {
   actions.textContent = '';
   if (desktop) {
     const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sl-btn';
     b.textContent = 'Change the data folder…';
     b.onclick = async () => {
       const go = await ask({
@@ -111,7 +113,7 @@ function renderSettings() {
     actions.append(b);
   } else {
     const hint = document.createElement('span');
-    hint.className = 'hint';
+    hint.className = 'sl-hint';
     hint.textContent = 'These are moved from the SpawnLoft app, or in a terminal with: spawnloft config set-root <folder>';
     actions.append(hint);
   }
