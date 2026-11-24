@@ -72,6 +72,9 @@
 @source "../js/ui/20-performance.js";
 @source "../js/ui/21-players.js";
 @source "../js/ui/28-activity.js";
+/* phase 12: the Play page */
+@source "../js/launcher/04-dom.js";
+@source "../js/launcher/10-play.js";
 /* phase 8: Worlds, Backups (the server's and a database's), Schedule */
 @source "../js/ui/23-worlds.js";
 @source "../js/ui/25-server-list-look.js";
