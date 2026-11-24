@@ -99,7 +99,7 @@
   <symbol id="i-alert" viewBox="0 0 16 16" stroke-miterlimit="2"><path d="M8 2.5l6 11H2z"/><path d="M8 6.5v3.5M8 11.5v1"/></symbol>
 </svg>
 
-<div id="banner"><div id="upgradeNotices" aria-live="polite"></div></div>
+<div id="banner"><div class="flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4" id="upgradeNotices" aria-live="polite"></div></div>
 
 <header class="relative z-5 flex h-13 flex-none items-center gap-3 border-b border-line-soft bg-chrome pr-4 pl-5">
   <span class="flex flex-none items-center gap-2.5">
@@ -255,8 +255,8 @@
         </div>
       </div>
 
-      <div id="srvNotice"></div>
-      <div class="popout:hidden" id="srvDiag"></div>
+      <div class="flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4" id="srvNotice"></div>
+      <div class="popout:hidden flex flex-col gap-2 px-6 pt-3 empty:hidden compact:px-4" id="srvDiag"></div>
 
       <!--
         The server's tools, as tabs under its header. Console first: it is where a server opens. A
@@ -672,30 +672,30 @@
         <button class="ghost" id="bFbClose">Close</button>
       </div>
       <div class="sheet-body wide">
-        <p class="hint" style="margin:0">
+        <p class="type-meta m-0 text-ink-3">
           SpawnLoft is in beta and reports are read. Every door opens GitHub in your browser; nothing
           is sent from here on its own.
         </p>
-        <div class="doors">
-          <button class="door" id="dBug">
-            <b>Something broke</b>
-            <span>Opens a bug report with the version, Java, server status and the panel log already
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(238px,1fr))] gap-3">
+          <button class="sl-card cursor-pointer items-start justify-start gap-2 whitespace-normal text-left hover:border-edge" id="dBug">
+            <b class="type-card block">Something broke</b>
+            <span class="type-body block text-ink-3">Opens a bug report with the version, Java, server status and the panel log already
               filled in, and puts the full diagnostics on your clipboard to paste under it. No
               passwords, no webhook.</span>
           </button>
-          <button class="door" id="dAsk">
-            <b>A question</b>
-            <span>Opens a new post in the project's Q&amp;A. How something works, whether it can
+          <button class="sl-card cursor-pointer items-start justify-start gap-2 whitespace-normal text-left hover:border-edge" id="dAsk">
+            <b class="type-card block">A question</b>
+            <span class="type-body block text-ink-3">Opens a new post in the project's Q&amp;A. How something works, whether it can
               do a thing, why a server will not start. Answers stay findable for the next
               person.</span>
           </button>
-          <button class="door" id="dIdea">
-            <b>An idea</b>
-            <span>Opens a new post in Ideas. A feature you wish it had, a server kind it should
+          <button class="sl-card cursor-pointer items-start justify-start gap-2 whitespace-normal text-left hover:border-edge" id="dIdea">
+            <b class="type-card block">An idea</b>
+            <span class="type-body block text-ink-3">Opens a new post in Ideas. A feature you wish it had, a server kind it should
               support. Say what you were trying to do, not only what to add.</span>
           </button>
         </div>
-        <p class="hint" id="fbNote" style="margin:0"></p>
+        <p class="type-meta m-0 text-ink-3" id="fbNote"></p>
       </div>
     </div>
 
@@ -817,9 +817,9 @@
             </label>
           </fieldset>
           <p class="hint" style="margin:0 0 6px">For Claude Desktop, add this to <code>claude_desktop_config.json</code> (Settings &rarr; Developer &rarr; Edit Config), then restart it:</p>
-          <textarea id="mcpJson" class="mono" readonly rows="9" style="width:100%;resize:vertical" aria-label="Claude Desktop configuration"></textarea>
+          <textarea id="mcpJson" class="sl-input sl-input-mono h-auto py-2" readonly rows="9" style="width:100%;resize:vertical" aria-label="Claude Desktop configuration"></textarea>
           <p class="hint" style="margin:10px 0 6px">For Claude Code, run this in a terminal:</p>
-          <textarea id="mcpCli" class="mono" readonly rows="3" style="width:100%;resize:vertical" aria-label="Claude Code command"></textarea>
+          <textarea id="mcpCli" class="sl-input sl-input-mono h-auto py-2" readonly rows="3" style="width:100%;resize:vertical" aria-label="Claude Code command"></textarea>
           <div class="row" style="margin-top:8px">
             <button class="ghost" id="bMcpJson">Copy Claude Desktop config</button>
             <button class="ghost" id="bMcpCli">Copy Claude Code command</button>

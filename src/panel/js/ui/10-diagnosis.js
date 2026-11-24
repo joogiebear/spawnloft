@@ -144,34 +144,15 @@ async function forceStop(name, label) {
 const forceStopped = new Set();
 
 function noticeBox({ tone, title, text, actions = [], dismiss }) {
-  const box = document.createElement('div');
-  box.className = 'notice ' + tone;
-  const body = document.createElement('span');
-  body.className = 'text';
-  const b = document.createElement('b');
-  b.textContent = title;
-  body.append(b, ' ', text);
-  const acts = document.createElement('span');
-  acts.className = 'acts';
-  for (const a of actions) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = a.primary ? '' : 'ghost';
-    btn.textContent = a.label;
-    btn.onclick = a.run;
-    acts.append(btn);
-  }
+  const buttons = actions.map((a) => Kit.button({ label: a.label, kind: a.primary ? 'primary' : 'ghost', size: 'sm', onClick: a.run }));
+  let box;
   if (dismiss) {
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'ghost x';
-    x.textContent = '×';
-    x.setAttribute('aria-label', 'Dismiss: ' + title);
-    x.title = 'Dismiss';
-    x.onclick = () => { dismiss(); box.remove(); };
-    acts.append(x);
+    buttons.push(Kit.button({
+      icon: 'close', kind: 'ghost', size: 'sm', title: 'Dismiss: ' + title,
+      onClick: () => { dismiss(); box.remove(); },
+    }));
   }
-  box.append(body, acts);
+  box = Kit.banner({ tone, title, text, actions: buttons });
   return box;
 }
 

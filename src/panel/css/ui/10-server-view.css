@@ -94,19 +94,4 @@
     .vitals { border-left: 0; padding-left: 0; flex-basis: 100%; }
   }
 
-  /*
-    A notice says what is wrong, and then what to do about it: a button for the way out when
-    the panel has one, one to find the line in the console, and one to dismiss it for this
-    run. The actions sit at the right and drop to their own line when the pane is narrow.
-  */
-  .notice { padding: var(--s-3) var(--s-6); font-size: var(--t-3); border-bottom: 1px solid var(--line-soft); display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-2); align-items: baseline; line-height: 1.5; }
-  .notice .text { flex: 1 1 320px; min-width: 0; }
-  .notice .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; flex: none; align-self: center; }
-  .notice .acts button { padding: 3px 10px; font-size: var(--t-2); }
-  .notice .acts .x { padding: 3px 8px; color: inherit; opacity: .7; }
-  .notice .acts .x:hover { opacity: 1; }
-  .notice.warn { background: var(--warn-wash); color: var(--warn-ink); }
-  .notice.fault { background: var(--fault-wash); color: var(--fault-ink); }
-  .notice b { font-weight: 600; white-space: nowrap; }
-
 }

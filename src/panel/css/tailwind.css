@@ -452,6 +452,9 @@
   .grid-cols-\[repeat\(auto-fill\,minmax\(340px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fill,minmax(340px,1fr));
   }
+  .grid-cols-\[repeat\(auto-fit\,minmax\(238px\,1fr\)\)\] {
+    grid-template-columns: repeat(auto-fit,minmax(238px,1fr));
+  }
   .grid-rows-\[auto_minmax\(0\,1fr\)\] {
     grid-template-rows: auto minmax(0,1fr);
   }
@@ -493,6 +496,9 @@
   }
   .justify-end {
     justify-content: flex-end;
+  }
+  .justify-start {
+    justify-content: flex-start;
   }
   .justify-items-start {
     justify-items: start;
