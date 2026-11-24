@@ -774,7 +774,7 @@ test('menus are disclosures over groups of plain buttons, each in a pad with a b
   assert.match(fnSource('setupsPanel'), /id: `setup-\$\{q\.name\}`, 'aria-current': q === p \? 'true' : null/)
   assert.match(fnSource('setupsPanel'), /id: `edit-\$\{q\.name\}`/)
   // the pad is positioned where the menu was and keeps a margin under it; alignment is the pad's
-  assert.match(html, /class: `menupad absolute [^`]*pb-7 [^`]*\$\{end \? ' justify-end' : ''\}`/)
+  assert.match(html, /class: `menupad absolute [^`]*pb-7 [^`]*max-\[700px\]:contents \$\{end \? 'justify-end' : ''\}`/)
 })
 
 test('removing a setup puts focus on the safe answer, and the button says when worlds go too', () => {
