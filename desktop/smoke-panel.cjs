@@ -382,14 +382,12 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.screenshot({ path: path.join(output, '02-theme-picker.png') })
     record('PASS: theme picker changes and persists the real application setting')
 
-    // the Tailwind file is served and declares the layer order ahead of the old stylesheets,
-    // which are one `legacy` layer under it and still draw the page
+    // the page is drawn by two stylesheets, the tokens and the Tailwind file, and nothing else
     assert.deepEqual(
-      await page.evaluate(() => Array.from(document.styleSheets).slice(0, 2).map((s) => (s.href ? new URL(s.href).pathname : ''))),
+      await page.evaluate(() => Array.from(document.styleSheets).map((s) => (s.href ? new URL(s.href).pathname : ''))),
       ['/assets/css/tokens.css', '/assets/css/tailwind.css'])
-    assert.equal(await page.evaluate(() => { const r = document.styleSheets[2].cssRules; return r.length === 1 && r[0].name === 'legacy' }), true, 'the first old stylesheet is one legacy layer')
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('header')).display), 'flex')
-    record('PASS: the Tailwind stylesheet loads ahead of the old ones, which still draw the page')
+    record('PASS: the tokens and the Tailwind stylesheet load, and they alone draw the page')
 
     daemonCreated = true
     const started = await api(`instances/${name}/start`, {})

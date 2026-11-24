@@ -1,5 +1,0 @@
-/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
-@layer legacy {
-  /* Empty: Players (js/ui/21-players.js) and the modpack results in Add server
-     (js/ui/34-from-modpack.js) are on the shared blocks. Remove with the next ui.html shell edit. */
-}

@@ -69,6 +69,30 @@
     cursor: not-allowed;
   }
 
+  /* The browser's own furniture inside a field, which no block can reach with a class. The
+     spinner on a number field is tiny grey furniture from another OS (ports, counts and minutes
+     here are typed), the search field's clear mark is redrawn in the page's ink, and the time
+     picker's clock ships black, a smudge on this ground. */
+  input[type="number"] {
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    display: none;
+  }
+  input[type="search"]::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    width: 13px;
+    height: 13px;
+    background: var(--ink-3);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4 4l8 8M12 4l-8 8' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px no-repeat;
+    cursor: pointer;
+  }
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.65);
+    cursor: pointer;
+  }
+
   /* Focus is visible on everything, not just buttons. A control panel is operated in a hurry,
      and losing the caret is losing your place. :root lifts it over a block's own transition,
      which otherwise faded the ring in and showed nothing on a quick Tab. The ring follows the
