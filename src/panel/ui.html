@@ -712,12 +712,14 @@
           <!-- Desktop app only: a plain browser has its own zoom. -->
           <div class="mt-4 flex items-center justify-between gap-4 border-t border-line-soft pt-4" id="uiSizeRow" hidden>
             <label class="grid gap-[3px]" for="uiSize"><strong class="text-4 font-semibold">Interface size</strong><small class="text-2 text-ink-3">Auto fits the screen. Ctrl and + or -, Ctrl 0 for 100%.</small></label>
-            <select class="sl-input w-40 flex-none" id="uiSize">
+            <span class="sl-input-group w-40 flex-none">
+            <select class="sl-input" id="uiSize">
               <option value="auto" id="uiSizeAuto">Auto</option>
               <option value="0.8">80%</option><option value="0.9">90%</option><option value="1">100%</option>
               <option value="1.1">110%</option><option value="1.25">125%</option><option value="1.5">150%</option>
               <option value="1.75">175%</option><option value="2">200%</option>
             </select>
+            <span class="sl-input-caret" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></span></span>
           </div>
         </fieldset>
         <div>

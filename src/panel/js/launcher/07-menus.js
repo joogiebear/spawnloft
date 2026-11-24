@@ -28,7 +28,7 @@
   // `end`). The pad's bottom padding is in flow, so the stage scrolls a little past the menu (a
   // positioned box's own margin would not count, in Chromium at least). On a narrow window the
   // pad steps aside and the menu comes up from the bottom.
-  const menuPad = (menu, end = false) => h('div', { class: `menupad absolute z-6 top-[calc(100%+6px)] left-0 right-0 pb-7 flex pointer-events-none max-[700px]:contents${end ? ' justify-end' : ''}` }, menu)
+  const menuPad = (menu, end = false) => h('div', { class: `menupad absolute z-6 top-[calc(100%+6px)] left-0 right-0 pb-7 flex pointer-events-none max-[700px]:contents ${end ? 'justify-end' : ''}` }, menu)
 
   // A menu: `menu` stays on it for the focus code above. `cls` is its width.
   const MENU = 'menu sl-menu static flex-none pointer-events-auto max-w-none max-h-[min(70vh,560px)] overflow-auto p-2 grid gap-[2px] content-start max-[700px]:fixed max-[700px]:z-6 max-[700px]:inset-x-0 max-[700px]:top-auto max-[700px]:bottom-0 max-[700px]:w-auto max-[700px]:max-h-[75vh] max-[700px]:rounded-b-none max-[700px]:rounded-t-lg max-[700px]:px-3 max-[700px]:pt-3 max-[700px]:pb-5'

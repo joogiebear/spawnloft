@@ -367,7 +367,7 @@ function playerRow(p, data, base, again, select) {
     end: [playerActions(p, data, base, again)],
   });
   line.querySelector('.sl-row-meta').title = p.uuid;
-  line.classList.add('flex-wrap', '@ultra/pane:cursor-pointer', '@ultra/pane:data-[selected]:bg-hover', '@ultra/pane:data-[selected]:shadow-[inset_3px_0_0_var(--accent)]');
+  line.classList.add('flex-wrap', '@ultra/pane:cursor-pointer', '@ultra/pane:data-[selected]:bg-hover', '@ultra/pane:data-[selected]:shadow-[inset_3px_0_0_var(--lapis)]');
   if (p.online) line.dataset.online = '';
   const title = line.querySelector('.sl-row-title');
   if (!p.name) {

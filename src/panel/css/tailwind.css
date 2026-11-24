@@ -2292,6 +2292,9 @@
     .max-\[700px\]\:col-start-1 {
       grid-column-start: 1;
     }
+    .max-\[700px\]\:contents {
+      display: contents;
+    }
     .max-\[700px\]\:max-h-\[75vh\] {
       max-height: 75vh;
     }
@@ -2561,8 +2564,8 @@
     .\@ultra\/pane\:data-\[selected\]\:bg-hover[data-selected] {
       background-color: var(--hover);
     }
-    .\@ultra\/pane\:data-\[selected\]\:shadow-\[inset_3px_0_0_var\(--accent\)\][data-selected] {
-      --tw-shadow: inset 3px 0 0 var(--tw-shadow-color, var(--accent));
+    .\@ultra\/pane\:data-\[selected\]\:shadow-\[inset_3px_0_0_var\(--lapis\)\][data-selected] {
+      --tw-shadow: inset 3px 0 0 var(--tw-shadow-color, var(--lapis));
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
   }
