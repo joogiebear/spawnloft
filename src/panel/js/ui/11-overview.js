@@ -25,7 +25,7 @@ function showHome() {
   up, and how much memory the machine has. Asked for when the overview shows and then twice a
   minute at most - a backup is minutes apart at the closest - and after anything here changes it.
 */
-const overview = { data: null, failed: false, asked: 0, showAll: false, attention: '', acting: {} };
+const overview = { data: null, failed: false, asked: 0, attention: '', acting: {} };
 
 // Activity is fetched this deep so that, once runs are folded into one line each, there is still
 // more than a screenful to show.
@@ -54,72 +54,57 @@ async function loadOverview(force) {
 
 const gbOf = (mb) => Math.round((mb / 1024) * 10) / 10;
 
+/**
+ * The line under the title: what is here, what runs, who is on, and the memory the servers may
+ * take against what the machine has. Each is said only when it is known; "0 players online" from
+ * servers that were not asked would be a claim about nobody.
+ */
+function overviewSummary(rows, dbs, machineMb) {
+  const running = rows.filter((r) => r.status === 'running');
+  const counted = running.filter((r) => r.latest && r.latest.players != null);
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const parts = [plural(rows.length, 'server', 'servers'), running.length + ' running'];
+  if (counted.length) {
+    const n = counted.reduce((sum, r) => sum + r.latest.players, 0);
+    parts.push(plural(n, 'player online', 'players online'));
+  }
+  if (dbs.length) parts.push(plural(dbs.length, 'database', 'databases'));
+  const reservedMb = rows.reduce((n, r) => n + (memoryCeilingMb(r.memory) || 0), 0);
+  // What the servers are allowed to take, added up, whether or not they run: "may use up to", not
+  // "reserved", which reads as memory already set aside.
+  const memory = !reservedMb ? ''
+    : machineMb ? ' Servers may use up to ' + gbOf(reservedMb) + ' of this machine’s ' + Math.round(machineMb / 1024) + ' GB.'
+      : ' Servers may use up to ' + gbOf(reservedMb) + ' GB.';
+  return { text: parts.join(', ') + '.' + memory, over: Boolean(machineMb && reservedMb > machineMb) };
+}
+
+let homeLoadTimer = null;
+
 function renderOverview() {
   const rows = state.rows;
   const dbs = state.dbs || [];
-  const running = rows.filter((r) => r.status === 'running');
-  const reservedMb = rows.reduce((n, r) => n + (memoryCeilingMb(r.memory) || 0), 0);
   const machineMb = overview.data && overview.data.machine && overview.data.machine.memoryMb;
-  const counted = running.filter((r) => r.latest && r.latest.players != null);
-  const chips = [
-    { n: rows.length, text: rows.length === 1 ? 'server' : 'servers', icon: 'server' },
-    { n: running.length, text: 'running', lamp: running.length ? 'running' : 'stopped' },
-  ];
-  // Only a figure the servers actually gave; "0 players online" from servers that were not asked
-  // would be a claim about nobody.
-  if (counted.length) {
-    const n = counted.reduce((sum, r) => sum + r.latest.players, 0);
-    chips.push({ n, text: n === 1 ? 'player online' : 'players online', icon: 'user' });
-  }
-  if (dbs.length) chips.push({ n: dbs.length, text: dbs.length === 1 ? 'database' : 'databases', icon: 'database' });
+  const said = overviewSummary(rows, dbs, machineMb);
   const box = $('#homeSummary');
-  box.textContent = '';
-  for (const c of chips) {
-    const li = document.createElement('li');
-    li.className = 'chip';
-    if (c.lamp) {
-      li.dataset.status = c.lamp;
-      const lamp = document.createElement('span');
-      lamp.className = 'lamp';
-      li.append(lamp);
-    } else li.append(icon(c.icon));
-    const b = document.createElement('b');
-    b.textContent = String(c.n);
-    li.append(b, ' ' + c.text);
-    box.append(li);
-  }
-  // Memory: what the servers are allowed to take, against what the machine has, as a bar.
-  const mem = document.createElement('li');
-  mem.className = 'chip chip-mem';
-  mem.title = 'Reserved is what the servers are allowed to use, added up, whether or not they are running.';
-  const words = document.createElement('span');
-  const b = document.createElement('b');
-  b.textContent = String(gbOf(reservedMb));
-  words.append(b, machineMb ? ' of ' + Math.round(machineMb / 1024) + ' GB reserved' : ' GB reserved');
-  mem.append(icon('pulse'), words);
-  if (machineMb) {
-    const share = reservedMb / machineMb;
-    if (share > 1) mem.dataset.tone = 'fault';
-    else if (share > 0.8) mem.dataset.tone = 'warn';
-    const meter = document.createElement('span');
-    meter.className = 'meter';
-    meter.setAttribute('role', 'meter');
-    meter.setAttribute('aria-label', 'Memory reserved');
-    meter.setAttribute('aria-valuemin', '0');
-    meter.setAttribute('aria-valuemax', String(Math.round(machineMb / 1024)));
-    meter.setAttribute('aria-valuenow', String(Math.min(gbOf(reservedMb), Math.round(machineMb / 1024))));
-    meter.setAttribute('aria-valuetext', Math.round(share * 100) + '% of this machine' + (share > 1 ? ', more than it has' : ''));
-    const fill = document.createElement('i');
-    fill.style.width = Math.min(100, Math.max(share > 0 ? 2 : 0, share * 100)).toFixed(1) + '%';
-    meter.append(fill);
-    mem.append(meter);
-  }
-  box.append(mem);
+  box.textContent = said.text;
+  // The tone is in words too: a colour alone does not tell everyone the servers want more than the machine has.
+  if (said.over) box.append(Kit.h('span', { class: 'text-warn-ink', text: ' That is more than it has.' }));
 
   // Said only when there is nothing older to show; a refresh that fails keeps the last answer.
   $('#homeFail').hidden = !(overview.failed && !overview.data);
-  if (!overview.data && !overview.failed) $('#vHome').setAttribute('aria-busy', 'true');
-  else $('#vHome').removeAttribute('aria-busy');
+  // Until the first /overview answers, the cards wait: Needs attention comes from it and lands
+  // above them, and painting the cards first dropped them a card's height as it arrived. The words
+  // only show if the wait is long enough to notice.
+  const waiting = !overview.data && !overview.failed;
+  $('#vHome').toggleAttribute('aria-busy', waiting);
+  $('#homeBody').hidden = waiting;
+  if (!waiting) {
+    clearTimeout(homeLoadTimer);
+    homeLoadTimer = null;
+    $('#homeLoading').hidden = true;
+  } else if (!homeLoadTimer) {
+    homeLoadTimer = setTimeout(() => { $('#homeLoading').hidden = !($('#homeBody').hidden); }, 400);
+  }
   renderAttention();
   renderHomeCards();
   renderHomeDbs();
@@ -144,7 +129,7 @@ async function pollHomeMetrics() {
   }
   if (Date.now() - homeMetrics.asked < 9000) return;
   homeMetrics.asked = Date.now();
-  const wide = new Set(Array.from($('#homeCards').children).filter((c) => c.clientWidth >= 640).map((c) => c.dataset.name));
+  const wide = new Set(Array.from($('#homeCards').children).filter((c) => c.dataset.live && c.clientWidth >= 720).map((c) => c.dataset.name));
   const asks = state.rows.filter((r) => r.status === 'running' && wide.has(r.name)).map((r) =>
     api('/instances/' + encodeURIComponent(r.name) + '/metrics?seconds=600')
       .then((d) => { homeMetrics.samples[r.name] = (d && d.samples) || []; }, () => {}));
@@ -305,18 +290,9 @@ function joinButton(row) {
 }
 const dbEngine = (row) => (row.engineLabel || row.engine) + (row.version ? ' ' + row.version : '');
 
-function setPill(pill, row, acting) {
-  const said = describeState(row, acting);
-  pill.textContent = said.text;
-  if (said.tone) pill.dataset.tone = said.tone;
-  else delete pill.dataset.tone;
-  if (said.since) pill.dataset.since = String(said.since);
-  else delete pill.dataset.since;
-}
-
 /**
- * The databases nobody owns alone, under the servers. Each card is keyed like a server card and
- * says what the database is, where it answers, how much memory it holds and which servers use it.
+ * The databases nobody owns alone, under the servers. Each is a row like a stopped server's: what
+ * the database is, where it answers, and which servers use it.
  */
 function renderHomeDbs() {
   const section = $('#homeDbs');
@@ -326,7 +302,7 @@ function renderHomeDbs() {
   const seen = new Set();
   dbs.forEach((row, i) => {
     seen.add(row.name);
-    let card = grid.querySelector('.dcard[data-name="' + CSS.escape(row.name) + '"]');
+    let card = grid.querySelector('[data-name="' + CSS.escape(row.name) + '"]');
     if (!card) card = buildDbCard(row.name);
     updateDbCard(card, row);
     if (grid.children[i] !== card) grid.insertBefore(card, grid.children[i] || null);
@@ -340,129 +316,90 @@ const el = (tag, cls) => {
   return node;
 };
 
-/** The head every card has: the kind's glyph, the name and its state, and a line under them. */
-function cardHead(kind) {
-  const head = el('div', 'sc-head');
-  const glyph = el('span', 'sc-kind');
-  glyph.append(icon(kind));
-  const title = el('div', 'sc-title');
-  const line = el('div', 'sc-line');
-  line.append(el('h3', 'sc-name'), el('span', 'spill'));
-  title.append(line, el('div', 'sc-soft'));
-  head.append(glyph, title);
-  return head;
-}
+/** A database's face: its engine's glyph, a cache for Redis. */
+const dbGlyph = (row) => (row.engineKind === 'redis' ? 'cache' : 'database');
 
 function buildDbCard(name) {
-  const card = el('article', 'scard dcard');
-  card.dataset.name = name;
-  const head = cardHead('database');
-  const stats = el('dl', 'sc-stats');
-  for (const [key, label] of [['memory', 'Memory'], ['attached', 'Used by']]) {
-    const cell = el('div');
-    cell.dataset.v = key;
-    const dt = el('dt');
-    dt.textContent = label;
-    cell.append(dt, el('dd'));
-    stats.append(cell);
-  }
-  stats.lastChild.style.gridColumn = 'span 2';
-  const foot = el('div', 'sc-foot');
-  const open = el('button', 'sc-open');
-  open.type = 'button';
-  open.textContent = 'Open →';
-  open.onclick = () => select(name);
-  foot.append(el('span', 'sc-note'), open);
-  card.append(head, stats, foot);
+  const nameButton = Kit.h('button', { type: 'button', class: 'sl-btn sl-btn-link block min-w-0 max-w-full truncate text-ink type-card', onclick: () => select(name) });
+  const pill = statePill();
+  const meta = Kit.h('div', { class: 'm-0 flex min-w-0 flex-wrap items-center gap-x-1.5 type-meta text-ink-3' });
+  const used = Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 type-meta text-ink-3' });
+  const open = Kit.button({ label: 'Open', onClick: () => select(name) });
+  const card = Kit.h('article', { class: 'sl-card sl-card-compact', dataset: { name } },
+    Kit.h('span', { class: 'contents', 'data-face': '' }),
+    Kit.h('div', { class: 'min-w-0 flex-[1_1_240px]' },
+      Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1' }, Kit.h('h3', { class: 'm-0 min-w-0 max-w-full' }, nameButton), pill),
+      meta, used),
+    open);
+  card.parts = { nameButton, pill, meta, used, open, face: card.querySelector('[data-face]') };
   return card;
 }
 
 function updateDbCard(card, row) {
+  const { nameButton, pill, meta, used, open, face } = card.parts;
+  const name = row.label || row.name;
   card.dataset.status = row.status;
-  card.querySelector('.sc-name').textContent = row.label || row.name;
-  setPill(card.querySelector('.spill'), row, null);
-  const soft = card.querySelector('.sc-soft');
-  const what = dbEngine(row) + (row.external ? ' · runs elsewhere' : '') + ' · ';
-  // Rebuilt only when it changes, so a focused button keeps its focus across polls.
-  if (soft.dataset.said !== what + dbAddress(row)) {
-    soft.dataset.said = what + dbAddress(row);
-    soft.textContent = '';
-    soft.append(what, addrButton(dbAddress(row)));
+  nameButton.textContent = name;
+  nameButton.setAttribute('aria-label', 'Open ' + name);
+  open.setAttribute('aria-label', 'Open ' + name);
+  pill.paint(row, null);
+  if (face.dataset.said !== dbGlyph(row)) {
+    face.dataset.said = dbGlyph(row);
+    face.replaceChildren(Kit.tile({ name, key: row.name, icon: dbGlyph(row) }));
   }
-  const latest = row.status === 'running' ? row.latest : null;
-  if (latest && Number.isFinite(latest.rss)) {
-    const gb = latest.rss >= 1024;
-    setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? 'GB' : 'MB');
-  } else {
-    const dd = card.querySelector('[data-v="memory"] dd');
-    dd.textContent = '';
-    const t = el('span', 'txt');
-    t.textContent = row.status === 'running' ? 'Not measured' : 'Not running';
-    t.style.color = 'var(--ink-3)';
-    dd.append(t);
+  // Rebuilt only when it changes, so a focused button keeps its focus across polls.
+  const what = dbEngine(row) + (row.external ? ' · runs elsewhere' : '');
+  if (meta.dataset.said !== what + dbAddress(row)) {
+    meta.dataset.said = what + dbAddress(row);
+    meta.textContent = '';
+    meta.append(what, Kit.h('span', { 'aria-hidden': 'true', text: '·' }), addrButton(dbAddress(row)));
   }
   const names = Object.keys(row.attachments || {});
-  const used = card.querySelector('[data-v="attached"] dd');
   const usedKey = names.map((n) => n + '=' + ((rowOf(n) || {}).label || '') + (rowOf(n) ? '' : '!')).join(',');
-  if (used.dataset.said === usedKey) {
-    // unchanged; the chips keep their focus
-  } else if (names.length) {
-    used.dataset.said = usedKey;
-    used.textContent = '';
-    const chips = el('div', 'used-by');
-    for (const n of names) {
-      const srv = rowOf(n);
-      const chip = el('button', 'srv-chip');
-      chip.type = 'button';
-      chip.append(icon('server'), (srv && srv.label) || n);
-      chip.title = srv ? 'Open ' + (srv.label || n) : n + ' is no longer on this machine';
-      chip.disabled = !srv;
-      chip.onclick = () => select(n);
-      chips.append(chip);
-    }
-    used.append(chips);
-  } else {
-    used.dataset.said = usedKey;
-    used.textContent = '';
-    const t = el('span', 'txt');
-    t.textContent = 'Nothing yet';
-    used.append(t);
+  if (used.dataset.said === usedKey) return;
+  used.dataset.said = usedKey;
+  used.textContent = '';
+  if (!names.length) {
+    used.append('No server uses it yet');
+    return;
   }
-  card.querySelector('.sc-open').setAttribute('aria-label', 'Open ' + (row.label || row.name));
-  const note = card.querySelector('.sc-note');
-  note.textContent = names.length > 1 ? 'Shared by ' + names.length + ' servers' : names.length ? '1 server attached' : 'No server attached';
+  used.append(names.length > 1 ? 'Shared by ' + names.length + ' servers:' : 'Used by');
+  for (const n of names) {
+    const srv = rowOf(n);
+    const chip = Kit.button({ label: (srv && srv.label) || n, kind: 'link', onClick: () => select(n) });
+    chip.title = srv ? 'Open ' + (srv.label || n) : n + ' is no longer on this machine';
+    chip.disabled = !srv;
+    used.append(chip);
+  }
 }
 
 /** A database this server owns, drawn inside its card. */
 function buildDbLink(db) {
-  const link = el('div', 'sc-link');
-  link.dataset.name = db.name;
-  const glyph = el('span', 'sc-kind');
-  glyph.append(icon('database'));
-  const words = el('div', 'sc-link-words');
-  words.append(el('b'), el('span', 'sc-soft'));
-  const open = el('button', 'sc-open');
-  open.type = 'button';
-  open.textContent = 'Open →';
-  open.onclick = () => select(db.name);
-  link.append(glyph, words, el('span', 'spill'), open);
+  const link = Kit.h('div', { class: 'flex flex-wrap items-center gap-3 rounded-md border border-line-soft bg-recess px-3 py-2', dataset: { name: db.name } });
+  const words = Kit.h('div', { class: 'min-w-0 flex-[1_1_200px]' }, Kit.h('div', { class: 'type-card' }), Kit.h('div', { class: 'type-meta text-ink-3' }));
+  const pill = statePill();
+  const open = Kit.button({ label: 'Open', size: 'sm', onClick: () => select(db.name) });
+  link.append(Kit.h('span', { class: 'contents', 'data-face': '' }), words, pill, open);
+  link.parts = { words, pill, open, face: link.querySelector('[data-face]') };
   return link;
 }
 
 function updateDbLink(link, db) {
+  const { words, pill, open, face } = link.parts;
+  const name = db.label || db.name;
   link.dataset.status = db.status;
-  const b = link.querySelector('b');
-  b.textContent = db.label || db.name;
-  const tag = document.createElement('small');
-  tag.textContent = 'Database';
-  b.append(tag);
-  const soft = link.querySelector('.sc-soft');
+  if (face.dataset.said !== dbGlyph(db)) {
+    face.dataset.said = dbGlyph(db);
+    face.replaceChildren(Kit.tile({ name, key: db.name, icon: dbGlyph(db), size: 'sm' }));
+  }
+  const [title, soft] = words.children;
+  title.textContent = name + ' ';
+  title.append(Kit.h('span', { class: 'sl-eyebrow', text: 'Database' }));
   if (soft.dataset.said !== dbEngine(db) + dbAddress(db)) {
     soft.dataset.said = dbEngine(db) + dbAddress(db);
     soft.textContent = '';
     soft.append(dbEngine(db) + ' · ', addrButton(dbAddress(db)));
   }
-  setPill(link.querySelector('.spill'), db, null);
-  link.querySelector('.sc-open').setAttribute('aria-label', 'Open ' + (db.label || db.name));
+  pill.paint(db, null);
+  open.setAttribute('aria-label', 'Open ' + name);
 }
-

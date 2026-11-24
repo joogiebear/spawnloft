@@ -58,6 +58,11 @@
 @source "../js/ui/03-tools.js";
 @source "../js/ui/06-server-tabs.js";
 @source "../js/ui/07-server-strip.js";
+/* phase 5: the Overview */
+@source "../js/ui/11-overview.js";
+@source "../js/ui/12-recent-activity.js";
+@source "../js/ui/13-needs-attention.js";
+@source "../js/ui/14-server-cards.js";
 /* phase 6: the console */
 @source "../js/ui/16-console.js";
 /* phase 7: Plugins and Mods, Files and the editor */
