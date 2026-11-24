@@ -420,6 +420,9 @@
   .grid-cols-\[repeat\(auto-fill\,minmax\(340px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fill,minmax(340px,1fr));
   }
+  .grid-cols-\[repeat\(auto-fit\,minmax\(238px\,1fr\)\)\] {
+    grid-template-columns: repeat(auto-fit,minmax(238px,1fr));
+  }
   .grid-rows-\[auto_minmax\(0\,1fr\)\] {
     grid-template-rows: auto minmax(0,1fr);
   }
@@ -461,6 +464,9 @@
   }
   .justify-end {
     justify-content: flex-end;
+  }
+  .justify-start {
+    justify-content: flex-start;
   }
   .justify-items-start {
     justify-items: start;
@@ -727,6 +733,9 @@
   }
   .px-5 {
     padding-inline: calc(4px * 5);
+  }
+  .px-6 {
+    padding-inline: calc(4px * 6);
   }
   .px-7 {
     padding-inline: calc(4px * 7);
@@ -1220,6 +1229,9 @@
   @media (hover: hover) {
     .hover\:transform-none:hover {
       transform: none;
+    }
+    .hover\:border-edge:hover {
+      border-color: var(--edge);
     }
     .hover\:bg-fault-wash:hover {
       background-color: var(--fault-wash);
