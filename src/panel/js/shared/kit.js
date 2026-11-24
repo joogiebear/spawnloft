@@ -129,13 +129,18 @@ const Kit = (() => {
     return h('textarea', { class: classes('sl-input', mono && 'sl-input-mono'), placeholder, rows, id, name, text: value });
   }
 
-  /** A drop-down. options: [{ value, label }] or plain strings. */
+  /**
+   * A drop-down. options: [{ value, label, note }] or plain strings; { group: 'Heading', options: [...] }
+   * puts the ones inside under a heading. A note shows muted at the right of its row. Ten or more
+   * options bring a search box (js/shared/dropdown.js draws the list; the select stays the value).
+   */
   function select({ options = [], value, id, name, label } = {}) {
+    const make = (o) => {
+      const opt = typeof o === 'string' ? { value: o, label: o } : o;
+      return h('option', { value: opt.value, text: opt.label, selected: opt.value === value, dataset: opt.note ? { note: opt.note } : null });
+    };
     const box = h('select', { class: 'sl-input', id, name, 'aria-label': label || null },
-      options.map((o) => {
-        const opt = typeof o === 'string' ? { value: o, label: o } : o;
-        return h('option', { value: opt.value, text: opt.label, selected: opt.value === value });
-      }));
+      options.map((o) => (o && o.group ? h('optgroup', { label: o.group }, o.options.map(make)) : make(o))));
     return h('span', { class: 'sl-input-group' }, box, h('span', { class: 'sl-input-caret', 'aria-hidden': 'true' }, icon('caret')));
   }
 
