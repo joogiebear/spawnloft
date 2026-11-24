@@ -37,7 +37,9 @@
     return svg
   }
 
-  const pill = (tone, text, dot = false) => h('span', { class: tone ? `pill ${tone}` : 'pill' }, dot && h('span', { class: 'dot' }), text)
+  const pill = (tone, text, dot = false) => h('span', { class: 'sl-pill', 'data-tone': tone || null }, dot && h('span', { class: 'sl-dot', 'data-tone': tone || null, 'aria-hidden': 'true' }), text)
+  // A server's state as a dot in the shared look: lit when running, a ring when stopped.
+  const stateDot = (status, stopped) => h('span', { class: 'sl-dot', 'data-tone': status === 'running' ? 'live' : stopped ? null : 'warn', 'data-hollow': status !== 'running' && stopped ? '' : null, 'aria-hidden': 'true' })
   const tile = (account, size = '') => h('span', { class: `tile ${size} ${tileClass(account.uuid ?? account.name)}`.replace(/\s+/g, ' ') }, initials(account.name))
   // playSentence's parts as nodes
   const parts = (list) => list.map((x) => (typeof x === 'string' ? x : h('b', { text: x.b })))
