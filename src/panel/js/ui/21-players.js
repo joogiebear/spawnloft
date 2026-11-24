@@ -139,33 +139,21 @@ async function renderPlayers(opts) {
   const again = () => renderPlayers({ force: true });
 
   // ---- how a change will be made -------------------------------------------
-  const how = document.createElement('div');
-  how.className = 'hint';
-  how.style.marginBottom = '12px';
-  how.textContent = data.running
-    ? 'Changes go through the running server\u2019s console, so they take effect at once. Deleting a player\u2019s data needs the server stopped.'
-    : 'Changes are written to the server\u2019s files, and take effect the next time it starts.';
-  body.append(how);
+  body.append(Kit.h('p', {
+    class: 'type-meta mb-4 text-ink-3',
+    text: data.running
+      ? 'Changes go through the running server’s console, so they take effect at once. Deleting a player’s data needs the server stopped.'
+      : 'Changes are written to the server’s files, and take effect the next time it starts.',
+  }));
 
   // ---- the whitelist: its switch, here with the list it is about -----------
   const listedCount = data.players.filter((p) => p.whitelisted).length;
-  const wl = document.createElement('div');
-  wl.className = 'who-wl';
-  const wlSwitch = document.createElement('input');
-  wlSwitch.type = 'checkbox';
-  wlSwitch.className = 'switch';
+  const wl = Kit.toggle({ label: 'Whitelist', checked: Boolean(data.whitelistOn) });
+  const wlSwitch = wl.querySelector('input');
   wlSwitch.id = 'playersWhitelist';
-  wlSwitch.checked = Boolean(data.whitelistOn);
-  const wlName = document.createElement('label');
-  wlName.htmlFor = wlSwitch.id;
-  wlName.textContent = 'Whitelist';
-  const wlSays = document.createElement('span');
-  wlSays.className = 'hint';
-  wlSays.id = 'playersWhitelistSays';
-  wlSays.textContent = whitelistWords(Boolean(data.whitelistOn), listedCount);
+  const wlSays = Kit.h('p', { class: 'type-meta m-0 text-ink-3', id: 'playersWhitelistSays', text: whitelistWords(Boolean(data.whitelistOn), listedCount) });
   wlSwitch.setAttribute('aria-describedby', wlSays.id);
-  wl.append(wlSwitch, wlName, wlSays);
-  body.append(wl);
+  body.append(Kit.card({ compact: true, label: 'Whitelist' }, wl, wlSays));
   wlSwitch.onchange = async () => {
     const on = wlSwitch.checked;
     // turned on with nobody on it, a running server lets nobody in from the next join on
@@ -184,9 +172,7 @@ async function renderPlayers(opts) {
   };
 
   // ---- search and filter ---------------------------------------------------
-  const bar = document.createElement('div');
-  bar.className = 'who-bar';
-  const addBtn = iconButton('plus', 'Add a player');
+  const addBtn = Kit.button({ label: 'Add a player', icon: 'plus', kind: 'primary' });
   addBtn.onclick = async () => {
     const got = await ask({
       ...addPlayerQuestion(data),
@@ -204,52 +190,34 @@ async function renderPlayers(opts) {
     if (got.out.as === 'whitelist') playerView.filter = 'whitelisted';
     await again();
   };
-  const search = document.createElement('input');
-  search.type = 'search';
-  search.placeholder = 'Search by name or id';
-  search.setAttribute('aria-label', 'Search players by name or id');
-  search.value = playerView.search;
+  // Names are short; a field the width of the pane reads as a search over something far bigger.
+  const search = Kit.input({ type: 'search', placeholder: 'Search by name or id', label: 'Search players by name or id', value: playerView.search });
   search.dataset.kept = '1';
-  const filters = document.createElement('div');
-  filters.className = 'filters';
-  filters.setAttribute('role', 'group');
-  filters.setAttribute('aria-label', 'Which players to show');
   const counts = {
     all: data.players.length,
     operators: data.players.filter((p) => p.op).length,
     banned: data.players.filter((p) => p.banned).length,
     whitelisted: listedCount,
   };
-  for (const f of PLAYER_FILTERS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    // the count apart from the name, which was read as "Everyone 12"
-    const count = document.createElement('span');
-    count.className = 'count';
-    count.textContent = String(counts[f.key]);
-    b.append(f.label + ' ', count);
-    b.setAttribute('aria-label', f.label + ', ' + counts[f.key]);
-    b.setAttribute('aria-pressed', String(playerView.filter === f.key));
-    b.onclick = () => { playerView.filter = f.key; paint(); };
-    filters.append(b);
-  }
-  bar.append(search, addBtn, filters);
-  body.append(bar);
+  const filters = Kit.segmented({
+    label: 'Which players to show',
+    options: PLAYER_FILTERS.map((f) => ({ value: f.key, label: f.label, count: counts[f.key] })),
+    value: playerView.filter,
+    onChange: (key) => { playerView.filter = key; paint(); },
+  });
+  const searchBox = Kit.h('div', { class: 'min-w-40 max-w-90 flex-[0_1_360px]' }, search);
+  body.append(Kit.h('div', { class: 'my-4 flex flex-wrap items-center gap-2' }, searchBox, addBtn, Kit.h('span', { class: 'ml-auto' }, filters)));
 
   // The list, and on an Ultra pane the chosen player's record beside it. The record is built for
-  // every tier and the stylesheet shows it only when the pane has the room.
-  const list = document.createElement('div');
-  list.className = 'who-split';
+  // every tier and shown only when the pane has the room.
+  const list = Kit.h('div', { class: 'grid grid-cols-[minmax(0,1fr)] items-start gap-5' });
   body.append(list);
 
   search.oninput = () => { playerView.search = search.value; paint(); };
   const select = (uuid) => { playerView.selected = uuid; paint(); };
 
   function paint() {
-    for (const b of filters.children) {
-      b.setAttribute('aria-pressed', String(b.textContent.startsWith(
-        PLAYER_FILTERS.find((f) => f.key === playerView.filter).label)));
-    }
+    filters.setValue(playerView.filter);
     const term = playerView.search.trim().toLowerCase();
     const match = PLAYER_FILTERS.find((f) => f.key === playerView.filter).match;
     const shown = data.players.filter((p) => match(p)
@@ -259,76 +227,64 @@ async function renderPlayers(opts) {
       .sort((a, b) => Number(b.online) - Number(a.online));
 
     list.textContent = '';
+    list.classList.remove('@ultra/pane:grid-cols-[minmax(0,1fr)_clamp(420px,36%,900px)]');
     if (!data.players.length) {
-      list.append(emptyState('user', 'Nobody has joined this server, and nobody is opped, banned '
-        + 'or whitelisted. People appear here the first time they join, or when you add them by name.'));
+      list.append(Kit.empty({
+        icon: 'user', title: 'No players yet',
+        text: 'Nobody has joined this server, and nobody is opped, banned or whitelisted. People appear here the first time they join, or when you add them by name.',
+      }));
       return;
     }
     if (!shown.length) {
-      list.append(emptyState('search', 'Nobody here matches that.'));
+      list.append(Kit.empty({ icon: 'search', title: 'Nobody here matches that.' }));
       return;
     }
     // The chosen player, or whoever is at the top when the choice is gone or was never made.
     const chosen = shown.find((p) => p.uuid === playerView.selected) || shown[0];
-    const people = document.createElement('div');
-    people.className = 'people';
-    for (const p of shown) {
+    const people = Kit.list(shown.map((p) => {
       const line = playerRow(p, data, base, again, select);
-      line.setAttribute('aria-selected', String(p === chosen));
-      people.append(line);
-    }
+      if (p === chosen) line.dataset.selected = '';
+      return line;
+    }), 'Players');
+    list.classList.add('@ultra/pane:grid-cols-[minmax(0,1fr)_clamp(420px,36%,900px)]');
     list.append(people, playerDetail(chosen, data, base, again));
   }
   paint();
 }
 
+/** The flags a player carries, as pills: online first, because it is true this second. */
+function playerPills(p) {
+  const pills = [];
+  if (p.online) pills.push(Kit.pill({ text: 'Online', tone: 'live' }));
+  if (p.op) pills.push(Kit.pill({ text: 'Operator', tone: 'accent' }));
+  if (p.banned) {
+    const pill = Kit.pill({ text: 'Banned', tone: 'fault' });
+    if (p.banReason) pill.title = p.banReason;
+    pills.push(pill);
+  }
+  if (p.whitelisted) pills.push(Kit.pill({ text: 'Whitelisted' }));
+  return pills;
+}
+
 /**
  * One player's whole record, for the companion column an Ultra pane has beside the list: the face
  * at a size that shows its pattern, every flag, the full id and the dates the list truncates, and
- * the same three actions the row offers.
+ * the same actions the row offers.
  */
 function playerDetail(p, data, base, again) {
-  const box = document.createElement('div');
-  box.className = 'who-detail section';
-  const head = document.createElement('div');
-  head.className = 'wd-head';
-  head.append(playerFace(p.uuid, 72));
-  const title = document.createElement('div');
-  const h = document.createElement('h3');
-  if (p.name) {
-    h.textContent = p.name;
-  } else {
-    h.className = 'unknown';
-    h.textContent = 'name unknown';
-  }
-  const pills = document.createElement('div');
-  pills.className = 'wd-pills';
-  const pill = (text, tone) => {
-    const span = document.createElement('span');
-    span.className = 'pill';
-    if (tone) span.dataset.tone = tone;
-    span.textContent = text;
-    pills.append(span);
-  };
-  if (p.online) pill('Online', 'on');
-  if (p.op) pill('Operator', 'op');
-  if (p.banned) pill('Banned', 'ban');
-  if (p.whitelisted) pill('Whitelisted');
-  if (!pills.childElementCount) pill(p.joined ? 'Has joined' : 'Never joined');
-  title.append(h, pills);
-  head.append(title);
+  const pills = playerPills(p);
+  if (!pills.length) pills.push(Kit.pill({ text: p.joined ? 'Has joined' : 'Never joined' }));
+  const name = Kit.h('h3', { class: 'm-0 text-[length:var(--text-5)] font-semibold leading-tight [overflow-wrap:anywhere]' + (p.name ? ' text-ink' : ' font-normal italic text-ink-3'), text: p.name || 'Name unknown' });
+  const head = Kit.h('div', { class: 'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2' },
+    playerFace(p.uuid, 72),
+    Kit.h('div', { class: 'flex flex-col gap-2' }, name, Kit.h('div', { class: 'flex flex-wrap gap-1.5' }, pills)));
 
-  const facts = document.createElement('dl');
+  const facts = Kit.h('dl', { class: 'm-0 grid gap-2' });
   const fact = (label, value, mono) => {
     if (value == null || value === '') return;
-    const d = document.createElement('div');
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    if (mono) dd.className = 'mono';
-    dd.textContent = value;
-    d.append(dt, dd);
-    facts.append(d);
+    facts.append(Kit.h('div', { class: 'grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-line-faint py-2 last:border-b-0' },
+      Kit.h('dt', { class: 'type-meta font-semibold text-ink-3', text: label }),
+      Kit.h('dd', { class: 'type-meta m-0 text-ink [overflow-wrap:anywhere]' + (mono ? ' font-mono' : ''), text: value })));
   };
   fact('UUID', p.uuid, true);
   fact('Status', p.online ? 'Connected now' : data.running ? 'Not connected' : 'Server stopped');
@@ -343,11 +299,11 @@ function playerDetail(p, data, base, again) {
   fact('Whitelist', p.whitelisted ? 'On the list' : 'Not on the list');
 
   // The row's own buttons, built the same way so they behave the same way.
-  const acts = playerRow(p, data, base, again).querySelector('.w-acts');
-  acts.className = 'wd-acts';
-  box.append(head, facts, acts);
-  return box;
+  const acts = playerActions(p, data, base, again);
+  acts.classList.remove('justify-end');
+  return Kit.h('section', { class: 'sl-card hidden @ultra/pane:grid sticky top-4 gap-4', 'aria-label': 'Player record' }, head, facts, acts);
 }
+
 
 /**
  * A face for a player, drawn from their id.
@@ -364,7 +320,7 @@ function playerFace(uuid, size) {
   const hex = String(uuid).replace(/-/g, '');
   const px = size || 34;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'face');
+  svg.setAttribute('class', 'face shrink-0 rounded-xs border border-line [image-rendering:pixelated] [shape-rendering:crispEdges]');
   svg.setAttribute('viewBox', '0 0 5 5');
   svg.setAttribute('width', px);
   svg.setAttribute('height', px);
@@ -398,104 +354,44 @@ function playerFace(uuid, size) {
   return svg;
 }
 
-/** One person, and the three things you can do about them. */
+/** One person, and what you can do about them. */
 function playerRow(p, data, base, again, select) {
-  const el = document.createElement('div');
-  el.className = 'who';
-  if (p.online) el.setAttribute('data-online', '');
-  el.append(playerFace(p.uuid));
-  // A click anywhere but a button chooses this player for the detail column an Ultra pane shows.
-  if (select) el.addEventListener('click', (e) => { if (!e.target.closest('button')) select(p.uuid); });
-
-  const name = document.createElement('div');
-  name.className = 'w-name';
-  const who = document.createElement('span');
-  if (p.name) {
-    who.textContent = p.name;
-  } else {
-    who.className = 'unknown';
-    who.textContent = 'name unknown';
-    who.title = 'This server has only ever seen this id, never a name to go with it.';
-  }
-  name.append(who);
-  // First, because it is the one piece of state that is true this second rather than on disk.
-  if (p.online) {
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.dataset.tone = 'on';
-    pill.textContent = 'Online';
-    name.append(pill);
-  }
-  if (p.op) {
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.dataset.tone = 'op';
-    pill.textContent = 'Operator';
-    name.append(pill);
-  }
-  if (p.banned) {
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.dataset.tone = 'ban';
-    pill.textContent = 'Banned';
-    if (p.banReason) pill.title = p.banReason;
-    name.append(pill);
-  }
-  if (p.whitelisted) {
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.textContent = 'Whitelisted';
-    name.append(pill);
-  }
-
-  // The id and when they were last on are in the meta line on a regular pane and in their own
-  // columns on a wide one; the spans marked w-dup are the ones the columns replace.
   const seenText = p.online ? 'Connected now' : p.lastSeen ? 'Last seen ' + stamp(p.lastSeen) : !p.joined ? 'Has never joined' : '';
-  const meta = document.createElement('div');
-  meta.className = 'w-meta';
-  const bit = (text, dup) => {
-    const span = document.createElement('span');
-    if (dup) span.className = 'w-dup';
-    span.textContent = text;
-    return span;
-  };
-  meta.append(bit(p.uuid, true));
-  if (seenText) meta.append(bit(seenText.charAt(0).toLowerCase() + seenText.slice(1), true));
-  if (p.banned && p.banReason) meta.append(bit('banned: ' + p.banReason));
-  const seen = document.createElement('div');
-  seen.className = 'w-seen';
-  seen.textContent = seenText;
-  if (p.lastSeen && !p.online) seen.title = new Date(p.lastSeen).toLocaleString();
-  const id = document.createElement('div');
-  id.className = 'w-id';
-  const idShort = document.createElement('span');
-  idShort.className = 'short';
-  idShort.textContent = p.uuid.slice(0, 8);
-  const idLong = document.createElement('span');
-  idLong.className = 'long';
-  idLong.textContent = p.uuid;
-  id.append(idShort, idLong);
-  id.title = p.uuid;
+  const line = Kit.row({
+    lead: playerFace(p.uuid),
+    title: p.name || 'Name unknown',
+    // Wide panes show the whole id in the record beside the list, so the line keeps the short one.
+    meta: [p.uuid.slice(0, 8), seenText, p.banned && p.banReason ? 'banned: ' + p.banReason : ''].filter(Boolean).join(' · '),
+    end: [playerActions(p, data, base, again)],
+  });
+  line.classList.add('flex-wrap', '@ultra/pane:cursor-pointer', '@ultra/pane:data-[selected]:bg-hover', '@ultra/pane:data-[selected]:shadow-[inset_3px_0_0_var(--accent)]');
+  if (p.online) line.dataset.online = '';
+  const title = line.querySelector('.sl-row-title');
+  if (!p.name) {
+    title.classList.add('italic', 'text-ink-3');
+    title.title = 'This server has only ever seen this id, never a name to go with it.';
+  }
+  const pills = playerPills(p);
+  if (pills.length) title.after(Kit.h('span', { class: 'flex flex-wrap gap-1.5 py-0.5' }, pills));
+  if (p.lastSeen && !p.online) line.querySelector('.sl-row-meta').title = new Date(p.lastSeen).toLocaleString();
+  // A click anywhere but a button chooses this player for the record an Ultra pane shows.
+  if (select) line.addEventListener('click', (e) => { if (!e.target.closest('button')) select(p.uuid); });
+  return line;
+}
 
-  const acts = document.createElement('div');
-  acts.className = 'w-acts';
-  const opBtn = document.createElement('button');
-  opBtn.textContent = p.op ? 'Remove operator' : 'Make operator';
-  const banBtn = document.createElement('button');
-  banBtn.className = p.banned ? '' : 'danger';
-  banBtn.textContent = p.banned ? 'Unban' : 'Ban';
-  const wlBtn = document.createElement('button');
-  wlBtn.textContent = p.whitelisted ? 'Off whitelist' : 'Whitelist';
-  const wipe = iconButton('trash', 'Delete data', 'danger');
+/** The buttons for one player: whitelist, operator, ban, and deleting their world data. */
+function playerActions(p, data, base, again) {
+  const label = p.name || p.uuid.slice(0, 8);
+  const opBtn = Kit.button({ label: p.op ? 'Remove operator' : 'Make operator', size: 'sm' });
+  const banBtn = Kit.button({ label: p.banned ? 'Unban' : 'Ban', size: 'sm', kind: p.banned ? 'secondary' : 'danger' });
+  const wlBtn = Kit.button({ label: p.whitelisted ? 'Off whitelist' : 'Whitelist', size: 'sm' });
+  const wipe = Kit.button({ icon: 'trash', title: 'Delete data', size: 'sm', kind: 'danger' });
   wipe.disabled = data.running || !p.joined;
   wipe.title = data.running
     ? 'Stop the server first - a running one writes this straight back'
-    : p.joined ? 'Remove this player\u2019s inventory, position, stats and advancements'
+    : p.joined ? 'Remove this player’s inventory, position, stats and advancements'
       : 'This player has no world data to delete';
-  acts.append(wlBtn, opBtn, banBtn, wipe);
-  el.append(name, meta, seen, id, acts);
-
-  const label = p.name || p.uuid.slice(0, 8);
+  const acts = Kit.h('div', { class: 'flex flex-wrap justify-end gap-1.5' }, wlBtn, opBtn, banBtn, wipe);
   const busy = (on) => { for (const b of acts.children) b.disabled = on || (b === wipe && (data.running || !p.joined)); };
 
   const run = async (path, payload, done) => {
@@ -549,6 +445,5 @@ function playerRow(p, data, base, again, select) {
     if (!ok) return;
     return run('/forget', { uuid: p.uuid }, 'Deleted ' + label + '\u2019s world data.');
   };
-  return el;
+  return acts;
 }
-

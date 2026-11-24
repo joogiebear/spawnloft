@@ -69,6 +69,9 @@
 @source "../js/ui/22-plugins.js";
 @source "../js/ui/26-files.js";
 @source "../js/ui/27-editor.js";
+@source "../js/ui/20-performance.js";
+@source "../js/ui/21-players.js";
+@source "../js/ui/28-activity.js";
 /* phase 8: Worlds, Backups (the server's and a database's), Schedule */
 @source "../js/ui/23-worlds.js";
 @source "../js/ui/25-server-list-look.js";

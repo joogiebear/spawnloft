@@ -18,7 +18,7 @@
     .who .w-acts { justify-content: flex-start; margin-top: 6px; opacity: 1; }
 
     /* Rows of controls wrap rather than squeeze a select too narrow to read. */
-    .gauge .row, .section .row { flex-wrap: wrap; }
+    .section .row { flex-wrap: wrap; }
   }
 
 }
