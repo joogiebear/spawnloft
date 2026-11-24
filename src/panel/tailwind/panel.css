@@ -77,8 +77,12 @@
 @source "../js/ui/21-players.js";
 @source "../js/ui/28-activity.js";
 /* phase 12: the Play page */
+@source "../launcher.html";
 @source "../js/launcher/04-dom.js";
+@source "../js/launcher/07-menus.js";
+@source "../js/launcher/09-account-chip.js";
 @source "../js/launcher/10-play.js";
+@source "../js/launcher/12-setup-sheet.js";
 /* phase 8: Worlds, Backups (the server's and a database's), Schedule */
 @source "../js/ui/23-worlds.js";
 @source "../js/ui/25-server-list-look.js";
@@ -102,6 +106,9 @@
    everything inside the stage measures the stage or its pane. */
 @custom-variant compact (@media (max-width: 1199px));
 @custom-variant tight (@media (max-width: 840px));
+/* The launcher inside the panel's Play page (a frame of the panel's own origin, 00-theme.js): its
+   top bar becomes the page's head. */
+@custom-variant embedded (:root[data-embedded] &);
 /* The console in a window of its own (/?console=<name>): the server's header shrinks to a line. */
 @custom-variant popout (:root[data-console-only] &);
 

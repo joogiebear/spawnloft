@@ -86,7 +86,7 @@ function declarations(css) {
 const classesIn = (selectors) => new Set(selectors.flatMap((s) =>
   [...s.matchAll(/\.((?:\\.|[A-Za-z0-9_-])+)/g)].map((m) => m[1].replace(/\\(.)/g, '$1'))))
 
-test('each page loads the tokens, then the Tailwind file, then its own stylesheets', () => {
+test('each page loads the tokens, then the Tailwind file, then any stylesheets of its own', () => {
   for (const file of ['ui.html', 'launcher.html', 'setup.html']) {
     const page = read(file).replace(/<!--[\s\S]*?-->/g, '')
     const links = [...page.matchAll(/<link rel="stylesheet" href="\/assets\/([^"]+)">/g)].map((m) => m[1])
@@ -95,7 +95,6 @@ test('each page loads the tokens, then the Tailwind file, then its own styleshee
     assert.ok(!/<style\b/i.test(page), `${file}: a <style> block would sit outside the layers`)
     // the Tailwind file declares the layer order, so it has to come before the first old sheet
     assert.deepEqual(links.slice(0, 2), ['css/tokens.css', 'css/tailwind.css'], file)
-    assert.ok(links.length > 2, `${file} loads no stylesheet of its own`)
     for (const name of links) assert.ok(fs.existsSync(path.join(panel, name)), `${file} links ${name}, which is not there`)
   }
 })
