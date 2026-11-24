@@ -1252,7 +1252,7 @@ test('Add: a create that is running can be cancelled from its own button', () =>
 
   // the button, driven as the page drives it
   const calls = []
-  const classes = new Set(['primary'])
+  const classes = new Set(['sl-btn-primary'])
   const button = {
     textContent: 'Create server', type: 'submit', disabled: true, dataset: {}, onclick: null,
     classList: { contains: (c) => classes.has(c), remove: (c) => classes.delete(c), toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) },
@@ -1284,7 +1284,7 @@ test('Add: a create that is running can be cancelled from its own button', () =>
     await button.onclick()
     assert.deepEqual([button.textContent, button.disabled], ['Cancel', false])
     restore()
-    assert.deepEqual([button.textContent, button.type, button.disabled, button.dataset.job, button.onclick, classes.has('primary')], ['Create server', 'submit', false, undefined, null, true])
+    assert.deepEqual([button.textContent, button.type, button.disabled, button.dataset.job, button.onclick, classes.has('sl-btn-primary')], ['Create server', 'submit', false, undefined, null, true])
     // both creates use it, and neither starts a second one from Enter while the first runs
     assert.match(html, /const restoreCreate = cancelButtonFor\(\$\('#bCreate'\), jobId\);/)
     assert.match(html, /const restorePack = cancelButtonFor\(\$\('#bPackCreate'\), jobId\);/)

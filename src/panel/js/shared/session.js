@@ -27,16 +27,19 @@ const panelSession = (() => {
     box.setAttribute('role', 'alertdialog');
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-labelledby', 'sessionEndedTitle');
+    // Inline, so the notice draws even where a stylesheet is what failed; the page's own tokens
+    // when it has them, the SpawnLoft look's values when it does not.
     box.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;'
-      + 'background:rgba(6,8,12,.86);font:15px/1.5 system-ui,sans-serif;color:#e9ecf4';
+      + 'background:rgba(4,6,6,.86);font:var(--t-4,15px)/1.55 var(--ui,system-ui,sans-serif);color:var(--ink,#efeee6)';
     const card = document.createElement('div');
-    card.style.cssText = 'max-width:440px;padding:24px 28px;border:1px solid #354056;border-radius:10px;background:#141823';
+    card.style.cssText = 'max-width:460px;padding:24px 28px;border:1px solid var(--line,#30382e);border-radius:var(--r-lg,12px);'
+      + 'background:var(--surface,#141b15);box-shadow:var(--shadow-lg,none)';
     const title = document.createElement('h2');
     title.id = 'sessionEndedTitle';
-    title.style.cssText = 'margin:0 0 8px;font-size:18px';
+    title.style.cssText = 'margin:0 0 8px;font:650 var(--t-5,18px)/1.3 var(--display,system-ui,sans-serif);letter-spacing:-.015em';
     title.textContent = 'This panel session has ended';
     const text = document.createElement('p');
-    text.style.cssText = 'margin:0;color:#9aa4ba';
+    text.style.cssText = 'margin:0;color:var(--ink-2,#b5bcac)';
     card.append(title, text);
     if (window.spawnloftDesktop && window.spawnloftDesktop.shell === 'tauri') {
       // In the app the window can sign itself in again: loading the page anew is answered with
@@ -45,14 +48,15 @@ const panelSession = (() => {
       const again = document.createElement('button');
       again.type = 'button';
       again.textContent = 'Sign in again';
-      again.style.cssText = 'margin-top:16px;padding:7px 14px;border:1px solid #4a67e8;border-radius:6px;background:#4a67e8;color:#fff;font:inherit;cursor:pointer';
+      again.style.cssText = 'margin-top:16px;min-height:var(--hit,34px);padding:0 14px;border:1px solid var(--primary-edge,#c4f566);border-radius:var(--r-sm,6px);'
+        + 'background:var(--primary-top,#c4f566);color:var(--primary-ink,#14200b);font:600 var(--t-3,14px)/1 var(--ui,system-ui,sans-serif);cursor:pointer';
       again.onclick = () => location.reload();
       card.append(again);
       setTimeout(() => again.focus(), 0);
     } else {
       text.append('Open SpawnLoft again from the app, or run ');
       const cmd = document.createElement('code');
-      cmd.style.color = '#e9ecf4';
+      cmd.style.cssText = 'color:var(--ink,#efeee6);font-family:var(--mono,monospace)';
       cmd.textContent = 'spawnloft ui';
       text.append(cmd, ' for a new sign-in link.');
     }

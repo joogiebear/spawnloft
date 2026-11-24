@@ -1,6 +1,6 @@
 /* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
 @layer legacy {
-  /* ---- sheets: add a server, settings ----------------------------------- */
+  /* ---- sheets: preferences, feedback (Add a server is on the shared classes) ---- */
 
   .sheet { align-content: start; background: var(--void); overflow: auto; }
   .sheet-head { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-5) var(--s-6); border-bottom: 1px solid var(--line-soft); }
@@ -10,29 +10,7 @@
   .sheet-body { padding: var(--s-6) var(--s-5) var(--s-7); display: grid; gap: var(--s-5); width: 100%; max-width: 640px; margin: 0 auto; }
   .sheet-body.wide { max-width: 840px; }
   .sheet-body h2 { margin: 0 0 4px; font: 650 var(--t-3)/1.4 var(--ui); letter-spacing: -.005em; }
-  /* The create form in two short groups, each under a heading, rather than one long run of fields. */
-  .sheet-body h2.form-group-title { margin: 0 0 calc(-1 * var(--s-2)); padding-bottom: var(--s-2); border-bottom: 1px solid var(--line-soft); }
-  .sheet-body h2.form-group-title ~ h2.form-group-title { margin-top: var(--s-2); }
-  /* What Create will make, in one line beside the button, so nobody has to scroll up to check. */
-  .new-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s-2); padding: var(--s-3) var(--s-4);
-    border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--sunken); font: var(--t-3)/1.4 var(--ui); color: var(--ink-2); }
-  .new-summary:empty { display: none; }
-  .new-summary b { color: var(--ink); font-weight: 600; }
-  .new-summary .sep { color: var(--ink-4); }
-  .hint code.slug-eg { color: var(--ink-3); }
 
-  .tabs { display: flex; gap: 4px; padding: 0 var(--s-5); border-bottom: 1px solid var(--line); }
-  .tabs button { background: transparent; border: 0; box-shadow: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 12px 12px 10px; color: var(--ink-2); font-size: var(--t-3); font-weight: 500; }
-  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--lapis); font-weight: 600; }
-  .tabs button:hover:not(:disabled) { background: transparent; color: var(--ink); transform: none; border-color: transparent; }
-  .tabs button[aria-selected="true"]:hover:not(:disabled) { border-bottom-color: var(--lapis); }
-
-  .prog { display: grid; gap: 8px; }
-  .prog .track { height: 6px; border-radius: 999px; background: var(--sunken); border: 1px solid var(--line); overflow: hidden; }
-  .prog .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--lapis-dim), var(--lapis)); border-radius: 999px; transition: width .25s ease; }
-  .prog .bar.indet { width: 34%; animation: slide 1.1s ease-in-out infinite; }
-  @keyframes slide { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
-  .prog .msg { font-size: var(--t-3); color: var(--ink-2); }
 
   .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 18px; align-items: baseline; margin: 0; }
   .kv dt { font: 650 var(--t-1)/1.6 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }

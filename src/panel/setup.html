@@ -9,18 +9,20 @@
 <link rel="stylesheet" href="/assets/css/tailwind.css">
 <link rel="stylesheet" href="/assets/css/setup.css">
 
-<form class="card" id="form">
-  <div class="brand">
-    <svg viewBox="0 0 64 64" width="22" height="22" aria-hidden="true">
-      <polygon points="8,20 32,8 56,20 32,32" fill="#5f85ef"/>
-      <polygon points="8,20 32,32 32,54 8,42" fill="#3a55b4"/>
-      <polygon points="56,20 32,32 32,54 56,42" fill="#24357a"/>
-      <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="#cfe0ff"/>
+<form class="grid w-[min(660px,100%)] gap-5 rounded-lg border border-line bg-surface px-7 pt-6 pb-6 shadow-lg max-[560px]:px-5" id="form">
+  <div class="mb-1 flex flex-wrap items-center gap-x-2 gap-y-3">
+    <svg class="block" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true">
+      <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
+      <polygon points="8,20 32,32 32,54 8,42" fill="var(--cube-left)"/>
+      <polygon points="56,20 32,32 32,54 56,42" fill="var(--cube-right)"/>
+      <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="var(--cube-cutout)"/>
     </svg>
-    <b>SpawnLoft</b>
-    <ol class="steps" aria-label="Getting started">
-      <li aria-current="step"><span class="dot">1</span>Choose folders</li>
-      <li><span class="dot">2</span>Open the panel</li>
+    <b class="font-display text-4 font-strong leading-none">SpawnLoft</b>
+    <!-- Where this screen sits in getting started: choosing folders here, then the panel itself.
+         The current step's dot is filled, so "you are here" shows without reading. -->
+    <ol class="m-0 ml-auto flex list-none items-center gap-2 p-0 text-2 font-medium leading-none text-ink-3 [&>li+li]:before:mr-0.5 [&>li+li]:before:h-px [&>li+li]:before:w-4.5 [&>li+li]:before:bg-line [&>li+li]:before:content-['']" aria-label="Getting started">
+      <li class="group flex items-center gap-1.5 aria-[current=step]:text-ink" aria-current="step"><span class="grid size-4.5 place-items-center rounded-full border border-edge text-1 font-semibold group-aria-[current=step]:border-accent group-aria-[current=step]:bg-accent group-aria-[current=step]:text-on-primary">1</span>Choose folders</li>
+      <li class="group flex items-center gap-1.5"><span class="grid size-4.5 place-items-center rounded-full border border-edge text-1 font-semibold">2</span>Open the panel</li>
     </ol>
   </div>
 
@@ -30,37 +32,37 @@
     location question there is, and it says out loud which one it is. "Install location" was the
     exact wording that made the two read as the same question asked twice.
   -->
-  <h1>Where should SpawnLoft keep your servers?</h1>
-  <p class="sub">
-    Worlds, downloaded server jars and backups go here. <b>Not the program itself</b> — that is
-    already installed. You can move this later from Settings.
-  </p>
-
-  <div>
-    <label class="fieldlabel" for="root">Data folder</label>
-    <div class="pathrow">
-      <input type="text" id="root" spellcheck="false" autocomplete="off">
-      <button type="button" id="pickRoot">Browse…</button>
-    </div>
-    <div class="hint">A fresh server takes about 300 MB. Worlds grow from there.</div>
+  <div class="grid gap-2">
+    <h1 class="m-0 font-display text-6 font-strong leading-tight tracking-display">Where should SpawnLoft keep your servers?</h1>
+    <p class="m-0 type-body text-ink-2 [&_b]:font-semibold [&_b]:text-ink">
+      Worlds, downloaded server jars and backups go here. <b>Not the program itself</b>: that is
+      already installed. You can move this later from Settings.
+    </p>
   </div>
 
-  <label class="toggle" for="separate">
-    <input type="checkbox" id="separate">
-    <b>Put servers on a different drive</b>
-    <span class="why">
-      Worlds and backups are the parts that grow. Turn this on if they should live somewhere with
-      more room than the folder above.
-    </span>
+  <div class="sl-field">
+    <label class="sl-label" for="root">Data folder</label>
+    <div class="flex gap-2">
+      <input class="sl-input sl-input-mono min-w-0 flex-1" type="text" id="root" spellcheck="false" autocomplete="off" aria-describedby="rootHint">
+      <button type="button" class="sl-btn" id="pickRoot">Browse…</button>
+    </div>
+    <p class="sl-hint" id="rootHint">A fresh server takes about 300 MB. Worlds grow from there.</p>
+  </div>
+
+  <label class="sl-choice flex rounded-md border border-line bg-raised px-4 py-3 hover:border-edge has-[:checked]:border-accent-edge has-[:checked]:bg-accent-wash" for="separate">
+    <input class="sl-switch mt-0.5" type="checkbox" role="switch" id="separate">
+    <span class="sl-choice-text"><b class="font-strong">Put servers on a different drive</b>
+      <small>Worlds and backups are the parts that grow. Turn this on if they should live somewhere
+        with more room than the folder above.</small></span>
   </label>
 
-  <div id="serversBlock" hidden>
-    <label class="fieldlabel" for="servers">Servers folder</label>
-    <div class="pathrow">
-      <input type="text" id="servers" spellcheck="false" autocomplete="off">
-      <button type="button" id="pickServers">Browse…</button>
+  <div class="sl-field" id="serversBlock" hidden>
+    <label class="sl-label" for="servers">Servers folder</label>
+    <div class="flex gap-2">
+      <input class="sl-input sl-input-mono min-w-0 flex-1" type="text" id="servers" spellcheck="false" autocomplete="off" aria-describedby="serversHint">
+      <button type="button" class="sl-btn" id="pickServers">Browse…</button>
     </div>
-    <div class="hint">Jars, backups and settings stay in the data folder above.</div>
+    <p class="sl-hint" id="serversHint">Jars, backups and settings stay in the data folder above.</p>
   </div>
 
   <!--
@@ -68,21 +70,21 @@
     because finding out at the first press of Start - after setup and a fifty-megabyte download -
     is the difference between a missing dependency and a broken application.
   -->
-  <div class="check" id="javaCheck" data-state="pending">
-    <span class="lamp"></span>
-    <b id="javaTitle">Checking for Java…</b>
-    <span class="why" id="javaWhy">Minecraft servers run on Java. SpawnLoft needs one installed.</span>
-    <span class="acts">
-      <button type="button" class="sm" id="javaGet" hidden>Get Java</button>
-      <button type="button" class="sm" id="javaAgain" hidden>Check again</button>
+  <div class="group grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 rounded-md border border-line bg-raised px-4 py-3 data-[state=bad]:border-fault-edge data-[state=warn]:border-warn-edge" id="javaCheck" data-state="pending" role="status">
+    <span class="sl-dot row-start-1 group-data-[state=ok]:bg-live group-data-[state=warn]:bg-warn group-data-[state=bad]:bg-fault" aria-hidden="true"></span>
+    <b class="col-start-2 row-start-1 text-3 font-strong" id="javaTitle">Checking for Java…</b>
+    <span class="col-start-2 row-start-2 type-meta text-ink-3" id="javaWhy">Minecraft servers run on Java. SpawnLoft needs one installed.</span>
+    <span class="col-start-2 row-start-3 flex flex-wrap gap-2 pt-1 [&:not(:has(>button:not([hidden])))]:hidden">
+      <button type="button" class="sl-btn sl-btn-sm sl-btn-primary" id="javaGet" hidden>Get Java</button>
+      <button type="button" class="sl-btn sl-btn-sm" id="javaAgain" hidden>Check again</button>
     </span>
   </div>
 
-  <div class="err" id="err" hidden></div>
+  <div class="whitespace-pre-wrap rounded-md border border-fault-edge bg-fault-wash px-4 py-3 text-3 text-fault-ink" id="err" role="alert" hidden></div>
 
-  <footer>
-    <span class="hint" id="note"></span>
-    <button type="submit" class="primary" id="go">Continue</button>
+  <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
+    <span class="sl-hint" id="note" aria-live="polite"></span>
+    <button type="submit" class="sl-btn sl-btn-primary sl-btn-lg ml-auto" id="go">Continue</button>
   </footer>
 </form>
 

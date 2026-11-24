@@ -112,7 +112,7 @@ async function loadVersions(loader) {
       bad.textContent = 'Unavailable';
       sel.append(bad);
       note.append('Could not reach the ' + sw.label + ' download service. ');
-      const retry = el('button', 'ghost inline');
+      const retry = el('button', 'sl-btn sl-btn-link');
       retry.type = 'button';
       retry.textContent = 'Try again';
       retry.onclick = () => { if ($('#nLoader').value === loader) loadVersions(loader); };
@@ -127,6 +127,7 @@ async function loadVersions(loader) {
       if (!$('#bJumpAdopt')) {
         const jump = document.createElement('button');
         jump.id = 'bJumpAdopt';
+        jump.className = 'sl-btn';
         jump.type = 'button';
         jump.textContent = 'Add an existing server instead';
         jump.onclick = () => selectTab('adopt');
