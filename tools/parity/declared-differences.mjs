@@ -285,6 +285,23 @@ export const DECLARED = [
       }).join('')
     },
   },
+  {
+    // UX phase 11 (docs/ux-ui-plan-2026-11/PLAN.md): the pages the core writes itself before a
+    // sign-in (signed out, "Opening SpawnLoft", "could not start") are drawn in the SpawnLoft look:
+    // a card with the cube and the name, the look's colours, and the way on as a button. What they
+    // say, where their links go and the headers they are sent with are still compared.
+    id: 'core-page-look',
+    late: true,
+    where: 'the panel\'s own pages from `panel_auth.rs` (signed out, the sign-in link\'s page)',
+    node: 'a plain page: dark grey, no card, the link as text',
+    rust: 'the SpawnLoft look: a card with the cube and the name, and the link as a button (`class="go"`)',
+    commands: ['ui'],
+    apply: (text) => text
+      .replace(/(<title>[^<]*<\/title>)<style>[^<]*<\/style>/g, '$1<style><page style></style>')
+      .replace(/<div class="brand"><svg[\s\S]*?<\/svg>SpawnLoft<\/div>/g, '')
+      .replace(/<a class="go" href=/g, '<a href=')
+      .replace(/\.<br><a href=/g, '. <a href='),
+  },
 ]
 
 // Both sides' text for one step, evened out by every row that applies to it. With lateOnly, only
