@@ -215,8 +215,13 @@ test('a step for one side only is refused outside a self-test', async () => {
   }
 })
 
-test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two, C5\'s three, C9\'s two and the UX overhaul\'s one, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 24)
+test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two, C5\'s three, C9\'s two and the UX overhaul\'s two, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 25)
+  // the core's own pages: the look is evened out, the words and the links are not
+  const plain = '<title>T</title><style>body{color:#eee}</style></head><body><main><h1>T</h1><p>Restarted. <a href="/auth/again">Sign in again</a></p></main>'
+  const lime = '<title>T</title><style>:root{--void:#090d0d}</style></head><body><main><div class="brand"><svg viewBox="0 0 64 64"><polygon/></svg>SpawnLoft</div><h1>T</h1><p>Restarted.<br><a class="go" href="/auth/again">Sign in again</a></p></main>'
+  assert.equal(applyDeclared(plain, 'ui'), applyDeclared(lime, 'ui'))
+  assert.notEqual(applyDeclared(plain, 'ui'), applyDeclared(lime.replace('/auth/again', '/elsewhere'), 'ui'), 'a link that goes elsewhere still differs')
   // the default theme: only an answer from before the first save is evened out
   const before = (theme) => 'GET /api/appearance\n  200\n{\n "theme": "' + theme + '"\n}\n\n'
   const save = 'POST /api/appearance\n  200\n{\n "ok": true\n}\n\n'

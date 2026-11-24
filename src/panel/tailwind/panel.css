@@ -82,6 +82,11 @@
 @source "../js/ui/31-databases.js";
 /* phase 10: Server Settings (in 29-backups.js), a database's Settings and its address editor */
 @source "../js/ui/10-diagnosis.js";
+/* phase 11: Add a server, the first run */
+@source "../js/ui/33-add-server.js";
+@source "../js/ui/34-from-modpack.js";
+@source "../js/ui/37-versions.js";
+@source "../setup.html";
 /* Old stylesheets still define these classes (test/panel-css.test.mjs), and the words turn up in
    sources as plain words. Never built until the old rules are gone; the phase that removes an old
    one takes its name off this line. (`grid` came off in phase 3: the chart's lines are `gridline`.)

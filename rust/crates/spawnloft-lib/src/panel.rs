@@ -689,15 +689,22 @@ fn missing(conn: &mut TcpStream, head: &Head, why: &str) -> std::io::Result<()> 
         });
         return respond(conn, 503, "application/json", body.to_string().as_bytes());
     }
-    let page = format!(
-        "<!doctype html><meta charset=utf-8><title>SpawnLoft</title>\
-         <body style=\"font:15px system-ui;margin:3em;color:#ddd;background:#1b1d22\">\
-         <h1 style=\"font-size:20px\">SpawnLoft could not start</h1>\
-         <p>SpawnLoft could not work out where its data is: {}</p>\
-         <p>Your servers and worlds are not affected.</p>",
-        html_escape(why)
+    let page = panel_auth::styled_page(
+        "SpawnLoft could not start",
+        &format!(
+            "<p>SpawnLoft could not work out where its data is: {}</p>\
+             <p class=\"small\">Your servers and worlds are not affected.</p>",
+            html_escape(why)
+        ),
+        "",
     );
-    respond(conn, 503, "text/html; charset=utf-8", page.as_bytes())
+    respond_with(
+        conn,
+        503,
+        "text/html; charset=utf-8",
+        &PAGE_HEADERS,
+        page.as_bytes(),
+    )
 }
 
 fn html_escape(s: &str) -> String {
