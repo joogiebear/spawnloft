@@ -46,7 +46,9 @@
     check('border is one solid pixel', css('card', 'border-top-width') === '1px' && css('card', 'border-top-style') === 'solid', css('card', 'border-top-width') + ' ' + css('card', 'border-top-style'))
     check('shadow-md draws', css('card', 'box-shadow') !== 'none' && css('card', 'box-shadow') !== '', css('card', 'box-shadow'))
     check('h-8 is the 32px hit size', css('btn', 'height') === '32px', css('btn', 'height'))
-    check('a transition takes the panel\'s 200ms', css('moves', 'transition-duration').split(',')[0].trim() === '0.2s', css('moves', 'transition-duration'))
+    // someone who asked for less motion gets none (base.css), so the duration depends on the machine
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    check(still ? 'reduced motion: no transition' : 'a transition takes the panel\'s 200ms', css('moves', 'transition-duration').split(',')[0].trim() === (still ? '0s' : '0.2s'), css('moves', 'transition-duration'))
 
     // 3. a see-through colour (color-mix, with a solid fallback before it)
     var wash = rgba(css('wash', 'background-color'))
@@ -59,12 +61,11 @@
     pane.style.width = '2560px'; check('pane 2560: three columns', columns() === 3, columns())
     pane.style.width = ''
 
-    // 5. cascade layers: a class from Tailwind beats an old rule with a stronger selector, an
-    //    element without one is left alone, and an old !important still holds
-    check('old rule alone: its padding', css('old', 'padding-top') === '3px', css('old', 'padding-top'))
-    check('old rule alone: its colour', rgba(css('old', 'color')) === rgba('rgb(1, 2, 3)'), css('old', 'color'))
-    check('utility over old rule: padding', css('new', 'padding-top') === '16px', css('new', 'padding-top'))
-    check('old [hidden] !important over a utility', css('gone', 'display') === 'none', css('gone', 'display'))
+    // 5. the base layer (base.css) under the utilities: a utility wins over it, [hidden] wins
+    //    over any utility, and a bare control starts as plain text in the page's type
+    check('utility over the base layer: padding', css('new', 'padding-top') === '16px', css('new', 'padding-top'))
+    check('[hidden] over a utility', css('gone', 'display') === 'none', css('gone', 'display'))
+    check('a bare button has no box', css('bare', 'border-top-width') === '0px' && css('bare', 'padding-top') === '0px' && css('bare', 'font-family') === getComputedStyle(document.body).fontFamily, css('bare', 'border-top-width') + ' ' + css('bare', 'font-family'))
 
     // 6. type roles
     check('type-label: 11px, upper case', css('label', 'font-size') === '11px' && css('label', 'text-transform') === 'uppercase' && css('label', 'font-weight') === '650', css('label', 'font-size') + ' ' + css('label', 'font-weight'))

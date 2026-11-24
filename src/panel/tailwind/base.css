@@ -134,7 +134,9 @@
     *::after {
       animation-duration: 0.001ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.001ms !important;
+      /* none at all, rather than a moment: a property changing under a near-zero transition
+         still reads its old value until the next frame, in WebKit at least */
+      transition-duration: 0s !important;
     }
   }
 }
