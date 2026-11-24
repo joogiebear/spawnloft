@@ -46,6 +46,10 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 
+/* ---- the page itself -------------------------------------------------------------------- */
+/* Box model, `hidden`, the starting type and colour, focus ring, scroll bars (base layer). */
+@import "./base.css";
+
 /* ---- the shared building blocks ------------------------------------------------------------ */
 /* `sl-` classes in the components layer, always built (they are not read from the sources). */
 @import "./components.css";
