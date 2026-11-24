@@ -1219,7 +1219,7 @@ async function buildServerSettings(row, body) {
   }
   if (body.dataset.for !== row.name) return; // switched servers while the fetch was in flight
   body.textContent = '';
-  paneHead(body, 'sliders', 'Server settings', 'server.properties, and how SpawnLoft runs this server.');
+  paneHead(body, 'sliders', 'Server settings', 'What is in server.properties, and how SpawnLoft runs this server.');
 
   const el = (tag, cls) => {
     const node = document.createElement(tag);

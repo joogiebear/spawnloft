@@ -77,6 +77,8 @@ step "2.0: the command line takes over the 1.x server"
 spawnloft status pkgtest --json | grep -q '"status": *"running"' || fail "2.0 does not see the 1.x server as running"
 spawnloft stop pkgtest
 spawnloft status pkgtest --json | grep -q '"status": *"stopped"' || fail "2.0 did not stop the 1.x server"
+# stop returns once Java has exited; the 1.x daemon follows its child a moment later
+for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
 if kill -0 "$pid" 2>/dev/null; then fail "the 1.x daemon (pid $pid) is still alive after stop"; fi
 
 step "the desktop package is refused beside spawnloft-cli"

@@ -351,7 +351,14 @@ pub fn run(
 
     log("removing scheduled tasks");
     match sched.remove_all() {
-        Ok(_) => result.tasks = true,
+        Ok((true, _)) => result.tasks = true,
+        // a task Task Scheduler would not delete (one made from an administrator prompt, which
+        // an ordinary account may only read) keeps its definition and its shim: say which
+        Ok((false, left)) => result.failed.push(format!(
+            "scheduled tasks still there: {}. Remove them with `spawnloft task rm <id>` from the \
+             same kind of prompt that made them (an administrator one, on Windows)",
+            left.join(", ")
+        )),
         Err(e) => result.failed.push(format!("scheduled tasks: {}", e.message())),
     }
 
