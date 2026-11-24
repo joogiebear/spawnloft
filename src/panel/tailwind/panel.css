@@ -1,5 +1,5 @@
 /* ==========================================================================
-   The Tailwind input for the panel's three pages (ui.html, launcher.html, setup.html).
+   The Tailwind input for the panel's pages (ui.html, launcher.html, setup.html, components.html).
 
    `node tools/panel-css.mjs` builds this into src/panel/css/tailwind.css with the pinned
    standalone Tailwind program (tools/tailwind-pin.json). The built file is committed and is what
@@ -17,31 +17,27 @@
       what they are: one attribute on <html> that swaps variables. No class changes with the
       scheme.
 
-   2. The hand-written stylesheets are one cascade layer, `legacy`, below Tailwind's components
-      and utilities. A class from here therefore wins over any old rule on the same element,
-      whatever that rule's selector, and an element that carries no class from here is drawn
-      exactly as before. The one exception is by design of layers: an old `!important` still
-      beats a class from here, even an important one, so `[hidden]` keeps hiding and the
-      reduced-motion rule keeps stopping motion. A page moves here when it is redesigned, and its
-      old rules are deleted in the same pull request (test/panel-css.test.mjs counts them; the
-      number only goes down).
+   2. There is no hand-written stylesheet. The page basics (box model, `hidden`, the starting
+      type, the focus ring, scroll bars, reduced motion) are base.css, the shared blocks are
+      components.css, and everything else is a class on the element. The old stylesheets lived in
+      a `legacy` layer under these while pages moved over, and were deleted in phase 14 of the
+      UX/UI plan; test/panel-css.test.mjs stops a new one.
 
    3. Only the files named with @source below are read for class names. Tailwind takes any word
       in a file it reads as a possible class, and the panel's scripts are full of words such as
       `filter`, `table` and `hidden`, so a file is listed when it starts using classes from here
-      and not before. A class cannot be defined both here and in an old stylesheet: the same
-      test stops that.
+      and not before.
 
-   Preflight (Tailwind's reset) is left out on purpose, and stays out until the last old rule
-   has gone (phase 14 of the plan; decided in phase 3). The old pages rely on browser defaults it
-   would remove, and it is one unlayered-looking switch for every element of every page at once,
-   which is the opposite of moving page by page. The shared blocks (components.css) do not need
-   it: each one starts from `all: unset` or sets what it relies on.
+   Preflight (Tailwind's reset) is left out, decided in phase 14 once the last old rule had gone.
+   Every page was built against the browser's defaults plus base.css, which resets what the
+   pages need (box model, controls start as plain text, [hidden] wins); Preflight would also
+   strip heading and list margins, make images block and change form controls everywhere at
+   once, for no gain. The shared blocks start from `all: unset` or set what they rely on.
    ========================================================================== */
 
 /* The layer order, declared before anything else is loaded: each page links the built file
-   straight after tokens.css and before its own stylesheets. */
-@layer theme, base, legacy, components, utilities;
+   straight after tokens.css. */
+@layer theme, base, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
@@ -77,8 +73,12 @@
 @source "../js/ui/21-players.js";
 @source "../js/ui/28-activity.js";
 /* phase 12: the Play page */
+@source "../launcher.html";
 @source "../js/launcher/04-dom.js";
+@source "../js/launcher/07-menus.js";
+@source "../js/launcher/09-account-chip.js";
 @source "../js/launcher/10-play.js";
+@source "../js/launcher/12-setup-sheet.js";
 /* phase 8: Worlds, Backups (the server's and a database's), Schedule */
 @source "../js/ui/23-worlds.js";
 @source "../js/ui/25-server-list-look.js";
@@ -111,6 +111,9 @@
    everything inside the stage measures the stage or its pane. */
 @custom-variant compact (@media (max-width: 1199px));
 @custom-variant tight (@media (max-width: 840px));
+/* The launcher inside the panel's Play page (a frame of the panel's own origin, 00-theme.js): its
+   top bar becomes the page's head. */
+@custom-variant embedded (:root[data-embedded] &);
 /* The console in a window of its own (/?console=<name>): the server's header shrinks to a line. */
 @custom-variant popout (:root[data-console-only] &);
 

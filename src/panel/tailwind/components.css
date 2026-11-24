@@ -1478,8 +1478,7 @@
     }
   }
   /*
-    Reduced motion means none here, as the legacy sheets already make it on every page that loads
-    them: a still spinner beside aria-busy still says "working". An indeterminate bar cannot stand
+    Reduced motion means none here, as base.css makes it on every page: a still spinner beside aria-busy still says "working". An indeterminate bar cannot stand
     still at a width, which would read as "this far done", so it fills dimmed instead.
   */
   @media (prefers-reduced-motion: reduce) {

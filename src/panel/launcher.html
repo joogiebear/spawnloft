@@ -10,8 +10,7 @@
 
 <link rel="stylesheet" href="/assets/css/tokens.css">
 <link rel="stylesheet" href="/assets/css/tailwind.css">
-<link rel="stylesheet" href="/assets/css/launcher.css">
-<body>
+<body class="overflow-hidden">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></symbol>
   <symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.5 14c.4-2.8 2.6-4.5 5.5-4.5s5.1 1.7 5.5 4.5"/></symbol>
@@ -28,19 +27,19 @@
   <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z" fill="var(--cube-top)"/><path d="M3.5 7.25L12 12v9.5l-8.5-4.75z" fill="var(--cube-left)"/><path d="M20.5 7.25L12 12v9.5l8.5-4.75z" fill="var(--cube-right)"/></symbol>
 </svg>
 
-<div class="app">
-  <header class="top">
-    <div class="brand"><svg width="24" height="24" aria-hidden="true"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Launcher</small></div></div>
-    <h1 class="pagetitle">Play</h1>
-    <span class="grow"></span>
-    <div class="menuhost" data-menu="account" id="chipwrap"></div>
+<div class="flex flex-col h-screen min-w-0">
+  <header class="h-14 flex-none flex items-center gap-3 px-5 bg-chrome border-b border-line-soft relative z-3 embedded:h-auto embedded:min-h-16 embedded:py-4 embedded:px-7 embedded:bg-transparent max-[700px]:px-4 embedded:max-[700px]:py-3 embedded:max-[700px]:px-4">
+    <div class="flex items-center gap-[10px] embedded:hidden"><svg class="block" width="24" height="24" aria-hidden="true"><use href="#i-logo"/></svg><div><b class="font-display text-4 leading-none font-strong tracking-[-.015em]">SpawnLoft</b><small class="block text-1 text-ink-3 mt-[3px] font-normal tracking-[.02em]">Launcher</small></div></div>
+    <h1 class="hidden m-0 type-page embedded:block">Play</h1>
+    <span class="flex-1"></span>
+    <div class="relative min-w-0" data-menu="account" id="chipwrap"></div>
   </header>
-  <main class="stage" id="stage"></main>
+  <main class="flex-1 min-h-0 overflow-auto relative grid pt-7 px-7 pb-[14vh] max-[700px]:p-4 max-[700px]:pb-7 [background:radial-gradient(1100px_620px_at_50%_46%,var(--lapis-wash),transparent_70%),linear-gradient(rgba(var(--ink-rgb),.022)_1px,transparent_1px)_0_0/48px_48px,linear-gradient(90deg,rgba(var(--ink-rgb),.022)_1px,transparent_1px)_0_0/48px_48px,var(--void)]" id="stage"></main>
   <div id="sheet"></div>
   <!-- what the page says aloud: these two stay put while everything above is rebuilt, so a
        notice is read once when it appears and not again at every rebuild -->
-  <div class="sr" id="say" role="status" aria-live="polite"></div>
-  <div class="sr" id="sayNow" role="alert"></div>
+  <div class="sl-sr" id="say" role="status" aria-live="polite"></div>
+  <div class="sl-sr" id="sayNow" role="alert"></div>
 </div>
 
 <script src="/assets/js/launcher/01-intro.js"></script>

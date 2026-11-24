@@ -159,28 +159,28 @@
     const facts = versionFacts(cur, S.details[f.mc])
     const refused = S.details[f.mc]?.refusal ?? null
     const changed = p && f.mc !== p.mc
-    const box = f.vOpen && h('div', { class: 'vbox', id: 'fMcBox' },
-      h('input', { id: 'fMcFind', type: 'text', role: 'combobox', 'aria-label': 'Find a version', 'aria-expanded': 'true', 'aria-controls': 'fMcOptions', 'aria-autocomplete': 'list', 'aria-activedescendant': f.vAt >= 0 ? `fMcRow${f.vAt}` : null,
+    const box = f.vOpen && h('div', { class: 'grid gap-2 p-3 border border-line rounded-sm bg-recess', id: 'fMcBox' },
+      h('input', { class: 'sl-input', id: 'fMcFind', type: 'text', role: 'combobox', 'aria-label': 'Find a version', 'aria-expanded': 'true', 'aria-controls': 'fMcOptions', 'aria-autocomplete': 'list', 'aria-activedescendant': f.vAt >= 0 ? `fMcRow${f.vAt}` : null,
         placeholder: 'Type to find one, like 1.20', value: f.vFind ?? '', autocomplete: 'off', spellcheck: 'false', oninput: (e) => { f.vFind = e.target.value; f.vAt = -1; f.vTop = true; if (!e.isComposing) render() }, oncompositionend: (e) => { f.vFind = e.target.value; render() }, onkeydown: keys }),
-      h('div', { class: 'vtabs' },
-        h('div', { class: 'seg', role: 'group', 'aria-label': 'Which versions the list shows' }, tab('release', 'Releases'), tab('snapshot', 'And snapshots'), tab('all', 'Everything')),
-        h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), title: 'Ask Mojang for the list again, for a version out within the hour', onclick: () => loadVersions({ refresh: true }) }, v?.loading ? 'Reading\u2026' : 'Refresh')),
-      typed && h('small', { class: 'hint', text: 'Searching every version, snapshots and old ones included.' }),
+      h('div', { class: 'flex items-center justify-between gap-2 flex-wrap' },
+        h('div', { class: SEG, role: 'group', 'aria-label': 'Which versions the list shows' }, tab('release', 'Releases'), tab('snapshot', 'And snapshots'), tab('all', 'Everything')),
+        h('button', { type: 'button', class: LINK, id: 'versionsRefresh', disabled: Boolean(v?.loading), title: 'Ask Mojang for the list again, for a version out within the hour', onclick: () => loadVersions({ refresh: true }) }, v?.loading ? 'Reading\u2026' : 'Refresh')),
+      typed && h('small', { class: HINT, text: 'Searching every version, snapshots and old ones included.' }),
       // the options alone are the listbox; the notes under them are not options
-      h('div', { class: 'vlist', id: 'fMcList' }, h('div', { class: 'vopts', id: 'fMcOptions', role: 'listbox', 'aria-label': 'Versions' },
-        rows.map((r, i) => h('div', { class: i === f.vAt ? 'vrow at' : 'vrow', id: `fMcRow${i}`, role: 'option', 'aria-selected': String(r.id === f.mc), 'aria-disabled': blocked(r) ? 'true' : null, onpointerdown: (e) => e.preventDefault(), onclick: () => pick(r) },
-          h('span', { class: 'vid', text: r.id }), badges(r),
-          (r.refusal || r.note) && h('small', { class: r.refusal ? 'why warn' : 'why', text: sentence(r.refusal ?? r.note) })))),
-        !rows.length && h('p', { class: 'hint', role: 'status', text: v?.loading ? 'Reading the version list\u2026' : typed ? `No version has \u201c${typed}\u201d in its name.` : 'No versions to pick.' }),
-        more > 0 && h('p', { class: 'hint', text: `${more} more. Type part of a version to find it.` })))
-    return h('div', { class: f.vOpen ? 'field full' : 'field' }, h('span', { class: 'label', id: 'fMcLabel', text: 'Version' }),
-      h('button', { type: 'button', class: 'vpick', id: 'fMc', 'aria-haspopup': 'dialog', 'aria-expanded': String(Boolean(f.vOpen)), 'aria-controls': f.vOpen ? 'fMcBox' : null, 'aria-labelledby': 'fMcLabel fMcNow',
+      h('div', { class: 'max-h-[232px] overflow-y-auto overscroll-contain', id: 'fMcList' }, h('div', { class: 'grid gap-px content-start', id: 'fMcOptions', role: 'listbox', 'aria-label': 'Versions' },
+        rows.map((r, i) => h('div', { class: i === f.vAt ? `${VROW} bg-hover-hi border-accent-edge` : `${VROW} border-transparent`, id: `fMcRow${i}`, role: 'option', 'aria-selected': String(r.id === f.mc), 'aria-disabled': blocked(r) ? 'true' : null, onpointerdown: (e) => e.preventDefault(), onclick: () => pick(r) },
+          h('span', { class: blocked(r) ? 'text-ink-3' : 'font-semibold', text: r.id }), badges(r),
+          (r.refusal || r.note) && h('small', { class: r.refusal ? 'basis-full type-meta text-warn-ink' : 'basis-full type-meta text-ink-3', text: sentence(r.refusal ?? r.note) })))),
+        !rows.length && h('p', { class: `${HINT} p-2`, role: 'status', text: v?.loading ? 'Reading the version list\u2026' : typed ? `No version has \u201c${typed}\u201d in its name.` : 'No versions to pick.' }),
+        more > 0 && h('p', { class: `${HINT} p-2`, text: `${more} more. Type part of a version to find it.` })))
+    return h('div', { class: f.vOpen ? `${FIELD} col-span-full` : FIELD }, h('span', { class: 'sl-label', id: 'fMcLabel', text: 'Version' }),
+      h('button', { type: 'button', class: 'sl-input flex items-center justify-between gap-2 h-auto min-h-9 text-left cursor-pointer aria-expanded:border-accent-edge aria-expanded:bg-[var(--field-focus)]', id: 'fMc', 'aria-haspopup': 'dialog', 'aria-expanded': String(Boolean(f.vOpen)), 'aria-controls': f.vOpen ? 'fMcBox' : null, 'aria-labelledby': 'fMcLabel fMcNow',
         onclick: () => { if (f.vOpen) return close(); f.vOpen = true; f.vAt = -1; render(); $('fMcFind')?.focus({ preventScroll: true }); $('fMcList')?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }) } },
-        h('span', { class: 'now', id: 'fMcNow' }, h('b', { text: f.mc || (v?.loading ? 'Reading the version list\u2026' : 'Pick a version') }), cur && badges(cur)), ico('chev')),
+        h('span', { class: 'flex items-center gap-2 flex-wrap min-w-0 py-1', id: 'fMcNow' }, h('b', { text: f.mc || (v?.loading ? 'Reading the version list\u2026' : 'Pick a version') }), cur && badges(cur)), ico('chev')),
       box,
-      changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
-      refused && h('small', { class: 'hint warn', text: sentence(refused) }),
-      (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint',
+      changed && h('small', { class: HINT_WARN, text: 'Changing it may stop the mods in its folder from loading.' }),
+      refused && h('small', { class: HINT_WARN, text: sentence(refused) }),
+      (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? HINT_WARN : HINT,
         text: [v?.error ? `The version list could not be read: ${v.error}.` : v?.offline ? sentence(v.offline) + '.' : '', facts.length ? sentence(facts.join(' \u00b7 ')) : ''].filter(Boolean).join(' ') }))
   }
 
@@ -206,15 +206,15 @@
   function loaderVersionField(f) {
     const name = loaderName(f.loader)
     const example = { quilt: '0.30.2', neoforge: '21.1.266', forge: '47.4.28' }[f.loader] ?? '0.17.3'
-    const typed = () => h('label', { class: 'field' }, h('span', { text: `${name} version` }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: (e) => { f.loaderVersion = e.target.value } }),
-      h('small', { class: 'hint', text: `The build of ${name} itself, like ${example}. Left empty, the first Play takes the newest stable one.` }))
+    const typed = () => h('label', { class: FIELD }, h('span', { class: 'sl-label', text: `${name} version` }), h('input', { class: 'sl-input', id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: (e) => { f.loaderVersion = e.target.value } }),
+      h('small', { class: HINT, text: `The build of ${name} itself, like ${example}. Left empty, the first Play takes the newest stable one.` }))
     if (!INSTALLER_LOADERS.includes(f.loader) || !f.mc || loaderBlock(f.loader, f.mc, versionInfo(f.mc))) return typed()
     // read when Advanced is open; until the list is in, the field to type one in
     if (f.adv) loadBuilds(f.loader, f.mc)
     const got = S.builds[buildsKey(f.loader, f.mc)]
     if (!got?.builds?.length) {
       if (!got?.error) return typed()
-      return h('div', {}, typed(), h('small', { class: 'hint warn', text: `${name}\u2019s builds could not be read: ${got.error}` }))
+      return h('div', { class: 'grid gap-1.5' }, typed(), h('small', { class: HINT_WARN, text: `${name}\u2019s builds could not be read: ${got.error}` }))
     }
     const builds = got.builds
     const by = got.picked && builds.find((b) => b.version === got.picked)
@@ -230,10 +230,10 @@
       : newer
       ? `${name} ${got.picked} is out. This setup stays on ${f.loaderVersion} until you pick another.`
       : f.loaderVersion ? `This setup stays on ${name} ${f.loaderVersion}.` : `Left on ${auto.split(':')[0].toLowerCase()}, the first Play takes that build and keeps it.`
-    return h('label', { class: 'field' }, h('span', { text: `${name} version` }),
-      h('select', { id: 'fLoaderVersion', value: f.loaderVersion, onchange: (e) => { f.loaderVersion = e.target.value; render() } },
-        options.map(([v, text]) => h('option', { value: v, selected: v === (f.loaderVersion ?? '') || null, text }))),
-      h('small', { class: newer || unknown ? 'hint warn' : 'hint', text: hint }))
+    return h('label', { class: FIELD }, h('span', { class: 'sl-label', text: `${name} version` }),
+      selectBox(h('select', { class: 'sl-input', id: 'fLoaderVersion', value: f.loaderVersion, onchange: (e) => { f.loaderVersion = e.target.value; render() } },
+        options.map(([v, text]) => h('option', { value: v, selected: v === (f.loaderVersion ?? '') || null, text })))),
+      h('small', { class: newer || unknown ? HINT_WARN : HINT, text: hint }))
   }
 
   async function loadJavas({ fresh = false } = {}) {
@@ -331,24 +331,24 @@
     if (other) hint = `The whole path to ${/Win/.test(navigator.platform) ? 'javaw.exe or java.exe' : 'the java program'}, in a Java's bin folder.`
     else if (f.java === 'mojang') hint = 'The Java that Mojang ships for this version, downloaded on the first Play. It is the one the official launcher uses.'
     else if (f.java) hint = 'This setup always starts with this Java.'
-    return h('div', { class: 'field' }, h('label', { class: 'label', for: 'fJava', text: 'Java' }),
-      h('select', { id: 'fJava', value: other ? JAVA_OTHER : f.java, onchange: onpick }, choices.map((c) => h('option', { value: c.value, text: c.text }))),
-      other && h('div', { class: 'pathrow' },
-        h('input', { id: 'fJavaPath', 'aria-label': 'Path to Java', value: f.java, class: check && check.found === false ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
+    return h('div', { class: FIELD }, h('label', { class: 'sl-label', for: 'fJava', text: 'Java' }),
+      selectBox(h('select', { class: 'sl-input', id: 'fJava', value: other ? JAVA_OTHER : f.java, onchange: onpick }, choices.map((c) => h('option', { value: c.value, text: c.text })))),
+      other && h('div', { class: 'grid grid-cols-[1fr_auto] gap-2' },
+        h('input', { id: 'fJavaPath', 'aria-label': 'Path to Java', value: f.java, class: check && check.found === false ? INPUT_BAD : 'sl-input', autocomplete: 'off', spellcheck: 'false',
           oninput: (e) => { f.java = e.target.value; f.javaCheck = null }, onchange: () => checkJava(f).catch(() => {}) }),
-        desktop?.pickFile && h('button', { type: 'button', class: 'sm', id: 'fJavaBrowse', onclick: () => browseJava(f) }, 'Browse\u2026')),
-      check?.checking && h('small', { class: 'hint', role: 'status', text: 'Checking that it is a Java\u2026' }),
-      check && check.found === false && h('small', { class: 'hint bad', id: 'fJavaBad', role: 'alert', text: sentence(check.message) }),
-      check?.found && h('small', { class: 'hint', id: 'fJavaGood', role: 'status', text: `That is Java ${check.major ?? 'of a version it does not say'}${check.arch ? ` (${check.arch})` : ''}.` }),
-      fit && h('small', { class: 'hint warn', id: 'fJavaFit', text: fit }),
-      h('small', { class: 'hint' }, hint, ' ',
-        h('button', { type: 'button', class: 'linkbtn', id: 'javasRefresh', disabled: Boolean(S.javas?.loading), title: 'Look for the Javas on this computer again, after installing one', onclick: () => loadJavas({ fresh: true }) }, S.javas?.loading ? 'Looking\u2026' : 'Look again'),
+        desktop?.pickFile && h('button', { type: 'button', class: BTN, id: 'fJavaBrowse', onclick: () => browseJava(f) }, 'Browse\u2026')),
+      check?.checking && h('small', { class: HINT, role: 'status', text: 'Checking that it is a Java\u2026' }),
+      check && check.found === false && h('small', { class: HINT_BAD, id: 'fJavaBad', role: 'alert', text: sentence(check.message) }),
+      check?.found && h('small', { class: HINT, id: 'fJavaGood', role: 'status', text: `That is Java ${check.major ?? 'of a version it does not say'}${check.arch ? ` (${check.arch})` : ''}.` }),
+      fit && h('small', { class: HINT_WARN, id: 'fJavaFit', text: fit }),
+      h('small', { class: HINT }, hint, ' ',
+        h('button', { type: 'button', class: LINK, id: 'javasRefresh', disabled: Boolean(S.javas?.loading), title: 'Look for the Javas on this computer again, after installing one', onclick: () => loadJavas({ fresh: true }) }, S.javas?.loading ? 'Looking\u2026' : 'Look again'),
         S.javas?.error && ` The Javas on this computer could not be listed: ${sentence(S.javas.error)}`))
   }
 
-  // Segmented buttons: one of `choices` ([value, label, disabled]) is pressed.
-  function segmented(label, choices, value, onpick) {
-    return h('div', { class: 'seg', role: 'group', 'aria-label': label },
+  // Segmented buttons: one of `choices` ([value, label, disabled]) is pressed. `cls` adds to the look.
+  function segmented(label, choices, value, onpick, cls = '') {
+    return h('div', { class: `${SEG} ${cls}`.trim(), role: 'group', 'aria-label': label },
       choices.map(([v, text, disabled]) => h('button', { type: 'button', 'aria-pressed': String(v === value), disabled: Boolean(disabled) && v !== value, title: typeof disabled === 'string' && v !== value ? disabled : null, onclick: () => onpick(v) }, text)))
   }
 
@@ -364,7 +364,7 @@
       if (rerender) render()
     }
     const toggle = (key) => () => { f[key] = !f[key]; render() }
-    const ro = (label, value, hint) => h('label', { class: 'field' }, h('span', { text: label }), h('input', { readonly: true, value }), hint && h('small', { class: 'hint', text: hint }))
+    const ro = (label, value, hint) => h('label', { class: FIELD }, h('span', { class: 'sl-label', text: label }), h('input', { class: 'sl-input text-ink-3 border-dashed', readonly: true, value }), hint && h('small', { class: HINT, text: hint }))
     const runningHint = 'Stop the game to change it.'
     // an error about the setup's own name, not one that only has the word in it
     const NAME_ERROR = /profile name|already exists|folder named|needs a name/i
@@ -390,15 +390,15 @@
     const others = loaderChoices.filter(([l, , why]) => why && l !== f.loader && !COMING.includes(l)).map(([, , why]) => why)
     const coming = COMING.filter((l) => l !== f.loader)
     if (coming.length) others.push(`${coming.map(loaderName).join(' and ')} ${coming.length > 1 ? 'are' : 'is'} coming in a later SpawnLoft.`)
-    const loaderField = running ? ro('Mods', modded(f.loader) ? loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }) : 'None', runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', id: 'fLoaderLabel', text: 'Mods' }),
-      h('div', { class: 'modsseg' }, segmented('Mods', loaderChoices, f.loader, pickLoader)),
-      // narrow sheets: the same five as a list
-      h('select', { class: 'modspick', id: 'fLoader', 'aria-labelledby': 'fLoaderLabel', value: f.loader, onchange: (e) => pickLoader(e.target.value) },
-        loaderChoices.map(([l, text, why]) => h('option', { value: l, disabled: Boolean(why) && l !== f.loader, text: why && l !== f.loader ? `${text} (${COMING.includes(l) ? 'coming' : 'not for this version'})` : text }))),
-      h('small', { class: loaderNo ? 'hint warn' : 'hint', text: loaderNo ?? loaderHint(f.loader) }),
-      !loaderNo && forgeUntested(f.loader, f.mc) && h('small', { class: 'hint', text: `Forge on ${f.mc} is not tested by SpawnLoft. Its 1.7.10 and 1.12.2 are, and ${f.mc} uses the same kind of installer.` }),
-      changed && h('small', { class: 'hint warn', text: changed }),
-      others.length > 0 && !loaderNo && h('small', { class: 'hint', text: others.join(' ') }))
+    const loaderField = running ? ro('Mods', modded(f.loader) ? loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }) : 'None', runningHint) : h('div', { class: FIELD }, h('span', { class: 'sl-label', id: 'fLoaderLabel', text: 'Mods' }),
+      // narrow sheets (under 560px): the same five as a list
+      h('div', { class: 'modsseg max-[560px]:hidden' }, segmented('Mods', loaderChoices, f.loader, pickLoader, '[&>button]:px-1.5')),
+      selectBox(h('select', { class: 'modspick sl-input', id: 'fLoader', 'aria-labelledby': 'fLoaderLabel', value: f.loader, onchange: (e) => pickLoader(e.target.value) },
+        loaderChoices.map(([l, text, why]) => h('option', { value: l, disabled: Boolean(why) && l !== f.loader, text: why && l !== f.loader ? `${text} (${COMING.includes(l) ? 'coming' : 'not for this version'})` : text }))), 'hidden max-[560px]:flex'),
+      h('small', { class: loaderNo ? HINT_WARN : HINT, text: loaderNo ?? loaderHint(f.loader) }),
+      !loaderNo && forgeUntested(f.loader, f.mc) && h('small', { class: HINT, text: `Forge on ${f.mc} is not tested by SpawnLoft. Its 1.7.10 and 1.12.2 are, and ${f.mc} uses the same kind of installer.` }),
+      changed && h('small', { class: HINT_WARN, text: changed }),
+      others.length > 0 && !loaderNo && h('small', { class: HINT, text: others.join(' ') }))
 
     const advice = memoryAdvice(f.memory, S.summary?.machine)
     const totalGb = advice.total ?? 16
@@ -409,15 +409,15 @@
       render()
       if (val === 'custom') $('fMemory')?.focus()
     }
-    const memoryField = running ? ro('Memory', memoryText(f.memory), runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', text: 'Memory' }),
+    const memoryField = running ? ro('Memory', memoryText(f.memory), runningHint) : h('div', { class: FIELD }, h('span', { class: 'sl-label', text: 'Memory' }),
       // a choice this computer does not have the memory for cannot be picked
       segmented('Memory', [...MEMORY_CHOICES.map((c) => [c, memoryText(c), advice.tooMuch(c)]), ['custom', 'Custom']], f.custom ? 'custom' : String(f.memory).toUpperCase(), pickMemory),
-      f.custom && h('div', { class: 'slider' },
-        h('input', { type: 'range', id: 'fMemory', min: '1', max: String(Math.max(totalGb, gb)), step: '0.5', value: String(gb), 'aria-label': 'Memory in gigabytes', 'aria-valuetext': memoryText(f.memory),
+      f.custom && h('div', { class: 'flex items-center gap-3' },
+        h('input', { class: 'flex-1 min-w-0 accent-accent', type: 'range', id: 'fMemory', min: '1', max: String(Math.max(totalGb, gb)), step: '0.5', value: String(gb), 'aria-label': 'Memory in gigabytes', 'aria-valuetext': memoryText(f.memory),
           oninput: (e) => { f.memory = memoryFromGb(e.target.value); f.memoryTouched = true; render() } }),
-        h('output', { for: 'fMemory', text: `${gb} GB` })),
-      advice.warn && h('small', { class: 'hint warn', id: 'fMemoryWarn', text: advice.warn }),
-      h('small', { class: 'hint', id: 'fMemoryLine', text: advice.line }))
+        h('output', { class: 'text-3 font-semibold min-w-[6ch] text-right', for: 'fMemory', text: `${gb} GB` })),
+      advice.warn && h('small', { class: HINT_WARN, id: 'fMemoryWarn', text: advice.warn }),
+      h('small', { class: HINT, id: 'fMemoryLine', text: advice.line }))
 
     const servers = serversNow()
     const def = defaultAccount()
@@ -425,37 +425,37 @@
     const taken = profilesNow().map((q) => q.name)
     const autoPlaceholder = f.mc ? autoName(f.mc, f.loader, taken) : 'Named by its version'
 
-    const grid = h('div', { class: 'grid2' },
+    const grid = h('div', { class: GRID2 },
       versionField,
       loaderField,
       memoryField,
       f.editing
         ? (running || busyHere
           ? ro('Name', f.name, running ? runningHint : 'It is being launched.')
-          : h('label', { class: 'field' }, h('span', { text: 'Name' }),
-            h('input', { id: 'fName', value: f.name, maxlength: '32', class: f.error && NAME_ERROR.test(f.error) ? 'bad' : null, oninput: set('name', true) }),
-            h('small', { class: 'hint', text: 'Renaming moves its folder too. Letters, digits, dash and underscore.' })))
-        : h('label', { class: 'field' }, h('span', { text: 'Name (optional)' }),
-          h('input', { id: 'fName', value: f.name, placeholder: autoPlaceholder, maxlength: '32', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
-          h('small', { class: 'hint', text: 'Shown in the setups list. Letters, digits, dash and underscore.' })),
-      h('label', { class: 'field' }, h('span', { text: 'Play as' }),
-        h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
+          : h('label', { class: FIELD }, h('span', { class: 'sl-label', text: 'Name' }),
+            h('input', { id: 'fName', value: f.name, maxlength: '32', class: f.error && NAME_ERROR.test(f.error) ? INPUT_BAD : 'sl-input', oninput: set('name', true) }),
+            h('small', { class: HINT, text: 'Renaming moves its folder too. Letters, digits, dash and underscore.' })))
+        : h('label', { class: FIELD }, h('span', { class: 'sl-label', text: 'Name (optional)' }),
+          h('input', { id: 'fName', value: f.name, placeholder: autoPlaceholder, maxlength: '32', class: f.error && /name/.test(f.error) ? INPUT_BAD : 'sl-input', oninput: set('name') }),
+          h('small', { class: HINT, text: 'Shown in the setups list. Letters, digits, dash and underscore.' })),
+      h('label', { class: FIELD }, h('span', { class: 'sl-label', text: 'Play as' }),
+        selectBox(h('select', { class: 'sl-input', id: 'fAccount', value: f.account, onchange: set('account') },
           h('option', { value: '', text: def ? `Whoever is signed in (${def.name})` : 'Whoever is signed in' }),
           accountsNow().map((a) => h('option', { value: accountValue(a, f.account), text: `${a.name} (${a.type === 'offline' ? 'Offline' : 'Microsoft'})` })),
-          f.account && !accountsNow().some((a) => accountValue(a, f.account) === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} (Offline)` : `${p?.accountName ?? f.account} (no longer signed in)` }))),
-      h('label', { class: 'field' }, h('span', { text: 'Usually joins' }),
-        h('select', { id: 'fServer', value: f.server, onchange: set('server') },
+          f.account && !accountsNow().some((a) => accountValue(a, f.account) === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} (Offline)` : `${p?.accountName ?? f.account} (no longer signed in)` })))),
+      h('label', { class: FIELD }, h('span', { class: 'sl-label', text: 'Usually joins' }),
+        selectBox(h('select', { class: 'sl-input', id: 'fServer', value: f.server, onchange: set('server') },
           h('option', { value: '', text: 'Title screen only' }),
           servers.map((s) => h('option', { value: s.name, text: `${s.label || s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (another version)' : ''}` })),
-          f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))))
+          f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` })))))
 
-    const harness = !running && h('div', { class: 'switchrow' },
-      h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds SpawnLoft\u2019s helper mod to the game. With it, a problem report and an AI assistant you connected can read what is on screen and send chat. Off until you need it.' })),
-      h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-labelledby': 'fHarnessLabel', disabled: Boolean(block), onclick: toggle('harness') }))
+    const harness = !running && h('div', { class: SWITCH_ROW },
+      h('div', { class: SWITCH_TEXT }, h('b', { class: 'block font-semibold', id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { class: block ? 'text-2 text-warn-ink' : 'text-2 text-ink-3', text: block ?? 'Adds SpawnLoft\u2019s helper mod to the game. With it, a problem report and an AI assistant you connected can read what is on screen and send chat. Off until you need it.' })),
+      h('button', { type: 'button', class: SWITCH, role: 'switch', 'aria-checked': String(f.harness), 'aria-labelledby': 'fHarnessLabel', disabled: Boolean(block), onclick: toggle('harness') }))
 
-    const serverList = h('div', { class: 'switchrow' },
-      h('div', { class: 'txt' }, h('b', { id: 'fServerListLabel', text: 'Show my SpawnLoft servers in the game' }), h('small', { text: 'Each time the game starts, the servers on this version are put in its Multiplayer list. Servers you added there yourself are never changed.' })),
-      h('button', { type: 'button', class: 'switch', id: 'fServerList', role: 'switch', 'aria-checked': String(f.serverList), 'aria-labelledby': 'fServerListLabel', onclick: toggle('serverList') }))
+    const serverList = h('div', { class: SWITCH_ROW },
+      h('div', { class: SWITCH_TEXT }, h('b', { class: 'block font-semibold', id: 'fServerListLabel', text: 'Show my SpawnLoft servers in the game' }), h('small', { class: 'text-2 text-ink-3', text: 'Each time the game starts, the servers on this version are put in its Multiplayer list. Servers you added there yourself are never changed.' })),
+      h('button', { type: 'button', class: SWITCH, id: 'fServerList', role: 'switch', 'aria-checked': String(f.serverList), 'aria-labelledby': 'fServerListLabel', onclick: toggle('serverList') }))
 
     if (f.adv === undefined) f.adv = Boolean(f.java || f.loaderVersion || f.assistantAccount)
     const msAccount = (() => {
@@ -463,26 +463,26 @@
       return a?.type === 'microsoft' ? a : null
     })()
     if (f.adv && !running && !S.javas) loadJavas()
-    const advanced = h('details', { class: 'adv', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open; if (f.adv && !S.javas) loadJavas() } },
-      h('summary', { text: 'Advanced' }),
-      h('div', { class: 'in' },
+    const advanced = h('details', { class: 'border border-line rounded-sm bg-recess', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open; if (f.adv && !S.javas) loadJavas() } },
+      h('summary', { class: 'cursor-pointer py-3 px-4 text-3 font-semibold text-ink-2', text: 'Advanced' }),
+      h('div', { class: 'px-4 pb-4 grid gap-4' },
         running
-          ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's own Java" : f.java || 'Automatic', runningHint), modded(f.loader) && ro(`${loaderName(f.loader)} version`, f.loaderVersion || 'Newest stable'))
-          : h('div', { class: 'grid2' },
+          ? h('div', { class: GRID2 }, ro('Java', f.java === 'mojang' ? "Mojang's own Java" : f.java || 'Automatic', runningHint), modded(f.loader) && ro(`${loaderName(f.loader)} version`, f.loaderVersion || 'Newest stable'))
+          : h('div', { class: GRID2 },
             javaField(f),
             modded(f.loader) && loaderVersionField(f)),
         f.editing
-          ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { id: 'fAssistLabel', text: 'Allow an assistant to use my account' }),
-            h('small', { text: msAccount ? `An AI assistant you connected to SpawnLoft may start this setup and play signed in as ${msAccount.name}.` : 'An AI assistant you connected to SpawnLoft may start this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),
-          h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-labelledby': 'fAssistLabel', onclick: toggle('assistantAccount') }))
-          : h('p', { class: 'hint', text: 'An AI assistant you connected to SpawnLoft plays a new setup as an offline player. To let it use a Microsoft account, turn that on after the setup exists.' })))
+          ? h('div', { class: SWITCH_ROW }, h('div', { class: SWITCH_TEXT }, h('b', { class: 'block font-semibold', id: 'fAssistLabel', text: 'Allow an assistant to use my account' }),
+            h('small', { class: 'text-2 text-ink-3', text: msAccount ? `An AI assistant you connected to SpawnLoft may start this setup and play signed in as ${msAccount.name}.` : 'An AI assistant you connected to SpawnLoft may start this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),
+          h('button', { type: 'button', class: SWITCH, role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-labelledby': 'fAssistLabel', onclick: toggle('assistantAccount') }))
+          : h('p', { class: HINT, text: 'An AI assistant you connected to SpawnLoft plays a new setup as an offline player. To let it use a Microsoft account, turn that on after the setup exists.' })))
 
     const given = p && givenName(p)
-    return h('div', { class: 'backdrop', onclick: (e) => { if (e.target === e.currentTarget) closeSheet() } },
-      h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle', onkeydown: trapTab },
+    return h('div', { class: 'fixed inset-0 z-8 grid items-start justify-items-center py-7 px-5 overflow-auto bg-backdrop', onclick: (e) => { if (e.target === e.currentTarget) closeSheet() } },
+      h('div', { class: 'w-[640px] max-w-full grid gap-4 py-5 px-7 bg-raised border border-edge rounded-lg shadow-lg max-[700px]:p-4', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle', onkeydown: trapTab },
         h('div', {},
-          h('h2', { id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { text: ` (${given})` })] : 'New setup'),
-          h('p', { class: 'sub', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : [playedLine(p), memoryText(p.memory), p.server ? `usually joins ${p.server}` : 'opens on the title screen'].filter(Boolean).join(' · ')) : 'Nothing is downloaded until you press Play.' })),
+          h('h2', { class: 'm-0 type-page', id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { class: 'text-ink-3 font-medium', text: ` (${given})` })] : 'New setup'),
+          h('p', { class: 'm-0 mt-0.5 type-meta text-ink-3', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : [playedLine(p), memoryText(p.memory), p.server ? `usually joins ${p.server}` : 'opens on the title screen'].filter(Boolean).join(' · ')) : 'Nothing is downloaded until you press Play.' })),
         f.error && notice({ tone: 'fault', title: sentence(f.error) }),
         running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, mods, Java, memory and the helper mod can\'t change while the game is open. Stop it first to change them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
@@ -490,23 +490,33 @@
         serverList,
         harness,
         advanced,
-        f.removing && p && h('div', { class: 'confirm', role: 'alert' },
+        f.removing && p && h('div', { class: CONFIRM, role: 'alert' },
           h('span', {}, h('b', { text: `Remove ${setupTitle(p)}?` }), ' Its folder with worlds, options and mods is kept.'),
           // The button says what it will do: with the box ticked it deletes worlds, and reads so.
-          h('label', {}, h('input', { type: 'checkbox', id: 'purge', onchange: (ev) => { $('confirmRemove').textContent = removeLabel(ev.target.checked) } }), ' Also delete its folder, worlds included'),
-          h('span', { class: 'grow' }),
-          h('button', { class: 'sm', id: 'keepSetup', onclick: () => { f.removing = false; render() } }, 'Keep it'),
-          h('button', { class: 'sm danger', id: 'confirmRemove', onclick: () => removeProfile(p, $('purge').checked) }, removeLabel(false))),
-        h('div', { class: 'foot' },
+          h('label', { class: 'inline-flex gap-2 items-center text-ink-2 cursor-pointer' }, h('input', { class: 'sl-check mt-0', type: 'checkbox', id: 'purge', onchange: (ev) => { $('confirmRemove').textContent = removeLabel(ev.target.checked) } }), ' Also delete its folder, worlds included'),
+          h('span', { class: 'flex-1' }),
+          h('button', { class: BTN_SM, id: 'keepSetup', onclick: () => { f.removing = false; render() } }, 'Keep it'),
+          h('button', { class: BTN_DANGER_SM, id: 'confirmRemove', onclick: () => removeProfile(p, $('purge').checked) }, removeLabel(false))),
+        h('div', { class: 'flex items-center flex-wrap gap-2 pt-3 border-t border-line-soft' },
           p
-            ? [h('button', { class: 'sm quiet', id: 'sheetFolder', onclick: () => reveal(p, 'folder') }, ico('folder'), 'Open folder'),
-              h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, title: running ? 'Stop the game to remove it.' : null, onclick: () => { f.removing = true; render(); const keep = $('keepSetup'); keep?.scrollIntoView({ block: 'nearest' }); keep?.focus() } }, 'Remove setup…'),
-              h('button', { class: 'sm quiet', disabled: f.saving || edited, title: edited ? 'Save or cancel your changes first: the copy is made from the saved setup.' : 'A second setup with the same settings, mods and options. Worlds are not copied.', onclick: () => duplicateProfile(p) }, 'Duplicate'),
-              h('span', { class: 'grow' })]
-            : h('span', { class: 'hint', text: 'Kept in its own folder under SpawnLoft\'s data folder.' }),
-          h('button', { onclick: closeSheet }, 'Cancel'),
-          h('button', { class: 'primary', disabled: f.saving || !f.mc, onclick: saveSheet }, f.saving ? 'Saving…' : f.editing ? 'Save' : 'Create'))))
+            ? [h('button', { class: BTN_QUIET_SM, id: 'sheetFolder', onclick: () => reveal(p, 'folder') }, ico('folder'), 'Open folder'),
+              h('button', { class: `${BTN_QUIET_SM} text-fault-ink hover:text-fault-ink`, disabled: running || busyHere, title: running ? 'Stop the game to remove it.' : null, onclick: () => { f.removing = true; render(); const keep = $('keepSetup'); keep?.scrollIntoView({ block: 'nearest' }); keep?.focus() } }, 'Remove setup…'),
+              h('button', { class: BTN_QUIET_SM, disabled: f.saving || edited, title: edited ? 'Save or cancel your changes first: the copy is made from the saved setup.' : 'A second setup with the same settings, mods and options. Worlds are not copied.', onclick: () => duplicateProfile(p) }, 'Duplicate'),
+              h('span', { class: 'flex-1' })]
+            : h('span', { class: `${HINT} mr-auto`, text: 'Kept in its own folder under SpawnLoft\'s data folder.' }),
+          h('button', { class: BTN, onclick: closeSheet }, 'Cancel'),
+          h('button', { class: BTN_PRIMARY, disabled: f.saving || !f.mc, onclick: saveSheet }, f.saving ? 'Saving…' : f.editing ? 'Save' : 'Create'))))
   }
+
+  // the sheet's parts
+  const FIELD = 'sl-field'
+  const GRID2 = 'grid grid-cols-2 gap-y-3 gap-x-4 max-[700px]:grid-cols-[minmax(0,1fr)]'
+  const SEG = 'sl-seg w-max max-w-full flex-wrap [&>button:disabled]:opacity-45 [&>button:disabled]:cursor-not-allowed'
+  const VROW = 'flex items-center flex-wrap gap-y-1 gap-x-2 min-h-8 py-1 px-2 border rounded-xs cursor-pointer hover:bg-hover-hi aria-selected:bg-accent-fill aria-disabled:cursor-not-allowed'
+  const SWITCH_ROW = 'flex items-start gap-3 py-3 px-4 border border-line rounded-sm bg-recess'
+  const SWITCH_TEXT = 'flex-1 min-w-0 text-3'
+  // a <button role="switch">: the shared switch, turned on by aria-checked rather than :checked
+  const SWITCH = 'sl-switch mt-0.5 cursor-pointer aria-checked:bg-[var(--switch-top)] aria-checked:border-[var(--switch-top)] aria-checked:after:[transform:translateX(14px)] aria-checked:after:bg-[var(--control-mark)] disabled:opacity-40 disabled:cursor-not-allowed'
 
   // A typed field as the panel wants it: trimmed, and null when empty.
   function fieldText(s) { return String(s ?? '').trim() || null }
