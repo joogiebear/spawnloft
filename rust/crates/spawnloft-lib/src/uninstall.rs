@@ -351,7 +351,23 @@ pub fn run(
 
     log("removing scheduled tasks");
     match sched.remove_all() {
-        Ok(_) => result.tasks = true,
+        Ok((true, _)) => result.tasks = true,
+        // a task Task Scheduler would not delete (one made from an administrator prompt, which
+        // an ordinary account may only read) keeps its definition and its shim: say which, and
+        // how, with a command that still exists once the uninstaller has removed this program
+        Ok((false, left)) => result.failed.push(if cfg!(windows) {
+            format!(
+                "scheduled tasks still there: {}. From an administrator prompt, run for each: \
+                 schtasks /Delete /TN \"\\{}\\<id>\" /F",
+                left.join(", "),
+                crate::schedule::TASK_FOLDER
+            )
+        } else {
+            format!(
+                "scheduled tasks still there: {}. Remove them with `spawnloft task rm <id>`",
+                left.join(", ")
+            )
+        }),
         Err(e) => result.failed.push(format!("scheduled tasks: {}", e.message())),
     }
 

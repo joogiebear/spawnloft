@@ -74,7 +74,7 @@ function buildHomeCard(name) {
       tileSlot,
       Kit.h('div', { class: 'min-w-0 flex-[1_1_240px]' },
         Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1' }, Kit.h('h3', { class: 'm-0 min-w-0 max-w-full' }, nameButton), pill),
-        meta, noteSlot),
+        meta),
       Kit.h('div', { class: 'flex flex-wrap gap-2' }, act, play, open)),
     stats, links);
   card.parts = { tileSlot, nameButton, pill, meta, noteSlot, act, play, open, stats, links };
@@ -179,8 +179,11 @@ function updateHomeCard(card, row) {
     meta.textContent = '';
     meta.append(what, Kit.h('span', { 'aria-hidden': 'true', text: '·' }), addr ? addrButton(addr) : 'port not known yet');
     if (shared.length) meta.append(Kit.h('span', { 'aria-hidden': 'true', text: '·' }), (shared.length === 1 ? 'Shared database ' : 'Shared databases ') + shared.map((d) => d.label || d.name).join(', '));
+    // the note goes back in last, so its "·" follows the address on the same line
+    meta.append(noteSlot);
   }
-  // The note is apart from the address, so "Stopped 5m ago" ticking over never rebuilds the button.
+  // The note has a slot of its own at the end of that line, so "Stopped 5m ago" ticking over never
+  // rebuilds the address button.
   const noteKey = note ? note.tone + '|' + note.text : '';
   if (noteSlot.dataset.said !== noteKey) {
     noteSlot.dataset.said = noteKey;

@@ -148,6 +148,8 @@ spawnloft list
 spawnloft status pkgtest --json | grep -q '"status": *"running"' || fail "2.0 does not see the 1.x server as running"
 spawnloft stop pkgtest
 spawnloft status pkgtest --json | grep -q '"status": *"stopped"' || fail "2.0 did not stop the 1.x server"
+# stop returns once Java has exited; the 1.x daemon follows its child a moment later
+for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
 if kill -0 "$pid" 2>/dev/null; then fail "the 1.x daemon (pid $pid) is still alive after stop"; fi
 # what a 1.x task shim or MCP config runs: the app with the Node core's script path, which no
 # longer exists and is never read (the shell drops it, rust/PLAN-CORE-PORT.md 5.2)
