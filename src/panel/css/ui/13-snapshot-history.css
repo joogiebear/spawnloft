@@ -24,13 +24,6 @@
   .act-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-3); margin-top: var(--s-3); }
   .act-foot .hint { margin: 0; font-variant-numeric: tabular-nums; }
   .act-foot:has(> .act-more[hidden]) { justify-content: flex-start; }
-  .launch-line {
-    display: block; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm);
-    background: var(--sunken); border: 1px solid var(--line-soft);
-    font: var(--t-1)/1.6 var(--mono); color: var(--ink-3); white-space: normal; overflow-wrap: anywhere;
-  }
-  .set-control label.check { display: flex; align-items: center; gap: 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); }
-  .set-control label.check input { width: auto; margin: 0; }
   .mc-look { display: grid; gap: var(--s-2); margin-top: var(--s-2); }
   .mc-palette { display: flex; flex-wrap: wrap; gap: 3px; }
   .mc-swatch { width: 18px; height: 18px; padding: 0; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .25); box-shadow: none; }
