@@ -380,7 +380,7 @@
             <div class="grid content-start grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4 pb-5" id="schedulerBody"></div>
           </div>
           <div class="pane pane-scroll hidden min-h-0 min-w-0 [grid-area:1/1] grid-rows-[1fr] overflow-auto [scrollbar-gutter:stable] @container/pane focus:outline-none data-active:grid" id="paneSettings" tabindex="-1">
-            <div class="grid content-start grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4 pb-5" id="settingsBody"></div>
+            <div class="grid grid-cols-[minmax(0,1fr)] grid-rows-[1fr_auto] gap-4 px-5 pt-4 pb-5" id="settingsBody"></div>
           </div>
         </div>
       </section>
@@ -685,7 +685,7 @@
     </div>
 
     <!-- ============ settings ============================================= -->
-    <div class="view sheet hidden min-h-0 grid-rows-[auto_1fr] overflow-auto bg-void [scrollbar-gutter:stable] focus:outline-none data-active:grid" id="vSettings">
+    <div class="view sheet hidden min-h-0 grid-rows-[auto_1fr] overflow-auto bg-void focus:outline-none data-active:grid" id="vSettings">
       <div class="flex items-center gap-3 border-b border-line-soft px-7 py-5">
         <h1 class="m-0 flex-1 type-page">Preferences</h1>
         <button type="button" class="sl-btn sl-btn-ghost" id="bSetClose">Close</button>

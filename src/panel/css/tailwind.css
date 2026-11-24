@@ -825,6 +825,9 @@
   .grid-rows-\[1fr\] {
     grid-template-rows: 1fr;
   }
+  .grid-rows-\[1fr_auto\] {
+    grid-template-rows: 1fr auto;
+  }
   .grid-rows-\[auto_1fr\] {
     grid-template-rows: auto 1fr;
   }
