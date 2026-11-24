@@ -89,7 +89,7 @@ function chart(samples, { pick, max, colour, label }) {
 function gauge({ title, now, aside, samples, pick, max, colour, empty, fmt }) {
   const head = Kit.h('div', { class: 'flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5' },
     Kit.eyebrow(title, 'h3'),
-    Kit.h('span', { class: 'now text-[length:var(--text-6)] font-semibold leading-none tracking-tight text-ink', text: now }),
+    Kit.h('span', { class: 'now text-[length:var(--text-6)] font-semibold leading-none tracking-display text-ink', text: now }),
     Kit.h('span', { class: 'type-meta ml-auto text-ink-3', text: aside }));
   head.firstChild.classList.add('basis-full', 'm-0');
   const plot = Kit.h('div', { class: 'relative grid' },
@@ -289,7 +289,7 @@ async function paintPerformance(name, opts) {
       + ' is what the game itself may use, and Java needs some more on top of it.' }));
   }
 
-  const facts = Kit.h('div', { class: 'type-meta col-span-full flex flex-wrap gap-x-6 gap-y-1 text-ink-3' });
+  const facts = Kit.h('div', { class: 'facts type-meta col-span-full flex flex-wrap gap-x-6 gap-y-1 text-ink-3' });
   const add = (label, value) => {
     facts.append(Kit.h('span', null, label + ' ', Kit.h('b', { class: 'font-mono font-semibold text-ink-2', text: value })));
   };

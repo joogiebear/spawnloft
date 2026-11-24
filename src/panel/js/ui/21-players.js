@@ -205,6 +205,8 @@ async function renderPlayers(opts) {
     value: playerView.filter,
     onChange: (key) => { playerView.filter = key; paint(); },
   });
+  // The count apart from the name, which was read as "Everyone12".
+  PLAYER_FILTERS.forEach((f, i) => filters.children[i].setAttribute('aria-label', f.label + ', ' + counts[f.key]));
   const searchBox = Kit.h('div', { class: 'min-w-40 max-w-90 flex-[0_1_360px]' }, search);
   body.append(Kit.h('div', { class: 'my-4 flex flex-wrap items-center gap-2' }, searchBox, addBtn, Kit.h('span', { class: 'ml-auto' }, filters)));
 
@@ -364,6 +366,7 @@ function playerRow(p, data, base, again, select) {
     meta: [p.uuid.slice(0, 8), seenText, p.banned && p.banReason ? 'banned: ' + p.banReason : ''].filter(Boolean).join(' · '),
     end: [playerActions(p, data, base, again)],
   });
+  line.querySelector('.sl-row-meta').title = p.uuid;
   line.classList.add('flex-wrap', '@ultra/pane:cursor-pointer', '@ultra/pane:data-[selected]:bg-hover', '@ultra/pane:data-[selected]:shadow-[inset_3px_0_0_var(--accent)]');
   if (p.online) line.dataset.online = '';
   const title = line.querySelector('.sl-row-title');
@@ -373,7 +376,6 @@ function playerRow(p, data, base, again, select) {
   }
   const pills = playerPills(p);
   if (pills.length) title.after(Kit.h('span', { class: 'flex flex-wrap gap-1.5 py-0.5' }, pills));
-  if (p.lastSeen && !p.online) line.querySelector('.sl-row-meta').title = new Date(p.lastSeen).toLocaleString();
   // A click anywhere but a button chooses this player for the record an Ultra pane shows.
   if (select) line.addEventListener('click', (e) => { if (!e.target.closest('button')) select(p.uuid); });
   return line;

@@ -219,32 +219,37 @@ function activityLine(run, { open, when, tail }) {
   const e = run.entries[0];
   const said = runText(run);
   const sentence = said.verb + (said.detail ? ' ' + said.detail : '');
+  const bad = e.ok === false ? Kit.pill({ text: e.action === 'crash' ? 'Crash' : 'Failed', tone: 'fault' }) : null;
   const tailOf = (entry) => {
     const t = tail(entry);
     return t ? [t] : [];
   };
-  const bad = e.ok === false ? Kit.pill({ text: e.action === 'crash' ? 'Crash' : 'Failed', tone: 'fault' }) : null;
+  const mark = e.ok === false ? 'text-fault-ink' : '';
   const line = Kit.row({
     lead: Kit.icon(activityIcon(e.action)),
     title: sentence,
-    end: [bad, activityChip(e.by), when(e.at), ...tailOf(e)],
+    end: [bad, activityChip(e.by), when(e.at), ...(run.entries.length === 1 ? tailOf(e) : [])],
   });
   line.classList.add('feed-row');
   line.querySelector('.sl-row-title').title = sentence;
-  if (e.ok === false) line.querySelector('.sl-row-title').classList.add('text-fault-ink');
+  if (mark) line.querySelector('.sl-row-title').classList.add(mark);
   if (run.entries.length === 1) return line;
 
-  // A run: the same row as a summary that opens to the entries in it.
+  // A run: the same line, led by a caret, as a summary that opens to the entries in it. Undo
+  // belongs to the entries, so the summary has none.
   const last = run.entries[run.entries.length - 1];
   const details = Kit.h('details', { class: 'group' });
   details.dataset.key = run.key + '|' + last.at;
   details.open = open.has(details.dataset.key);
-  const summary = Kit.h('summary', { class: 'sl-row cursor-pointer list-none hover:bg-hover [&::-webkit-details-marker]:hidden' });
-  summary.append(Kit.icon('caret', '-rotate-90 group-open:rotate-0'), ...line.childNodes);
-  summary.querySelector('.ico:not(:first-child)')?.remove();
+  const head = Kit.row({
+    lead: Kit.icon('caret', '-rotate-90 group-open:rotate-0'),
+    title: sentence,
+    end: [bad, activityChip(e.by), when(e.at)],
+  });
+  const summary = Kit.h('summary', { class: 'sl-row feed-row cursor-pointer list-none hover:bg-hover [&::-webkit-details-marker]:hidden' }, ...head.childNodes);
+  if (mark) summary.querySelector('.sl-row-title').classList.add(mark);
   const span = ago(last.at) !== ago(e.at) ? ago(last.at) + ' to ' + ago(e.at) : ago(e.at);
   summary.title = sentence + ' \u00b7 ' + span;
-  summary.classList.add('feed-row');
   const sub = Kit.h('div', { class: 'border-t border-line-faint bg-recess pl-8' });
   for (const one of run.entries) {
     const l = Kit.row({
@@ -257,5 +262,6 @@ function activityLine(run, { open, when, tail }) {
     sub.append(l);
   }
   details.append(summary, sub);
-  return details;
+  // A list item wraps it: ARIA allows no role on <details> itself.
+  return Kit.h('div', null, details);
 }
