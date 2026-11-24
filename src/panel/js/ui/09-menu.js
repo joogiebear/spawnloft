@@ -50,20 +50,22 @@ function buildMoreMenu() {
   for (const item of moreItems(row)) {
     if (item === 'sep') {
       const sep = document.createElement('div');
-      sep.className = 'menu-sep';
+      sep.className = 'sl-menu-sep';
       sep.setAttribute('role', 'separator');
       menu.append(sep);
       continue;
     }
     const b = document.createElement('button');
     b.type = 'button';
+    b.className = 'sl-menu-item disabled:cursor-not-allowed disabled:opacity-50';
     b.setAttribute('role', 'menuitem');
     b.tabIndex = -1;
     b.disabled = Boolean(item.disabled);
-    if (item.danger) b.dataset.tone = 'danger';
-    const title = document.createElement('b');
+    if (item.disabled) b.setAttribute('aria-disabled', 'true');
+    const title = document.createElement('span');
+    title.className = 'font-semibold' + (item.danger && !item.disabled ? ' text-fault-ink' : '');
     title.textContent = item.label;
-    const hint = document.createElement('span');
+    const hint = document.createElement('small');
     hint.textContent = item.hint;
     b.append(title, hint);
     b.onclick = () => { moreMenu.close({ refocus: true }); item.run(); };

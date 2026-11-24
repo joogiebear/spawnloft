@@ -191,7 +191,7 @@ test('Join offers the servers on the setup\'s version, running ones first, and t
   // the menu ends in the two choices that are not servers, and says where the rest are
   assert.match(fnSource('joinMenu'), /id: 'joinOther'[^\n]*'Another address\\u2026'\)/)
   assert.match(fnSource('joinMenu'), /id: 'joinTitle'[^\n]*'Title screen'\)/)
-  assert.match(fnSource('joinMenu'), /rest > 0 && h\('p', \{ class: 'note'/)
+  assert.match(fnSource('joinMenu'), /rest > 0 && h\('p', \{ class: MENU_NOTE/)
 })
 
 test('a server on another version stops Play until the player says where to go', () => {
@@ -230,7 +230,7 @@ test('"Another address" is a choice of its own, with its own box', () => {
   assert.match(plan, /custom && addrProblem\s+\? \[address \? 'Fix the server address under Join/)
   assert.match(fnSource('startLaunch'), /if \(plan\.addrProblem\) \{\s+render\(\)\s+return \(\$\('joinAddress'\) \?\? \$\('join'\)\)\?\.focus\(\)/)
   const field = fnSource('joinField')
-  assert.match(field, /custom && h\('div', \{ class: 'addr' \}/)
+  assert.match(field, /custom && h\('div', \{ class: JOIN_ADDRESS \}/)
   assert.match(field, /id: 'joinAddress', 'aria-label': 'Server address'/)
   assert.match(field, /oninput: \(e\) => \{ setTarget\(p, \{ address: e\.target\.value, custom: true \}\)/)
   // the field itself takes no typing, so a picked server cannot turn into an address
@@ -750,32 +750,31 @@ test('menus are disclosures over groups of plain buttons, each in a pad with a b
   assert.match(fnSource('versionPicker'), /id: 'fMcOptions', role: 'listbox', 'aria-label': 'Versions' \},\s+rows\.map/)
   for (const id of ['menuAccount']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
   // Join is a button that opens a dialog of choices; nothing is typed into it
-  assert.match(html, /class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint \? 'joinHint' : null/)
+  assert.match(html, /class: JOIN_BOX, id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint \? 'joinHint' : null/)
   // the links in a blocked Play's reason keep the focus through a re-render
-  assert.match(fnSource('fixButton'), /class: 'linkbtn', id: `fix-\$\{fix\}`/)
+  assert.match(fnSource('fixButton'), /class: LINK, id: `fix-\$\{fix\}`/)
   assert.doesNotMatch(menus, /role: 'combobox'/)
   assert.match(html, /id: 'menuJoin', role: 'dialog'/)
   assert.match(html, /id: 'menuAsk', role: 'dialog'/)
   // every opener names what it opens, and every menu renders inside the pad
   for (const id of ['menuAccount', 'menuJoin']) assert.match(html, new RegExp(`'aria-expanded': String\\([^)]*\\), 'aria-controls': '${id}'`), id)
-  assert.match(fnSource('accountChip'), /menuPad\(accountMenu\(def\)\)/)
+  assert.match(fnSource('accountChip'), /menuPad\(accountMenu\(def\), true\)/)
   assert.match(fnSource('playButton'), /menuPad\(askMenu\(p\)\)/)
   assert.match(fnSource('joinField'), /menuPad\(joinMenu\(p, plan\)\)/)
   // the setups are not a menu any more: a list always in view, which the first run shares and
   // which says there are none yet
   assert.match(fnSource('playView'), /setupsPanel\(p\)/)
   assert.match(fnSource('firstRunView'), /setupsPanel\(draft\)/)
-  assert.match(fnSource('setupsPanel'), /!list\.length && h\('p', \{ class: 'note', text: 'No setups yet/)
+  assert.match(fnSource('setupsPanel'), /!list\.length && h\('p', \{ class: NOTE, text: 'No setups yet/)
   assert.doesNotMatch(html, /menuVersion|verBtn/)
   assert.match(html, /querySelector\('\.menupad'\)\?\.scrollIntoView\(\{ block: 'nearest' \}\)/)
   // the chosen setup is marked for the eye and for a screen reader, and every control in the
   // list has an id, which is what lets a re-render keep focus on it
-  assert.match(fnSource('setupsPanel'), /class: q === p \? 'srow cur' : 'srow'/)
+  assert.match(fnSource('setupsPanel'), /class: q === p \? `\$\{SETUP_ROW\} bg-accent-wash border-accent-edge` : `\$\{SETUP_ROW\} border-transparent`/)
   assert.match(fnSource('setupsPanel'), /id: `setup-\$\{q\.name\}`, 'aria-current': q === p \? 'true' : null/)
   assert.match(fnSource('setupsPanel'), /id: `edit-\$\{q\.name\}`/)
   // the pad is positioned where the menu was and keeps a margin under it; alignment is the pad's
-  assert.match(html, /\.menupad \{[^}]*position: absolute;[^}]*padding-bottom: var\(--s-6\)/)
-  assert.match(html, /\.menupad:has\(> \.who\) \{ justify-content: flex-end; \}/)
+  assert.match(html, /class: `menupad absolute [^`]*pb-7 [^`]*max-\[700px\]:contents \$\{end \? 'justify-end' : ''\}`/)
 })
 
 test('removing a setup puts focus on the safe answer, and the button says when worlds go too', () => {
@@ -932,9 +931,8 @@ test('focus goes back to what opened the sheet', () => {
 })
 
 test('the page is a fixed size, not a share of the window', () => {
-  assert.match(html, /\.playgrid \{ width: min\(1120px, 100%\);[^}]*grid-template-columns: minmax\(0, 1fr\) 312px;/)
-  assert.doesNotMatch(html, /\.playbox \{[^}]*vw/)
-  assert.doesNotMatch(html, /\.playrow \.play \{[^}]*vw/)
+  assert.match(constSource('PLAYGRID'), /'w-\[min\(1120px,100%\)\] [^']*grid-cols-\[minmax\(0,1fr\)_312px\]/)
+  for (const name of ['PLAYGRID', 'PLAYBOX', 'PLAY_BTN', 'PLAY_ROW']) assert.doesNotMatch(constSource(name), /vw/, name)
 })
 
 test('exits are shown one at a time, and only its own setup\'s Play or a dismissal ends a crash notice', async () => {
@@ -1075,7 +1073,7 @@ test('Java is a list, and a path is checked before it is saved', () => {
   assert.match(save, /const check = await checkJava\(f\)\s+if \(check && check\.found === false\) \{\s+f\.adv = true\s+throw new Error\(`The Java was not saved: \$\{check\.message\}`\)/)
   // Browse is the desktop app's file picker, asked for programs
   assert.match(fnSource('browseJava'), /desktop\.pickFile\('Choose the java program', 'program'\)/)
-  assert.match(fnSource('javaField'), /desktop\?\.pickFile && h\('button', \{ type: 'button', class: 'sm', id: 'fJavaBrowse'/)
+  assert.match(fnSource('javaField'), /desktop\?\.pickFile && h\('button', \{ type: 'button', class: BTN, id: 'fJavaBrowse'/)
   // an answer that arrives while a button is pressed does not rebuild the page under the click
   assert.match(fnSource('renderSoon'), /if \(pressed\) renderWaits = true\s+else render\(\)/)
 })
@@ -1096,7 +1094,7 @@ test('the sheet says things in plain words', () => {
   assert.doesNotMatch(html, /through MCP/)
   assert.doesNotMatch(sheet, /'Loader'/)
   assert.match(sheet, /const loaderChoices = \[\['vanilla', 'None'\], \.\.\.MOD_LOADERS\.map/)
-  assert.match(sheet, /segmented\('Mods', loaderChoices, f\.loader, pickLoader\)/)
+  assert.match(sheet, /segmented\('Mods', loaderChoices, f\.loader, pickLoader, '[^']*'\)/)
   assert.match(fnSource('loaderHint'), /None is plain Minecraft, also called Vanilla/)
   assert.doesNotMatch(html, /or mojang for Mojang/)
 })
@@ -1141,7 +1139,7 @@ test('accounts: signing out asks first, the offline name has a label and is chec
   assert.match(ask, /Signing in again goes through Microsoft\\'s page\./)
   // both offline fields are the same labelled one
   const field = fnSource('offlineField')
-  assert.match(field, /h\('label', \{ class: 'flabel', for: id, text: 'Offline name' \}\)/)
+  assert.match(field, /h\('label', \{ class: '[^']*', for: id, text: 'Offline name' \}\)/)
   assert.match(field, /disabled: !ok, onclick: go/)
   assert.match(menu, /offlineField\('offName', 'Add'/)
   assert.match(fnSource('askMenu'), /offlineField\('askName', 'Play'/)
@@ -1306,7 +1304,8 @@ test('the Mods choice: None and four loaders, each with its reason; Forge from 1
   assert.deepEqual(playSentence({ mc: '1.20.1', loader: 'quilt', who: 'alice' })[1], { b: 'Minecraft 1.20.1 (Quilt)' })
   assert.deepEqual(playSentence({ mc: '1.20.1', fabric: true, who: 'alice' })[1], { b: 'Minecraft 1.20.1 (Fabric)' })
   // narrow sheets get the same five as a list
-  assert.match(html, /@media \(max-width: 559px\) \{ \.modsseg \{ display: none; \} \.modspick \{ display: block; \} \}/)
+  assert.match(html, /h\('div', \{ class: 'modsseg max-\[560px\]:hidden' \}/)
+  assert.match(html, /class: 'modspick sl-input'[\s\S]*?'hidden max-\[560px\]:flex'\)/)
 })
 
 test('the crash notice names the common Forge and NeoForge causes', () => {

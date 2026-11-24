@@ -20,76 +20,49 @@
  * twice.
  */
 function icon(name, cls) {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'ico' + (cls ? ' ' + cls : ''));
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('focusable', 'false');
-  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  use.setAttribute('href', '#i-' + name);
-  svg.append(use);
-  return svg;
-}
-
-/** A button that carries an icon and a word. The word is what is read out; the icon is for speed. */
-function iconButton(name, label, cls) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  if (cls) b.className = cls;
-  b.append(icon(name), document.createTextNode(label));
-  return b;
+  return Kit.icon(name, cls);
 }
 
 /**
- * An empty pane that says what would be here.
- *
- * <p>These were a paragraph of grey text against a large blank area, which reads as a page that
- * failed to load rather than one with nothing in it yet. An icon at the size of the thing it
- * stands for turns the same sentence into a state.
+ * A pane whose read failed: the error as the server worded it, an icon the size of the thing it
+ * stands for, and Retry. A paragraph of grey text against a blank area reads as a page that did
+ * not load rather than as a state.
  */
-function emptyState(name, text, action) {
-  const wrap = document.createElement('div');
-  wrap.className = 'empty-pane';
-  wrap.append(icon(name, 'empty-mark'));
+function paneError(body, message, retry) {
+  // Kept from the loading state, so the error lands where the skeleton was.
+  if (!body.parentElement.querySelector(':scope > .pane-head-wait')) clearPaneHead(body);
+  const box = document.createElement('div');
+  box.className = 'grid justify-items-center gap-3 px-5 py-10 text-center';
+  box.setAttribute('role', 'alert');
   const p = document.createElement('p');
-  p.textContent = text;
-  wrap.append(p);
-  // The one thing that fills it, where there is one. An empty list with no way out of it is a
-  // dead end; the action belongs where the eye already is.
-  if (action) {
-    const b = iconButton(action.icon || 'plus', action.label, 'primary');
-    b.onclick = action.onClick;
-    wrap.append(b);
+  p.className = 'm-0 max-w-[46ch] text-3 leading-[1.6] text-ink-2';
+  p.textContent = message;
+  box.append(icon('alert', 'size-[34px] text-fault [stroke-width:1.25]'), p);
+  if (retry) {
+    const again = Kit.button({ label: 'Retry', icon: 'restart', onClick: retry });
+    again.classList.add('mt-1');
+    box.append(again);
   }
-  return wrap;
+  body.replaceChildren(box);
 }
 
 /**
- * Put a pane into its loading state: the previous server's title and rows go, and a skeleton
- * holds the space. Called only when the pane is about to show a different server (or nothing yet),
- * so a refresh of the same server keeps what is on screen until the new answer replaces it.
+ * Put a pane into its loading state: the previous server's title and rows go, and grey bars hold
+ * the space at the rows' height, so nothing jumps when the answer arrives. Called only when the
+ * pane is about to show a different server (or nothing yet), so a refresh of the same server
+ * keeps what is on screen until the new answer replaces it.
  */
 function paneLoading(body) {
   // An invisible stand-in the height of the title row, so the body does not drop when the real
   // title arrives with the data.
-  paneHead(body, 'server', '\u00a0', '\u00a0').classList.add('pane-head-wait');
+  paneHead(body, 'server', '\u00a0', '\u00a0').classList.add('pane-head-wait', 'invisible');
   const sk = document.createElement('div');
-  sk.className = 'skeleton';
+  sk.className = 'grid gap-3 pt-2';
   sk.setAttribute('aria-busy', 'true');
   sk.setAttribute('aria-label', 'Loading');
-  for (let i = 0; i < 7; i++) sk.append(document.createElement('i'));
+  const bars = ['w-[38%] h-[18px] mb-2', 'w-[64%] h-3.5', 'w-[72%] h-3.5', 'w-[86%] h-3.5', 'w-[64%] h-3.5', 'w-[72%] h-3.5', 'w-[86%] h-3.5'];
+  for (const bar of bars) sk.append(Object.assign(document.createElement('span'), { className: 'sl-skeleton ' + bar }));
   body.replaceChildren(sk);
-}
-
-/** A pane whose read failed: the error as the server worded it, and Retry. */
-function paneError(body, message, retry) {
-  // Kept from the loading state, so the error lands where the skeleton was.
-  if (!body.parentElement.querySelector(':scope > .pane-head-wait')) clearPaneHead(body);
-  const box = emptyState('alert', message, retry && { icon: 'restart', label: 'Retry', onClick: retry });
-  box.classList.add('pane-error');
-  box.setAttribute('role', 'alert');
-  const b = box.querySelector('button');
-  if (b) b.className = '';
-  body.replaceChildren(box);
 }
 
 /**
@@ -213,16 +186,17 @@ function paneHead(bodyEl, name, title, subtitle) {
   const existing = pane.querySelector(':scope > .pane-head');
   if (existing) existing.remove();
 
+  // Inside a tool the tab above already names the pane, so only the line saying what it is for
+  // shows; the title stays for whoever reads the pane's text.
   const head = document.createElement('div');
-  head.className = 'pane-head';
-  const mark = document.createElement('span');
-  mark.className = 'mark';
-  mark.append(icon(name));
+  head.className = 'pane-head block px-5 pt-4';
   const h = document.createElement('h2');
+  h.hidden = true;
   h.textContent = title;
   const p = document.createElement('p');
+  p.className = 'm-0 text-2 leading-[1.45] text-ink-3';
   p.textContent = subtitle;
-  head.append(mark, h, p);
+  head.append(h, p);
   pane.insertBefore(head, bodyEl);
   return head;
 }

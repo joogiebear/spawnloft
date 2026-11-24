@@ -63,36 +63,29 @@ function shortAgo(ms) {
   return Math.floor(h / 24) + 'd';
 }
 
-/** A line with no axes, the width of a word: whether a number has been steady, at a glance. */
-function sparkline(values, max) {
-  const el = svg('svg', { class: 'spark', viewBox: '0 0 64 18', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
-  if (values.length < 2) return el;
-  const step = 64 / (values.length - 1);
-  const points = values.map((v, i) => (i * step).toFixed(1) + ',' + (17 - Math.min(1, Math.max(0, v / max)) * 16).toFixed(1));
-  el.append(svg('polyline', { points: points.join(' ') }));
-  return el;
-}
-
 function vitalCell(key, label, title) {
   const wrap = document.createElement('div');
-  wrap.className = 'vital';
+  // TPS is the one to go when the stage is narrow: it is also in Stats, with its history
+  wrap.className = 'grid min-w-0 content-start gap-[5px] @max-[1024px]/stage:data-[v=tps]:hidden';
   wrap.dataset.v = key;
   if (title) wrap.title = title;
   const dt = document.createElement('dt');
+  dt.className = 'text-1 leading-[1.3] font-strong tracking-[.08em] whitespace-nowrap text-ink-3 uppercase';
   dt.textContent = label;
   const dd = document.createElement('dd');
+  dd.className = 'm-0 flex min-w-0 items-center gap-2 whitespace-nowrap';
   wrap.append(dt, dd);
   return { wrap, dd };
 }
 
 function bigNumber(dd, value, of) {
   const big = document.createElement('span');
-  big.className = 'big';
+  big.className = 'font-display text-5 leading-none font-strong tracking-[-.01em] text-ink';
   big.textContent = value;
   dd.append(big);
   if (of) {
     const small = document.createElement('span');
-    small.className = 'of';
+    small.className = 'text-2 leading-none text-ink-3';
     small.textContent = of;
     dd.append(small);
   }
@@ -115,7 +108,7 @@ function renderVitals(row) {
     } else bigNumber(mem.dd, '—');
     const att = vitalCell('attached', 'Attached', attached.join(', '));
     const t = document.createElement('span');
-    t.className = 'txt';
+    t.className = 'min-w-0 truncate font-mono text-3 leading-[1.3] text-ink';
     t.textContent = attached.length ? attached.join(', ') : 'nothing yet';
     att.dd.append(t);
     dl.append(mem.wrap, att.wrap);
@@ -182,10 +175,11 @@ function renderVitals(row) {
  */
 function bar(share, tone) {
   const meter = document.createElement('span');
-  meter.className = 'meter';
+  meter.className = 'block h-1 w-full max-w-[120px] overflow-hidden rounded-full bg-sunken shadow-[inset_0_0_0_1px_var(--line)]';
   meter.setAttribute('aria-hidden', 'true');
   if (tone) meter.dataset.tone = tone;
   const fill = document.createElement('i');
+  fill.className = 'block h-full rounded-full ' + (tone === 'fault' ? 'bg-fault' : tone === 'warn' ? 'bg-warn' : 'bg-accent');
   fill.style.width = share == null ? '0' : (Math.max(0, Math.min(1, share)) * 100).toFixed(1) + '%';
   meter.append(fill);
   return meter;

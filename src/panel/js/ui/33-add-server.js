@@ -9,7 +9,7 @@ const MEM_RE = /^\d+(?:\.\d+)?\s*[GgMm]$/;
 
 /** The line under a field that says what is wrong with it, read out with the field. */
 function fieldNote(input) {
-  const note = el('div', 'bad field-note');
+  const note = el('div', 'field-note sl-error empty:hidden');
   note.id = input.id + '_note';
   note.setAttribute('aria-live', 'polite');
   input.setAttribute('aria-describedby', note.id);

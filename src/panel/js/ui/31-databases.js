@@ -148,7 +148,7 @@ async function showCredentials(dbName, serverName) {
   $('#dlgBody').append(list);
   const ok = $('#dlgOk');
   ok.textContent = 'Copy';
-  ok.className = 'primary';
+  ok.className = 'sl-btn sl-btn-primary';
   ok.disabled = false;
   $('#dlgCancel').hidden = false;
   $('#dlgCancel').textContent = 'Close';

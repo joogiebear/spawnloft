@@ -382,14 +382,12 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.screenshot({ path: path.join(output, '02-theme-picker.png') })
     record('PASS: theme picker changes and persists the real application setting')
 
-    // the Tailwind file is served and declares the layer order ahead of the old stylesheets,
-    // which are one `legacy` layer under it and still draw the page
+    // the page is drawn by two stylesheets, the tokens and the Tailwind file, and nothing else
     assert.deepEqual(
-      await page.evaluate(() => Array.from(document.styleSheets).slice(0, 2).map((s) => (s.href ? new URL(s.href).pathname : ''))),
+      await page.evaluate(() => Array.from(document.styleSheets).map((s) => (s.href ? new URL(s.href).pathname : ''))),
       ['/assets/css/tokens.css', '/assets/css/tailwind.css'])
-    assert.equal(await page.evaluate(() => { const r = document.styleSheets[2].cssRules; return r.length === 1 && r[0].name === 'legacy' }), true, 'the first old stylesheet is one legacy layer')
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('header')).display), 'flex')
-    record('PASS: the Tailwind stylesheet loads ahead of the old ones, which still draw the page')
+    record('PASS: the tokens and the Tailwind stylesheet load, and they alone draw the page')
 
     daemonCreated = true
     const started = await api(`instances/${name}/start`, {})
@@ -543,7 +541,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(await editor.inputValue(), 'enabled: true\nlimit: 5\n')
     await editor.fill('enabled: false\nlimit: 5\n')
     await page.locator('#filesBody .fm-bar').getByRole('button', { name: 'Save', exact: true }).click()
-    await page.locator('#toasts .toast').filter({ hasText: 'Saved config.yml' }).waitFor({ state: 'visible' })
+    await page.locator('#toasts .sl-toast').filter({ hasText: 'Saved config.yml' }).waitFor({ state: 'visible' })
     assert.equal(fs.readFileSync(filesConfig, 'utf8'), 'enabled: false\nlimit: 5\n')
     assert.equal(snapshotsLabelled('file-edit').length, 1, 'A save must copy the file first')
     await page.screenshot({ path: path.join(output, '06-files-editor.png') })
@@ -551,7 +549,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.locator('#filesBody .fm-row').filter({ hasText: 'config.yml' }).locator('input[type="checkbox"]').check()
     await page.locator('#filesBody .fm-sel').getByRole('button', { name: 'Delete', exact: true }).click()
     await page.locator('#dlgOk').click()
-    await page.locator('#toasts .toast').filter({ hasText: 'Deleted config.yml' }).waitFor({ state: 'visible' })
+    await page.locator('#toasts .sl-toast').filter({ hasText: 'Deleted config.yml' }).waitFor({ state: 'visible' })
     assert.ok(!fs.existsSync(filesConfig))
     assert.equal(snapshotsLabelled('file-delete').length, 1, 'A delete must copy what it removes first')
     await openTool('tabActivity')

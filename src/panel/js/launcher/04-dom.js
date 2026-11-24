@@ -26,10 +26,11 @@
     return el
   }
 
-  function ico(name) {
+  // the sprite's icon; `cls` sizes or places it where it sits
+  function ico(name, cls = '') {
     const ns = 'http://www.w3.org/2000/svg'
     const svg = document.createElementNS(ns, 'svg')
-    svg.setAttribute('class', 'ico')
+    svg.setAttribute('class', cls ? `sl-ico ${cls}` : 'sl-ico')
     svg.setAttribute('aria-hidden', 'true')
     const use = document.createElementNS(ns, 'use')
     use.setAttribute('href', '#i-' + name)
@@ -40,19 +41,44 @@
   const pill = (tone, text, dot = false) => h('span', { class: 'sl-pill', 'data-tone': tone || null }, dot && h('span', { class: 'sl-dot', 'data-tone': tone || null, 'aria-hidden': 'true' }), text)
   // A server's state as a dot in the shared look: lit when running, a ring when stopped.
   const stateDot = (status, stopped) => h('span', { class: 'sl-dot', 'data-tone': status === 'running' ? 'live' : stopped ? null : 'warn', 'data-hollow': status !== 'running' && stopped ? '' : null, 'aria-hidden': 'true' })
-  const tile = (account, size = '') => h('span', { class: `tile ${size} ${tileClass(account.uuid ?? account.name)}`.replace(/\s+/g, ' ') }, initials(account.name))
+  // an account's face: its initial on one of the shared tile colours, 28px, or 22px when `small`
+  const tile = (account, small = false) => h('span', { class: small ? 'sl-tile sl-tile-sm size-[22px] text-1' : 'sl-tile sl-tile-sm', 'data-tone': tileClass(account.uuid ?? account.name).slice(1) }, initials(account.name))
   // playSentence's parts as nodes
   const parts = (list) => list.map((x) => (typeof x === 'string' ? x : h('b', { text: x.b })))
 
-  // { tone: 'fault' | 'warn' | 'live' | '', title, text, acts: [nodes], onclose, extra: node }
-  function notice({ tone = '', title, text, acts = [], onclose, extra }) {
+  // The launcher's controls in the shared look (src/panel/tailwind/components.css).
+  const BTN = 'sl-btn'
+  const BTN_SM = 'sl-btn sl-btn-sm'
+  const BTN_PRIMARY = 'sl-btn sl-btn-primary'
+  const BTN_DANGER_SM = 'sl-btn sl-btn-danger sl-btn-sm'
+  const BTN_QUIET_SM = 'sl-btn sl-btn-ghost sl-btn-sm'
+  const BTN_ICON = 'sl-btn sl-btn-ghost sl-btn-sm sl-btn-icon'
+  // a verb inside a sentence: it flows and wraps with the words around it, at their size
+  const LINK = 'sl-btn sl-btn-link [display:inline] whitespace-normal [font:inherit]'
+  // the buttons of a launch under way or a game running, at the weight of Play
+  const BTN_BIG = 'h-auto min-h-[52px] px-5 rounded-md'
+  const HINT = 'sl-hint'
+  const HINT_WARN = 'sl-hint text-warn-ink'
+  const HINT_BAD = 'sl-error font-normal'
+  const NOTE = 'sl-hint'
+  // a field whose value is refused: the border and the focus ring say so
+  const INPUT_BAD = 'sl-input border-fault focus:outline-fault'
+  const LABEL = 'sl-eyebrow'
+  // a box that asks before something that cannot be taken back
+  const CONFIRM = 'flex items-center flex-wrap gap-3 mt-1 py-3 px-4 border border-fault-edge bg-fault-wash rounded-sm text-3 text-fault-ink [&_b]:font-semibold'
+  // a select in the shared look, with its chevron
+  const selectBox = (select, cls = '') => h('div', { class: `sl-input-group ${cls}`.trim() }, select, h('span', { class: 'sl-input-caret', 'aria-hidden': 'true' }, ico('chev')))
+
+  // { tone: 'fault' | 'warn' | 'live' | '', title, text, acts: [nodes], onclose, extra: node, cls }
+  // `notice` and the tone stay on it for announce() and the poll, which look for them.
+  function notice({ tone = '', title, text, acts = [], onclose, extra, cls = '' }) {
     const icon = tone === 'fault' ? 'alert' : tone === 'live' ? 'check' : 'info'
     // no live role of its own: it is rebuilt with the page, and would be read again each time.
     // announce() reads a notice once, when it first shows.
-    return h('div', { class: `notice ${tone}`.trim(), role: 'group', 'aria-label': tone === 'fault' ? 'Problem' : 'Notice' }, ico(icon),
-      h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text })),
-      (acts.length || onclose) && h('div', { class: 'acts' }, acts,
-        onclose && h('button', { class: 'sm quiet icon', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))),
+    return h('div', { class: `notice sl-banner items-start ${cls}`.trim(), 'data-tone': tone || null, role: 'group', 'aria-label': tone === 'fault' ? 'Problem' : 'Notice' }, ico(icon),
+      h('div', { class: 'sl-banner-text grid gap-1 basis-[200px]' }, h('b', { class: 'sl-banner-title', text: title }), text && h('span', { class: 'sl-banner-body', text })),
+      (acts.length || onclose) && h('div', { class: 'sl-banner-actions flex-none items-center ml-auto' }, acts,
+        onclose && h('button', { class: BTN_ICON, 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))),
       extra)
   }
 
@@ -93,7 +119,7 @@
     const p = S.summary && !S.down ? currentProfile() : null
     const job = S.job && !S.job.done ? S.job : null
     const now = {
-      notices: [...document.querySelectorAll('.notice')].map((n) => ({ text: [...n.querySelectorAll('.body > *')].map((x) => x.textContent.trim()).filter(Boolean).join(' '), fault: n.classList.contains('fault') })),
+      notices: [...document.querySelectorAll('.notice')].map((n) => ({ text: [...n.querySelectorAll('.sl-banner-text > *')].map((x) => x.textContent.trim()).filter(Boolean).join(' '), fault: n.dataset.tone === 'fault' })),
       why: $('why')?.textContent ?? '',
       // the step, not its words, which change with every file counted
       step: job ? `Launching ${setupName(profileNamed(job.profile) ?? { name: job.profile, mc: '' })}: ${STEP_SAID[stepOf(job.stage)] ?? 'getting ready'}.` : '',
@@ -107,5 +133,5 @@
     if (out.polite) say(out.polite)
   }
 
-  const sk = (style) => h('div', { class: 'sk', style })
+  const sk = (style) => h('div', { class: 'sl-skeleton', style })
 

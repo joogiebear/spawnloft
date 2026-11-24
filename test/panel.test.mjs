@@ -625,7 +625,7 @@ test('a dialog that saves keeps what was typed when the save is refused', () => 
   assert.equal(askBlocked({}, ''), false)
 
   // the refusal is shown in the dialog, and the next asking starts clean
-  assert.match(html, /<p class="hint bad" id="dlgError"/)
+  assert.match(html, /<p class="sl-error" id="dlgError"/)
   assert.match(html, /getElementById\('dlg'\)\.addEventListener\('close'/)
   // the dialogs that used to close and then toast the refusal now save inside
   for (const title of ['New file', 'New folder']) {

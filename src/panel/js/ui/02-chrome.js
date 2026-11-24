@@ -27,19 +27,18 @@ function toastsToDrop(list, max) {
 }
 
 function toast(message, kind, opts) {
+  // the shared toast (components.css .sl-toast); 'bad' and 'good' are its fault and live tones
+  const tone = kind === 'bad' ? 'fault' : kind === 'good' ? 'live' : null;
   const el = document.createElement('div');
-  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.className = 'sl-toast';
+  if (tone) el.dataset.tone = tone;
   const text = document.createElement('div');
-  text.style.flex = '1';
+  text.className = 'sl-toast-text';
   text.textContent = message;
-  const close = document.createElement('button');
-  close.className = 'x';
-  close.type = 'button';
-  close.setAttribute('aria-label', 'Dismiss');
-  close.append(icon('close'));
-  close.onclick = () => el.remove();
-  // The tone is said by a glyph as well as the edge colour, so it does not rest on colour alone.
-  el.append(icon(kind === 'bad' ? 'alert' : kind === 'good' ? 'check' : 'bolt'), text, close);
+  const close = Kit.button({ icon: 'close', kind: 'ghost', size: 'sm', title: 'Dismiss', onClick: () => el.remove() });
+  close.classList.add('x'); // what a toast that grows its own buttons puts them before
+  // The tone is said by a glyph as well as the colour, so it does not rest on colour alone.
+  el.append(Kit.icon(tone === 'fault' ? 'alert' : tone === 'live' ? 'check' : 'bolt'), text, close);
   const stays = toastStays(message, kind, opts);
   // Work under way, or something to read or copy: neither is dropped to make room.
   if (stays && kind !== 'bad') el.dataset.working = '1';
@@ -101,15 +100,20 @@ function ask(opts) {
   choiceBox.hidden = !opts.choices;
   if (opts.choices) {
     opts.choices.forEach((c, i) => {
+      // a card per answer: the shared radio, the answer, and what it means
       const label = document.createElement('label');
+      label.className = 'grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5 rounded-sm border border-line bg-surface px-4 py-3 transition-colors hover:border-edge hover:bg-raised has-checked:border-accent-edge has-checked:bg-accent-wash';
       const input = document.createElement('input');
       input.type = 'radio';
+      input.className = 'sl-radio row-span-2 mt-0';
       input.name = 'dlgchoice';
       input.value = c.value;
       if (i === 0) input.checked = true;
       const b = document.createElement('b');
+      b.className = 'text-3 font-semibold text-ink';
       b.textContent = c.label;
       const s = document.createElement('span');
+      s.className = 'text-3 leading-normal text-ink-3';
       s.textContent = c.hint;
       label.append(input, b, s);
       choiceBox.append(label);
@@ -131,7 +135,7 @@ function ask(opts) {
     // often mistyped than misread. The box is still there for anyone who prefers to type.
     const name = document.createElement('button');
     name.type = 'button';
-    name.className = 'fill';
+    name.className = 'cursor-pointer appearance-none rounded-[3px] border-0 bg-transparent -mx-0.5 px-0.5 py-0 font-mono text-1 leading-none font-semibold tracking-[0] text-ink normal-case underline decoration-dotted underline-offset-3 transition-colors hover:bg-hover-hi';
     name.title = 'Click to fill it in';
     name.textContent = opts.typeToConfirm;
     name.onclick = () => {
@@ -144,7 +148,7 @@ function ask(opts) {
 
   const ok = $('#dlgOk');
   ok.textContent = opts.confirmLabel || 'Confirm';
-  ok.className = opts.danger ? 'danger' : 'primary';
+  ok.className = 'sl-btn ' + (opts.danger ? 'sl-btn-danger' : 'sl-btn-primary');
   // Nothing to cancel when the dialog is telling you something rather than asking.
   $('#dlgCancel').hidden = Boolean(opts.tellOnly);
 

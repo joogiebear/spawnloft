@@ -2,16 +2,16 @@
   // ---- Play ----------------------------------------------------------------------------------
 
   function unreachableView() {
-    return h('div', { class: 'nothing', role: 'alert' }, h('div', { class: 'glyph' }, ico('alert')),
-      h('h2', { text: S.downWhy ? 'SpawnLoft could not open the launcher' : 'Can\'t reach SpawnLoft' }),
-      h('p', { text: S.downWhy || 'The panel that runs the launcher is not answering. If you closed the SpawnLoft app, open it again; this page reconnects by itself.' }),
-      h('button', { class: 'primary', onclick: () => poll() }, 'Try again'))
+    return h('div', { class: 'sl-empty m-auto max-w-[420px] p-0', role: 'alert' }, h('div', { class: 'size-12 mb-1 rounded-sm border border-dashed border-edge grid place-items-center text-ink-3 text-[20px]' }, ico('alert')),
+      h('h2', { class: 'sl-empty-title', text: S.downWhy ? 'SpawnLoft could not open the launcher' : 'Can\'t reach SpawnLoft' }),
+      h('p', { class: 'sl-empty-text', text: S.downWhy || 'The panel that runs the launcher is not answering. If you closed the SpawnLoft app, open it again; this page reconnects by itself.' }),
+      h('div', { class: 'sl-empty-actions mt-1' }, h('button', { class: BTN_PRIMARY, onclick: () => poll() }, 'Try again')))
   }
 
   function playView() {
     const sum = S.summary
     if (!sum) {
-      return h('div', { class: 'playgrid solo' }, h('div', { class: 'playbox', 'aria-busy': 'true', 'aria-label': 'Loading' }, sk('height:72px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)')))
+      return h('div', { class: PLAYGRID_SOLO }, h('div', { class: PLAYBOX, 'aria-busy': 'true', 'aria-label': 'Loading' }, sk('height:72px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)')))
     }
     const p = currentProfile()
     if (!p) return firstRunView()
@@ -22,22 +22,48 @@
     else if (S.crash && !S.crash.pending && S.crash.profile !== p.name && profileNamed(S.crash.profile)) kids.push(crashElsewhere(S.crash))
     if (S.notice?.profile === p.name && state.kind !== 'launching' && !(S.notice.busy && state.kind === 'blocked')) {
       const n = S.notice
-      kids.push(notice({ ...n, acts: n.fix === 'sign-in' ? [h('button', { class: 'sm', onclick: () => openMenu('account') }, 'Sign in')] : [], onclose: () => { S.notice = null; render() } }))
+      kids.push(notice({ ...n, acts: n.fix === 'sign-in' ? [h('button', { class: BTN_SM, onclick: () => openMenu('account') }, 'Sign in')] : [], onclose: () => { S.notice = null; render() } }))
     }
     if (state.kind === 'launching') kids.push(launchingCard(p, S.job))
     else if (state.kind === 'running') kids.push(runningCard(p))
     else {
       kids.push(playButton(p, plan))
-      if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
-      else kids.push(h('p', { class: 'does', id: 'does' }, parts(plan.sentence)))
+      if (state.kind === 'blocked') kids.push(h('p', { class: WHY, id: 'why' }, ico('alert', WHY_ICO), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
+      else kids.push(h('p', { class: DOES, id: 'does' }, parts(plan.sentence)))
       const lw = state.kind !== 'blocked' && loaderWarning(plan.picked, p)
-      if (lw) kids.push(h('p', { class: 'why', id: 'loaderWarn' }, ico('alert'), h('span', {}, parts(lw), ' ', fixButton('loader-setup', p, true, { mc: plan.picked.mc ?? p.mc, server: plan.picked.name }), '.')))
+      if (lw) kids.push(h('p', { class: WHY, id: 'loaderWarn' }, ico('alert', WHY_ICO), h('span', {}, parts(lw), ' ', fixButton('loader-setup', p, true, { mc: plan.picked.mc ?? p.mc, server: plan.picked.name }), '.')))
     }
     kids.push(joinField(p, plan, state.kind === 'launching' || state.kind === 'running'))
-    return h('div', { class: 'playgrid' },
-      h('div', { class: 'maincol' }, h('div', { class: 'playbox' }, kids), serversRow(p, plan)),
+    return h('div', { class: PLAYGRID },
+      h('div', { class: MAINCOL }, h('div', { class: PLAYBOX }, kids), serversRow(p, plan)),
       setupsPanel(p))
   }
+
+  // The page: the selected setup's card with your servers under it, and the setups beside it.
+  // Sizes are fixed, not a share of the window: on a wide screen the page stays the size it
+  // reads well at and the window's own zoom is what grows it. Under 940px it is one column: the
+  // card, then the setups (the only way to change setup must not sit under a long row of
+  // servers), then your servers. margin:auto centres it in the stage and still scrolls when it
+  // is taller.
+  const PLAYGRID = 'w-[min(1120px,100%)] m-auto grid grid-cols-[minmax(0,1fr)_312px] gap-5 items-start max-[940px]:grid-cols-[minmax(0,1fr)]'
+  const PLAYGRID_SOLO = 'w-[min(760px,100%)] m-auto grid grid-cols-[minmax(0,1fr)] gap-5 items-start'
+  const MAINCOL = 'grid grid-cols-[minmax(0,1fr)] gap-5 min-w-0 max-[940px]:contents'
+  // One card for every state: Play, a launch under way, a running game, a game that closed
+  // early, a blocked Play. What changes is the block in the button's place, never the frame.
+  // minmax(0, 1fr) keeps a long log line from widening the card past the window.
+  const PLAYBOX = 'sl-card grid grid-cols-[minmax(0,1fr)] gap-5 p-7 shadow-md *:min-w-0 max-[940px]:order-1 max-[700px]:p-4'
+  // the lines under Play: what it will do, or why it can't yet
+  const DOES = 'm-0 text-4 leading-normal text-ink-2 text-center [&_b]:text-ink [&_b]:font-semibold'
+  const WHY = 'm-0 flex gap-2 items-start justify-center text-4 leading-normal text-warn-ink [&_b]:font-semibold'
+  const WHY_ICO = 'mt-[.3em]'
+  // the setup's head: a label, its name, the facts it is picked by
+  const SETUP_HEAD = 'grid gap-2'
+  const SETUP_NAME = 'm-0 font-display text-6 leading-[1.15] font-strong tracking-[-.01em] [overflow-wrap:anywhere]'
+  const PLAY_BTN = 'sl-btn sl-btn-primary flex-1 h-auto min-h-16 px-7 gap-3 rounded-md font-display text-6 leading-none font-strong tracking-[-.01em] max-[700px]:basis-full'
+  const PLAY_ROW = 'relative min-w-0 flex items-stretch gap-3 max-[700px]:flex-wrap'
+  // the head of the setups and of your servers: its label, and a control at the end
+  const SECTION_HEAD = 'flex items-center gap-3 min-h-8'
+  const SETUP_ROW = 'flex items-center gap-1 border rounded-sm'
 
   // The line under Play when the server picked runs another mod loader than the setup: sentence
   // parts, or null. The join will probably be turned away, but a server whose mods are all
@@ -54,10 +80,10 @@
 
   function setupHead(p) {
     const played = playedLine(p)
-    return h('header', { class: 'shd' },
-      h('span', { class: 'label', text: 'Selected setup' }),
-      h('h2', { id: 'setupName', text: setupName(p) }),
-      h('div', { class: 'chips' },
+    return h('header', { class: SETUP_HEAD },
+      h('span', { class: LABEL, text: 'Selected setup' }),
+      h('h2', { class: SETUP_NAME, id: 'setupName', text: setupName(p) }),
+      h('div', { class: 'flex flex-wrap gap-2' },
         h('span', { class: 'sl-pill', text: `Minecraft ${p.mc}` }),
         h('span', { class: 'sl-pill', text: loaderName(p.loader) }),
         h('span', { class: 'sl-pill', text: memoryText(p.memory) }),
@@ -75,7 +101,7 @@
   function fixButton(fix, p, first, other = null) {
     const cap = (text) => (first ? sentence(text) : text)
     // an id each, so a re-render (a poll) keeps the focus on the link it was on
-    const link = (text, onclick) => h('button', { class: 'linkbtn', id: `fix-${fix}`, onclick }, cap(text))
+    const link = (text, onclick) => h('button', { class: LINK, id: `fix-${fix}`, onclick }, cap(text))
     if (fix === 'sign-in') return link('sign in with Microsoft', () => openMenu('account'))
     if (fix === 'sign-in-again') return link('sign in again', startLogin)
     if (fix === 'pick-account') return link('pick another account', () => openSheet(p, null, 'fAccount'))
@@ -106,18 +132,18 @@
     const def = defaultAccount()
     const machine = S.summary.machineRefusal
     const does = machine
-      ? h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', { text: `Minecraft can't be launched on this computer: ${sentence(machine).replace(/\.?$/, '.')}` }))
-      : h('p', { class: 'does', id: 'does' }, mc ? parts(def ? plan.sentence : ['Opens ', { b: `Minecraft ${mc}` }, plan.picked ? [' and joins ', { b: plan.picked.name }] : ' on the title screen', '. Pick who is playing first.']) : S.versions?.error ? [`The version list could not be read: ${S.versions.error}. `, h('button', { type: 'button', class: 'linkbtn', id: 'versionsAgain', onclick: loadVersions }, 'Try again')] : 'Reading Mojang\'s version list…')
-    const card = h('div', { class: 'playbox' }, flashNotice(),
-      h('header', { class: 'shd' },
-        h('span', { class: 'label', text: 'Latest release' }),
-        h('h2', { id: 'setupName', text: mc ? `Minecraft ${mc}` : 'Minecraft' })),
-      h('div', { class: 'playrow' },
-        h('button', { class: 'primary play', id: 'play', disabled: !mc || S.firstRun || Boolean(machine), 'aria-describedby': machine ? 'why' : 'does', onclick: firstPlay }, ico('play'), S.firstRun ? 'Getting ready…' : 'Play')),
+      ? h('p', { class: WHY, id: 'why' }, ico('alert', WHY_ICO), h('span', { text: `Minecraft can't be launched on this computer: ${sentence(machine).replace(/\.?$/, '.')}` }))
+      : h('p', { class: DOES, id: 'does' }, mc ? parts(def ? plan.sentence : ['Opens ', { b: `Minecraft ${mc}` }, plan.picked ? [' and joins ', { b: plan.picked.name }] : ' on the title screen', '. Pick who is playing first.']) : S.versions?.error ? [`The version list could not be read: ${S.versions.error}. `, h('button', { type: 'button', class: LINK, id: 'versionsAgain', onclick: loadVersions }, 'Try again')] : 'Reading Mojang\'s version list…')
+    const card = h('div', { class: PLAYBOX }, flashNotice(),
+      h('header', { class: SETUP_HEAD },
+        h('span', { class: LABEL, text: 'Latest release' }),
+        h('h2', { class: SETUP_NAME, id: 'setupName', text: mc ? `Minecraft ${mc}` : 'Minecraft' })),
+      h('div', { class: PLAY_ROW },
+        h('button', { class: PLAY_BTN, id: 'play', disabled: !mc || S.firstRun || Boolean(machine), 'aria-describedby': machine ? 'why' : 'does', onclick: firstPlay }, ico('play', 'text-[1em]'), S.firstRun ? 'Getting ready…' : 'Play')),
       does,
       joinField(draft, plan, false))
-    return h('div', { class: 'playgrid' },
-      h('div', { class: 'maincol' }, card, serversRow(draft, plan)),
+    return h('div', { class: PLAYGRID },
+      h('div', { class: MAINCOL }, card, serversRow(draft, plan)),
       setupsPanel(draft))
   }
 
@@ -155,13 +181,13 @@
   // "Who's playing?": asked when a setup has no account of its own and nobody signs in here.
   function askMenu(p) {
     const o = S.offline
-    return h('div', { class: 'menu ask', id: 'menuAsk', role: 'dialog', 'aria-label': 'Who\'s playing?', onkeydown: menuKeys },
-      h('div', { class: 'mhead', text: 'Who\'s playing?' }),
+    return h('div', { class: `${MENU} w-[400px]`, id: 'menuAsk', role: 'dialog', 'aria-label': 'Who\'s playing?', onkeydown: menuKeys },
+      h('div', { class: MENU_HEAD, text: 'Who\'s playing?' }),
       S.acctNotice && acctNotice(S.acctNotice),
-      S.login ? waitingStrip(S.login) : h('button', { class: 'primary', style: 'width:100%;min-height:36px', onclick: () => { S.afterLogin = p.name; startLogin() } }, ico('ext'), 'Sign in with Microsoft'),
-      h('p', { class: 'note', text: 'Opens Microsoft\'s own sign-in page. SpawnLoft never sees your password. Needed for online servers.' }),
-      h('hr'),
-      h('div', { class: 'mhead', text: 'Or play offline on local servers' }),
+      S.login ? waitingStrip(S.login) : h('button', { class: `${BTN_PRIMARY} w-full`, onclick: () => { S.afterLogin = p.name; startLogin() } }, ico('ext'), 'Sign in with Microsoft'),
+      h('p', { class: MENU_NOTE, text: 'Opens Microsoft\'s own sign-in page. SpawnLoft never sees your password. Needed for online servers.' }),
+      h('hr', { class: MENU_SEP }),
+      h('div', { class: MENU_HEAD, text: 'Or play offline on local servers' }),
       offlineField('askName', 'Play', () => addOffline(p.name)))
   }
 
@@ -204,9 +230,9 @@
 
   function playButton(p, plan) {
     const label = plan.startsServer ? 'Start server and play' : plan.state.kind === 'closed-early' ? 'Play again' : 'Play'
-    return h('div', { class: 'playrow menuhost', 'data-menu': 'ask' },
-      h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => { S.askFrom = null; startLaunch(p) } }, ico('play'), label),
-      h('button', { class: 'edit', id: 'editSetup', onclick: () => openSheet(p) }, ico('gear'), 'Edit setup'),
+    return h('div', { class: PLAY_ROW, 'data-menu': 'ask' },
+      h('button', { class: PLAY_BTN, id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => { S.askFrom = null; startLaunch(p) } }, ico('play', 'text-[1em]'), label),
+      h('button', { class: 'sl-btn h-auto min-h-16 px-4 rounded-md', id: 'editSetup', onclick: () => openSheet(p) }, ico('gear'), 'Edit setup'),
       S.menu === 'ask' && menuPad(askMenu(p)))
   }
 
@@ -228,18 +254,18 @@
   // sheet (edit, rename, duplicate, remove). Each control has an id, so a re-render keeps focus.
   function setupsPanel(p) {
     const list = profilesNow()
-    return h('aside', { class: 'setups', id: 'setups', 'aria-labelledby': 'setupsTitle' },
-      h('div', { class: 'shead' },
-        h('h2', { class: 'label', id: 'setupsTitle', text: 'Setups' }),
-        h('button', { class: 'sm', id: 'newSetup', title: 'Any version, snapshots too', 'aria-label': 'New setup', onclick: () => openSheet() }, ico('plus'), 'New')),
-      !list.length && h('p', { class: 'note', text: 'No setups yet. Play makes one for the latest release, or make your own with New.' }),
-      list.length > 0 && h('ul', { class: 'slist', role: 'list' }, list.map((q) => h('li', { class: q === p ? 'srow cur' : 'srow' },
-        h('button', { class: 'pick', id: `setup-${q.name}`, 'aria-current': q === p ? 'true' : null, onclick: () => { pickProfile(q.name); S.menu = null; render() } },
-          h('span', { class: 'badge', 'aria-hidden': 'true', text: setupBadge(q) }),
-          h('span', { class: 'sub' }, h('b', { text: setupName(q) }), h('small', { text: setupSub(q) })),
+    return h('aside', { class: 'sl-card grid gap-3 p-4 shadow-md min-w-0 max-[940px]:order-2', id: 'setups', 'aria-labelledby': 'setupsTitle' },
+      h('div', { class: SECTION_HEAD },
+        h('h2', { class: `${LABEL} flex-1`, id: 'setupsTitle', text: 'Setups' }),
+        h('button', { class: BTN_SM, id: 'newSetup', title: 'Any version, snapshots too', 'aria-label': 'New setup', onclick: () => openSheet() }, ico('plus'), 'New')),
+      !list.length && h('p', { class: NOTE, text: 'No setups yet. Play makes one for the latest release, or make your own with New.' }),
+      list.length > 0 && h('ul', { class: 'list-none m-0 p-0 grid gap-1 max-h-[420px] overflow-auto max-[940px]:max-h-[264px]', role: 'list' }, list.map((q) => h('li', { class: q === p ? `${SETUP_ROW} bg-accent-wash border-accent-edge` : `${SETUP_ROW} border-transparent` },
+        h('button', { class: 'sl-row m-0 w-auto flex-1 min-w-0 p-2 hover:bg-hover-hi', id: `setup-${q.name}`, 'aria-current': q === p ? 'true' : null, onclick: () => { pickProfile(q.name); S.menu = null; render() } },
+          h('span', { class: 'size-9 flex-none grid place-items-center rounded-xs bg-recess border border-line font-mono text-1 leading-none font-strong text-ink-2', 'aria-hidden': 'true', text: setupBadge(q) }),
+          h('span', { class: 'grid leading-[1.3] min-w-0 flex-1' }, h('b', { class: 'font-semibold truncate', text: setupName(q) }), h('small', { class: 'text-1 text-ink-3 truncate', text: setupSub(q) })),
           q.running ? pill('live', 'running', true) : S.job?.profile === q.name ? pill('accent', 'launching', true) : null),
-        h('button', { class: 'sm quiet icon', id: `edit-${q.name}`, title: `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear'))))),
-      list.length > 0 && h('p', { class: 'note', text: 'A setup keeps its own worlds, options and mods. The gear edits, renames or copies it.' }))
+        h('button', { class: BTN_ICON, id: `edit-${q.name}`, title: `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear'))))),
+      list.length > 0 && h('p', { class: NOTE, text: 'A setup keeps its own worlds, options and mods. The gear edits, renames or copies it.' }))
   }
 
   // Which of your servers the page shows: those on the setup's version, or all of them, narrowed
@@ -270,24 +296,24 @@
     const card = (c) => {
       const cur = plan.picked?.name === c.name
       const act = c.otherVersion
-        ? h('button', { class: 'sm', id: `srv-${c.name}`, disabled: Boolean(S.firstRun), onclick: () => { S.menu = null; takePrefill({ mc: c.otherVersion, server: c.name }) } }, `Use a ${c.otherVersion} setup`)
+        ? h('button', { class: `${BTN_SM} justify-self-start mt-1`, id: `srv-${c.name}`, disabled: Boolean(S.firstRun), onclick: () => { S.menu = null; takePrefill({ mc: c.otherVersion, server: c.name }) } }, `Use a ${c.otherVersion} setup`)
         : c.blocked
-          ? h('small', { text: sentence(c.blocked) })
-          : h('button', { class: 'sm', id: `srv-${c.name}`, disabled: busy || stuck, title: stuck && !busy ? 'Play can\'t start yet: the card above says why.' : null, onclick: () => playOn(p, c) }, ico('play'), c.stopped ? 'Start and play' : 'Play here')
-      return h('li', { class: cur ? 'scard cur' : 'scard', 'aria-current': cur ? 'true' : null },
-        h('span', { class: 'nm' }, stateDot(c.status, c.stopped), h('b', { title: c.label && c.label !== c.name ? `${c.label} (folder name: ${c.name})` : c.name, text: c.label || c.name })),
-        h('small', { text: `${c.mc ?? 'version unknown'}${c.loader ? ` · ${loaderName(c.loader)}` : ''} · ${statusText(c.status).toLowerCase()}` }),
+          ? h('small', { class: 'text-2 text-ink-3', text: sentence(c.blocked) })
+          : h('button', { class: `${BTN_SM} justify-self-start mt-1`, id: `srv-${c.name}`, disabled: busy || stuck, title: stuck && !busy ? 'Play can\'t start yet: the card above says why.' : null, onclick: () => playOn(p, c) }, ico('play'), c.stopped ? 'Start and play' : 'Play here')
+      return h('li', { class: 'sl-card grid gap-2 content-start p-4 rounded-md', 'data-tone': cur ? 'accent' : null, 'aria-current': cur ? 'true' : null },
+        h('span', { class: 'flex items-center gap-2 min-w-0' }, stateDot(c.status, c.stopped), h('b', { class: 'font-semibold truncate', title: c.label && c.label !== c.name ? `${c.label} (folder name: ${c.name})` : c.name, text: c.label || c.name })),
+        h('small', { class: 'text-2 text-ink-3', text: `${c.mc ?? 'version unknown'}${c.loader ? ` · ${loaderName(c.loader)}` : ''} · ${statusText(c.status).toLowerCase()}` }),
         act)
     }
-    return h('section', { class: 'servers', 'aria-labelledby': 'serversTitle' },
-      h('div', { class: 'shead' },
-        h('h2', { class: 'label', id: 'serversTitle', text: wide ? 'Your servers' : `Your servers on ${p.mc}` }),
-        all.length >= FIND_FROM && h('input', { class: 'find', id: 'serverFind', type: 'search', 'aria-label': 'Find a server', placeholder: 'Find a server', value: S.serverFind, autocomplete: 'off', spellcheck: 'false', oninput: (e) => { S.serverFind = e.target.value; S.menu = null; render() } }),
+    return h('section', { class: 'grid gap-3 min-w-0 max-[940px]:order-3', 'aria-labelledby': 'serversTitle' },
+      h('div', { class: SECTION_HEAD },
+        h('h2', { class: `${LABEL} flex-1`, id: 'serversTitle', text: wide ? 'Your servers' : `Your servers on ${p.mc}` }),
+        all.length >= FIND_FROM && h('input', { class: 'sl-input w-[200px] h-8 max-[700px]:w-full', id: 'serverFind', type: 'search', 'aria-label': 'Find a server', placeholder: 'Find a server', value: S.serverFind, autocomplete: 'off', spellcheck: 'false', oninput: (e) => { S.serverFind = e.target.value; S.menu = null; render() } }),
         // the label says what a press does; it is not a pressed/unpressed toggle
-        others > 0 && p.mc !== 'latest' && !find && h('button', { class: 'linkbtn', id: 'serversAll', onclick: () => { S.serversAll = !S.serversAll; S.menu = null; render() } }, S.serversAll ? `Only ${p.mc}` : `Show all ${all.length}`)),
+        others > 0 && p.mc !== 'latest' && !find && h('button', { class: LINK, id: 'serversAll', onclick: () => { S.serversAll = !S.serversAll; S.menu = null; render() } }, S.serversAll ? `Only ${p.mc}` : `Show all ${all.length}`)),
       shown.length
-        ? h('ul', { class: 'scards', role: 'list' }, shown.map(card))
-        : h('p', { class: 'note', text: find ? `No server matches \u201c${find}\u201d.` : `None of your servers run Minecraft ${p.mc}.${wide ? '' : ' Show all to see the others.'}` }))
+        ? h('ul', { class: 'list-none m-0 p-0 grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3', role: 'list' }, shown.map(card))
+        : h('p', { class: NOTE, text: find ? `No server matches \u201c${find}\u201d.` : `None of your servers run Minecraft ${p.mc}.${wide ? '' : ' Show all to see the others.'}` }))
   }
 
   // Whether a server card's Play would go nowhere whichever server it is for: Play is blocked,
@@ -317,24 +343,28 @@
     const dot = picked && stateDot(picked.status, picked.stopped)
     const now = picked ? picked.label || picked.name : custom ? 'Another address' : 'Title screen'
     const hint = picked ? `${statusText(picked.status)}${picked.mc ? ` \u00b7 ${picked.mc}` : ''}` : custom ? null : 'no server'
-    return h('div', { class: 'join' },
-      h('span', { class: 'label', id: 'joinLabel', text: 'Join' }),
-      h('div', { class: 'menuhost', 'data-menu': 'join' },
+    return h('div', { class: 'grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 items-center pt-5 border-t border-line-soft max-[700px]:grid-cols-[minmax(0,1fr)]' },
+      h('span', { class: LABEL, id: 'joinLabel', text: 'Join' }),
+      h('div', { class: 'relative min-w-0', 'data-menu': 'join' },
         h('button', {
-          class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint ? 'joinHint' : null, disabled: inert,
+          class: JOIN_BOX, id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint ? 'joinHint' : null, disabled: inert,
           onclick: toggleMenu('join'),
           onkeydown: (e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); openMenu('join') } },
-        }, dot, h('span', { class: 'now', id: 'joinNow', text: now }), hint && h('span', { class: 'hint', id: 'joinHint', text: hint }), h('span', { class: 'chev', 'aria-hidden': 'true' }, ico('chev'))),
+        }, dot, h('span', { class: 'flex-[0_1_auto] min-w-0 truncate text-4 font-strong', id: 'joinNow', text: now }), hint && h('span', { class: `${HINT} flex-1 truncate`, id: 'joinHint', text: hint }), h('span', { class: 'inline-flex ml-auto px-2 text-ink-3', 'aria-hidden': 'true' }, ico('chev'))),
         open && menuPad(joinMenu(p, plan))),
-      custom && h('div', { class: 'addr' },
+      custom && h('div', { class: JOIN_ADDRESS },
         h('input', {
           id: 'joinAddress', 'aria-label': 'Server address', 'aria-describedby': 'joinAddressHint', autocomplete: 'off', spellcheck: 'false', disabled: inert,
-          class: address && addrProblem ? 'bad' : null, placeholder: 'play.example.net or 192.168.1.20:25566', value: t.address, maxlength: '260',
+          class: address && addrProblem ? `${INPUT_BAD} h-10` : 'sl-input h-10', placeholder: 'play.example.net or 192.168.1.20:25566', value: t.address, maxlength: '260',
           oninput: (e) => { setTarget(p, { address: e.target.value, custom: true }); S.menu = null; render() },
           onkeydown: (e) => { if (e.key === 'Enter' && !plan.blocked) { e.preventDefault(); startLaunch(p) } },
         }),
-        h('small', { id: 'joinAddressHint', class: address && addrProblem ? 'hint bad' : 'hint', text: address && addrProblem ? addrProblem : `Host, or host:port. Online servers need a Microsoft account${acct.type === 'microsoft' ? `; you are signed in as ${acct.name}` : ''}.` })))
+        h('small', { id: 'joinAddressHint', class: address && addrProblem ? HINT_BAD : HINT, text: address && addrProblem ? addrProblem : `Host, or host:port. Online servers need a Microsoft account${acct.type === 'microsoft' ? `; you are signed in as ${acct.name}` : ''}.` })))
   }
+
+  // The Join field looks like a field and is a button that opens the menu of places to join.
+  const JOIN_BOX = 'sl-input flex items-center gap-2 h-auto min-h-11 pl-3 pr-1 bg-recess text-left text-ink cursor-pointer hover:border-accent-edge hover:bg-[var(--field-focus)] aria-expanded:border-accent-edge aria-expanded:bg-[var(--field-focus)]'
+  const JOIN_ADDRESS = 'col-start-2 grid gap-1 max-[700px]:col-start-1'
 
   // The servers Join offers a setup: the ones on its version (and the one picked now, whatever
   // it runs), those that are up first. The first run's draft has no version to narrow by yet.
@@ -349,49 +379,58 @@
     const list = joinChoices(choices, p.mc, t.server)
     const rest = choices.length - list.length
     const pickServer = (c) => () => { setTarget(p, { server: c.name }); closeMenu({ refocus: true }) }
-    return h('div', { class: 'menu srv', id: 'menuJoin', role: 'dialog', 'aria-label': 'Where to join', onkeydown: menuKeys },
+    return h('div', { class: `${MENU} w-full`, id: 'menuJoin', role: 'dialog', 'aria-label': 'Where to join', onkeydown: menuKeys },
       list.length
-        ? h('div', { class: 'mhead', text: p.mc === 'latest' ? 'Your servers' : `Your servers on ${p.mc}` })
-        : h('p', { class: 'note', text: choices.length ? `None of your servers run Minecraft ${p.mc}.` : 'No SpawnLoft servers yet.' }),
+        ? h('div', { class: MENU_HEAD, text: p.mc === 'latest' ? 'Your servers' : `Your servers on ${p.mc}` })
+        : h('p', { class: MENU_NOTE, text: choices.length ? `None of your servers run Minecraft ${p.mc}.` : 'No SpawnLoft servers yet.' }),
       list.map((c) => {
         let meta = c.status === 'running' ? 'joins right away' : c.stopped ? 'starts it first, up to 2 min' : statusText(c.status)
         let warn = false
         if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion && p.mc !== 'latest') { meta = 'runs another version'; warn = true } else if (c.otherLoader) { meta = `runs ${loaderName(c.otherLoader)}`; warn = true }
-        return h('button', { class: c.name === t.server ? 'row cur' : 'row', 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
+        return h('button', { class: c.name === t.server ? `${MENU_ROW} bg-accent-wash` : MENU_ROW, 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
           stateDot(c.status, c.stopped),
-          h('span', { class: 'sub' }, h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` \u00b7 ${c.mc}` : ''}` })),
-          h('span', { class: warn ? 'meta warn' : 'meta', text: meta }))
+          h('span', { class: 'grid leading-[1.25] min-w-0' }, h('b', { class: 'font-semibold', title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { class: 'text-1 text-ink-3 truncate', text: `${statusText(c.status)}${c.mc ? ` \u00b7 ${c.mc}` : ''}` })),
+          h('span', { class: warn ? `${MENU_META} text-warn-ink` : MENU_META, text: meta }))
       }),
-      rest > 0 && h('p', { class: 'note', text: `${rest} more on other versions. They are under Your servers, with Show all.` }),
-      h('hr'),
-      h('button', { class: custom ? 'row act cur' : 'row act', id: 'joinOther', 'aria-current': custom ? 'true' : null, onclick: () => { setTarget(p, { address: t.address, custom: true }); closeMenu(); $('joinAddress')?.focus() } }, 'Another address\u2026'),
-      h('button', { class: title ? 'row act cur' : 'row act', id: 'joinTitle', 'aria-current': title ? 'true' : null, onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen'))
+      rest > 0 && h('p', { class: MENU_NOTE, text: `${rest} more on other versions. They are under Your servers, with Show all.` }),
+      h('hr', { class: MENU_SEP }),
+      h('button', { class: custom ? `${MENU_ROW} text-ink-2 bg-accent-wash` : `${MENU_ROW} text-ink-2`, id: 'joinOther', 'aria-current': custom ? 'true' : null, onclick: () => { setTarget(p, { address: t.address, custom: true }); closeMenu(); $('joinAddress')?.focus() } }, 'Another address\u2026'),
+      h('button', { class: title ? `${MENU_ROW} text-ink-2 bg-accent-wash` : `${MENU_ROW} text-ink-2`, id: 'joinTitle', 'aria-current': title ? 'true' : null, onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen'))
   }
 
   function launchingCard(p, job) {
     const [headline, facts] = splitMessage(job.message || 'Preparing…')
     const shown = STEPS.map((name, i) => ({ name, i })).filter((s) => s.name !== 'Server' || job.startsServer)
     return [
-      h('div', { class: 'eyebrow' }, pill('accent', 'Launching', true)),
+      h('div', { class: EYEBROW }, pill('accent', 'Launching', true)),
       // not a live region: every counted file would be read out. announce() says each new step once.
-      h('div', { class: 'prog' },
-        h('div', { class: 'line' }, h('b', { text: stepOf(job.stage) === -1 && !job.message ? 'Preparing…' : headline }), facts && h('span', { class: 'hint', text: facts })),
-        h('div', { class: job.percent === null || job.percent === undefined ? 'bar indet' : 'bar', role: 'progressbar', 'aria-label': 'Launch progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null, 'aria-valuetext': job.percent === null || job.percent === undefined ? headline : null },
-          h('i', { style: job.percent === null || job.percent === undefined ? null : `width:${Math.max(2, job.percent)}%` })),
+      h('div', { class: PROG },
+        h('div', { class: PROG_LINE }, h('b', { class: PROG_HEAD, text: stepOf(job.stage) === -1 && !job.message ? 'Preparing…' : headline }), facts && h('span', { class: `${HINT} ml-auto`, text: facts })),
+        h('div', { class: 'sl-progress h-2.5', role: 'progressbar', 'aria-label': 'Launch progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null, 'aria-valuetext': job.percent === null || job.percent === undefined ? headline : null,
+          style: job.percent === null || job.percent === undefined ? null : `--value:${Math.max(2, job.percent) / 100}` }),
         // which steps are done and which one it is on, in words too, not by colour and a dot alone
-        h('div', { class: 'steps', role: 'list', 'aria-label': 'Steps of the launch' }, shown.map((s) => {
+        h('div', { class: 'flex gap-3 flex-wrap', role: 'list', 'aria-label': 'Steps of the launch' }, shown.map((s) => {
           const now = stepOf(job.stage)
-          if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: 'step done', role: 'listitem' }, ico('check'), s.name, h('span', { class: 'sr', text: ', done' }))
-          if (s.i === now) return h('span', { class: 'step now', role: 'listitem', 'aria-current': 'step' }, h('span', { 'aria-hidden': 'true', text: '● ' }), s.name)
-          return h('span', { class: 'step', role: 'listitem' }, s.name)
+          if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: `${STEP} text-live-ink`, role: 'listitem' }, ico('check'), s.name, h('span', { class: 'sl-sr', text: ', done' }))
+          if (s.i === now) return h('span', { class: `${STEP} text-accent-ink font-strong`, role: 'listitem', 'aria-current': 'step' }, h('span', { 'aria-hidden': 'true', text: '● ' }), s.name)
+          return h('span', { class: `${STEP} text-ink-4`, role: 'listitem' }, s.name)
         })),
         // the one thing to do while it runs; once the game itself is starting there is nothing left to cancel
-        h('div', { class: 'runrow' },
-          h('button', { id: 'cancelLaunch', disabled: Boolean(job.cancelling) || stepOf(job.stage) >= 4, onclick: () => cancelLaunch(job) }, job.cancelling ? 'Cancelling…' : 'Cancel')),
+        h('div', { class: RUN_ROW },
+          h('button', { class: `${BTN} ${BTN_BIG}`, id: 'cancelLaunch', disabled: Boolean(job.cancelling) || stepOf(job.stage) >= 4, onclick: () => cancelLaunch(job) }, job.cancelling ? 'Cancelling…' : 'Cancel')),
         // once the game itself is starting there is no download left to speak of
-        h('p', { class: 'hint', text: stepOf(job.stage) >= 4 ? 'The game is starting. Its window opens in a moment.' : `${CLOSING} does not stop the download. It keeps going and the files are used next time. Cancel stops it; what is already downloaded is kept.` })),
+        h('p', { class: `${HINT} text-3`, text: stepOf(job.stage) >= 4 ? 'The game is starting. Its window opens in a moment.' : `${CLOSING} does not stop the download. It keeps going and the files are used next time. Cancel stops it; what is already downloaded is kept.` })),
     ]
   }
+
+  // the card's status row while the game is being launched or is running: the pill and the setup
+  const EYEBROW = 'flex items-center gap-3 flex-wrap mb-[calc(var(--s-2)-var(--s-5))] type-card text-ink-2'
+  // a launch under way, or a game running: a well in the button's place, at the button's weight
+  const PROG = 'grid gap-3 min-h-[84px] p-5 border border-line rounded-md bg-recess shadow-lift max-[700px]:p-4'
+  const PROG_LINE = 'flex items-baseline gap-3 flex-wrap'
+  const PROG_HEAD = 'font-display text-5 leading-[1.2] font-strong tracking-[-.01em]'
+  const STEP = 'text-1 inline-flex gap-[5px] items-center'
+  const RUN_ROW = 'flex items-center gap-3 flex-wrap mt-1'
 
   // Asks the panel to stop the launch. The job's own stream then says it was cancelled, and that
   // is what puts Play back; a launch that had already finished just carries on to its result.
@@ -430,27 +469,27 @@
     const asking = S.stopAsk === p.name && S.stopping !== p.name
     const live = S.live?.profile === p.name ? S.live : null
     return [
-      h('div', { class: 'eyebrow' }, pill('live', 'Running', true), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
-      h('div', { class: 'prog' },
-        h('div', { class: 'line' }, h('b', { text: 'Minecraft is running' }), h('span', { class: 'hint' }, target ? ['joined ', h('b', { style: 'color:var(--ink-2)', text: target })] : 'on the title screen')),
+      h('div', { class: EYEBROW }, pill('live', 'Running', true), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
+      h('div', { class: PROG },
+        h('div', { class: PROG_LINE }, h('b', { class: PROG_HEAD, text: 'Minecraft is running' }), h('span', { class: `${HINT} ml-auto` }, target ? ['joined ', h('b', { class: 'text-ink-2', text: target })] : 'on the title screen')),
         asking
           // Stop closes the game where it stands; asked first, with the safe choice in focus
-          ? h('div', { class: 'confirm', role: 'group', 'aria-label': 'Stop the game?' },
-            h('p', { id: 'stopWhy', text: target ? 'Stop Minecraft now? It closes straight away.' : 'Stop Minecraft now? If a single-player world is open, quit from the game\'s own menu instead, so the world is saved first.' }),
-            h('button', { id: 'keepPlaying', onclick: () => { S.stopAsk = null; render(); $('stop')?.focus({ preventScroll: true }) } }, 'Keep playing'),
-            h('button', { class: 'danger', id: 'stopNow', 'aria-describedby': 'stopWhy', onclick: () => stopProfile(p) }, ico('stop'), 'Stop now'))
-          : h('div', { class: 'runrow' },
+          ? h('div', { class: CONFIRM, role: 'group', 'aria-label': 'Stop the game?' },
+            h('p', { class: 'm-0 flex-[1_1_260px] text-3 text-ink-2', id: 'stopWhy', text: target ? 'Stop Minecraft now? It closes straight away.' : 'Stop Minecraft now? If a single-player world is open, quit from the game\'s own menu instead, so the world is saved first.' }),
+            h('button', { class: BTN, id: 'keepPlaying', onclick: () => { S.stopAsk = null; render(); $('stop')?.focus({ preventScroll: true }) } }, 'Keep playing'),
+            h('button', { class: 'sl-btn sl-btn-danger', id: 'stopNow', 'aria-describedby': 'stopWhy', onclick: () => stopProfile(p) }, ico('stop'), 'Stop now'))
+          : h('div', { class: RUN_ROW },
             // not `disabled` while stopping: the button holds the focus "Stop now" had
-            h('button', { class: 'danger stop', id: 'stop', 'aria-disabled': S.stopping === p.name ? 'true' : null, onclick: () => { if (S.stopping !== p.name) askStop(p) } }, ico('stop'), S.stopping === p.name ? 'Stopping\u2026' : 'Stop'),
-            h('button', { id: 'liveLog', 'aria-expanded': String(Boolean(live)), 'aria-controls': live ? 'liveLogBox' : null, onclick: () => toggleLive(p) }, live ? 'Hide log' : 'Show log'),
-            h('button', { id: 'openFolder', onclick: () => reveal(p, 'folder') }, ico('folder'), 'Open folder')),
-        h('div', { class: 'facts' }, facts),
-        live && h('div', { class: 'livelog', id: 'liveLogBox' },
-          logBlock(live.lines, { id: 'liveLogPre', label: 'The game\'s log, as it runs', empty: live.read ? 'Nothing in the log yet.' : 'Reading the log\u2026' }),
-          h('div', { class: 'acts' },
-            h('button', { class: 'sm', id: 'copyLive', disabled: !live.lines.length, onclick: () => copyLines('live', live.lines) }, S.copied === 'live' ? 'Copied' : 'Copy'),
-            h('button', { class: 'sm', id: 'liveFolder', onclick: () => reveal(p, 'logs') }, 'Open log folder'))),
-        h('p', { class: 'hint', text: `${CLOSING} does not stop the game.` })),
+            h('button', { class: 'sl-btn sl-btn-danger h-auto min-h-[52px] px-10 gap-3 rounded-md font-display text-5 leading-none font-strong', id: 'stop', 'aria-disabled': S.stopping === p.name ? 'true' : null, onclick: () => { if (S.stopping !== p.name) askStop(p) } }, ico('stop', 'text-[14px]'), S.stopping === p.name ? 'Stopping\u2026' : 'Stop'),
+            h('button', { class: `${BTN} ${BTN_BIG}`, id: 'liveLog', 'aria-expanded': String(Boolean(live)), 'aria-controls': live ? 'liveLogBox' : null, onclick: () => toggleLive(p) }, live ? 'Hide log' : 'Show log'),
+            h('button', { class: `${BTN} ${BTN_BIG}`, id: 'openFolder', onclick: () => reveal(p, 'folder') }, ico('folder'), 'Open folder')),
+        h('div', { class: 'flex flex-wrap gap-y-1 gap-x-3 type-meta text-ink-3 [&_b]:text-ink-2 [&_b]:font-semibold' }, facts),
+        live && h('div', { class: 'grid gap-2', id: 'liveLogBox' },
+          logBlock(live.lines, { id: 'liveLogPre', label: 'The game\'s log, as it runs', empty: live.read ? 'Nothing in the log yet.' : 'Reading the log\u2026', cls: 'w-full max-h-[260px]' }),
+          h('div', { class: 'flex gap-2 flex-wrap' },
+            h('button', { class: BTN_SM, id: 'copyLive', disabled: !live.lines.length, onclick: () => copyLines('live', live.lines) }, S.copied === 'live' ? 'Copied' : 'Copy'),
+            h('button', { class: BTN_SM, id: 'liveFolder', onclick: () => reveal(p, 'logs') }, 'Open log folder'))),
+        h('p', { class: `${HINT} text-3`, text: `${CLOSING} does not stop the game.` })),
     ]
   }
 
@@ -494,14 +533,14 @@
     if (crash.report && typeof crash.report === 'object') {
       text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
     }
-    const acts = [h('button', { class: 'sm', id: 'crashReport', disabled: crash.report === 'busy', onclick: () => reportProblem(crash) }, crash.report === 'busy' ? 'Collecting\u2026' : 'Report a problem')]
-    const pre = logBlock(lines, { id: 'crashLogPre' })
-    if (S.logMore) pre.classList.add('more')
-    const logActs = h('div', { class: 'logacts' },
-      h('button', { class: 'sm', id: 'copyCrash', disabled: !all.length, onclick: () => copyLines('crash', all) }, S.copied === 'crash' ? 'Copied' : 'Copy log'),
-      all.length > LOG_LINES && h('button', { class: 'sm', id: 'crashMore', 'aria-expanded': String(S.logMore), 'aria-controls': 'crashLogPre', onclick: () => { S.logMore = !S.logMore; render() } }, S.logMore ? 'Show less' : `Show ${all.length} lines`),
-      p && h('button', { class: 'sm', id: 'crashFolder', onclick: () => reveal(p, 'crash-reports') }, 'Show crash reports'),
-      p && h('button', { class: 'sm', id: 'crashLogs', onclick: () => reveal(p, 'logs') }, 'Open log folder'))
+    const acts = [h('button', { class: BTN_SM, id: 'crashReport', disabled: crash.report === 'busy', onclick: () => reportProblem(crash) }, crash.report === 'busy' ? 'Collecting\u2026' : 'Report a problem')]
+    // under the notice's words, lined up with them (past the icon and the gap after it)
+    const pre = logBlock(lines, { id: 'crashLogPre', cls: `basis-full ml-[34px] w-[calc(100%-34px)] ${S.logMore ? 'max-h-80' : 'max-h-32'}` })
+    const logActs = h('div', { class: 'flex gap-2 flex-wrap basis-full ml-[34px]' },
+      h('button', { class: BTN_SM, id: 'copyCrash', disabled: !all.length, onclick: () => copyLines('crash', all) }, S.copied === 'crash' ? 'Copied' : 'Copy log'),
+      all.length > LOG_LINES && h('button', { class: BTN_SM, id: 'crashMore', 'aria-expanded': String(S.logMore), 'aria-controls': 'crashLogPre', onclick: () => { S.logMore = !S.logMore; render() } }, S.logMore ? 'Show less' : `Show ${all.length} lines`),
+      p && h('button', { class: BTN_SM, id: 'crashFolder', onclick: () => reveal(p, 'crash-reports') }, 'Show crash reports'),
+      p && h('button', { class: BTN_SM, id: 'crashLogs', onclick: () => reveal(p, 'logs') }, 'Open log folder'))
     const title = `Minecraft ${rec && exitKind(rec) === 'abnormal' ? 'crashed' : 'closed'} ${ranFor(crash.seconds)} after it started`
     return notice({ tone: 'fault', title, text, acts, extra: [pre, logActs], onclose: () => { dropCrash(); nextExit(); render() } })
   }
@@ -511,7 +550,7 @@
   function crashElsewhere(crash) {
     const q = profileNamed(crash.profile)
     return notice({ tone: 'fault', title: `Minecraft crashed in ${setupName(q)}`, text: 'Its log is on that setup\'s card.',
-      acts: [h('button', { class: 'sm', id: 'crashShow', onclick: () => { pickProfile(crash.profile); render(); $('crashLogPre')?.focus({ preventScroll: true }) } }, 'Show')],
+      acts: [h('button', { class: BTN_SM, id: 'crashShow', onclick: () => { pickProfile(crash.profile); render(); $('crashLogPre')?.focus({ preventScroll: true }) } }, 'Show')],
       onclose: () => { dropCrash(); nextExit(); render() } })
   }
 
@@ -557,8 +596,9 @@
     setTimeout(() => { if (S.copied === what) { S.copied = null; render() } }, 2000)
   }
 
-  function logBlock(lines, { id = null, label = 'The last lines of the game log', empty = 'The game left no log lines.' } = {}) {
-    const pre = h('pre', { class: 'log', id, tabindex: '0', 'aria-label': label })
+  // `cls` is its height
+  function logBlock(lines, { id = null, label = 'The last lines of the game log', empty = 'The game left no log lines.', cls = 'w-full max-h-[220px]' } = {}) {
+    const pre = h('pre', { class: `m-0 py-2 px-3 bg-sunken border border-line-soft rounded-xs font-mono font-normal text-2 leading-[1.55] text-console whitespace-pre overflow-auto ${cls}`, id, tabindex: '0', 'aria-label': label })
     lines.forEach((line, i) => {
       if (i) pre.append('\n')
       const m = LEVEL_RE.exec(line)
@@ -566,7 +606,7 @@
         pre.append(line)
         return
       }
-      pre.append(line.slice(0, m.index), h('span', { class: m[1] === 'WARN' ? 'w' : 'e', text: m[1] }), line.slice(m.index + m[1].length))
+      pre.append(line.slice(0, m.index), h('span', { class: m[1] === 'WARN' ? 'text-warn-ink' : 'text-fault-ink', text: m[1] }), line.slice(m.index + m[1].length))
     })
     if (!lines.length) pre.append(empty)
     return pre

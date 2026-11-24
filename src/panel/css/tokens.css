@@ -190,6 +190,14 @@
     --glass:        var(--chrome);
     --glass-strong: var(--raised);
     --blur: none;
+    /* The welcome screen (no servers yet), the one screen with room to spare: it wears the brand's
+       own geometry, a faint isometric grid at the mark's 2:1 pitch, lit from above. */
+    --welcome-ground:
+      linear-gradient(180deg, rgba(var(--accent-rgb), .06), transparent 46%),
+      repeating-linear-gradient(63.43deg, rgba(var(--ink-rgb), .018) 0 1px, transparent 1px 56px),
+      repeating-linear-gradient(-63.43deg, rgba(var(--ink-rgb), .018) 0 1px, transparent 1px 56px),
+      var(--void);
+    --welcome-glow: drop-shadow(0 0 32px rgba(var(--accent-rgb), .4));
     --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, .045), 0 1px 2px rgba(0, 0, 0, .35);
     --shadow-md: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 2px rgba(0, 0, 0, .35), 0 12px 32px -18px rgba(0, 0, 0, .7);
     --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, .07), 0 2px 6px rgba(0, 0, 0, .4), 0 28px 64px -20px rgba(0, 0, 0, .75);

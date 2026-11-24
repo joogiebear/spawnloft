@@ -753,7 +753,7 @@ async function uploadFiles(row, view, list) {
   const noteText = note.querySelector('div');
   const stop = document.createElement('button');
   stop.type = 'button';
-  stop.className = 'sm';
+  stop.className = 'sl-btn sl-btn-sm';
   stop.textContent = 'Cancel';
   note.insertBefore(stop, note.querySelector('.x'));
   note.querySelector('.x').hidden = true;

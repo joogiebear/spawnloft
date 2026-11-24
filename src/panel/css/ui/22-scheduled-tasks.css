@@ -1,7 +1,0 @@
-/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
-@layer legacy {
-  /* The small heading over a list: Plugins and Files still use it. (Schedule's own rules went in
-     phase 8, when it moved to the shared blocks.) */
-  .hist-title { margin: 0 0 8px; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
-
-}

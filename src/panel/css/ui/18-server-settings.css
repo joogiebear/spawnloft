@@ -1,6 +1,0 @@
-/* One cascade layer for every hand-written stylesheet, below Tailwind's (src/panel/tailwind/panel.css). */
-@layer legacy {
-  /* the line under a field that says what is wrong with it (fieldNote, Add a server) takes no room while empty */
-  .field-note:empty { display: none; }
-
-}

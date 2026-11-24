@@ -2,16 +2,9 @@
 <html lang="en" data-theme="classic">
 <meta charset="utf-8">
 <title>probe: running</title>
-<!-- The order the panel's pages use: tokens, the built Tailwind file, then the old stylesheets. -->
+<!-- The order the panel's pages use: the tokens, then the built Tailwind file, and nothing else. -->
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="probe.out.css">
-<style>
-  /* stands in for a hand-written panel stylesheet: one layer, declared below Tailwind's */
-  @layer legacy {
-    #layers .old-box { padding: 3px; color: rgb(1, 2, 3); }
-    [hidden] { display: none !important; }
-  }
-</style>
 <body class="bg-void text-ink font-ui text-4">
   <div id="card" class="bg-surface border border-line rounded-lg p-5 shadow-md"></div>
   <div id="wash" class="bg-live/15"></div>
@@ -21,8 +14,8 @@
     </div>
   </div>
   <div id="layers">
-    <div id="old" class="old-box"></div>
-    <div id="new" class="old-box p-4 text-accent"></div>
+    <div id="new" class="p-4 text-accent"></div>
+    <button id="bare">bare</button>
     <div id="gone" class="flex" hidden></div>
   </div>
   <p id="label" class="type-label text-ink-3">Label</p>
