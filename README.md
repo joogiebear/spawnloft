@@ -785,6 +785,13 @@ had stays where it is, and a data folder you pointed at a drive with other thing
 SpawnLoft's own folders. The same command is available from a terminal as
 `spawnloft uninstall --yes [--data]`.
 
+On **Linux** there is no uninstaller of this kind: the package manager removes the program, and its
+scripts run as root, so they cannot reach your servers or your account's timers. Run
+`spawnloft uninstall --yes [--data]` first, then `sudo apt remove spawnloft` (or `dnf remove`; the
+command-line package is `spawnloft-cli`).
+Removed the other way round, running servers keep going until they stop and the timers keep firing
+at a program that is gone; reinstall, run the command, and remove again.
+
 ## Databases
 
 On **Mac (macOS 15+)**, managed SQL databases use MySQL 8.4 LTS. Choose **Create a database**
