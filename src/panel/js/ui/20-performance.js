@@ -89,14 +89,14 @@ function chart(samples, { pick, max, colour, label }) {
 function gauge({ title, now, aside, samples, pick, max, colour, empty, fmt }) {
   const head = Kit.h('div', { class: 'flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5' },
     Kit.eyebrow(title, 'h3'),
-    Kit.h('span', { class: 'text-[length:var(--text-6)] font-semibold leading-none tracking-tight text-ink', text: now }),
+    Kit.h('span', { class: 'now text-[length:var(--text-6)] font-semibold leading-none tracking-tight text-ink', text: now }),
     Kit.h('span', { class: 'type-meta ml-auto text-ink-3', text: aside }));
   head.firstChild.classList.add('basis-full', 'm-0');
   const plot = Kit.h('div', { class: 'relative grid' },
     chart(samples, { pick, max, colour, label: chartWords(title, empty ? 'no readings yet' : now, empty ? '' : aside, perfView.seconds) }));
   if (empty) plot.append(Kit.h('p', { class: 'type-meta absolute inset-0 m-0 grid place-content-center px-4 py-2 text-center text-ink-3', text: empty }));
   const wrap = Kit.card({}, head, plot);
-  wrap.classList.add('gap-3');
+  wrap.classList.add('gap-3', 'gauge');
   // The range's numbers, shown under the chart when the pane is Ultra.
   if (samples.length && fmt) {
     const values = samples.map(pick).filter((v) => v != null && Number.isFinite(v));
@@ -191,7 +191,7 @@ async function paintPerformance(name, opts) {
     onChange: (key) => { perfView.seconds = key; paintPerformance(name); },
   });
   RANGES.forEach((r, i) => { ranges.children[i].title = r.say; });
-  ranges.classList.add('mb-4', 'flex', 'w-fit');
+  ranges.classList.add('mb-4', 'flex', 'w-fit', 'ranges');
   body.append(ranges);
   // The widgets share the row once the pane has the room, so processor and memory can be read
   // against each other at the same instant.

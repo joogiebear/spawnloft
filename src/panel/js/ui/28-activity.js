@@ -65,6 +65,7 @@ function activityChip(by) {
   const who = activityActor(by);
   const tone = { you: 'accent', ai: 'warn', sched: 'live' }[who.tone];
   const pill = Kit.pill({ text: who.text, tone });
+  pill.classList.add('act-who');
   if (who.title) pill.title = who.title;
   return pill;
 }
@@ -140,6 +141,7 @@ async function renderActivity(opts) {
       return Kit.h('span', { class: 'type-meta', text: 'Undone' });
     }
     const undo = Kit.button({ label: 'Undo', icon: 'restore', kind: 'ghost', size: 'sm' });
+    undo.classList.add('act-undo');
     undo.title = 'Put back what this changed, as it was just before';
     undo.onclick = async (ev) => {
       ev.stopPropagation();
@@ -227,6 +229,7 @@ function activityLine(run, { open, when, tail }) {
     title: sentence,
     end: [bad, activityChip(e.by), when(e.at), ...tailOf(e)],
   });
+  line.classList.add('feed-row');
   line.querySelector('.sl-row-title').title = sentence;
   if (e.ok === false) line.querySelector('.sl-row-title').classList.add('text-fault-ink');
   if (run.entries.length === 1) return line;
@@ -241,12 +244,14 @@ function activityLine(run, { open, when, tail }) {
   summary.querySelector('.ico:not(:first-child)')?.remove();
   const span = ago(last.at) !== ago(e.at) ? ago(last.at) + ' to ' + ago(e.at) : ago(e.at);
   summary.title = sentence + ' \u00b7 ' + span;
+  summary.classList.add('feed-row');
   const sub = Kit.h('div', { class: 'border-t border-line-faint bg-recess pl-8' });
   for (const one of run.entries) {
     const l = Kit.row({
       title: one.detail || ACTIVITY_BARE[one.action] || (ACTIVITY_TEXT[one.action] || one.action),
       end: [when(one.at), ...tailOf(one)],
     });
+    l.classList.add('feed-row');
     l.querySelector('.sl-row-title').title = l.querySelector('.sl-row-title').textContent;
     if (one.ok === false) l.querySelector('.sl-row-title').classList.add('text-fault-ink');
     sub.append(l);
