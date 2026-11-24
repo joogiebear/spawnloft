@@ -750,12 +750,55 @@ pub fn idle_now() -> u64 {
 // ---- what the listener sends -----------------------------------------------------------------
 
 pub const PAGE_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-const PAGE_STYLE: &str = "body{font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center}h1{font-size:20px;margin:0 0 8px}p{margin:0;color:#bbb}a{color:#9cf}code{color:#eee}";
+/// The look of the pages the core writes itself: the sign-in pages here, the opening file
+/// (`panel_open.rs`) and "could not start" (`panel.rs`). They are sent before any sign-in and
+/// under `PAGE_CSP`, which loads nothing, so the panel's stylesheets and fonts are out of reach:
+/// they carry a copy of the SpawnLoft look's colours and corners instead.
+/// `the_page_tokens_are_the_panels` holds the copy to `src/panel/css/tokens.css`.
+pub const PAGE_STYLE: &str = concat!(
+    ":root{color-scheme:dark;",
+    "--void:#090d0d;--surface:#141b15;--line:#30382e;--edge:#485541;",
+    "--ink:#efeee6;--ink-2:#b5bcac;--ink-3:#9aa48f;--lapis:#c4f566;--lapis-ink:#dbf4b2;",
+    "--primary-ink:#14200b;--primary-hover-top:#d3ff80;",
+    "--cube-top:#c4f566;--cube-left:#8bb640;--cube-right:#567c24;--cube-cutout:#efffdc;",
+    "--r-sm:6px;--r-lg:12px}",
+    "*{box-sizing:border-box}",
+    "body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--void);",
+    "color:var(--ink);font:15px/1.55 system-ui,-apple-system,\"Segoe UI\",sans-serif}",
+    "main{width:min(480px,100%);padding:28px 32px;border:1px solid var(--line);border-radius:var(--r-lg);",
+    "background:var(--surface)}",
+    ".brand{display:flex;align-items:center;gap:8px;margin:0 0 20px;font-weight:650;letter-spacing:-.01em}",
+    ".brand svg{display:block}",
+    "h1{margin:0 0 8px;font-size:20px;line-height:1.25;font-weight:650;letter-spacing:-.015em}",
+    "p{margin:0 0 8px;color:var(--ink-2)}p:last-child{margin:0}p.small{font-size:13px;color:var(--ink-3)}",
+    "a{color:var(--lapis-ink)}",
+    "a:focus-visible{outline:2px solid var(--lapis);outline-offset:2px}",
+    "a.go{display:inline-block;margin-top:8px;padding:8px 14px;border-radius:var(--r-sm);background:var(--lapis);",
+    "color:var(--primary-ink);font-weight:600;text-decoration:none}",
+    "a.go:hover{background:var(--primary-hover-top)}",
+    "code{font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);",
+    "background:var(--void);border:1px solid var(--line);border-radius:4px;padding:1px 5px;word-break:break-all}",
+);
+
+/// The cube and the name, as the panel's header has them. Drawn inline: the policy loads nothing.
+const PAGE_BRAND: &str = concat!(
+    "<div class=\"brand\"><svg viewBox=\"0 0 64 64\" width=\"20\" height=\"20\" aria-hidden=\"true\">",
+    "<polygon points=\"8,20 32,8 56,20 32,32\" fill=\"var(--cube-top)\"/>",
+    "<polygon points=\"8,20 32,32 32,54 8,42\" fill=\"var(--cube-left)\"/>",
+    "<polygon points=\"56,20 32,32 32,54 56,42\" fill=\"var(--cube-right)\"/>",
+    "<polygon points=\"51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7\" fill=\"var(--cube-cutout)\"/>",
+    "</svg>SpawnLoft</div>",
+);
+
+/// One of the core's own pages: `title` as its heading, `inner` (HTML, already escaped) under it.
+pub fn styled_page(title: &str, inner: &str, extra_head: &str) -> String {
+    format!(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">{extra_head}<title>{title}</title><style>{PAGE_STYLE}</style></head><body><main>{PAGE_BRAND}<h1>{title}</h1>{inner}</main></body></html>"
+    )
+}
 
 fn page(title: &str, body: &str, extra_head: &str) -> String {
-    format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">{extra_head}<title>{title}</title><style>{PAGE_STYLE}</style></head><body><main><h1>{title}</h1><p>{body}</p></main></body></html>"
-    )
+    styled_page(title, &format!("<p>{body}</p>"), extra_head)
 }
 
 /// The page behind a good login link. A page with a refresh, not a 303: the link is often opened
@@ -764,7 +807,7 @@ fn page(title: &str, body: &str, extra_head: &str) -> String {
 pub fn login_page(to: &str) -> String {
     page(
         "Opening SpawnLoft",
-        &format!("<a href=\"{to}\">Continue to SpawnLoft</a>"),
+        &format!("<a class=\"go\" href=\"{to}\">Continue to SpawnLoft</a>"),
         &format!("<meta http-equiv=\"refresh\" content=\"0; url={to}\">"),
     )
 }
@@ -804,7 +847,7 @@ pub fn unauthorized_page(shell: bool, path: &str, refused: bool) -> String {
     page(
         TITLE,
         &format!(
-            "SpawnLoft restarted, or this window sat unused for a while. <a href=\"{again}\">Sign in again</a>"
+            "SpawnLoft restarted, or this window sat unused for a while.<br><a class=\"go\" href=\"{again}\">Sign in again</a>"
         ),
         &head,
     )
@@ -1171,6 +1214,45 @@ mod tests {
             "left as it was"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The core's own pages carry a copy of the SpawnLoft look's tokens (`PAGE_STYLE`); each value
+    /// in it is the one `src/panel/css/tokens.css` gives that look, so the two cannot drift.
+    #[test]
+    fn the_page_tokens_are_the_panels() {
+        let css = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../src/panel/css/tokens.css"
+        ))
+        .expect("tokens.css");
+        let at = css
+            .find(":root[data-theme=\"spawnloft\"] {")
+            .expect("the SpawnLoft block");
+        let block = &css[at..at + css[at..].find("\n  }").expect("its end")];
+        let theirs = |name: &str| {
+            let key = format!("--{name}:");
+            let from = block
+                .find(&key)
+                .unwrap_or_else(|| panic!("tokens.css has no --{name}"))
+                + key.len();
+            block[from..from + block[from..].find(';').unwrap()]
+                .trim()
+                .to_string()
+        };
+        let root = &PAGE_STYLE[PAGE_STYLE.find(":root{").unwrap() + 6..];
+        let root = &root[..root.find('}').unwrap()];
+        let mut checked = 0;
+        for decl in root.split(';') {
+            let Some((name, value)) = decl.split_once(':') else {
+                continue;
+            };
+            let Some(name) = name.trim().strip_prefix("--") else {
+                continue;
+            };
+            assert_eq!(value.trim(), theirs(name), "--{name} in PAGE_STYLE");
+            checked += 1;
+        }
+        assert!(checked >= 15, "only {checked} tokens in PAGE_STYLE");
     }
 
     #[test]

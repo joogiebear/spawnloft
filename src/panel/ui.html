@@ -400,223 +400,263 @@
     </div>
 
     <!-- ============ add a server ========================================= -->
-    <div class="view sheet" id="vAdd">
-      <div class="sheet-head">
-        <h1 id="addTitle">Add a server</h1>
+    <div class="view sheet @container/add" id="vAdd">
+      <div class="flex items-center gap-3 px-6 pt-5 pb-1">
+        <h1 class="m-0 type-page tracking-display" id="addTitle">Add a server</h1>
         <span class="grow"></span>
-        <button class="ghost" id="bAddClose">Close</button>
+        <button type="button" class="sl-btn sl-btn-ghost" id="bAddClose">Close</button>
       </div>
-      <div class="tabs" role="tablist">
-        <button role="tab" data-tab="new" aria-selected="true">Create a new one</button>
-        <button role="tab" data-tab="pack" aria-selected="false">From a modpack</button>
-        <button role="tab" data-tab="adopt" aria-selected="false">Add one I already have</button>
-        <button role="tab" data-tab="db" aria-selected="false">A database</button>
+      <!-- data-add-tabs: what 33-add-server.js finds the tabs by -->
+      <div class="sl-tabs px-4 border-b border-line-soft" role="tablist" aria-label="What to add" data-add-tabs>
+        <button type="button" class="sl-tab disabled:opacity-50 disabled:cursor-not-allowed" role="tab" data-tab="new" aria-selected="true">Create a new one</button>
+        <button type="button" class="sl-tab disabled:opacity-50 disabled:cursor-not-allowed" role="tab" data-tab="pack" aria-selected="false">From a modpack</button>
+        <button type="button" class="sl-tab disabled:opacity-50 disabled:cursor-not-allowed" role="tab" data-tab="adopt" aria-selected="false">Add one I already have</button>
+        <button type="button" class="sl-tab disabled:opacity-50 disabled:cursor-not-allowed" role="tab" data-tab="db" aria-selected="false">A database</button>
       </div>
 
-      <form class="sheet-body" id="formNew">
-        <h2 class="form-group-title">What to run</h2>
-        <div class="field">
-          <label for="nName">Name</label>
-          <input id="nName" name="name" required autocomplete="off" placeholder="Survival (Season 3)" maxlength="48">
-          <div class="hint">Anything you like. The folder and the console use <code id="nNameSlug">—</code></div>
-          <div class="bad" id="nNameBad"></div>
-        </div>
-        <div class="row" style="align-items:flex-start">
-          <div class="field" style="flex:1">
-            <label for="nLoader">Software</label>
-            <select id="nLoader" name="loader">
-              <!-- Filled from /api/software; Paper stands in until that answers. -->
-              <option value="paper" selected>Paper</option>
-            </select>
-            <div class="hint" id="nLoaderHint">Runs plugins</div>
-          </div>
-          <div class="field" style="flex:2">
-            <label for="nVersion">Minecraft version</label>
-            <select id="nVersion" name="version"><option value="">Loading versions…</option></select>
-            <div class="hint" id="nVersionHint">Downloads the newest stable Paper build.</div>
-            <div class="bad field-note" id="nVersionBad" role="status"></div>
-            <div class="inline-warn" id="nJavaWarn" hidden></div>
-          </div>
-          <div class="field" style="flex:1">
-            <label for="nMem">Memory</label>
-            <input id="nMem" name="memory" value="4G" class="mono" autocomplete="off" inputmode="text">
-            <div class="hint">e.g. 4G</div>
-            <div class="bad" id="nMemBad"></div>
-          </div>
-          <div class="field" style="flex:1">
-            <label for="nPort">Port</label>
-            <input id="nPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off" min="1024" max="65535" aria-describedby="nPortBad">
-            <div class="hint">Blank picks a free one</div>
-            <div class="bad field-note" id="nPortBad" aria-live="polite"></div>
-          </div>
-        </div>
-        <h2 class="form-group-title" id="nJoinTitle">Who can join</h2>
-        <div class="field">
-          <div class="choice" id="nJoin" role="radiogroup" aria-labelledby="nJoinTitle">
-            <label>
-              <input type="radio" name="onlineMode" value="online" checked>
-              <b>Require a Minecraft account</b>
-              <span>Only people who own Minecraft can join, each under their own name. Recommended.</span>
-            </label>
-            <label>
-              <input type="radio" name="onlineMode" value="offline">
-              <b>Anyone, as any name</b>
-              <span>Nobody's account is checked, so anyone can join under any name. For testing by
-                yourself, or with no internet. Not safe for a public server.</span>
-            </label>
-          </div>
-        </div>
-        <div class="prog" id="newProg" hidden>
-          <div class="track"><div class="bar" id="newBar"></div></div>
-          <div class="msg" id="newMsg"></div>
-        </div>
-        <div class="new-summary" id="newSummary" aria-live="polite"></div>
-        <div class="row">
-          <button type="submit" class="primary" id="bCreate">Create server</button>
-          <span class="hint" id="newHint">Accepts the Minecraft EULA on your behalf, as the operator of this machine.</span>
-        </div>
-      </form>
-
-      <form class="sheet-body" id="formPack" hidden>
-        <div class="field">
-          <label for="pSearch">Modpack</label>
-          <div class="row">
-            <input id="pSearch" type="search" placeholder="Search Modrinth — server-ready Fabric and NeoForge packs" autocomplete="off">
-            <button type="button" id="bPackSearch">Search</button>
-          </div>
-          <div class="hint">The pack decides the Minecraft version, the loader and the mods. You pick a name and how much memory it gets.</div>
-        </div>
-        <div id="packResults"></div>
-        <div id="packChosenWrap" hidden>
-          <div class="field">
-            <label>Chosen pack</label>
-            <div class="hint" id="packChosen" style="font-size:13px;color:var(--ink)"></div>
-          </div>
-          <div class="row" style="align-items:flex-start;margin-top:12px">
-            <div class="field" style="flex:2">
-              <label for="pName">Name</label>
-              <input id="pName" autocomplete="off" maxlength="48">
-              <div class="hint">Folder and console: <code id="pNameSlug">—</code></div>
-              <div class="bad" id="pNameBad"></div>
+      <form class="mx-auto grid w-full max-w-[1080px] grid-cols-1 items-start gap-6 px-5 pt-6 pb-8 @min-[880px]/add:grid-cols-[minmax(0,1fr)_300px] @min-[880px]/add:px-6" id="formNew">
+        <div class="grid min-w-0 gap-5">
+          <section class="sl-card" aria-labelledby="nWhatTitle">
+            <h2 class="sl-eyebrow" id="nWhatTitle">What to run</h2>
+            <div class="sl-field">
+              <label class="sl-label" for="nName">Name</label>
+              <input class="sl-input" id="nName" name="name" required autocomplete="off" placeholder="Survival (Season 3)" maxlength="48">
+              <p class="sl-hint">Anything you like. The folder and the console use <code class="sl-code" id="nNameSlug">—</code></p>
+              <p class="sl-error empty:hidden" id="nNameBad"></p>
             </div>
-            <div class="field" style="flex:1">
-              <label for="pMem">Memory</label>
-              <input id="pMem" value="4G" class="mono" autocomplete="off">
-              <div class="hint">Modded servers want 4G or more.</div>
-              <div class="bad" id="pMemBad"></div>
+            <div class="grid grid-cols-1 items-start gap-4 @min-[600px]/add:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+              <div class="sl-field">
+                <label class="sl-label" for="nLoader">Software</label>
+                <span class="sl-input-group">
+                  <select class="sl-input" id="nLoader" name="loader">
+                    <!-- Filled from /api/software; Paper stands in until that answers. -->
+                    <option value="paper" selected>Paper</option>
+                  </select>
+                  <span class="sl-input-caret" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-caret"></use></svg></span>
+                </span>
+                <p class="sl-hint" id="nLoaderHint">Runs plugins</p>
+              </div>
+              <div class="sl-field">
+                <label class="sl-label" for="nVersion">Minecraft version</label>
+                <span class="sl-input-group">
+                  <select class="sl-input" id="nVersion" name="version"><option value="">Loading versions…</option></select>
+                  <span class="sl-input-caret" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-caret"></use></svg></span>
+                </span>
+                <p class="sl-hint" id="nVersionHint">Downloads the newest stable Paper build.</p>
+                <p class="sl-error empty:hidden" id="nVersionBad" role="status"></p>
+                <p class="m-0 rounded-sm border border-warn-edge bg-warn-wash px-3 py-2 type-meta text-warn-ink [&_a]:text-ink [&_a]:underline" id="nJavaWarn" hidden></p>
+              </div>
+            </div>
+          </section>
+
+          <section class="sl-card" aria-labelledby="nRoomTitle">
+            <h2 class="sl-eyebrow" id="nRoomTitle">Memory and address</h2>
+            <div class="grid grid-cols-1 items-start gap-4 @min-[600px]/add:grid-cols-2">
+              <div class="sl-field">
+                <label class="sl-label" for="nMem">Memory</label>
+                <input class="sl-input sl-input-mono" id="nMem" name="memory" value="4G" autocomplete="off" inputmode="text">
+                <p class="sl-hint">How much the server may use, for example 4G</p>
+                <p class="sl-error empty:hidden" id="nMemBad"></p>
+              </div>
+              <div class="sl-field">
+                <label class="sl-label" for="nPort">Port</label>
+                <input class="sl-input sl-input-mono" id="nPort" name="port" type="number" placeholder="auto" autocomplete="off" min="1024" max="65535" aria-describedby="nPortBad">
+                <p class="sl-hint">Blank picks a free one</p>
+                <p class="sl-error empty:hidden" id="nPortBad" aria-live="polite"></p>
+              </div>
+            </div>
+          </section>
+
+          <section class="sl-card" aria-labelledby="nJoinTitle">
+            <h2 class="sl-eyebrow" id="nJoinTitle">Who can join</h2>
+            <div class="grid gap-2 @min-[600px]/add:grid-cols-2" id="nJoin" role="radiogroup" aria-labelledby="nJoinTitle">
+              <label class="sl-choice flex rounded-md border border-line bg-raised px-4 py-3 hover:border-edge has-[:checked]:border-accent-edge has-[:checked]:bg-accent-wash">
+                <input class="sl-radio" type="radio" name="onlineMode" value="online" checked>
+                <span class="sl-choice-text"><b class="font-strong">Require a Minecraft account</b>
+                  <small>Only people who own Minecraft can join, each under their own name. Recommended.</small></span>
+              </label>
+              <label class="sl-choice flex rounded-md border border-line bg-raised px-4 py-3 hover:border-edge has-[:checked]:border-accent-edge has-[:checked]:bg-accent-wash">
+                <input class="sl-radio" type="radio" name="onlineMode" value="offline">
+                <span class="sl-choice-text"><b class="font-strong">Anyone, as any name</b>
+                  <small>Nobody's account is checked, so anyone can join under any name. For testing by
+                    yourself, or with no internet. Not safe for a public server.</small></span>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <!-- what Create will make, read back; beside the form on a wide sheet, under it on a narrow one -->
+        <aside class="sl-card grid gap-4 @min-[880px]/add:sticky @min-[880px]/add:top-6" aria-labelledby="newSummaryTitle">
+          <h2 class="sl-eyebrow" id="newSummaryTitle">You are creating</h2>
+          <dl class="m-0 grid gap-3 empty:hidden [&>div]:grid [&>div]:gap-0.5 [&_dt]:type-meta [&_dt]:text-ink-3 [&_dd]:m-0 [&_dd]:text-3 [&_dd]:font-strong [&_dd]:text-ink" id="newSummary" aria-live="polite"></dl>
+          <div class="grid gap-2" id="newProg" hidden>
+            <div class="sl-progress" id="newBar" role="progressbar" aria-label="Creating the server" aria-valuemin="0" aria-valuemax="100"></div>
+            <p class="m-0 type-meta text-ink-2" id="newMsg"></p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="submit" class="sl-btn sl-btn-primary sl-btn-lg grow" id="bCreate">Create server</button>
+          </div>
+          <p class="sl-hint" id="newHint">Accepts the Minecraft EULA on your behalf, as the operator of this machine.</p>
+        </aside>
+      </form>
+
+      <form class="mx-auto grid w-full max-w-[880px] gap-5 px-5 pt-6 pb-8 @min-[880px]/add:px-6" id="formPack" hidden>
+        <section class="sl-card" aria-labelledby="pFindTitle">
+          <h2 class="sl-eyebrow" id="pFindTitle">Find a modpack</h2>
+          <div class="sl-field">
+            <label class="sl-label" for="pSearch">Modpack</label>
+            <div class="flex gap-2">
+              <span class="sl-input-group grow">
+                <span class="sl-input-lead" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg></span>
+                <input class="sl-input" id="pSearch" type="search" placeholder="Search Modrinth: server-ready Fabric and NeoForge packs" autocomplete="off">
+              </span>
+              <button type="button" class="sl-btn" id="bPackSearch">Search</button>
+            </div>
+            <p class="sl-hint">The pack decides the Minecraft version, the loader and the mods. You pick a name and how much memory it gets.</p>
+          </div>
+          <div class="grid gap-3 empty:hidden" id="packResults"></div>
+        </section>
+        <section class="sl-card" id="packChosenWrap" aria-labelledby="packChosenTitle" hidden>
+          <h2 class="sl-eyebrow" id="packChosenTitle">Chosen pack</h2>
+          <p class="m-0 type-card text-ink" id="packChosen"></p>
+          <div class="grid grid-cols-1 items-start gap-4 @min-[600px]/add:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div class="sl-field">
+              <label class="sl-label" for="pName">Name</label>
+              <input class="sl-input" id="pName" autocomplete="off" maxlength="48">
+              <p class="sl-hint">Folder and console: <code class="sl-code" id="pNameSlug">—</code></p>
+              <p class="sl-error empty:hidden" id="pNameBad"></p>
+            </div>
+            <div class="sl-field">
+              <label class="sl-label" for="pMem">Memory</label>
+              <input class="sl-input sl-input-mono" id="pMem" value="4G" autocomplete="off">
+              <p class="sl-hint">Modded servers want 4G or more.</p>
+              <p class="sl-error empty:hidden" id="pMemBad"></p>
             </div>
           </div>
-          <div class="prog" id="packProg" hidden style="margin-top:12px">
-            <div class="track"><div class="bar" id="packBar"></div></div>
-            <div class="msg" id="packMsg"></div>
+          <div class="grid gap-2" id="packProg" hidden>
+            <div class="sl-progress" id="packBar" role="progressbar" aria-label="Creating the server" aria-valuemin="0" aria-valuemax="100"></div>
+            <p class="m-0 type-meta text-ink-2" id="packMsg"></p>
           </div>
-          <div class="row" style="margin-top:12px">
-            <button type="submit" class="primary" id="bPackCreate">Create server from this pack</button>
-            <span class="hint">Downloads every server-side file the pack lists, checksummed, before the server exists.</span>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button type="submit" class="sl-btn sl-btn-primary sl-btn-lg" id="bPackCreate">Create server from this pack</button>
+            <span class="sl-hint">Downloads every server-side file the pack lists, checksummed, before the server exists.</span>
           </div>
-        </div>
+        </section>
       </form>
 
-      <form class="sheet-body" id="formAdopt" hidden>
-        <div class="field">
-          <label for="aDir">Server folder</label>
-          <div class="row">
-            <input id="aDir" class="mono" spellcheck="false" placeholder="The folder the server is in" autocomplete="off">
-            <button type="button" id="bBrowse" hidden>Browse…</button>
+      <form class="mx-auto grid w-full max-w-[880px] gap-5 px-5 pt-6 pb-8 @min-[880px]/add:px-6" id="formAdopt" hidden>
+        <section class="sl-card" aria-labelledby="aWhereTitle">
+          <h2 class="sl-eyebrow" id="aWhereTitle">The server you have</h2>
+          <div class="sl-field">
+            <label class="sl-label" for="aDir">Server folder</label>
+            <div class="flex gap-2">
+              <input class="sl-input sl-input-mono grow" id="aDir" spellcheck="false" placeholder="The folder the server is in" autocomplete="off">
+              <button type="button" class="sl-btn" id="bBrowse" hidden>Browse…</button>
+            </div>
+            <p class="sl-hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</p>
           </div>
-          <div class="hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</div>
-        </div>
-        <div class="row" style="align-items:flex-start">
-          <div class="field" style="flex:2">
-            <label for="aName">Name in SpawnLoft</label>
-            <input id="aName" autocomplete="off" placeholder="Survival" maxlength="48">
-            <div class="hint">The console and commands use <code id="aNameSlug">—</code></div>
-            <div class="bad" id="aNameBad"></div>
+          <div class="grid grid-cols-1 items-start gap-4 @min-[600px]/add:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div class="sl-field">
+              <label class="sl-label" for="aName">Name in SpawnLoft</label>
+              <input class="sl-input" id="aName" autocomplete="off" placeholder="Survival" maxlength="48">
+              <p class="sl-hint">The console and commands use <code class="sl-code" id="aNameSlug">—</code></p>
+              <p class="sl-error empty:hidden" id="aNameBad"></p>
+            </div>
+            <div class="sl-field">
+              <label class="sl-label" for="aMem">Memory</label>
+              <input class="sl-input sl-input-mono" id="aMem" value="4G" autocomplete="off" inputmode="text">
+              <p class="sl-error empty:hidden" id="aMemBad"></p>
+            </div>
           </div>
-          <div class="field" style="flex:1">
-            <label for="aMem">Memory</label>
-            <input id="aMem" value="4G" class="mono" autocomplete="off" inputmode="text">
-            <div class="bad" id="aMemBad"></div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button type="submit" class="sl-btn sl-btn-primary sl-btn-lg" id="bAdopt">Add server</button>
+            <span class="sl-hint">Nothing is moved. Its port and the rest of its settings are read from its own server.properties.</span>
           </div>
-        </div>
-        <div class="row">
-          <button type="submit" class="primary" id="bAdopt">Add server</button>
-          <span class="hint">Nothing is moved. Its port and the rest of its settings are read from its own server.properties.</span>
-        </div>
+        </section>
       </form>
 
-      <form class="sheet-body" id="formDb" hidden>
-        <p class="hint" style="margin:0 0 4px">
-          A database for plugins that want one — MySQL for LuckPerms, CoreProtect, Plan and the rest;
-          Redis for messaging between servers. Run here, downloaded once and supervised like a server,
+      <form class="mx-auto grid w-full max-w-[880px] gap-5 px-5 pt-6 pb-8 @min-[880px]/add:px-6" id="formDb" hidden>
+        <p class="m-0 type-body text-ink-2">
+          A database for plugins that want one: MySQL for LuckPerms, CoreProtect, Plan and the rest,
+          and Redis for messaging between servers. Run here, downloaded once and supervised like a server,
           reachable only from this machine. Or point at one you already run.
         </p>
-        <div class="field">
-          <div class="choice" id="dMode">
-            <label>
-              <input type="radio" name="dbMode" value="run" checked>
-              <b>Run one here</b>
-              <span>MySQL from Oracle, or Redis by way of Microsoft's Garnet. SpawnLoft installs what each engine needs.</span>
-            </label>
-            <label>
-              <input type="radio" name="dbMode" value="connect">
-              <b>Connect to one I already run</b>
-              <span>A MySQL or Redis database you already run. Registered with its address so servers can be attached; never started or stopped from here.</span>
-            </label>
-          </div>
+        <div class="grid gap-2 @min-[600px]/add:grid-cols-2" id="dMode" role="radiogroup" aria-label="Where the database runs">
+          <label class="sl-choice flex rounded-md border border-line bg-raised px-4 py-3 hover:border-edge has-[:checked]:border-accent-edge has-[:checked]:bg-accent-wash">
+            <input class="sl-radio" type="radio" name="dbMode" value="run" checked>
+            <span class="sl-choice-text"><b class="font-strong">Run one here</b>
+              <small>MySQL from Oracle, or Redis by way of Microsoft's Garnet. SpawnLoft installs what each engine needs.</small></span>
+          </label>
+          <label class="sl-choice flex rounded-md border border-line bg-raised px-4 py-3 hover:border-edge has-[:checked]:border-accent-edge has-[:checked]:bg-accent-wash">
+            <input class="sl-radio" type="radio" name="dbMode" value="connect">
+            <span class="sl-choice-text"><b class="font-strong">Connect to one I already run</b>
+              <small>A MySQL or Redis database you already run. Registered with its address so servers can be attached; never started or stopped from here.</small></span>
+          </label>
         </div>
-        <div class="row" style="align-items:flex-start">
-          <div class="field" style="flex:2">
-            <label for="dName">Name</label>
-            <input id="dName" name="name" required autocomplete="off" placeholder="Database" maxlength="48">
-            <div class="hint">The commands use <code id="dNameSlug">—</code></div>
-            <div class="bad" id="dNameBad"></div>
+        <section class="sl-card" aria-labelledby="dWhatTitle">
+          <h2 class="sl-eyebrow" id="dWhatTitle">The database</h2>
+          <div class="grid grid-cols-1 items-start gap-4 @min-[600px]/add:grid-cols-2">
+            <div class="sl-field">
+              <label class="sl-label" for="dName">Name</label>
+              <input class="sl-input" id="dName" name="name" required autocomplete="off" placeholder="Database" maxlength="48">
+              <p class="sl-hint">The commands use <code class="sl-code" id="dNameSlug">—</code></p>
+              <p class="sl-error empty:hidden" id="dNameBad"></p>
+            </div>
+            <div class="sl-field">
+              <label class="sl-label" for="dEngine">Engine</label>
+              <span class="sl-input-group">
+                <select class="sl-input" id="dEngine" name="engine"><option value="mysql" selected>MySQL</option></select>
+                <span class="sl-input-caret" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-caret"></use></svg></span>
+              </span>
+              <p class="sl-hint" id="dEngineHint">MySQL-compatible</p>
+            </div>
+            <div class="sl-field" id="dVersionWrap">
+              <label class="sl-label" for="dVersion">Version</label>
+              <span class="sl-input-group">
+                <select class="sl-input" id="dVersion" name="version"><option value="">Loading versions…</option></select>
+                <span class="sl-input-caret" aria-hidden="true"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-caret"></use></svg></span>
+              </span>
+              <p class="sl-hint" id="dVersionHint">Newest stable release first.</p>
+            </div>
+            <div class="sl-field">
+              <label class="sl-label" for="dPort">Port</label>
+              <input class="sl-input sl-input-mono" id="dPort" name="port" type="number" placeholder="auto" autocomplete="off">
+              <p class="sl-hint" id="dPortHint">Blank picks the engine's usual port or the next free one</p>
+            </div>
           </div>
-          <div class="field" style="flex:1;min-width:170px">
-            <label for="dEngine">Engine</label>
-            <select id="dEngine" name="engine"><option value="mysql" selected>MySQL</option></select>
-            <div class="hint" id="dEngineHint">MySQL-compatible</div>
+        </section>
+        <section class="sl-card" id="dConnect" aria-labelledby="dConnectTitle" hidden>
+          <h2 class="sl-eyebrow" id="dConnectTitle">How to reach it</h2>
+          <div class="grid grid-cols-1 items-start gap-4 @min-[600px]/add:grid-cols-2">
+            <div class="sl-field">
+              <label class="sl-label" for="dHost">Host</label>
+              <input class="sl-input sl-input-mono" id="dHost" value="127.0.0.1" autocomplete="off">
+              <p class="sl-hint">Where it listens</p>
+            </div>
+            <div class="sl-field" id="dUserWrap">
+              <label class="sl-label" for="dUser">Admin user</label>
+              <input class="sl-input sl-input-mono" id="dUser" value="root" autocomplete="off">
+              <p class="sl-hint">Makes databases and users</p>
+            </div>
+            <div class="sl-field">
+              <label class="sl-label" for="dPassword">Password</label>
+              <input class="sl-input sl-input-mono" id="dPassword" type="password" autocomplete="off">
+              <p class="sl-hint" id="dPasswordHint">XAMPP's root has none</p>
+            </div>
+            <div class="sl-field" id="dToolsWrap">
+              <label class="sl-label" for="dTools">Client tools folder (optional)</label>
+              <input class="sl-input sl-input-mono" id="dTools" placeholder="The bin folder of MySQL or MariaDB" autocomplete="off">
+              <p class="sl-hint">Where the MySQL client tools live. Found on its own in the usual places.</p>
+            </div>
           </div>
-          <div class="field" style="flex:2" id="dVersionWrap">
-            <label for="dVersion">Version</label>
-            <select id="dVersion" name="version"><option value="">Loading versions…</option></select>
-            <div class="hint" id="dVersionHint">Newest stable release first.</div>
-          </div>
-          <div class="field" style="flex:1">
-            <label for="dPort">Port</label>
-            <input id="dPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off">
-            <div class="hint" id="dPortHint">Blank picks the engine's usual port or the next free one</div>
-          </div>
+        </section>
+        <div class="grid gap-2" id="dbProg" hidden>
+          <div class="sl-progress" id="dbBar" role="progressbar" aria-label="Adding the database" aria-valuemin="0" aria-valuemax="100"></div>
+          <p class="m-0 type-meta text-ink-2" id="dbMsg"></p>
         </div>
-        <div class="row" style="align-items:flex-start" id="dConnect" hidden>
-          <div class="field" style="flex:2">
-            <label for="dHost">Host</label>
-            <input id="dHost" class="mono" value="127.0.0.1" autocomplete="off">
-            <div class="hint">Where it listens</div>
-          </div>
-          <div class="field" style="flex:1" id="dUserWrap">
-            <label for="dUser">Admin user</label>
-            <input id="dUser" class="mono" value="root" autocomplete="off">
-            <div class="hint">Makes databases and users</div>
-          </div>
-          <div class="field" style="flex:2">
-            <label for="dPassword">Password</label>
-            <input id="dPassword" type="password" class="mono" autocomplete="off">
-            <div class="hint" id="dPasswordHint">XAMPP's root has none</div>
-          </div>
-          <div class="field" style="flex:3" id="dToolsWrap">
-            <label for="dTools">Client tools folder <span class="hint">(optional)</span></label>
-            <input id="dTools" class="mono" placeholder="The bin folder of MySQL or MariaDB" autocomplete="off">
-            <div class="hint">Where the MySQL client tools live. Found on its own in the usual places.</div>
-          </div>
-        </div>
-        <div class="prog" id="dbProg" hidden>
-          <div class="track"><div class="bar" id="dbBar"></div></div>
-          <div class="msg" id="dbMsg"></div>
-        </div>
-        <div class="row">
-          <button type="submit" class="primary" id="bDbCreate">Add database</button>
-          <span class="hint" id="dbHint">The engine downloads once for each version; every database on that version shares it.</span>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button type="submit" class="sl-btn sl-btn-primary sl-btn-lg" id="bDbCreate">Add database</button>
+          <span class="sl-hint" id="dbHint">The engine downloads once for each version; every database on that version shares it.</span>
         </div>
       </form>
     </div>

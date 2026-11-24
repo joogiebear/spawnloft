@@ -25,17 +25,6 @@
   dialog p { margin: 0; color: var(--ink-2); font-size: var(--t-3); line-height: 1.6; }
   dialog footer { display: flex; justify-content: flex-end; gap: var(--s-2); padding: var(--s-5) var(--s-6) var(--s-5); }
 
-  /* A consequence you need before you decide, not after. Sits under the control it belongs to. */
-  .inline-warn {
-    background: var(--warn-wash);
-    border: 1px solid var(--warn-edge);
-    border-radius: var(--r-sm);
-    padding: var(--s-2) var(--s-3);
-    font-size: var(--t-3);
-    line-height: 1.5;
-    color: var(--warn-ink);
-  }
-
   .choice { display: grid; gap: 8px; }
   .choice label {
     display: grid;

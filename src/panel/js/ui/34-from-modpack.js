@@ -14,53 +14,25 @@ async function packSearch() {
   const results = $('#packResults');
   $('#bPackSearch').disabled = true;
   results.textContent = '';
-  const looking = document.createElement('div');
-  looking.className = 'hint';
-  looking.textContent = 'Asking Modrinth…';
+  const looking = Kit.h('p', { class: 'sl-hint', text: 'Asking Modrinth\u2026' });
   results.append(looking);
   let found;
   try {
     found = await api('/modpacks/search?q=' + encodeURIComponent(term));
   } catch (e) {
     looking.remove();
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    results.append(bad);
+    results.append(Kit.h('p', { class: 'sl-error', role: 'alert', text: e.message }));
     $('#bPackSearch').disabled = false;
     return;
   }
   $('#bPackSearch').disabled = false;
   results.textContent = '';
   if (!found.results.length) {
-    const none = document.createElement('div');
-    none.className = 'hint';
-    none.textContent = 'No server-ready Fabric or NeoForge packs match that.';
-    results.append(none);
+    results.append(Kit.h('p', { class: 'sl-hint', text: 'No server-ready Fabric or NeoForge packs match that.' }));
     return;
   }
-  const list = document.createElement('div');
-  list.className = 'people';
-  for (const hit of found.results) {
-    const el = document.createElement('div');
-    el.className = 'who';
-    const mark = document.createElement('div');
-    mark.className = 'face face-mark';
-    mark.append(icon('archive'));
-    const nm = document.createElement('div');
-    nm.className = 'w-name';
-    nm.textContent = hit.title;
-    const meta = document.createElement('div');
-    meta.className = 'w-meta';
-    meta.textContent = (hit.downloads ? hit.downloads.toLocaleString() + ' downloads  ·  ' : '') + (hit.description || '');
-    const acts = document.createElement('div');
-    acts.className = 'w-acts';
-    const use = document.createElement('button');
-    use.className = 'primary';
-    use.textContent = 'Use this pack';
-    acts.append(use);
-    el.append(mark, nm, meta, acts);
-    list.append(el);
+  const rows = found.results.map((hit) => {
+    const use = Kit.button({ label: 'Use this pack', kind: 'primary', size: 'sm' });
     use.onclick = () => {
       packView.chosen = hit;
       $('#packChosen').textContent = hit.title;
@@ -71,8 +43,14 @@ async function packSearch() {
       }
       $('#pName').focus();
     };
-  }
-  results.append(list);
+    return Kit.row({
+      lead: Kit.tile({ name: hit.title, key: hit.slug || hit.title }),
+      title: hit.title,
+      meta: (hit.downloads ? hit.downloads.toLocaleString() + ' downloads  \u00b7  ' : '') + (hit.description || ''),
+      end: [use],
+    });
+  });
+  results.append(Kit.list(rows, 'Modpacks that match'));
 }
 $('#bPackSearch').onclick = packSearch;
 $('#pSearch').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); packSearch(); } };
@@ -90,8 +68,7 @@ $('#formPack').onsubmit = async (e) => {
   const bar = $('#packBar');
   const msg = $('#packMsg');
   $('#packProg').hidden = false;
-  bar.style.width = '0';
-  bar.classList.add('indet');
+  paintBar(bar, null);
   msg.textContent = 'Starting…';
   const restorePack = cancelButtonFor($('#bPackCreate'), jobId);
   lockAddTabs(true);
@@ -102,10 +79,9 @@ $('#formPack').onsubmit = async (e) => {
     try { job = JSON.parse(ev.data); } catch { return; }
     if (job.message) msg.textContent = job.message;
     if (typeof job.percent === 'number') {
-      bar.classList.remove('indet');
-      bar.style.width = job.percent + '%';
+      paintBar(bar, job.percent);
     } else {
-      bar.classList.add('indet');
+      paintBar(bar, null);
     }
   };
 
@@ -127,8 +103,7 @@ $('#formPack').onsubmit = async (e) => {
   } catch (err) {
     jobs.close();
     lockAddTabs(false);
-    bar.classList.remove('indet');
-    bar.style.width = '0';
+    paintBar(bar, 0);
     msg.textContent = cancelledWords(err) || err.message;
     restorePack();
     if (cancelledWords(err)) { $('#bPackCreate').focus(); return; }

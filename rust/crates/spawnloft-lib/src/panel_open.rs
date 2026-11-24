@@ -143,19 +143,18 @@ fn escape(s: &str) -> String {
 /// No script: a refresh and a link, so it works with scripts off and says what it is if it stays.
 pub fn open_page(url: &str) -> String {
     let href = escape(url);
-    format!(
-        concat!(
-            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
-            "<meta name=\"referrer\" content=\"no-referrer\">",
-            "<meta http-equiv=\"refresh\" content=\"0; url={href}\">",
-            "<title>Opening SpawnLoft</title></head>",
-            "<body style=\"font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;padding:24px\">",
-            "<p>Opening SpawnLoft. If nothing happens, <a href=\"{href}\" style=\"color:#9cf\">continue to SpawnLoft</a>.</p>",
-            "<p style=\"color:#bbb\">This link signs one browser in, once, within five minutes.</p>",
-            "</body></html>\n"
+    let mut page = crate::panel_auth::styled_page(
+        "Opening SpawnLoft",
+        &format!(
+            "<p>If nothing happens, <a class=\"go\" href=\"{href}\">Continue to SpawnLoft</a></p>\
+             <p class=\"small\">This link signs one browser in, once, within five minutes.</p>"
         ),
-        href = href
-    )
+        &format!(
+            "<meta name=\"referrer\" content=\"no-referrer\"><meta http-equiv=\"refresh\" content=\"0; url={href}\">"
+        ),
+    );
+    page.push('\n');
+    page
 }
 
 /// Writes the page for `url` (a login link whose nonce is `nonce`) and returns its path. The

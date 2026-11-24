@@ -16,6 +16,21 @@ function fieldNote(input) {
   return note;
 }
 
+/**
+ * A create's progress bar (an sl-progress): its share done, from 0 to 100, or null while the
+ * share is not known yet, when a band sweeps along it instead.
+ */
+function paintBar(bar, percent) {
+  if (percent == null) {
+    bar.removeAttribute('aria-valuenow');
+    bar.style.removeProperty('--value');
+    return;
+  }
+  const share = Math.max(0, Math.min(100, Number(percent) || 0));
+  bar.setAttribute('aria-valuenow', String(Math.round(share)));
+  bar.style.setProperty('--value', String(share / 100));
+}
+
 /** What is wrong with a link typed into a setting, or '' when it will do. Empty means none. */
 function linkProblem(value) {
   const v = String(value == null ? '' : value).trim();
@@ -53,7 +68,7 @@ function checkMemory(input, out) {
 }
 
 function selectTab(tab) {
-  for (const b of $$('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  for (const b of $$('[data-add-tabs] [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   $('#addTitle').textContent = tab === 'db' ? 'Add a database' : 'Add a server';
   for (const id of ['#nName', '#aName', '#dName', '#pName']) paintSlug($(id));
   $('#formNew').hidden = tab !== 'new';
@@ -68,13 +83,13 @@ function selectTab(tab) {
  * download that cannot yet be stopped, and left nothing to say it was still going.
  */
 function lockAddTabs(on) {
-  for (const tab of document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')) tab.disabled = on;
+  for (const tab of document.querySelectorAll('[data-add-tabs] [role="tab"]')) tab.disabled = on;
 }
 
 function openAdd(tab) {
   openSheet('add');
   // A create is running: its tab, with its progress, is the one to come back to.
-  if ([...document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')].some((t) => t.disabled)) return;
+  if ([...document.querySelectorAll('[data-add-tabs] [role="tab"]')].some((t) => t.disabled)) return;
   selectTab(tab);
   setTimeout(() => $(tab === 'adopt' ? '#aDir' : tab === 'pack' ? '#pSearch' : tab === 'db' ? '#dName' : '#nName').focus(), 0);
 }
@@ -164,7 +179,7 @@ async function loadDbVersions() {
   }
 }
 
-for (const b of $$('.tabs [data-tab]')) b.onclick = () => selectTab(b.dataset.tab);
+for (const b of $$('[data-add-tabs] [data-tab]')) b.onclick = () => selectTab(b.dataset.tab);
 $('#bNew').onclick = () => openAdd('new');
 $('#bLauncher').onclick = () => showPlay();
 $('#playFrame').addEventListener('load', () => {
@@ -215,7 +230,7 @@ function paintSlug(input) {
   if (!slugEl) return;
   const value = input.value.trim();
   slugEl.textContent = value ? slugOf(input) : input.placeholder ? freeSlug(slugFor(input.placeholder)) : '—';
-  slugEl.classList.toggle('slug-eg', !value);
+  slugEl.classList.toggle('opacity-60', !value);
 }
 
 function checkName(input, out) {
@@ -251,20 +266,18 @@ function paintNewSummary() {
   const sw = softwareById[$('#nLoader').value] || softwareById.paper;
   const version = $('#nVersion').value;
   const port = $('#nPort').value.trim();
+  const name = $('#nName').value.trim();
   const parts = [
-    [sw.label + (version ? ' ' + version : ''), version ? '' : ' (no version yet)'],
-    [$('#nMem').value.trim() || '4G', ' memory'],
-    [port ? 'port ' + port : 'a free port', ''],
-    [$('input[name="onlineMode"]:checked')?.value === 'offline' ? 'any name can join' : 'Minecraft account required', ''],
+    ['Name', name || 'Not named yet'],
+    ['Software', sw.label + (version ? ' ' + version : ' (no version yet)')],
+    ['Memory', $('#nMem').value.trim() || '4G'],
+    ['Address', port ? 'Port ' + port : 'A free port, picked when it is made'],
+    ['Who can join', $('input[name="onlineMode"]:checked')?.value === 'offline' ? 'Anyone, as any name' : 'Minecraft account required'],
   ];
   box.textContent = '';
-  box.append('Creates ');
-  parts.forEach(([b, rest], i) => {
-    if (i) { const sep = el('span', 'sep'); sep.textContent = '\u00b7'; box.append(sep); }
-    const strong = el('b');
-    strong.textContent = b;
-    box.append(strong, rest);
-  });
+  for (const [term, value] of parts) {
+    box.append(Kit.h('div', null, Kit.h('dt', { text: term }), Kit.h('dd', { text: value })));
+  }
 }
 $('#formNew').addEventListener('input', paintNewSummary);
 $('#formNew').addEventListener('change', paintNewSummary);
@@ -304,8 +317,7 @@ $('#formDb').onsubmit = async (e) => {
   const bar = $('#dbBar');
   const msg = $('#dbMsg');
   $('#dbProg').hidden = false;
-  bar.style.width = '0';
-  bar.classList.add('indet');
+  paintBar(bar, null);
   msg.textContent = 'Starting…';
   $('#bDbCreate').disabled = true;
 
@@ -315,10 +327,9 @@ $('#formDb').onsubmit = async (e) => {
     try { job = JSON.parse(ev.data); } catch { return; }
     if (job.message) msg.textContent = job.message;
     if (typeof job.percent === 'number') {
-      bar.classList.remove('indet');
-      bar.style.width = job.percent + '%';
+      paintBar(bar, job.percent);
     } else {
-      bar.classList.add('indet');
+      paintBar(bar, null);
     }
   };
   try {
@@ -341,8 +352,7 @@ $('#formDb').onsubmit = async (e) => {
     toast('Added ' + db.name + ' on port ' + db.port + '. Start it, then attach a server from its Settings tab.', 'good');
   } catch (err) {
     jobs.close();
-    bar.classList.remove('indet');
-    bar.style.width = '0';
+    paintBar(bar, 0);
     msg.textContent = err.message;
     $('#bDbCreate').disabled = false;
   }
@@ -355,10 +365,10 @@ $('#formDb').onsubmit = async (e) => {
   button back as it was.
 */
 function cancelButtonFor(button, jobId) {
-  const was = { text: button.textContent, primary: button.classList.contains('primary') };
+  const was = { text: button.textContent, primary: button.classList.contains('sl-btn-primary') };
   button.type = 'button';
   button.dataset.job = jobId;
-  button.classList.remove('primary');
+  button.classList.remove('sl-btn-primary');
   button.textContent = 'Cancel';
   button.disabled = false;
   // The press that started the create can have a second one right behind it (a double click, a
@@ -384,7 +394,7 @@ function cancelButtonFor(button, jobId) {
     button.onclick = null;
     delete button.dataset.job;
     button.type = 'submit';
-    button.classList.toggle('primary', was.primary);
+    button.classList.toggle('sl-btn-primary', was.primary);
     button.textContent = was.text;
     button.disabled = false;
   };
@@ -409,8 +419,7 @@ $('#formNew').onsubmit = async (e) => {
   const bar = $('#newBar');
   const msg = $('#newMsg');
   $('#newProg').hidden = false;
-  bar.style.width = '0';
-  bar.classList.add('indet');
+  paintBar(bar, null);
   msg.textContent = 'Starting…';
   const restoreCreate = cancelButtonFor($('#bCreate'), jobId);
   lockAddTabs(true);
@@ -424,10 +433,9 @@ $('#formNew').onsubmit = async (e) => {
     try { job = JSON.parse(ev.data); } catch { return; }
     if (job.message) msg.textContent = job.message;
     if (typeof job.percent === 'number') {
-      bar.classList.remove('indet');
-      bar.style.width = job.percent + '%';
+      paintBar(bar, job.percent);
     } else {
-      bar.classList.add('indet');
+      paintBar(bar, null);
     }
   };
 
@@ -466,8 +474,7 @@ $('#formNew').onsubmit = async (e) => {
     forceJava = false;
     jobs.close();
     lockAddTabs(false);
-    bar.classList.remove('indet');
-    bar.style.width = '0';
+    paintBar(bar, 0);
     msg.textContent = cancelledWords(err) || err.message;
     restoreCreate();
     $('#newHint').textContent = '';
