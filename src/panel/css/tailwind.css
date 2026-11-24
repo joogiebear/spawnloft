@@ -822,9 +822,6 @@
   .grid-cols-\[repeat\(auto-fit\,minmax\(238px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fit,minmax(238px,1fr));
   }
-  .grid-rows-\[1fr\] {
-    grid-template-rows: 1fr;
-  }
   .grid-rows-\[1fr_auto\] {
     grid-template-rows: 1fr auto;
   }
