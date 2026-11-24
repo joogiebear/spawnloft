@@ -24,13 +24,6 @@
   }
   .pane-foot .hint { margin: 0; }
 
-  @container pane (min-width: 860px) {
-    /* Performance: the two widgets share the row, so processor and memory can be read against
-       each other at the same instant. */
-    #performanceBody { grid-template-columns: 1fr 1fr; align-items: start; }
-    #performanceBody > .ranges, #performanceBody > .hint, #performanceBody > .facts,
-    #performanceBody > .bad { grid-column: 1 / -1; }
-  }
   /*
     Ultra: split before stretch. A row stops reading as one line past about 1400px, so a pane that
     has more room than that divides into a well and a companion instead of growing. Players
@@ -38,16 +31,6 @@
     its gauges two by two with the numbers of the range under each chart. The companion is a second
     column the lower tiers simply do not have, so nothing changes below 2000px.
   */
-  @container pane (min-width: 2000px) {
-    #performanceBody { gap: var(--s-5); }
-    /* The fourth cell of the two-by-two: uptime, start and sample count as a small table. */
-    #performanceBody > .facts {
-      grid-column: auto; align-self: stretch;
-      display: grid; grid-template-columns: max-content minmax(0, 1fr); align-content: start; gap: var(--s-2) var(--s-4);
-      padding: var(--s-4) var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm);
-    }
-    #performanceBody > .facts > span { display: contents; }
-  }
   /* .row wraps rather than crushing its controls when the pane is narrow. */
   .row { flex-wrap: wrap; }
 

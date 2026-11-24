@@ -22,7 +22,6 @@
 <link rel="stylesheet" href="/assets/css/ui/11-work-area.css">
 <link rel="stylesheet" href="/assets/css/ui/12-wide-panes.css">
 <link rel="stylesheet" href="/assets/css/ui/13-snapshot-history.css">
-<link rel="stylesheet" href="/assets/css/ui/14-performance.css">
 <link rel="stylesheet" href="/assets/css/ui/15-plugins.css">
 <link rel="stylesheet" href="/assets/css/ui/16-players.css">
 <link rel="stylesheet" href="/assets/css/ui/17-settings-groups.css">
@@ -183,39 +182,43 @@
       Every server at once: what each is doing, and the few things that want someone's attention.
       The screen the Overview tab opens, and the first one once there is anything to show on it.
     -->
-    <div class="view home" id="vHome">
-      <div class="home-head">
-        <div class="home-title">
-          <h1>Your servers</h1>
-          <ul class="home-chips" id="homeSummary" aria-label="Summary"></ul>
+    <div class="view @container/pane content-start overflow-auto bg-void px-10 pt-8 pb-12 compact:px-6 tight:px-5" id="vHome">
+      <p class="m-0 text-ink-3 type-body" id="homeLoading" role="status" hidden>Loading your servers…</p>
+      <div class="mx-auto flex w-full min-w-0 max-w-[1240px] flex-col gap-6 @ultra/pane:max-w-[1800px]" id="homeBody">
+        <div class="sl-page-head">
+          <div>
+            <h1 class="sl-page-title" id="homeTitle">Your servers</h1>
+            <p class="sl-page-lede" id="homeSummary"></p>
+          </div>
+          <button type="button" class="sl-btn sl-btn-primary" id="homeNew"><svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>New server</button>
         </div>
-        <button class="primary" id="homeNew"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>New server</button>
+        <div class="sl-banner" data-tone="warn" id="homeFail" role="status" hidden>
+          <svg class="sl-ico" aria-hidden="true" focusable="false"><use href="#i-alert"/></svg>
+          <div class="sl-banner-text"><div class="sl-banner-body">Backup ages and this machine's memory could not be read.</div></div>
+          <div class="sl-banner-actions"><button type="button" class="sl-btn sl-btn-sm" id="homeFailRetry">Try again</button></div>
+        </div>
+        <!-- One banner for each kind of thing that needs someone, built by renderAttention. -->
+        <section class="flex flex-col gap-3" id="homeAttention" aria-labelledby="attTitle" hidden>
+          <h2 class="sl-sr" id="attTitle">Needs attention</h2>
+        </section>
+        <div class="flex flex-wrap items-start gap-6">
+          <div class="flex min-w-0 flex-[999_1_560px] flex-col gap-6">
+            <section class="flex flex-col gap-3" aria-labelledby="homeSrvTitle">
+              <h2 class="sl-sr" id="homeSrvTitle">Servers</h2>
+              <div class="flex flex-col gap-3" id="homeCards"></div>
+            </section>
+            <section class="flex flex-col gap-3" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
+              <h2 class="sl-eyebrow" id="homeDbTitle">Databases</h2>
+              <div class="flex flex-col gap-3" id="dbsGrid"></div>
+            </section>
+          </div>
+          <section class="flex min-w-0 flex-[1_1_300px] flex-col gap-2.5" id="homeActivity" aria-labelledby="homeActTitle" hidden>
+            <h2 class="sl-eyebrow" id="homeActTitle">Recent activity</h2>
+            <div id="homeActList"></div>
+            <button type="button" class="sl-btn sl-btn-link min-h-8 self-start" id="homeActMore" hidden></button>
+          </section>
+        </div>
       </div>
-      <!-- attention, cards and databases share a column, so a feed beside them sizes nothing of theirs -->
-      <div class="home-main">
-        <p class="home-fail" id="homeFail" role="status" hidden>
-          <span>Backup ages and this machine's memory could not be read.</span>
-          <button type="button" class="ghost sm" id="homeFailRetry">Try again</button>
-        </p>
-        <section class="attention" id="homeAttention" aria-labelledby="attTitle" hidden>
-          <h2 class="hist-title" id="attTitle">Needs attention</h2>
-          <div class="att-grid" id="attGrid"></div>
-          <button type="button" class="more-link" id="attMore" hidden></button>
-        </section>
-        <section class="home-servers" aria-labelledby="homeSrvTitle">
-          <h2 class="sr-only" id="homeSrvTitle">Servers</h2>
-          <div class="home-cards" id="homeCards"></div>
-        </section>
-        <section class="home-dbs" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
-          <h2 class="hist-title" id="homeDbTitle">Databases</h2>
-          <div class="dbs-grid" id="dbsGrid"></div>
-        </section>
-      </div>
-      <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
-        <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
-        <ol class="feed" id="homeActList"></ol>
-        <button type="button" class="more-link" id="homeActMore" hidden></button>
-      </section>
     </div>
 
     <!-- ============ a server is selected ================================= -->

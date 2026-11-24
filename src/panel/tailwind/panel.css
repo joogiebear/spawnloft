@@ -58,12 +58,20 @@
 @source "../js/ui/03-tools.js";
 @source "../js/ui/06-server-tabs.js";
 @source "../js/ui/07-server-strip.js";
+/* phase 5: the Overview */
+@source "../js/ui/11-overview.js";
+@source "../js/ui/12-recent-activity.js";
+@source "../js/ui/13-needs-attention.js";
+@source "../js/ui/14-server-cards.js";
 /* phase 6: the console */
 @source "../js/ui/16-console.js";
 /* phase 7: Plugins and Mods, Files and the editor */
 @source "../js/ui/22-plugins.js";
 @source "../js/ui/26-files.js";
 @source "../js/ui/27-editor.js";
+@source "../js/ui/20-performance.js";
+@source "../js/ui/21-players.js";
+@source "../js/ui/28-activity.js";
 /* phase 8: Worlds, Backups (the server's and a database's), Schedule */
 @source "../js/ui/23-worlds.js";
 @source "../js/ui/25-server-list-look.js";

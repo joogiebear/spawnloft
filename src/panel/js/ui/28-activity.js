@@ -60,15 +60,14 @@ function activityActor(by) {
   return { text: 'SpawnLoft', tone: 'sl', title: 'SpawnLoft itself - crash guard, or something it did on its own' };
 }
 
-/** Who did it, as the chip both screens show. */
+/** Who did it, as a pill in a colour per kind, since it is the column people scan. */
 function activityChip(by) {
   const who = activityActor(by);
-  const chip = document.createElement('span');
-  chip.className = 'act-who';
-  chip.dataset.tone = who.tone;
-  chip.textContent = who.text;
-  if (who.title) chip.title = who.title;
-  return chip;
+  const tone = { you: 'accent', ai: 'warn', sched: 'live' }[who.tone];
+  const pill = Kit.pill({ text: who.text, tone });
+  pill.classList.add('act-who');
+  if (who.title) pill.title = who.title;
+  return pill;
 }
 
 function activityDay(iso) {
@@ -103,37 +102,29 @@ async function renderActivity(opts) {
   paneHead(body, 'history', 'Activity',
     'What was done to this server and who did it: you, a schedule, an AI assistant, or SpawnLoft itself.');
 
-  const seg = document.createElement('div');
-  seg.className = 'seg act-filter';
-  seg.setAttribute('role', 'group');
-  seg.setAttribute('aria-label', 'Show');
-  for (const [value, label] of ACTIVITY_FILTERS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = label;
-    b.setAttribute('aria-pressed', String(activityView.by === value));
-    b.onclick = () => { activityView.by = value; renderActivity(); };
-    seg.append(b);
-  }
+  const seg = Kit.segmented({
+    label: 'Show',
+    options: ACTIVITY_FILTERS.map(([value, label]) => ({ value, label })),
+    value: activityView.by,
+    onChange: (value) => { activityView.by = value; renderActivity(); },
+  });
+  seg.classList.add('mb-4', 'flex', 'w-fit');
   body.append(seg);
 
   if (!data.entries.length) {
-    body.append(emptyState('history', activityView.by
-      ? 'Nothing from them yet.'
-      : 'Nothing yet. Starts and stops, backups, edits and anything an assistant or a schedule does will show here.'));
+    body.append(Kit.empty(activityView.by
+      ? { icon: 'history', title: 'Nothing from them yet.' }
+      : { icon: 'history', title: 'Nothing yet', text: 'Starts and stops, backups, edits and anything an assistant or a schedule does will show here.' }));
     return;
   }
 
-  const list = el('div', 'act-list');
+  const list = Kit.h('div', { class: 'grid gap-2' });
   body.append(list);
   const all = [...data.entries];
   let more = data.more;
 
   const clock = (iso) => {
-    const t = el('time', 'act-when');
-    t.dateTime = iso;
-    t.textContent = CLOCK.format(new Date(iso));
-    t.title = new Date(iso).toLocaleString();
+    const t = Kit.h('time', { class: 'tabular-nums', dateTime: iso, title: new Date(iso).toLocaleString(), text: CLOCK.format(new Date(iso)) });
     return t;
   };
 
@@ -144,17 +135,12 @@ async function renderActivity(opts) {
     if (!ACTIVITY_UNDOABLE.has(e.action) || !e.snapshot) return null;
     if (e.snapshotGone && !undone.has(e.snapshot)) {
       // the copy this would put back was deleted in Backups, or cleaned up for being old
-      const note = el('span', 'act-undone');
-      note.textContent = 'Copy removed';
-      note.title = 'The copy kept before this change is no longer in Backups, so it cannot be undone from here.';
-      return note;
+      return Kit.h('span', { class: 'type-meta', text: 'Copy removed', title: 'The copy kept before this change is no longer in Backups, so it cannot be undone from here.' });
     }
     if (undone.has(e.snapshot)) {
-      const note = el('span', 'act-undone');
-      note.textContent = 'Undone';
-      return note;
+      return Kit.h('span', { class: 'type-meta', text: 'Undone' });
     }
-    const undo = iconButton('restore', 'Undo', 'ghost sm');
+    const undo = Kit.button({ label: 'Undo', icon: 'restore', kind: 'ghost', size: 'sm' });
     undo.classList.add('act-undo');
     undo.title = 'Put back what this changed, as it was just before';
     undo.onclick = async (ev) => {
@@ -191,7 +177,6 @@ async function renderActivity(opts) {
     undone = new Set(all.filter((e) => e.action === 'undo' && e.snapshot).map((e) => e.snapshot));
     const open = new Set(Array.from(list.querySelectorAll('details[open]')).map((d) => d.dataset.key));
     list.textContent = '';
-    list.toggleAttribute('data-undo', all.some((e) => ACTIVITY_UNDOABLE.has(e.action) && e.snapshot));
     const days = [];
     for (const e of all) {
       const day = activityDay(e.at);
@@ -199,24 +184,17 @@ async function renderActivity(opts) {
       days[days.length - 1].entries.push(e);
     }
     for (const d of days) {
-      const h = el('h3', 'act-day');
-      h.textContent = d.day;
-      const ol = el('ol', 'feed act-feed');
-      for (const run of groupActivity(d.entries)) {
-        ol.append(feedItem(run, { showServer: false, showWho: true, open, linked: false, when: clock, tail: undoOf }));
-      }
-      list.append(h, ol);
+      list.append(
+        Kit.h('h3', { class: 'sl-eyebrow mt-3 mb-0 first:mt-0', text: d.day }),
+        Kit.list(groupActivity(d.entries).map((run) => activityLine(run, { open, when: clock, tail: undoOf })), d.day));
     }
     count.textContent = more ? 'Showing the latest ' + all.length : all.length + (all.length === 1 ? ' entry' : ' entries');
     loadMore.hidden = !more;
   };
 
-  const foot = el('div', 'act-foot');
-  const count = el('span', 'hint');
-  const loadMore = el('button', 'act-more');
-  loadMore.textContent = 'Load more';
-  loadMore.type = 'button';
-  foot.append(count, loadMore);
+  const count = Kit.h('span', { class: 'type-meta tabular-nums text-ink-3' });
+  const loadMore = Kit.button({ label: 'Load more' });
+  const foot = Kit.h('div', { class: 'mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2' }, count, loadMore);
   body.append(foot);
   loadMore.onclick = async () => {
     busy(loadMore, true, 'Loading…');
@@ -232,3 +210,58 @@ async function renderActivity(opts) {
   paint();
 }
 
+/**
+ * One line of history, or a run that opens to its lines. A run is a row of its own: a run of the
+ * same thing back to back is one line, as on the Overview. `when` says the time by the clock, `tail`
+ * gives a line's Undo.
+ */
+function activityLine(run, { open, when, tail }) {
+  const e = run.entries[0];
+  const said = runText(run);
+  const sentence = said.verb + (said.detail ? ' ' + said.detail : '');
+  const bad = e.ok === false ? Kit.pill({ text: e.action === 'crash' ? 'Crash' : 'Failed', tone: 'fault' }) : null;
+  const tailOf = (entry) => {
+    const t = tail(entry);
+    return t ? [t] : [];
+  };
+  const mark = e.ok === false ? 'text-fault-ink' : '';
+  const line = Kit.row({
+    lead: Kit.icon(activityIcon(e.action)),
+    title: sentence,
+    end: [bad, activityChip(e.by), when(e.at), ...(run.entries.length === 1 ? tailOf(e) : [])],
+  });
+  line.classList.add('feed-row');
+  line.querySelector('.sl-row-title').title = sentence;
+  if (mark) line.querySelector('.sl-row-title').classList.add(mark);
+  if (run.entries.length === 1) return line;
+
+  // A run: the same line, led by a caret, as a summary that opens to the entries in it. Undo
+  // belongs to the entries, so the summary has none.
+  const last = run.entries[run.entries.length - 1];
+  const details = Kit.h('details', { class: 'group' });
+  details.dataset.key = run.key + '|' + last.at;
+  details.open = open.has(details.dataset.key);
+  const head = Kit.row({
+    lead: Kit.icon('caret', '-rotate-90 group-open:rotate-0'),
+    title: sentence,
+    end: [bad, activityChip(e.by), when(e.at)],
+  });
+  const summary = Kit.h('summary', { class: 'sl-row feed-row cursor-pointer list-none hover:bg-hover [&::-webkit-details-marker]:hidden' }, ...head.childNodes);
+  if (mark) summary.querySelector('.sl-row-title').classList.add(mark);
+  const span = ago(last.at) !== ago(e.at) ? ago(last.at) + ' to ' + ago(e.at) : ago(e.at);
+  summary.title = sentence + ' \u00b7 ' + span;
+  const sub = Kit.h('div', { class: 'border-t border-line-faint bg-recess pl-8' });
+  for (const one of run.entries) {
+    const l = Kit.row({
+      title: one.detail || ACTIVITY_BARE[one.action] || (ACTIVITY_TEXT[one.action] || one.action),
+      end: [when(one.at), ...tailOf(one)],
+    });
+    l.classList.add('feed-row');
+    l.querySelector('.sl-row-title').title = l.querySelector('.sl-row-title').textContent;
+    if (one.ok === false) l.querySelector('.sl-row-title').classList.add('text-fault-ink');
+    sub.append(l);
+  }
+  details.append(summary, sub);
+  // A list item wraps it: ARIA allows no role on <details> itself.
+  return Kit.h('div', null, details);
+}

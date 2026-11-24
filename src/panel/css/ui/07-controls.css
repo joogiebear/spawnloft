@@ -154,11 +154,9 @@
   */
   /* A grid item, unlike the other two, so inline-flex blockifies to flex and the trough stretched
      the width of the pane - 620px of empty inset well beside 194px of buttons. */
-  .ranges { justify-self: start; width: max-content; }
   /* Focus rests here when Escape steps out of a field; the tool is not a control, so no ring. */
   #toolPanel:focus, .view.sheet:focus { outline: none; }
-  .filters .count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
-  .seg, .filters, .ranges {
+  .seg {
     display: inline-flex;
     background: rgba(var(--ink-rgb), .025);
     border: 1px solid var(--line);
@@ -168,13 +166,13 @@
     padding: 0;
     gap: 0;
   }
-  .seg button, .filters button, .ranges button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 0 11px; font-size: var(--t-2); font-weight: 500; color: var(--ink-2); border-radius: calc(var(--r-sm) - 1px); }
-  .seg button[aria-pressed="true"], .filters button[aria-pressed="true"], .ranges button[aria-pressed="true"] {
+  .seg button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 0 11px; font-size: var(--t-2); font-weight: 500; color: var(--ink-2); border-radius: calc(var(--r-sm) - 1px); }
+  .seg button[aria-pressed="true"] {
     background: var(--segment-top);
     border-color: var(--line);
     color: var(--ink);
     box-shadow: var(--lift-strong);
   }
-  .seg button:hover:not([aria-pressed="true"]), .filters button:hover:not([aria-pressed="true"]), .ranges button:hover:not([aria-pressed="true"]) { color: var(--ink); background: var(--hover); border-color: transparent; transform: none; }
+  .seg button:hover:not([aria-pressed="true"]) { color: var(--ink); background: var(--hover); border-color: transparent; transform: none; }
 
 }

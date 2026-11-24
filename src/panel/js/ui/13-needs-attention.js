@@ -58,9 +58,10 @@ function goneSentence(trail) {
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * The few things that want someone to do something, each with the one thing to do. Nothing here
- * is shown for its own sake: a card is a crash, updates somebody asked about, a server with no
- * backups going unprotected, or a Java that will stop servers starting.
+ * The things that want someone to do something, each with the one thing to do. Nothing here is
+ * shown for its own sake: a crash, updates somebody asked about, a server with no backups going
+ * unprotected, or a Java that will stop servers starting. Each item names its `rows`; items that
+ * share a `merge` key are said once for all of them (groupAttention).
  */
 function attentionItems() {
   const items = [];
@@ -97,8 +98,8 @@ function attentionItems() {
     if (!n) continue;
     const names = Object.values(found).map((u) => (u.name || u.file.replace(/\.jar$/, '')));
     items.push({
-      key: 'updates|' + r.name + '|' + n, tone: 'accent', icon: 'plug',
-      title: n + (n === 1 ? ' update' : ' updates') + ' for ' + nameOf(r),
+      key: 'updates|' + r.name + '|' + n, tone: 'accent', icon: 'plug', merge: 'updates', row: r, count: n,
+      title: n + (n === 1 ? ' plugin update' : ' plugin updates') + ' for ' + nameOf(r),
       text: names.join(', '),
       actions: [{ label: 'Review', run: () => openServerTool(r.name, 'plugins') }],
     });
@@ -115,6 +116,7 @@ function attentionItems() {
         : 'Automatic backups are not available here; take one from Backups.';
       items.push({
         key: 'backup|' + r.name + '|' + (b.gone ? 'gone' : b.none ? 'never' : days), tone: 'warn', icon: 'archive',
+        merge: 'backup', row: r, never: b.none && !b.gone, offer, automatic: Boolean(data.automaticAvailable),
         title: b.gone ? nameOf(r) + ' has no backups' : b.none ? nameOf(r) + ' has never been backed up' : 'No backup of ' + nameOf(r) + ' in ' + days + ' days',
         text: b.gone ? goneSentence(b.trail) + ' ' + offer : offer,
         actions: data.automaticAvailable
@@ -132,75 +134,114 @@ function attentionItems() {
       key: 'java|' + need + '|' + names.join(','), tone: 'warn', icon: 'alert',
       title: 'Java ' + need + ' needed',
       text: (names.length > 2 ? names.slice(0, 2).join(', ') + ' and ' + (names.length - 2) + ' more' : names.join(' and '))
-        + (names.length === 1 ? ' won’t start until it is installed.' : ' won’t start until it is installed.'),
+        + ' won’t start until it is installed.',
       actions: [{ label: 'Get Java', run: () => openOutside(state.health.javaDownload), primary: true }],
     });
   }
   return items;
 }
 
+/** "A, B and C": names for a sentence. */
+function nameList(names) {
+  return names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+}
+
+/**
+ * One line for each kind of problem, not one for each server: "2 servers have never been backed
+ * up" with one button for both, where the page used to say the same thing twice. Crashes and Java
+ * stay as they are (each is its own server's, or already one line). The worst comes first, then
+ * the order they were found in.
+ */
+function groupAttention(items) {
+  const nameOf = (r) => r.label || r.name;
+  const groups = new Map();
+  const out = [];
+  for (const item of items) {
+    if (!item.merge) { out.push(item); continue; }
+    if (!groups.has(item.merge)) {
+      const slot = { many: [] };
+      groups.set(item.merge, slot);
+      out.push(slot);
+    }
+    groups.get(item.merge).many.push(item);
+  }
+  const merged = out.map((entry) => {
+    if (!entry.many) return entry;
+    const list = entry.many;
+    if (list.length === 1) return list[0];
+    const rows = list.map((i) => i.row);
+    const names = rows.map(nameOf);
+    // one way into each server's own page for the kind, as a menu under one button
+    const review = (tool, label) => ({ label, items: rows.map((r) => ({ label: nameOf(r), onSelect: () => openServerTool(r.name, tool) })) });
+    if (list[0].merge === 'updates') {
+      return {
+        key: 'updates|' + list.map((i) => i.key).join('+'), tone: 'accent', icon: 'plug',
+        title: 'Plugin updates for ' + list.length + ' servers',
+        text: list.map((i) => nameOf(i.row) + ' (' + i.count + ')').join(', '),
+        actions: [review('plugins', 'Review')],
+      };
+    }
+    const never = list.every((i) => i.never);
+    const automatic = list[0].automatic;
+    const both = list.length === 2 ? 'both' : 'all ' + list.length;
+    return {
+      key: 'backup|' + list.map((i) => i.key).join('+'), tone: 'warn', icon: 'archive',
+      title: list.length + ' servers ' + (never ? 'have never been backed up' : 'have no recent backup'),
+      text: nameList(names) + '. ' + list[0].offer,
+      actions: automatic
+        ? [{ label: 'Turn on for ' + both, run: () => turnOnBackups(rows), primary: true }, review('backups', 'Review')]
+        : [{ ...review('backups', 'Open Backups'), primary: true }],
+    };
+  });
+  const rank = { fault: 0, warn: 1, accent: 2 };
+  // Array.sort is stable: within one tone the order they were found in stays
+  return merged.sort((a, b) => (rank[a.tone] ?? 3) - (rank[b.tone] ?? 3));
+}
+
+/* A button that does one thing, or a menu that goes to each of several servers. */
+function attentionAction(a) {
+  if (a.items) return Kit.menu({ label: a.label, kind: a.primary ? 'primary' : 'secondary', items: a.items });
+  const button = Kit.button({ label: a.label, kind: a.primary ? 'primary' : 'secondary', size: 'sm' });
+  button.onclick = async () => {
+    Kit.busy(button, true);
+    try { await a.run(); } finally { Kit.busy(button, false); }
+  };
+  return button;
+}
+
 /*
-  Three to a row, and "and N more" for the rest: a wall of warnings is read as none. Rebuilt only
-  when what it says changes, not on every poll - a card rebuilt under someone's pointer loses the
-  hover and, worse, the focus of the button they were about to press.
+  Rebuilt only when what it says changes, not on every poll - a banner rebuilt under someone's
+  pointer loses the hover and, worse, the focus of the button they were about to press.
 */
 function renderAttention() {
-  const items = attentionItems();
+  const items = groupAttention(attentionItems());
   const box = $('#homeAttention');
-  const shown = overview.showAll ? items : items.slice(0, 3);
-  // The text is left out of the key: it carries "6h ago", and a card rebuilt each time that ticks
-  // over loses the focus of the button someone was about to press. It is refreshed in place.
-  const key = items.map((i) => i.key + '|' + i.title).join('\n') + '|' + overview.showAll;
   box.hidden = !items.length;
+  // The text is left out of the key: it carries "6h ago", and a banner rebuilt each time that ticks
+  // over loses the focus of the button someone was about to press. It is refreshed in place.
+  const key = items.map((i) => i.key + '|' + i.title).join('\n');
   if (key === overview.attention) {
-    $$('#attGrid .att-words span').forEach((span, i) => { if (shown[i] && span.textContent !== shown[i].text) span.textContent = shown[i].text; });
+    items.forEach((item, i) => {
+      const body = box.children[i + 1] && box.children[i + 1].querySelector('.sl-banner-body');
+      if (body && body.textContent !== item.text) body.textContent = item.text;
+    });
     return;
   }
   overview.attention = key;
-
-  const grid = $('#attGrid');
-  grid.textContent = '';
-  for (const item of shown) {
-    const card = document.createElement('div');
-    card.className = 'att';
-    card.dataset.tone = item.tone;
-    const tile = document.createElement('span');
-    tile.className = 'att-tile';
-    tile.append(icon(item.icon));
-    // Said in words as well as in colour: the tile's glyph is decoration to a screen reader.
-    card.setAttribute('role', 'group');
-    card.setAttribute('aria-label', (item.tone === 'fault' ? 'Problem: ' : item.tone === 'warn' ? 'Warning: ' : '') + item.title);
-    const words = document.createElement('div');
-    words.className = 'att-words';
-    const b = document.createElement('b');
-    b.textContent = item.title;
-    const p = document.createElement('span');
-    p.textContent = item.text;
-    words.append(b, p);
-    const acts = document.createElement('div');
-    acts.className = 'att-acts';
-    for (const a of item.actions) {
-      const act = document.createElement('button');
-      act.type = 'button';
-      act.textContent = a.label;
-      if (a.primary) act.className = 'primary';
-      act.onclick = a.run;
-      acts.append(act);
-    }
-    card.append(tile, words, acts);
-    grid.append(card);
+  box.replaceChildren(box.querySelector('#attTitle'));
+  for (const item of items) {
+    const banner = Kit.banner({ tone: item.tone === 'accent' ? undefined : item.tone, icon: item.icon, title: item.title, text: item.text, actions: item.actions.map(attentionAction) });
+    // Said in words as well as in colour: the glyph is decoration to a screen reader.
+    const lead = item.tone === 'fault' ? 'Problem: ' : item.tone === 'warn' ? 'Warning: ' : '';
+    if (lead) banner.querySelector('.sl-banner-title').prepend(Kit.h('span', { class: 'sl-sr', text: lead }));
+    box.append(banner);
   }
-  const more = $('#attMore');
-  const rest = items.length - 3;
-  more.hidden = rest <= 0;
-  more.textContent = overview.showAll ? 'Show fewer' : 'and ' + rest + ' more';
 }
 $('#homeFailRetry').onclick = async (e) => {
-  busy(e.currentTarget, true);
+  Kit.busy(e.currentTarget, true);
   await loadOverview(true);
-  busy($('#homeFailRetry'), false);
+  Kit.busy($('#homeFailRetry'), false);
 };
-$('#attMore').onclick = () => { overview.showAll = !overview.showAll; renderAttention(); };
 
 /** "See why": that server, its console on screen. */
 function openServerConsole(name) {
@@ -213,14 +254,24 @@ function openServerTool(name, tool) {
 }
 
 /** The default the Backups tool offers: every night at 03:00, keeping seven. */
-async function turnOnBackups(row) {
+async function turnOnBackups(target) {
+  const rows = [].concat(target);
   const nightly = AUTO_INTERVALS.find((o) => o.label === 'Daily at 03:00');
-  try {
-    await post('/instances/' + encodeURIComponent(row.name) + '/backups/auto', { enabled: true, schedule: nightly.schedule, keep: 7 });
-    toast('Nightly backups of ' + (row.label || row.name) + ' at ' + clockWords('03:00') + ', keeping the last 7.', 'good');
-  } catch (e) {
-    toast(e.message, 'bad');
+  const worked = [];
+  const failed = [];
+  let why = '';
+  for (const row of rows) {
+    try {
+      await post('/instances/' + encodeURIComponent(row.name) + '/backups/auto', { enabled: true, schedule: nightly.schedule, keep: 7 });
+      worked.push(row);
+    } catch (e) {
+      failed.push(row);
+      why = e.message;
+    }
   }
+  const said = ', at ' + clockWords('03:00') + ', keeping the last 7.';
+  if (worked.length === 1) toast('Nightly backups of ' + (worked[0].label || worked[0].name) + ' at ' + clockWords('03:00') + ', keeping the last 7.', 'good');
+  else if (worked.length) toast('Nightly backups are on for ' + worked.length + ' servers' + said, 'good');
+  if (failed.length) toast(failed.length === 1 && rows.length === 1 ? why : 'Could not turn on backups for ' + nameList(failed.map((r) => r.label || r.name)) + ': ' + why, 'bad');
   if (state.view === 'home') await loadOverview(true);
 }
-

@@ -1,45 +1,83 @@
 'use strict';
 // ---- the server cards ----------------------------------------------------------
 
+/*
+  A server's card on the Overview. Running, it is the large one: who it is, the verbs, and four
+  numbers. Stopped, it is one row: who it is, and Start. One element either way, built once and
+  changed in place on every poll, so the button someone is about to press is the same button when
+  the server's state flips under it.
+*/
+const CARD_LIVE = 'gap-4.5';
+
+/** A state as the pill beside a name; paint() sets its words, tone and dot from a row. */
+function statePill() {
+  const dot = Kit.dot({});
+  const words = Kit.h('span', { 'data-state-text': '' });
+  const pill = Kit.h('span', { class: 'sl-pill' }, dot, words);
+  pill.paint = (row, acting) => {
+    const said = describeState(row, acting);
+    words.textContent = said.text;
+    for (const el of [pill, dot]) {
+      if (said.tone) el.dataset.tone = said.tone;
+      else delete el.dataset.tone;
+    }
+    dot.toggleAttribute('data-busy', said.tone === 'warn' && (Boolean(acting) || row.status === 'stopping'));
+    dot.toggleAttribute('data-hollow', !said.tone && row.status === 'stopped');
+    // The uptime ticker (15-server-tools.js) rewrites the words each second from this.
+    if (said.since) words.dataset.since = String(said.since);
+    else delete words.dataset.since;
+  };
+  return pill;
+}
+
+/** Live-number sparkline: the last ten minutes, drawn small beside a figure. */
+function homeSpark(values, max) {
+  const svg = svgNode('svg', { viewBox: '0 0 64 18', preserveAspectRatio: 'none', 'aria-hidden': 'true', class: 'ml-2 hidden h-4.5 w-16 flex-none overflow-visible align-middle @min-[720px]/card:inline-block' });
+  if (values.length < 2) return svg;
+  const step = 64 / (values.length - 1);
+  const points = values.map((v, i) => (i * step).toFixed(1) + ',' + (17 - Math.min(1, Math.max(0, v / max)) * 16).toFixed(1));
+  const line = svgNode('polyline', { points: points.join(' '), fill: 'none', 'stroke-width': '1.5', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' });
+  line.style.stroke = 'var(--chart-cpu)';
+  svg.append(line);
+  return svg;
+}
+const svgNode = (tag, attrs) => {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+};
+
+/** A number in a stat's place: its figure, its unit after it, and optionally a line beside. */
+function paintStat(stat, value, unit, { tone, spark } = {}) {
+  const v = stat.querySelector('.sl-stat-value');
+  const kids = [String(value)];
+  if (unit) kids.push(Kit.h('span', { class: 'sl-stat-unit', text: unit }));
+  if (spark && spark.values.length > 1) kids.push(homeSpark(spark.values, spark.max));
+  v.replaceChildren(...kids);
+  v.classList.toggle('text-warn-ink', tone === 'warn');
+}
+
 function buildHomeCard(name) {
-  const card = el('article', 'scard');
-  card.dataset.name = name;
-
-  const head = cardHead('server');
-  // The verbs: the one that changes its state, and Restart beside Stop while it runs.
-  const acts = el('div', 'sc-acts');
-  const restart = el('button', 'sc-restart');
-  restart.type = 'button';
-  restart.onclick = () => cardAct(name, 'restart');
-  const play = el('button', 'sc-play');
-  play.type = 'button';
-  play.textContent = 'Play';
-  play.onclick = () => playClient(rowOf(name));
-  const act = el('button', 'sc-act');
-  act.type = 'button';
-  act.onclick = () => cardAct(name);
-  acts.append(restart, play, act);
-  head.append(acts);
-
-  const stats = el('dl', 'sc-stats');
-  for (const [key, label] of [['players', 'Players'], ['tps', 'TPS'], ['memory', 'Memory']]) {
-    const cell = el('div');
-    cell.dataset.v = key;
-    const dt = el('dt');
-    dt.textContent = label;
-    cell.append(dt, el('dd'));
-    stats.append(cell);
-  }
-  const idle = el('p', 'sc-idle');
-
-  const foot = el('div', 'sc-foot');
-  const open = el('button', 'sc-open');
-  open.type = 'button';
-  open.textContent = 'Open →';
-  open.onclick = () => select(name);
-  foot.append(el('div', 'sc-note'), open);
-
-  card.append(head, stats, idle, el('div', 'sc-links'), el('div', 'sc-dbs'), foot);
+  const tileSlot = Kit.h('span', { class: 'contents' });
+  const nameButton = Kit.h('button', { type: 'button', class: 'sl-btn sl-btn-link block min-w-0 max-w-full truncate text-ink', onclick: () => select(name) });
+  const pill = statePill();
+  const meta = Kit.h('div', { class: 'm-0 flex min-w-0 flex-wrap items-center gap-x-1.5 type-meta text-ink-3' });
+  const noteSlot = Kit.h('span', { class: 'contents' });
+  const act = Kit.button({ label: 'Start', onClick: () => cardAct(name) });
+  const play = Kit.button({ label: 'Play', onClick: () => playClient(rowOf(name)) });
+  const open = Kit.button({ label: 'Open', onClick: () => select(name) });
+  const stats = Kit.h('div', { class: 'grid grid-cols-2 gap-3 border-t border-line-soft pt-4 @narrow/card:grid-cols-4' },
+    ...['Players', 'TPS', 'Memory', 'Last backup'].map((label) => Kit.stat({ label })));
+  const links = Kit.h('div', { class: 'flex flex-col gap-2 empty:hidden' });
+  const card = Kit.h('article', { class: 'sl-card @container/card', dataset: { name } },
+    Kit.h('div', { class: 'sl-card-head' },
+      tileSlot,
+      Kit.h('div', { class: 'min-w-0 flex-[1_1_240px]' },
+        Kit.h('div', { class: 'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1' }, Kit.h('h3', { class: 'm-0 min-w-0 max-w-full' }, nameButton), pill),
+        meta, noteSlot),
+      Kit.h('div', { class: 'flex flex-wrap gap-2' }, act, play, open)),
+    stats, links);
+  card.parts = { tileSlot, nameButton, pill, meta, noteSlot, act, play, open, stats, links };
   return card;
 }
 
@@ -74,192 +112,143 @@ async function cardAct(name, what) {
 }
 
 /**
- * The line at the foot of a card: how it is looked after. A server with no backup on disk says
- * so in the warning's colour and offers the way to set them up; "Never" only when it truly never
- * was.
+ * How a server is looked after, for the one number a running card shows: when it was last backed
+ * up. A server with no backup on disk says so in the warning's colour; "Never" only when it truly
+ * never was. The page says what to do about it once, in Needs attention.
  */
-function cardNote(row) {
+function cardBackup(row) {
   const b = backupState(row);
-  if (!b) return { text: overview.failed ? 'Backups unknown' : 'Checking backups…' };
-  const schedule = b.auto ? 'backs up ' + describeSchedule(b.auto.schedule) : '';
-  if (!b.none) {
-    const old = !b.auto && Date.now() - b.lastAt >= 7 * DAY_MS;
-    return {
-      icon: 'archive', tone: old ? 'warn' : '',
-      lead: 'Last backup', strong: ago(new Date(b.lastAt).toISOString()) || 'just now',
-      text: schedule ? capital(schedule) : 'No schedule',
-      link: b.auto ? null : 'Set up backups',
-    };
-  }
-  if (b.auto) return { icon: 'archive', lead: 'No backup yet', text: 'First one ' + describeSchedule(b.auto.schedule) };
-  if (row.origin && row.origin.clonedFrom && !b.gone) return { icon: 'archive', text: 'Test copy, backups off' };
-  return { icon: 'alert', tone: 'warn', strong: b.gone ? 'No backups kept' : 'Never backed up', text: 'Backups off', link: 'Set up backups' };
-}
-
-function setStat(card, key, value, of, tone, spark) {
-  const dd = card.querySelector('[data-v="' + key + '"] dd');
-  dd.textContent = '';
-  const big = document.createElement('span');
-  big.className = 'big';
-  big.textContent = value;
-  if (tone) big.dataset.tone = tone;
-  dd.append(big);
-  if (of) {
-    const small = document.createElement('span');
-    small.className = 'of';
-    small.textContent = of;
-    dd.append(small);
-  }
-  // Drawn whenever there is history; the stylesheet shows it only on a card wide enough for it.
-  if (spark && spark.values.length > 1) dd.append(sparkline(spark.values, spark.max));
+  if (!b) return { value: '—', unit: overview.failed ? 'not known' : 'checking' };
+  if (b.none) return { value: b.gone ? 'None kept' : 'Never', tone: 'warn' };
+  const said = ago(new Date(b.lastAt).toISOString()) || 'just now';
+  const old = !b.auto && Date.now() - b.lastAt >= 7 * DAY_MS;
+  // "3h ago" is a figure and a unit; "just now" is neither
+  const m = /^(\d+\w*)\s+(.+)$/.exec(said);
+  return m ? { value: m[1], unit: m[2], tone: old ? 'warn' : '' } : { value: said, tone: old ? 'warn' : '' };
 }
 
 /** A button's word, and whether it is the one doing something right now. */
 function setVerb(button, label, busy, disabled, name) {
-  button.textContent = busy ? ACTION_ING[busy] + '…' : label;
-  button.setAttribute('aria-busy', busy ? 'true' : 'false');
+  button.replaceChildren(busy ? ACTION_ING[busy] + '…' : label);
+  if (busy) button.setAttribute('aria-busy', 'true');
+  else button.removeAttribute('aria-busy');
   button.disabled = disabled;
   button.setAttribute('aria-label', (busy ? ACTION_ING[busy] : label) + ' ' + name);
 }
 
 function updateHomeCard(card, row) {
+  const { tileSlot, nameButton, pill, meta, noteSlot, act, play, open, stats, links } = card.parts;
   const name = row.label || row.name;
   const acting = overview.acting[row.name];
+  const live = row.status === 'running' || row.status === 'stopping';
   card.dataset.status = row.status;
+  card.dataset.live = live ? '1' : '';
   card.toggleAttribute('data-crashed', crashedNow(row));
-  card.querySelector('.sc-name').textContent = name;
-  setPill(card.querySelector('.spill'), row, acting);
+  // the large card runs; the stopped one is a row
+  card.classList.toggle('py-3.5', !live);
+  card.classList.toggle(CARD_LIVE, live);
+  nameButton.classList.toggle('type-section', live);
+  nameButton.classList.toggle('type-card', !live);
+  nameButton.textContent = name;
+  nameButton.setAttribute('aria-label', 'Open ' + name);
+  pill.paint(row, acting);
 
+  const faceKey = row.name + '|' + name + '|' + live + '|' + iconAsk;
+  if (tileSlot.dataset.said !== faceKey) {
+    tileSlot.dataset.said = faceKey;
+    const face = Kit.tile({ name, key: row.name, size: live ? 'lg' : 'md' });
+    tileSlot.replaceChildren(face);
+    // its own icon when it has one, else the initial on its colour
+    withServerIcon(row.name, (src) => { if (tileSlot.dataset.said === faceKey) face.replaceChildren(iconImage(src)); });
+  }
+
+  // Who it is: software and version, where it answers, and why it is not running when it is not.
   const sw = softwareById[row.loader ?? 'paper'];
-  const soft = card.querySelector('.sc-soft');
   const addr = row.port ? 'localhost:' + row.port : '';
   const what = (sw ? sw.label : (row.loader || 'Paper')) + (row.mcVersion ? ' ' + row.mcVersion : '');
-  // Rebuilt only when it changes, so the address button keeps its focus across polls.
-  if (soft.dataset.said !== what + '|' + addr) {
-    soft.dataset.said = what + '|' + addr;
-    soft.textContent = '';
-    soft.append(what + ' · ', addr ? addrButton(addr) : 'port not known yet');
+  const shared = (state.dbs || []).filter((d) => d.attachments && d.attachments[row.name] && !ownedDbs(row.name).includes(d));
+  let note = null;
+  if (!live) {
+    if (javaShort(row)) note = { tone: 'fault', text: 'Needs Java ' + row.javaNeeds + ' to start' };
+    else if (crashedNow(row)) note = { tone: 'fault', text: 'Crashed, open the console to see why' };
+    else if (row.stoppedAt && !acting) note = { text: 'Stopped ' + (ago(new Date(row.stoppedAt).toISOString()) || 'just now') };
+  }
+  const metaKey = JSON.stringify([what, addr, shared.map((d) => d.name)]);
+  if (meta.dataset.said !== metaKey) {
+    meta.dataset.said = metaKey;
+    meta.textContent = '';
+    meta.append(what, Kit.h('span', { 'aria-hidden': 'true', text: '·' }), addr ? addrButton(addr) : 'port not known yet');
+    if (shared.length) meta.append(Kit.h('span', { 'aria-hidden': 'true', text: '·' }), (shared.length === 1 ? 'Shared database ' : 'Shared databases ') + shared.map((d) => d.label || d.name).join(', '));
+  }
+  // The note is apart from the address, so "Stopped 5m ago" ticking over never rebuilds the button.
+  const noteKey = note ? note.tone + '|' + note.text : '';
+  if (noteSlot.dataset.said !== noteKey) {
+    noteSlot.dataset.said = noteKey;
+    noteSlot.replaceChildren(...(note ? [Kit.h('span', { 'aria-hidden': 'true', text: '·' }), Kit.h('span', { class: note.tone === 'fault' ? 'text-fault-ink' : '', text: note.text })] : []));
   }
 
   const verb = cardVerb(row);
   const blocked = Boolean(acting) || row.status === 'stopping' || Boolean(state.busy && state.current === row.name);
-  const act = card.querySelector('.sc-act');
-  act.className = 'sc-act' + (verb.primary ? ' primary' : '');
-  const busy = acting && acting !== 'restart' ? acting : row.status === 'stopping' ? 'stop' : null;
+  act.classList.toggle('sl-btn-primary', verb.primary);
+  const busy = acting && acting !== 'restart' ? acting : row.status === 'stopping' ? 'stop' : acting === 'restart' ? 'restart' : null;
   setVerb(act, verb.label, busy, blocked, name);
-  const restart = card.querySelector('.sc-restart');
-  restart.hidden = !(row.status === 'running' || acting === 'restart');
-  setVerb(restart, 'Restart', acting === 'restart' ? 'restart' : null, blocked, name);
-  const play = card.querySelector('.sc-play');
+  // Play joins a running server; a stopped one is started from the Play page's own list
+  play.hidden = !live;
   const pp = playProfileFor(row);
   play.textContent = pp && pp.running ? 'Playing' : 'Play';
   play.title = !pp ? 'Opens the Play page to make a setup for this server' : pp.running ? pp.name + ' is running: opens it on the Play page' : 'Starts ' + pp.name + ' on the Play page, pointed at this server';
-  card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
+  open.setAttribute('aria-label', 'Open ' + name);
 
-  // Live figures while it runs; one line saying why there are none while it does not.
-  const live = row.status === 'running';
-  const stats = card.querySelector('.sc-stats');
-  const idle = card.querySelector('.sc-idle');
+  // Live figures only while it runs.
   stats.hidden = !live;
-  idle.hidden = live;
-  if (!live) {
-    idle.textContent = '';
-    delete idle.dataset.tone;
-    if (javaShort(row)) {
-      idle.dataset.tone = 'fault';
-      idle.append(icon('alert'), 'Needs Java ' + row.javaNeeds + ' to start');
-    } else if (crashedNow(row)) {
-      idle.dataset.tone = 'fault';
-      idle.append(icon('alert'), 'Crashed — open the console to see why, or start it again');
-    } else if (acting === 'start' || acting === 'restart') {
-      idle.append(icon('pulse'), 'Starting — live stats appear once it is up');
-    } else {
-      idle.append(icon('pulse'), 'Server is stopped — start it to see live stats');
-    }
-  } else {
+  if (live) {
     const latest = row.latest;
-    if (latest && latest.players != null) setStat(card, 'players', String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
-    else setStat(card, 'players', '…', 'starting');
+    const [players, tps, memory, backup] = Array.from(stats.children);
+    if (latest && latest.players != null) paintStat(players, String(latest.players), latest.maxPlayers != null ? 'of ' + latest.maxPlayers : '');
+    else paintStat(players, '—', 'no reply yet');
     const samples = (latest && homeMetrics.samples[row.name]) || [];
-    setStat(card, 'tps', latest && latest.tps != null ? latest.tps.toFixed(1) : '…', '', '',
-      { values: samples.filter((s) => s.tps != null).map((s) => s.tps), max: 20 });
+    paintStat(tps, latest && latest.tps != null ? latest.tps.toFixed(1) : '—', '', { spark: { values: samples.filter((s) => s.tps != null).map((s) => s.tps), max: 20 } });
     const ceiling = memoryCeilingMb(row.memory);
     if (latest && Number.isFinite(latest.rss)) {
       const gb = latest.rss >= 1024;
-      const allotted = ceiling ? '/ ' + gbOf(ceiling) + ' GB' : 'GB';
+      const allotted = ceiling ? 'of ' + gbOf(ceiling) + ' GB' : 'GB';
       const rss = samples.map((s) => s.rss).filter((v) => Number.isFinite(v));
-      setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted, '',
-        { values: rss, max: Math.max(ceiling || 0, ...rss, 256) });
-    } else setStat(card, 'memory', '…');
+      paintStat(memory, gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted,
+        { spark: { values: rss, max: Math.max(ceiling || 0, ...rss, 256) } });
+    } else paintStat(memory, '—');
+    const b = cardBackup(row);
+    paintStat(backup, b.value, b.unit, { tone: b.tone });
   }
 
-  // The databases only this server uses, inside its card; the ones it shares, named.
-  const links = card.querySelector('.sc-links');
+  // The databases only this server uses, inside its card.
   const owned = ownedDbs(row.name);
   const keep = new Set(owned.map((d) => d.name));
   for (const l of Array.from(links.children)) if (!keep.has(l.dataset.name)) l.remove();
   owned.forEach((db, i) => {
-    let link = links.querySelector('.sc-link[data-name="' + CSS.escape(db.name) + '"]');
+    let link = links.querySelector('[data-name="' + CSS.escape(db.name) + '"]');
     if (!link) link = buildDbLink(db);
     updateDbLink(link, db);
     if (links.children[i] !== link) links.insertBefore(link, links.children[i] || null);
   });
-  const shared = (state.dbs || []).filter((d) => d.attachments && d.attachments[row.name] && !keep.has(d.name));
-  const dbLine = card.querySelector('.sc-dbs');
-  dbLine.textContent = '';
-  if (shared.length) {
-    const b = document.createElement('b');
-    b.textContent = shared.length === 1 ? 'Shared database ' : 'Shared databases ';
-    dbLine.append(b, shared.map((d) => d.label || d.name).join(', '));
-  }
-
-  const note = cardNote(row);
-  const noteEl = card.querySelector('.sc-note');
-  // Keyed without the time, which is refreshed in place: a rebuild would take the focus off "Set up
-  // backups" each time a minute ticks over.
-  const said = JSON.stringify({ ...note, strong: note.lead === 'Last backup' ? '' : note.strong });
-  if (noteEl.dataset.said === said && note.strong) {
-    const b = noteEl.querySelector('b');
-    if (b && b.textContent !== note.strong) b.textContent = note.strong;
-  }
-  if (noteEl.dataset.said !== said) {
-    noteEl.dataset.said = said;
-    noteEl.textContent = '';
-    if (note.icon) noteEl.append(icon(note.icon));
-    const words = document.createElement('span');
-    if (note.lead) words.append(note.lead + (note.strong ? ' ' : ''));
-    if (note.strong) {
-      const b = document.createElement('b');
-      b.textContent = note.strong;
-      words.append(b);
-    }
-    if (note.text) words.append((note.lead || note.strong ? ' · ' : '') + note.text);
-    noteEl.append(words);
-    if (note.link) {
-      const link = document.createElement('button');
-      link.type = 'button';
-      link.className = 'more-link';
-      link.textContent = note.link;
-      link.setAttribute('aria-label', note.link + ' for ' + name);
-      link.onclick = () => openServerTool(row.name, 'backups');
-      noteEl.append(link);
-    }
-  }
-  if (note.tone) noteEl.dataset.tone = note.tone;
-  else delete noteEl.dataset.tone;
 }
 
 /** Keyed, like the tabs: a card is built once and its words changed in place on every poll. */
 function renderHomeCards() {
   const box = $('#homeCards');
   const seen = new Set();
-  state.rows.forEach((row, i) => {
+  // The ones that are running first: they are what is happening; the rest are a list to start from.
+  const ordered = state.rows.map((row, i) => ({ row, i, rank: row.status === 'running' || row.status === 'stopping' ? 0 : 1 }))
+    .sort((a, b) => a.rank - b.rank || a.i - b.i).map((x) => x.row);
+  // Moving a card takes focus off whatever inside it had it: put it back.
+  const focused = box.contains(document.activeElement) ? document.activeElement : null;
+  ordered.forEach((row, i) => {
     seen.add(row.name);
-    let card = box.querySelector('.scard[data-name="' + CSS.escape(row.name) + '"]');
+    let card = box.querySelector(':scope > [data-name="' + CSS.escape(row.name) + '"]');
     if (!card) card = buildHomeCard(row.name);
     updateHomeCard(card, row);
     if (box.children[i] !== card) box.insertBefore(card, box.children[i] || null);
   });
+  if (focused && focused.isConnected && document.activeElement !== focused) focused.focus();
   for (const card of Array.from(box.children)) if (!seen.has(card.dataset.name)) card.remove();
 }
 
