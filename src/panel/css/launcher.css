@@ -70,13 +70,6 @@
   .notice { flex-wrap: wrap; }
   .notice > pre.log { flex-basis: 100%; margin-left: calc(14px + var(--s-3)); width: calc(100% - 14px - var(--s-3)); max-height: 128px; }
 
-  .pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--t-1); font-weight: 600; color: var(--ink-2); background: var(--recess); white-space: nowrap; }
-  .pill.live { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
-  .pill.warn { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
-  .pill.fault { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-wash); }
-  .pill.accent { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-  .dot.live { color: var(--live); } .dot.idle { color: var(--idle); } .dot.warn { color: var(--warn); }
 
   .seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); width: max-content; max-width: 100%; flex-wrap: wrap; }
   .seg button { min-height: 28px; padding: 0 var(--s-3); font-size: var(--t-2); font-weight: 600; background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); border-radius: var(--r-xs); }
@@ -136,7 +129,6 @@
   .shd { display: grid; gap: var(--s-2); }
   .shd h2 { margin: 0; font: 650 var(--t-6)/1.15 var(--display); letter-spacing: -.01em; overflow-wrap: anywhere; }
   .chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
-  .chips .pill { height: 24px; padding: 0 10px; font-weight: 500; }
   .playrow { display: flex; align-items: stretch; gap: var(--s-3); }
   .playrow .play { flex: 1; min-height: 64px; padding: 0 var(--s-6); font: 650 var(--t-6)/1 var(--display); letter-spacing: -.01em; border-radius: var(--r); gap: var(--s-3); }
   .playrow .play .ico { font-size: 1em; }

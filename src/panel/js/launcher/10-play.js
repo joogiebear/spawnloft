@@ -58,10 +58,10 @@
       h('span', { class: 'label', text: 'Selected setup' }),
       h('h2', { id: 'setupName', text: setupName(p) }),
       h('div', { class: 'chips' },
-        h('span', { class: 'pill', text: `Minecraft ${p.mc}` }),
-        h('span', { class: 'pill', text: loaderName(p.loader) }),
-        h('span', { class: 'pill', text: memoryText(p.memory) }),
-        played && !p.running && h('span', { class: 'pill', text: played })))
+        h('span', { class: 'sl-pill', text: `Minecraft ${p.mc}` }),
+        h('span', { class: 'sl-pill', text: loaderName(p.loader) }),
+        h('span', { class: 'sl-pill', text: memoryText(p.memory) }),
+        played && !p.running && h('span', { class: 'sl-pill', text: played })))
   }
 
   // What goes between the links in a blocked Play's reason: "A or B", "A, B, or C".
@@ -275,7 +275,7 @@
           ? h('small', { text: sentence(c.blocked) })
           : h('button', { class: 'sm', id: `srv-${c.name}`, disabled: busy || stuck, title: stuck && !busy ? 'Play can\'t start yet: the card above says why.' : null, onclick: () => playOn(p, c) }, ico('play'), c.stopped ? 'Start and play' : 'Play here')
       return h('li', { class: cur ? 'scard cur' : 'scard', 'aria-current': cur ? 'true' : null },
-        h('span', { class: 'nm' }, h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }), h('b', { title: c.label && c.label !== c.name ? `${c.label} (folder name: ${c.name})` : c.name, text: c.label || c.name })),
+        h('span', { class: 'nm' }, stateDot(c.status, c.stopped), h('b', { title: c.label && c.label !== c.name ? `${c.label} (folder name: ${c.name})` : c.name, text: c.label || c.name })),
         h('small', { text: `${c.mc ?? 'version unknown'}${c.loader ? ` · ${loaderName(c.loader)}` : ''} · ${statusText(c.status).toLowerCase()}` }),
         act)
     }
@@ -314,7 +314,7 @@
   function joinField(p, plan, inert) {
     const { t, picked, custom, address, addrProblem, acct } = plan
     const open = S.menu === 'join' && !inert
-    const dot = picked && h('span', { class: `dot ${picked.status === 'running' ? 'live' : picked.stopped ? 'idle' : 'warn'}` })
+    const dot = picked && stateDot(picked.status, picked.stopped)
     const now = picked ? picked.label || picked.name : custom ? 'Another address' : 'Title screen'
     const hint = picked ? `${statusText(picked.status)}${picked.mc ? ` \u00b7 ${picked.mc}` : ''}` : custom ? null : 'no server'
     return h('div', { class: 'join' },
@@ -358,7 +358,7 @@
         let warn = false
         if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion && p.mc !== 'latest') { meta = 'runs another version'; warn = true } else if (c.otherLoader) { meta = `runs ${loaderName(c.otherLoader)}`; warn = true }
         return h('button', { class: c.name === t.server ? 'row cur' : 'row', 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
-          h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }),
+          stateDot(c.status, c.stopped),
           h('span', { class: 'sub' }, h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` \u00b7 ${c.mc}` : ''}` })),
           h('span', { class: warn ? 'meta warn' : 'meta', text: meta }))
       }),
