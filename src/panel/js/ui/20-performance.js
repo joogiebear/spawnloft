@@ -55,13 +55,13 @@ function chart(samples, { pick, max, colour, label }) {
   const W = 600;
   const H = 96;
   const el = svg('svg', {
-    class: 'chart', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img',
+    class: 'chart block h-[72px] w-full', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img',
   });
   if (label) el.setAttribute('aria-label', label);
 
   for (let i = 1; i < 4; i++) {
     const y = (H / 4) * i;
-    el.append(svg('line', { class: 'gridline', x1: 0, y1: y, x2: W, y2: y }));
+    el.append(svg('line', { class: 'stroke-line [vector-effect:non-scaling-stroke]', x1: 0, y1: y, x2: W, y2: y }));
   }
   if (samples.length < 2) return el;
 
@@ -72,10 +72,10 @@ function chart(samples, { pick, max, colour, label }) {
 
   const points = samples.map((s) => `${x(s).toFixed(1)},${y(s).toFixed(1)}`);
   el.append(svg('polygon', {
-    class: 'area', fill: colour,
+    class: 'stroke-none opacity-[.14]', fill: colour,
     points: `0,${H} ${points.join(' ')} ${W},${H}`,
   }));
-  el.append(svg('polyline', { class: 'line', stroke: colour, points: points.join(' ') }));
+  el.append(svg('polyline', { class: 'fill-none stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round] [vector-effect:non-scaling-stroke]', stroke: colour, points: points.join(' ') }));
   return el;
 }
 
@@ -87,51 +87,28 @@ function chart(samples, { pick, max, colour, label }) {
  * rather than a sentence where two charts are about to be.
  */
 function gauge({ title, now, aside, samples, pick, max, colour, empty, fmt }) {
-  const wrap = document.createElement('div');
-  wrap.className = 'gauge';
-  const head = document.createElement('div');
-  head.className = 'gauge-head';
-  const h = document.createElement('h3');
-  h.textContent = title;
-  const value = document.createElement('span');
-  value.className = 'now';
-  value.textContent = now;
-  const note = document.createElement('span');
-  note.className = 'aside';
-  note.textContent = aside;
-  head.append(h, value, note);
-  const plot = document.createElement('div');
-  plot.className = 'chart-wrap';
-  plot.append(chart(samples, { pick, max, colour, label: chartWords(title, empty ? 'no readings yet' : now, empty ? '' : aside, perfView.seconds) }));
-  if (empty) {
-    const p = document.createElement('p');
-    p.className = 'chart-note';
-    p.textContent = empty;
-    plot.append(p);
-  }
-  wrap.append(head, plot);
-  // The range's numbers, shown under the chart when the pane is Ultra (the stylesheet decides).
+  const head = Kit.h('div', { class: 'flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5' },
+    Kit.eyebrow(title, 'h3'),
+    Kit.h('span', { class: 'now text-[length:var(--text-6)] font-semibold leading-none tracking-display text-ink', text: now }),
+    Kit.h('span', { class: 'type-meta ml-auto text-ink-3', text: aside }));
+  head.firstChild.classList.add('basis-full', 'm-0');
+  const plot = Kit.h('div', { class: 'relative grid' },
+    chart(samples, { pick, max, colour, label: chartWords(title, empty ? 'no readings yet' : now, empty ? '' : aside, perfView.seconds) }));
+  if (empty) plot.append(Kit.h('p', { class: 'type-meta absolute inset-0 m-0 grid place-content-center px-4 py-2 text-center text-ink-3', text: empty }));
+  const wrap = Kit.card({}, head, plot);
+  wrap.classList.add('gap-3', 'gauge');
+  // The range's numbers, shown under the chart when the pane is Ultra.
   if (samples.length && fmt) {
     const values = samples.map(pick).filter((v) => v != null && Number.isFinite(v));
     if (values.length) {
-      const nums = document.createElement('dl');
-      nums.className = 'gauge-nums';
-      const cell = (label, v) => {
-        const d = document.createElement('div');
-        const dt = document.createElement('dt');
-        dt.textContent = label;
-        const dd = document.createElement('dd');
-        dd.textContent = fmt(v);
-        d.append(dt, dd);
-        return d;
-      };
-      nums.append(
+      const cell = (label, v) => Kit.h('div', { class: 'grid min-w-0 gap-1' },
+        Kit.h('dt', { class: 'sl-eyebrow', text: label }),
+        Kit.h('dd', { class: 'm-0 whitespace-nowrap font-mono text-ink-2', text: fmt(v) }));
+      wrap.append(Kit.h('dl', { class: 'm-0 hidden grid-cols-4 gap-3 border-t border-line-soft pt-3 @ultra/pane:grid' },
         cell('Now', values[values.length - 1]),
-        cell('Average', values.reduce((a, b) => a + b, 0) / values.length),
+        cell('Average', values.reduce((x, y) => x + y, 0) / values.length),
         cell('Peak', Math.max(...values)),
-        cell('Low', Math.min(...values)),
-      );
-      wrap.append(nums);
+        cell('Low', Math.min(...values))));
     }
   }
   return wrap;
@@ -202,28 +179,24 @@ async function paintPerformance(name, opts) {
     data.available === false ? 'Not available in this preview.'
       : 'Processor and memory while the server runs, sampled every ten seconds.');
   if (data.available === false) {
-    const note = document.createElement('p');
-    note.className = 'hint';
-    note.textContent = data.reason;
-    body.append(note);
+    body.append(Kit.h('p', { class: 'type-meta text-ink-3', text: data.reason }));
     return;
   }
 
   // ---- how far back to look ------------------------------------------------
-  const ranges = document.createElement('div');
-  ranges.className = 'ranges';
-  ranges.setAttribute('role', 'group');
-  ranges.setAttribute('aria-label', 'Time range');
-  for (const r of RANGES) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = r.label;
-    b.title = r.say;
-    b.setAttribute('aria-pressed', String(perfView.seconds === r.key));
-    b.onclick = () => { perfView.seconds = r.key; paintPerformance(name); };
-    ranges.append(b);
-  }
+  const ranges = Kit.segmented({
+    label: 'Time range',
+    options: RANGES.map((r) => ({ value: r.key, label: r.label })),
+    value: perfView.seconds,
+    onChange: (key) => { perfView.seconds = key; paintPerformance(name); },
+  });
+  RANGES.forEach((r, i) => { ranges.children[i].title = r.say; });
+  ranges.classList.add('mb-4', 'flex', 'w-fit', 'ranges');
   body.append(ranges);
+  // The widgets share the row once the pane has the room, so processor and memory can be read
+  // against each other at the same instant.
+  const grid = Kit.h('div', { class: 'grid grid-cols-1 items-start gap-4 @min-[860px]/pane:grid-cols-2 @ultra/pane:gap-5' });
+  body.append(grid);
 
   const samples = data.samples;
   const history = data.history || { count: 0 };
@@ -245,12 +218,12 @@ async function paintPerformance(name, opts) {
     // The pane's own shape, empty: both gauges with their grids, the reason written once across
     // the processor chart, and the memory chart saying only what it will measure against.
     const ceilingNote = data.memory ? data.memory + ' allowed' : '';
-    body.append(gauge({
+    grid.append(gauge({
       title: 'Processor', now: data.running ? '…' : '—',
       aside: data.cores ? 'share of all ' + data.cores + ' cores' : '',
       samples: [], pick: (s) => s.cpu, max: 10, colour: 'var(--chart-cpu)', empty: none,
     }));
-    body.append(gauge({
+    grid.append(gauge({
       title: 'Memory', now: data.running ? '…' : '—', aside: ceilingNote,
       samples: [], pick: (s) => s.rss, max: 256, colour: '#8fd3a8',
       empty: data.running ? 'Waiting for the first reading.' : 'No readings in this range.',
@@ -266,7 +239,7 @@ async function paintPerformance(name, opts) {
   // below the ceiling the JVM was given, so "nearly full" looks like nearly full.
   const rssMax = Math.max(ceiling || 0, peakRss * 1.15, 256);
 
-  body.append(gauge({
+  grid.append(gauge({
     title: 'Processor',
     now: data.running ? last.cpu.toFixed(1) + '%' : 'stopped',
     aside: 'peak ' + peakCpu.toFixed(1) + '%  ·  share of all ' + data.cores + ' cores',
@@ -279,7 +252,7 @@ async function paintPerformance(name, opts) {
     fmt: (v) => v.toFixed(1) + '%',
   }));
 
-  body.append(gauge({
+  grid.append(gauge({
     title: 'Memory',
     now: data.running ? last.rss + ' MB' : 'stopped',
     aside: 'peak ' + peakRss + ' MB' + (ceiling ? '  ·  ' + data.memory + ' allowed' : ''),
@@ -295,7 +268,7 @@ async function paintPerformance(name, opts) {
   const ticks = samples.filter((s) => s.tps != null);
   if (ticks.length) {
     const low = ticks.reduce((m, s) => Math.min(m, s.tps), 20);
-    body.append(gauge({
+    grid.append(gauge({
       title: 'TPS',
       now: data.running ? ticks[ticks.length - 1].tps.toFixed(1) : 'stopped',
       aside: 'low ' + low.toFixed(1) + '  ·  20 is full speed',
@@ -312,26 +285,17 @@ async function paintPerformance(name, opts) {
   // process, which includes the JVM itself, metaspace and anything off-heap, and sitting above the
   // heap limit is ordinary rather than a problem.
   if (ceiling && peakRss > ceiling) {
-    const note = document.createElement('div');
-    note.className = 'hint';
-    note.textContent = 'Memory can sit above the limit you set. That is normal: ' + data.memory
-      + ' is what the game itself may use, and Java needs some more on top of it.';
-    body.append(note);
+    grid.append(Kit.h('p', { class: 'type-meta col-span-full m-0 text-ink-3', text: 'Memory can sit above the limit you set. That is normal: ' + data.memory
+      + ' is what the game itself may use, and Java needs some more on top of it.' }));
   }
 
-  const facts = document.createElement('div');
-  facts.className = 'facts';
+  const facts = Kit.h('div', { class: 'facts type-meta col-span-full flex flex-wrap gap-x-6 gap-y-1 text-ink-3' });
   const add = (label, value) => {
-    const span = document.createElement('span');
-    const b = document.createElement('b');
-    b.textContent = value;
-    span.append(label + ' ', b);
-    facts.append(span);
+    facts.append(Kit.h('span', null, label + ' ', Kit.h('b', { class: 'font-mono font-semibold text-ink-2', text: value })));
   };
   const up = humanUptime(data.uptimeMs);
   add('Uptime', up || (data.running ? 'just started' : 'not running'));
   if (data.startedAt) add('Started', stamp(new Date(data.startedAt).toISOString()));
   add('Readings', samples.length + ', one every ' + data.everySeconds + ' seconds');
-  body.append(facts);
+  grid.append(facts);
 }
-
