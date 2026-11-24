@@ -30,13 +30,24 @@ async function loadSoftware() {
   const sel = $('#nLoader');
   const current = sel.value;
   sel.textContent = '';
+  // Under headings when the list mixes kinds of software (plugins, mods, plain Minecraft), so the
+  // dropdown says which one runs what before anyone has to know the names.
+  const KINDS = { plugins: 'Runs plugins', mods: 'Runs mods', none: 'Plain Minecraft, no add-ons' };
+  const grouped = new Set(list.map((s) => s.content)).size > 1;
+  const groups = {};
   for (const s of list) {
     softwareById[s.id] = s;
     const o = document.createElement('option');
     o.value = s.id;
     o.textContent = s.label;
     if (s.id === current) o.selected = true;
-    sel.append(o);
+    if (!grouped) { sel.append(o); continue; }
+    if (!groups[s.content]) {
+      groups[s.content] = document.createElement('optgroup');
+      groups[s.content].label = KINDS[s.content] || s.content;
+      sel.append(groups[s.content]);
+    }
+    groups[s.content].append(o);
   }
 }
 
@@ -137,13 +148,25 @@ async function loadVersions(loader) {
     }
   }
   sel.textContent = '';
-  versionLists[loader].forEach((v, i) => {
+  // Plain releases first, under their own heading; snapshots, release candidates and the like
+  // follow under another, only when the list has any. The newest stays the one picked.
+  const isRelease = (v) => /^\d+(\.\d+){1,2}$/.test(v);
+  const all = versionLists[loader];
+  const mixed = all.some(isRelease) && all.some((v) => !isRelease(v));
+  const heads = mixed ? { rel: document.createElement('optgroup'), pre: document.createElement('optgroup') } : null;
+  if (heads) { heads.rel.label = 'Releases'; heads.pre.label = 'Snapshots and previews'; sel.append(heads.rel, heads.pre); }
+  all.forEach((v, i) => {
     const o = document.createElement('option');
     o.value = v;
     o.textContent = v + (i === 0 ? ' (newest)' : '');
     if (i === 0) o.selected = true;
-    sel.append(o);
+    (heads ? (isRelease(v) ? heads.rel : heads.pre) : sel).append(o);
   });
+  if (heads && !isRelease(all[0])) {
+    // the newest is a preview: the newest release is the one to start on
+    const best = [...sel.options].find((o) => isRelease(o.value));
+    if (best) best.selected = true;
+  }
   annotateJavaNeeds(loader);
   sel.disabled = false;
   $('#bCreate').disabled = false;

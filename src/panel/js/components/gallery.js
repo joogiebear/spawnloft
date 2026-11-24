@@ -78,6 +78,10 @@
       Kit.field({ label: 'Filter', control: Kit.input({ placeholder: 'Filter the console', lead: 'search' }) }),
       Kit.field({ label: 'Command', control: Kit.input({ placeholder: 'Type a command', mono: true, lead: h('span', { text: '/' }) }) }),
       Kit.field({ label: 'Memory', control: Kit.select({ value: '2G', options: [{ value: '1G', label: '1 GB' }, { value: '2G', label: '2 GB' }, { value: '4G', label: '4 GB' }] }), hint: '6 of 16 GB already reserved.' }),
+      Kit.field({ label: 'Minecraft version', control: Kit.select({ value: '1.21.4', options: [
+        { group: 'Releases', options: ['1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20.4', '1.20.2', '1.19.4', '1.18.2', '1.17.1', '1.16.5', '1.12.2'].map((v) => ({ value: v, label: v, note: Number(v.split('.')[1]) >= 21 ? 'Java 21' : 'Java 17' })) },
+        { group: 'Snapshots and previews', options: ['25w02a', '25w01a', '24w46a'] },
+      ] }), hint: 'Eleven or more choices bring a search box.' }),
       Kit.field({ label: 'Disabled', control: Kit.input({ value: 'survival', disabled: true, mono: true }) }),
       Kit.field({ label: 'Message of the day', control: Kit.textarea({ value: 'A Minecraft server\nrun with SpawnLoft' }) })));
 
