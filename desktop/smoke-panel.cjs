@@ -110,9 +110,9 @@ async function main() {
   // which databases the server is attached to.
   async function openDatabaseSettings() {
     await openTool('tabSettings')
-    const databases = page.locator('#settingsBody .set-nav [data-section="databases"]')
+    const databases = page.locator('#settingsBody [data-settings-nav] [data-section="databases"]')
     await databases.waitFor({ state: 'visible' })
-    if (await databases.getAttribute('aria-current') !== 'true') await databases.click()
+    if (await databases.getAttribute('aria-current') !== 'page') await databases.click()
   }
 
   function record(message) {

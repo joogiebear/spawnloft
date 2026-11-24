@@ -34,27 +34,17 @@ const dismissed = new Set();
  * one saved, so the form never has to hold it.
  */
 function dbAddressEditor(row, facts) {
-  const wrap = el('div', 'db-edit-wrap');
-  const open = iconButton('pencil', 'Edit address', 'sm');
-  const form = el('form', 'db-edit');
-  form.hidden = true;
-  const field = (label, input, hint) => {
-    const f = el('label', 'db-edit-field');
-    const t = el('span', 'db-edit-label');
-    t.textContent = label;
-    f.append(t, input);
-    if (hint) {
-      const h = el('span', 'hint');
-      h.textContent = hint;
-      f.append(h);
-    }
-    form.append(f);
-    return input;
+  const { h } = Kit;
+  const open = Kit.button({ label: 'Edit address', icon: 'pencil', size: 'sm' });
+  open.dataset.editAddress = '';
+  const form = h('form', { class: 'flex flex-col gap-3', hidden: true, 'aria-label': 'Address of ' + (row.label || row.name) });
+  const field = (label, box, hint) => {
+    form.append(h('div', { class: 'max-w-96' }, Kit.field({ label, control: box, hint })));
+    return box;
   };
   const input = (value, attrs = {}) => {
-    const i = el('input', 'mono');
-    i.value = value;
-    Object.assign(i, { spellcheck: false, autocomplete: 'off' }, attrs);
+    const i = Kit.input({ value, mono: true });
+    Object.assign(i, attrs);
     return i;
   };
   const host = field('Host', input(row.host || '127.0.0.1', { required: true }));
@@ -62,16 +52,10 @@ function dbAddressEditor(row, facts) {
   const redis = row.engineKind === 'redis';
   const user = redis ? null : field('Admin user', input(''), 'Empty keeps the one saved.');
   const pass = field('Password', input('', { type: 'password', autocomplete: 'new-password' }), 'Empty keeps the one saved.');
-  const acts = el('div', 'db-edit-acts');
-  const save = el('button', 'primary');
-  save.type = 'submit';
-  save.textContent = 'Save';
-  const cancel = el('button', 'ghost');
-  cancel.type = 'button';
-  cancel.textContent = 'Cancel';
-  acts.append(save, cancel);
-  form.append(acts);
-  wrap.append(open, form);
+  const save = Kit.button({ label: 'Save', kind: 'primary', type: 'submit' });
+  const cancel = Kit.button({ label: 'Cancel', kind: 'ghost' });
+  form.append(h('div', { class: 'flex gap-2' }, save, cancel));
+  const wrap = h('div', { class: 'flex flex-col items-start gap-3' }, open, form);
 
   const show = (editing) => {
     form.hidden = !editing;
@@ -84,7 +68,7 @@ function dbAddressEditor(row, facts) {
   cancel.onclick = () => show(false);
   form.onsubmit = async (e) => {
     e.preventDefault();
-    busy(save, true);
+    Kit.busy(save, true);
     try {
       const out = await post('/databases/' + encodeURIComponent(row.name) + '/address', {
         host: host.value.trim(), port: port.value, user: user ? user.value.trim() : undefined, password: pass.value || undefined,
@@ -97,7 +81,7 @@ function dbAddressEditor(row, facts) {
       const now = rowOf(row.name);
       if (now && state.current === row.name) renderDatabaseSettings(now);
     } catch (err) {
-      busy(save, false);
+      Kit.busy(save, false);
       toast(err.message, 'bad');
     }
   };
@@ -106,22 +90,23 @@ function dbAddressEditor(row, facts) {
 
 /** The unreachable notice on a database's own page, kept in step with each poll. */
 function paintDbReach(row) {
-  const box = $('#settingsBody .db-reach');
+  const box = $('#settingsBody [data-db-reach]');
   if (!box || $('#settingsBody').dataset.for !== row.name) return;
   const down = row.status === 'unreachable';
   if (box.dataset.down === String(down)) return;
   box.dataset.down = String(down);
   box.textContent = '';
   if (!down) return;
-  const again = { label: 'Check again', run: async (e) => {
-    const b = e.currentTarget;
-    busy(b, true);
+  const again = Kit.button({ label: 'Check again', size: 'sm' });
+  again.onclick = async () => {
+    Kit.busy(again, true);
     await refresh();
-    if (b.isConnected) busy(b, false);
-  } };
-  const edit = { label: 'Edit address', run: () => $('#settingsBody .db-edit-wrap > button')?.click() };
-  const notice = noticeBox({
+    if (again.isConnected) Kit.busy(again, false);
+  };
+  const edit = Kit.button({ label: 'Edit address', size: 'sm', kind: 'ghost', onClick: () => $('#settingsBody [data-edit-address]')?.click() });
+  const notice = Kit.banner({
     tone: 'fault',
+    icon: 'alert',
     title: 'Not answering',
     text: 'Nothing replied at ' + (row.host || '127.0.0.1') + ':' + row.port + '. Start it where it runs, or correct the address, then check again.',
     actions: row.external ? [again, edit] : [again],
