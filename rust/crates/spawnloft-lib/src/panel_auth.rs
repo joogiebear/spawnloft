@@ -770,7 +770,7 @@ pub const PAGE_STYLE: &str = concat!(
     ".brand{display:flex;align-items:center;gap:8px;margin:0 0 20px;font-weight:650;letter-spacing:-.01em}",
     ".brand svg{display:block}",
     "h1{margin:0 0 8px;font-size:20px;line-height:1.25;font-weight:650;letter-spacing:-.015em}",
-    "p{margin:0 0 8px;color:var(--ink-2)}p:last-child{margin:0}p.small{font-size:13px;color:var(--ink-3)}",
+    "p{margin:0 0 8px;color:var(--ink-2);overflow-wrap:anywhere}p:last-child{margin:0}p.small{font-size:13px;color:var(--ink-3)}",
     "a{color:var(--lapis-ink)}",
     "a:focus-visible{outline:2px solid var(--lapis);outline-offset:2px}",
     "a.go{display:inline-block;margin-top:8px;padding:8px 14px;border-radius:var(--r-sm);background:var(--lapis);",
@@ -790,7 +790,8 @@ const PAGE_BRAND: &str = concat!(
     "</svg>SpawnLoft</div>",
 );
 
-/// One of the core's own pages: `title` as its heading, `inner` (HTML, already escaped) under it.
+/// One of the core's own pages: `title` as its heading, `inner` under it, `extra_head` in its head.
+/// All three go in as HTML, unchanged: anything that came from outside must be escaped first.
 pub fn styled_page(title: &str, inner: &str, extra_head: &str) -> String {
     format!(
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">{extra_head}<title>{title}</title><style>{PAGE_STYLE}</style></head><body><main>{PAGE_BRAND}<h1>{title}</h1>{inner}</main></body></html>"
@@ -1228,7 +1229,7 @@ mod tests {
         let at = css
             .find(":root[data-theme=\"spawnloft\"] {")
             .expect("the SpawnLoft block");
-        let block = &css[at..at + css[at..].find("\n  }").expect("its end")];
+        let block = &css[at..at + css[at..].find('}').expect("its end")];
         let theirs = |name: &str| {
             let key = format!("--{name}:");
             let from = block

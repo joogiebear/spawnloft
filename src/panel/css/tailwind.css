@@ -1447,6 +1447,9 @@
   .\[\&\:\:-webkit-details-marker\]\:hidden::-webkit-details-marker {
     display: none;
   }
+  .\[\&\:not\(\:has\(\>button\:not\(\[hidden\]\)\)\)\]\:hidden:not(:has( > button:not([hidden]))) {
+    display: none;
+  }
   .\[\&\>\*\]\:w-\[300px\] > * {
     width: 300px;
   }

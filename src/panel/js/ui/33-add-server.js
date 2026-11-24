@@ -121,7 +121,7 @@ function syncDbForm() {
     const run = $('input[name="dbMode"][value="run"]');
     run.disabled = true;
     run.checked = false;
-    run.closest('label').querySelector('span').textContent = databasePreviewNote;
+    run.closest('label').querySelector('small').textContent = databasePreviewNote;
     $('input[name="dbMode"][value="connect"]').checked = true;
   }
   const connect = dbMode() === 'connect';
@@ -274,6 +274,11 @@ function paintNewSummary() {
     ['Address', port ? 'Port ' + port : 'A free port, picked when it is made'],
     ['Who can join', $('input[name="onlineMode"]:checked')?.value === 'offline' ? 'Anyone, as any name' : 'Minecraft account required'],
   ];
+  // A live region: rebuilt only when what it says changed, so typing elsewhere is not read out
+  // again and again.
+  const said = parts.map((p) => p.join(': ')).join('\n');
+  if (box.dataset.said === said) return;
+  box.dataset.said = said;
   box.textContent = '';
   for (const [term, value] of parts) {
     box.append(Kit.h('div', null, Kit.h('dt', { text: term }), Kit.h('dd', { text: value })));

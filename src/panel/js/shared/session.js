@@ -36,7 +36,7 @@ const panelSession = (() => {
       + 'background:var(--surface,#141b15);box-shadow:var(--shadow-lg,none)';
     const title = document.createElement('h2');
     title.id = 'sessionEndedTitle';
-    title.style.cssText = 'margin:0 0 8px;font:650 var(--t-5,18px)/1.3 var(--display,inherit);letter-spacing:-.015em';
+    title.style.cssText = 'margin:0 0 8px;font:650 var(--t-5,18px)/1.3 var(--display,system-ui,sans-serif);letter-spacing:-.015em';
     title.textContent = 'This panel session has ended';
     const text = document.createElement('p');
     text.style.cssText = 'margin:0;color:var(--ink-2,#b5bcac)';
@@ -49,7 +49,7 @@ const panelSession = (() => {
       again.type = 'button';
       again.textContent = 'Sign in again';
       again.style.cssText = 'margin-top:16px;min-height:var(--hit,34px);padding:0 14px;border:1px solid var(--primary-edge,#c4f566);border-radius:var(--r-sm,6px);'
-        + 'background:var(--primary-top,#c4f566);color:var(--primary-ink,#14200b);font:600 var(--t-3,14px)/1 var(--ui,inherit);cursor:pointer';
+        + 'background:var(--primary-top,#c4f566);color:var(--primary-ink,#14200b);font:600 var(--t-3,14px)/1 var(--ui,system-ui,sans-serif);cursor:pointer';
       again.onclick = () => location.reload();
       card.append(again);
       setTimeout(() => again.focus(), 0);

@@ -43,7 +43,7 @@
   <div class="sl-field">
     <label class="sl-label" for="root">Data folder</label>
     <div class="flex gap-2">
-      <input class="sl-input sl-input-mono grow" type="text" id="root" spellcheck="false" autocomplete="off" aria-describedby="rootHint">
+      <input class="sl-input sl-input-mono min-w-0 flex-1" type="text" id="root" spellcheck="false" autocomplete="off" aria-describedby="rootHint">
       <button type="button" class="sl-btn" id="pickRoot">Browse…</button>
     </div>
     <p class="sl-hint" id="rootHint">A fresh server takes about 300 MB. Worlds grow from there.</p>
@@ -59,7 +59,7 @@
   <div class="sl-field" id="serversBlock" hidden>
     <label class="sl-label" for="servers">Servers folder</label>
     <div class="flex gap-2">
-      <input class="sl-input sl-input-mono grow" type="text" id="servers" spellcheck="false" autocomplete="off" aria-describedby="serversHint">
+      <input class="sl-input sl-input-mono min-w-0 flex-1" type="text" id="servers" spellcheck="false" autocomplete="off" aria-describedby="serversHint">
       <button type="button" class="sl-btn" id="pickServers">Browse…</button>
     </div>
     <p class="sl-hint" id="serversHint">Jars, backups and settings stay in the data folder above.</p>
@@ -74,7 +74,7 @@
     <span class="sl-dot row-start-1 group-data-[state=ok]:bg-live group-data-[state=warn]:bg-warn group-data-[state=bad]:bg-fault" aria-hidden="true"></span>
     <b class="col-start-2 row-start-1 text-3 font-strong" id="javaTitle">Checking for Java…</b>
     <span class="col-start-2 row-start-2 type-meta text-ink-3" id="javaWhy">Minecraft servers run on Java. SpawnLoft needs one installed.</span>
-    <span class="col-start-2 row-start-3 flex flex-wrap gap-2 empty:hidden pt-1">
+    <span class="col-start-2 row-start-3 flex flex-wrap gap-2 pt-1 [&:not(:has(>button:not([hidden])))]:hidden">
       <button type="button" class="sl-btn sl-btn-sm sl-btn-primary" id="javaGet" hidden>Get Java</button>
       <button type="button" class="sl-btn sl-btn-sm" id="javaAgain" hidden>Check again</button>
     </span>

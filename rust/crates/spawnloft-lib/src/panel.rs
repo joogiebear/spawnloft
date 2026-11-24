@@ -698,7 +698,13 @@ fn missing(conn: &mut TcpStream, head: &Head, why: &str) -> std::io::Result<()> 
         ),
         "",
     );
-    respond(conn, 503, "text/html; charset=utf-8", page.as_bytes())
+    respond_with(
+        conn,
+        503,
+        "text/html; charset=utf-8",
+        &PAGE_HEADERS,
+        page.as_bytes(),
+    )
 }
 
 fn html_escape(s: &str) -> String {
