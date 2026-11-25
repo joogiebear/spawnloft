@@ -65,8 +65,17 @@ pub fn run_in(bin: &str, args: &[&str], dir: &Path) -> Ran {
             .args(args)
             .current_dir(dir)
             .env("SPAWNLOFT_DATA_ROOT", dir)
-            .env("MCCTL_DATA_ROOT", dir),
+            .env("MCCTL_DATA_ROOT", dir)
+            // and the per-user config folder away from the real one too: the core records the
+            // installed version there (`installed-version.json`, `update.log`)
+            .env("XDG_CONFIG_HOME", sandbox_config())
+            .env("APPDATA", sandbox_config()),
     )
+}
+
+/// A config folder for the core under test, shared by the tests and never the person's own.
+pub fn sandbox_config() -> std::path::PathBuf {
+    std::env::temp_dir().join("spawnloft-test-config")
 }
 
 fn collect(cmd: &mut Command) -> Ran {

@@ -189,11 +189,30 @@ fn before_listening(layout: &Layout) {
         marker.as_ref(),
         Some(crate::data_format::release_version()),
     );
-    crate::data_format::mark_version(
+    let marked = crate::data_format::mark_version(
         &crate::paths::config_dir(),
         Path::new(&layout.data_root),
         crate::data_format::release_version(),
     );
+    if let Some(from) = marked.changed_from {
+        let from = if from.is_empty() {
+            "nothing recorded".to_string()
+        } else {
+            from
+        };
+        panel_log(
+            &layout.run_dir,
+            &format!(
+                "installed version {} (was {from}){}",
+                crate::data_format::release_version(),
+                if marked.wrote_format {
+                    "; marked the data folder"
+                } else {
+                    ""
+                }
+            ),
+        );
+    }
     if let Some(newer) = warned {
         panel_log(&layout.run_dir, &format!("warning: {newer}"));
     }

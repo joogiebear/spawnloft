@@ -85,6 +85,12 @@ impl Server {
             .current_dir(self.root.path())
             .env("SPAWNLOFT_DATA_ROOT", self.root.path())
             .env("MCCTL_DATA_ROOT", self.root.path())
+            // never the real config folder: the core records the installed version there
+            .env(
+                "XDG_CONFIG_HOME",
+                std::env::temp_dir().join("spawnloft-test-config"),
+            )
+            .env("APPDATA", std::env::temp_dir().join("spawnloft-test-config"))
             .envs(self.envs.iter().map(|(k, v)| (k, v)));
         let out = cmd.output().expect("run spawnloft-core");
         Ran {
