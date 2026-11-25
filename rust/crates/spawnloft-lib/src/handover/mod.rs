@@ -1057,7 +1057,10 @@ fn disable_tasks(ctx: Ctx<'_>, record: &mut Record) {
         match tasks.set_enabled(t, false) {
             Ok(()) => log.line(&format!("task {t} disabled for the handover")),
             // it stays in the record: enabling a task that is on already changes nothing
-            Err(e) => log.line(&format!("task {t} could not be disabled: {e}")),
+            Err(e) => match tasks::disable_failure_note(&e) {
+                Some(why) => log.line(&format!("task {t} could not be disabled: {why} ({e})")),
+                None => log.line(&format!("task {t} could not be disabled: {e}")),
+            },
         }
     }
 }
