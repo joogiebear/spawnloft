@@ -47,6 +47,7 @@ test('a frozen record holds when the runner\'s JDKs move a patch release', () =>
   const frozen = '"version": "openjdk version \\"21.0.13\\" <date> LTS", 8: openjdk version "1.8.0_512", 11: openjdk version "11.0.33"'
   const now = '"version": "openjdk version \\"21.0.13.1\\" <date> LTS", 8: openjdk version "1.8.0_514", 11: openjdk version "11.0.33.1"'
   assert.equal(javaPatchNeutral(frozen), javaPatchNeutral(now))
+  assert.equal(javaPatchNeutral('java%3A+openjdk+version+%2225.0.5.1%22+LTS'), javaPatchNeutral('java%3A+openjdk+version+%2225.0.5%22+LTS'))
   // a different major is still a difference
   assert.notEqual(javaPatchNeutral('openjdk version "21.0.13"'), javaPatchNeutral('openjdk version "17.0.13"'))
 })
