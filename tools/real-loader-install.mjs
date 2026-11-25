@@ -56,7 +56,7 @@ const secs = () => `${((Date.now() - began) / 1000).toFixed(0)}s`
 // shown as it comes, with the time, and handed to `onLine`; stdout is returned.
 function runCore(args, { onLine = () => {} } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(core, args, { env: { ...process.env, SPAWNLOFT_DATA_ROOT: root }, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(core, args, { env: { ...process.env, SPAWNLOFT_DATA_ROOT: root, XDG_CONFIG_HOME: path.join(root, '.config'), APPDATA: path.join(root, '.config') }, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let carry = ''
     let failure = null

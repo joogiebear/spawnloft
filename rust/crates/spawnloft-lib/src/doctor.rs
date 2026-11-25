@@ -284,6 +284,13 @@ pub fn run(layout: &Layout, repair: bool) -> Result<Report, Failure> {
         ));
     }
 
+    // design section 8, item 4: what the banner says, for whoever looks here instead
+    for server in crate::handover::api::legacy_servers(Path::new(&layout.data_root)) {
+        if let Some(name) = server.get("name").and_then(Value::as_str) {
+            problems.push(legacy_daemon_problem(name));
+        }
+    }
+
     let majors: Vec<Option<u32>> = java_check.others.iter().map(|j| j.probe.major).collect();
     let client = crate::client::doctor::check_client_profiles(&ClientPaths::new(layout), repair, &majors)?;
     problems.extend(client.problems);
@@ -298,6 +305,13 @@ pub fn run(layout: &Layout, repair: bool) -> Result<Report, Failure> {
         problems,
         private_copies,
     })
+}
+
+/// A server still run by a SpawnLoft 1 daemon after the update to 2.0.
+fn legacy_daemon_problem(name: &str) -> String {
+    format!(
+        "{name}: still run by SpawnLoft 1; restart it to move it to this version (\"spawnloft restart {name}\", or Restart in the app). Nothing happens on its own, so players stay connected until then."
+    )
 }
 
 /// `isPortFree(inst.port)` on 127.0.0.1. No port at all lets the system pick one, which is

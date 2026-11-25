@@ -53,8 +53,9 @@ fn shown_record(root: &Path, now_ms: i64) -> Value {
 }
 
 /// Servers whose recorded daemon is a 1.x program (`SpawnLoft`, `spawnloft-desktop`) and still
-/// serves them. Nothing happens to them on its own: players may be on them.
-fn legacy_servers(root: &Path) -> Vec<Value> {
+/// serves them. Nothing happens to them on its own: players may be on them. `doctor` says the
+/// same (design section 8, item 4).
+pub fn legacy_servers(root: &Path) -> Vec<Value> {
     let Ok(list) = read_state_files(root) else {
         return Vec::new();
     };

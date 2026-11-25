@@ -10,7 +10,12 @@
 // The candidate is the 2.0 Squirrel.Mac zip (keepParent, so SpawnLoft.app is the top entry). After
 // the swap the installed bundle is a Tauri app, which Playwright/_electron cannot drive, so the
 // replacement is checked on disk: Info.plist version and bundle id, codesign, stapled ticket,
-// Gatekeeper, and that the seeded user data survived.
+// Gatekeeper, and that the seeded user data survived. It goes through "Restart and update"
+// (quitAndInstall with relaunch, as the 1.x panel's button does), so it also proves the 2.0 app
+// opens again afterwards: Squirrel.Mac's ShipIt reopens it through the ShipIt stand-in in the new
+// bundle (installer/mac-shipit/ShipIt.c). That relaunched app runs with the runner's own session
+// (launchd's environment, not this script's), so it is found by its executable path and closed;
+// run this on an ephemeral runner, never on a machine with a real SpawnLoft profile.
 const fs = require('node:fs')
 const path = require('node:path')
 const assert = require('node:assert/strict')
@@ -113,7 +118,8 @@ async function main() {
       // whatever autoInstallOnAppQuit is, so this does not depend on the native Squirrel event
       const updater = process.mainModule.require('electron-updater').autoUpdater
       updater.setFeedURL({ provider: 'generic', url })
-      updater.autoRunAppAfterInstall = false // the swapped bundle is a Tauri app; do not relaunch it here
+      // "Restart and update": Squirrel.Mac relaunches the app it swapped in (the 1.x default)
+      updater.autoRunAppAfterInstall = true
       globalThis.__updateReady = false
       globalThis.__updateErrors = []
       updater.on('update-downloaded', () => { globalThis.__updateReady = true })
@@ -127,6 +133,11 @@ async function main() {
       assert.deepEqual(state.errors, [])
       return state.ready
     }, 'electron-updater did not download and stage the signed 2.0 update')
+    // every process of the installed bundle's main executable before the swap (the 1.x app, and
+    // any 1.x Node daemon running as it): none of these is the relaunched 2.0 app
+    const mainExe = `${installed}/Contents/MacOS/${plist(installed, 'CFBundleExecutable')}`
+    const pidsOf = () => (spawnSync('/usr/bin/pgrep', ['-f', mainExe], { encoding: 'utf8' }).stdout || '').split('\n').map(Number).filter(Boolean)
+    const before = new Set([app.process().pid, ...pidsOf()])
     await page.evaluate(() => { void window.spawnloftDesktop.installUpdate() }).catch(() => {})
     await until(() => {
       try { return plist(installed, 'CFBundleShortVersionString') === version }
@@ -134,6 +145,13 @@ async function main() {
     }, 'Squirrel.Mac did not replace the installed bundle with the 2.0 app')
     await app.close().catch(() => {})
     app = null
+
+    // the relaunch: ShipIt runs <new bundle>/Contents/Frameworks/Squirrel.framework/Resources/ShipIt
+    // ___launch___ <bundle>, which opens the 2.0 app; a process of the installed bundle's main
+    // executable that was not there before the update is it
+    const running = () => pidsOf().filter(pid => !before.has(pid))
+    await until(() => running().length > 0, 'the 2.0 app did not open again after "Restart and update" (Squirrel.Mac could not run the ShipIt stand-in?)', 90000)
+    console.log(`relaunch: 2.0 opened again after "Restart and update" (pid ${running().join(', ')})`)
 
     // the installed bundle is now the 2.0 Tauri app; check it on disk
     assert.equal(plist(installed, 'CFBundleIdentifier'), 'io.github.joogiebear.mcctl')
@@ -149,12 +167,13 @@ async function main() {
     assert.ok(spctl.status === 0 && /Notarized Developer ID/.test(spctlOut), `Gatekeeper did not accept the 2.0 bundle as notarized: ${spctlOut.trim()}`)
     for (const [file, content] of preserved) assert.equal(fs.readFileSync(file, 'utf8'), content, `changed user data: ${file}`)
     assert.ok(requests.some(url => url.startsWith('/' + zipName)), 'the candidate zip was never fetched')
-    console.log(`PASS: ${previous.tag_name} -> ${version} through Squirrel.Mac; 2.0 Tauri bundle in place, Developer ID / notarization / Gatekeeper accepted, user data preserved`)
+    console.log(`PASS: ${previous.tag_name} -> ${version} through Squirrel.Mac "Restart and update"; 2.0 Tauri bundle in place and reopened, Developer ID / notarization / Gatekeeper accepted, user data preserved`)
   } finally {
     if (app) await app.close().catch(() => {})
-    // an older electron-updater that relaunches the swapped 2.0 app would leave it running with
-    // the runner's real HOME; make sure nothing lingers
+    // the relaunched 2.0 app (and its core) run with the runner's real HOME; make sure nothing
+    // lingers
     spawnSync('/usr/bin/pkill', ['-f', `${installed}/Contents/MacOS/SpawnLoft`])
+    spawnSync('/usr/bin/pkill', ['-f', `${installed}/Contents/Resources/resources/bin/spawnloft-core`])
     server.closeAllConnections()
     await new Promise(resolve => server.close(resolve))
   }

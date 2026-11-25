@@ -72,6 +72,14 @@ export const DECLARED = [
     apply: (text) => text.replace(/"(root|coreDir)"(\s*):(\s*)"(?!<run>|[^"]*sl-parity)(?:[^"\\]|\\.)*"/g, '"$1"$2:$3"<code folder>"'),
   },
   {
+    id: 'version-marker',
+    where: 'every command but `data`, `uninstall` and `help`, and the panel\'s start (installer design section 8, item 1)',
+    node: 'nothing',
+    rust: '`<config>/installed-version.json`, an `installed` line in `<config>/update.log`, and the data root\'s `data-format.json` when it is missing or the installed version changed',
+    apply: null,
+    held: 'the rig sets SPAWNLOFT_TEST_NO_VERSION_MARK=1, which only a test-hooks core reads; spawnloft-lib data_format.rs\'s unit tests cover the marker rules',
+  },
+  {
     id: 'collation-outside-ascii',
     where: 'free-text sort order outside ASCII',
     node: 'ICU collation',

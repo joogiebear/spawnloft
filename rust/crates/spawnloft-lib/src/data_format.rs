@@ -71,6 +71,66 @@ pub fn warning(file: &str, marker: Option<&Map<String, Value>>, version: Option<
     ))
 }
 
+/// `<config>/installed-version.json`: the version that last started against this config folder.
+pub fn installed_version_file(config_dir: &Path) -> std::path::PathBuf {
+    config_dir.join("installed-version.json")
+}
+
+/// What [`mark_version`] did.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Marked {
+    /// The version `installed-version.json` named before, when it named another one (or there
+    /// was none: `Some("")`). `None` when this version was already recorded.
+    pub changed_from: Option<String>,
+    /// `data-format.json` was written.
+    pub wrote_format: bool,
+}
+
+/// Design section 8, item 1 (first launch after an install or update, and plain CLI use): when the
+/// installed version differs from `<config>/installed-version.json`, record it, note the change in
+/// `update.log`, and write `{ "writtenBy": <version>, "format": DATA_FORMAT }` into the data root's
+/// `data-format.json`; also write that marker whenever it is missing. A marker that cannot be read,
+/// or that names a newer format, is never overwritten (design 5.6: an older build rewrites it only
+/// when the format is the same). Losing any of these writes is fine: the next start tries again.
+///
+/// The parity rig's test-hooks build skips all of it when `SPAWNLOFT_TEST_NO_VERSION_MARK=1`: the
+/// frozen Node records never had these files (declared difference `version-marker`).
+pub fn mark_version(config_dir: &Path, data_root: &Path, version: &str) -> Marked {
+    if cfg!(feature = "test-hooks")
+        && std::env::var_os("SPAWNLOFT_TEST_NO_VERSION_MARK").is_some_and(|v| v == "1")
+    {
+        return Marked::default();
+    }
+    let version_file = installed_version_file(config_dir);
+    let previous =
+        read(&version_file).and_then(|m| m.get("version").and_then(Value::as_str).map(str::to_string));
+    let changed = previous.as_deref() != Some(version);
+    let format_file = data_root.join("data-format.json");
+    let exists = format_file.exists();
+    let marker = read(&format_file);
+    let newer_format = marker
+        .as_ref()
+        .and_then(|m| m.get("format"))
+        .and_then(Value::as_f64)
+        .is_some_and(|f| f > DATA_FORMAT as f64);
+    let keep = (exists && marker.is_none()) || newer_format;
+    let mut out = Marked::default();
+    if (changed || !exists) && !keep && data_root.is_dir() {
+        let value = serde_json::json!({ "writtenBy": version, "format": DATA_FORMAT });
+        out.wrote_format = crate::fsx::write_json(&format_file, &value).is_ok();
+    }
+    if changed {
+        let value = serde_json::json!({ "version": version, "at": crate::time::iso_now() });
+        if crate::fsx::write_json(&version_file, &value).is_ok() {
+            let from = previous.clone().unwrap_or_else(|| "none".into());
+            crate::update::store::Store::new(config_dir)
+                .log("installed", &[("from", &from), ("to", version)]);
+        }
+        out.changed_from = Some(previous.unwrap_or_default());
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,5 +206,62 @@ mod tests {
         assert_eq!(read(&f), None);
         assert_eq!(read(&dir.join("none")), None);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+    #[test]
+    fn marks_the_version_and_the_data_folder_once() {
+        let base = std::env::temp_dir().join(format!("sl-mark-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (config, data) = (base.join("config"), base.join("data"));
+        std::fs::create_dir_all(&data).unwrap();
+        let m = mark_version(&config, &data, "2.0.0");
+        assert_eq!(
+            m,
+            Marked {
+                changed_from: Some(String::new()),
+                wrote_format: true
+            }
+        );
+        assert_eq!(
+            read(&data.join("data-format.json")).map(Value::Object),
+            Some(json!({ "writtenBy": "2.0.0", "format": 1 }))
+        );
+        assert_eq!(
+            read(&installed_version_file(&config)).unwrap()["version"],
+            json!("2.0.0")
+        );
+        let log = std::fs::read_to_string(config.join("update.log")).unwrap();
+        assert!(log.contains(" installed from=none to=2.0.0"), "{log}");
+        // same version again: nothing to do
+        assert_eq!(mark_version(&config, &data, "2.0.0"), Marked::default());
+        // the marker went missing (a new data root): written again, version unchanged
+        std::fs::remove_file(data.join("data-format.json")).unwrap();
+        assert!(mark_version(&config, &data, "2.0.0").wrote_format);
+        // an update
+        let m = mark_version(&config, &data, "2.1.0");
+        assert_eq!(m.changed_from.as_deref(), Some("2.0.0"));
+        assert!(m.wrote_format);
+        // back to 2.0 from a 2.1 of the same format: rewritten (design 5.6)
+        let m = mark_version(&config, &data, "2.0.0");
+        assert!(m.wrote_format && m.changed_from.as_deref() == Some("2.1.0"));
+        assert_eq!(
+            read(&data.join("data-format.json")).unwrap()["writtenBy"],
+            json!("2.0.0")
+        );
+        // a newer format, or a marker that cannot be read: left as it is
+        for kept in [r#"{"writtenBy":"3.0.0","format":2}"#, "{ not json"] {
+            std::fs::write(data.join("data-format.json"), kept).unwrap();
+            let m = mark_version(&config, &data, "2.2.0");
+            assert!(!m.wrote_format && m.changed_from.is_some(), "{kept}");
+            assert_eq!(
+                std::fs::read_to_string(data.join("data-format.json")).unwrap(),
+                kept
+            );
+            std::fs::remove_file(installed_version_file(&config)).unwrap();
+        }
+        // no data folder (an unplugged drive): nothing is made there
+        let gone = base.join("gone");
+        assert!(!mark_version(&config, &gone, "2.2.0").wrote_format);
+        assert!(!gone.exists());
+        std::fs::remove_dir_all(&base).unwrap();
     }
 }

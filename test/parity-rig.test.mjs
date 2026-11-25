@@ -215,8 +215,8 @@ test('a step for one side only is refused outside a self-test', async () => {
   }
 })
 
-test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two, C5\'s three, C9\'s two and the UX overhaul\'s two, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 25)
+test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two, C5\'s three, C9\'s two, the UX overhaul\'s two and the 2.0 version marker, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 26)
   // the core's own pages: the look is evened out, the words and the links are not
   const plain = '<title>T</title><style>body{color:#eee}</style></head><body><main><h1>T</h1><p>Restarted. <a href="/auth/again">Sign in again</a></p></main>'
   const lime = '<title>T</title><style>:root{--void:#090d0d}</style></head><body><main><div class="brand"><svg viewBox="0 0 64 64"><polygon/></svg>SpawnLoft</div><h1>T</h1><p>Restarted.<br><a class="go" href="/auth/again">Sign in again</a></p></main>'

@@ -236,6 +236,18 @@ fn dispatch(
         }
         return Err(e);
     }
+    // design section 8, item 1: the first command after an install or update records the version
+    // and marks the data folder (the window's `ui` is one). Not `uninstall`, which would leave a
+    // marker in the data root it is emptying, nor `help`; and not this crate's own unit tests,
+    // which would write to the real config folder.
+    // The panel (`ui`) does it itself as it starts, so its panel.log says so.
+    if !cfg!(test) && !matches!(command, "data" | "uninstall" | "help" | "ui" | "panel") {
+        spawnloft_lib::data_format::mark_version(
+            &spawnloft_lib::paths::config_dir(),
+            std::path::Path::new(&layout.data_root),
+            spawnloft_lib::data_format::release_version(),
+        );
+    }
     match command {
         "help" => {
             ctx.out.print(HELP);
