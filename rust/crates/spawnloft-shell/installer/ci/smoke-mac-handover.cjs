@@ -14,7 +14,8 @@
 // (quitAndInstall with relaunch, as the 1.x panel's button does), so it also proves the 2.0 app
 // opens again afterwards: Squirrel.Mac's ShipIt reopens it through the ShipIt stand-in in the new
 // bundle (installer/mac-shipit/ShipIt.c). That relaunched app runs with the runner's own session
-// (launchd's environment, not this script's), so it is found by its executable path and closed.
+// (launchd's environment, not this script's), so it is found by its executable path and closed;
+// run this on an ephemeral runner, never on a machine with a real SpawnLoft profile.
 const fs = require('node:fs')
 const path = require('node:path')
 const assert = require('node:assert/strict')
@@ -132,7 +133,11 @@ async function main() {
       assert.deepEqual(state.errors, [])
       return state.ready
     }, 'electron-updater did not download and stage the signed 2.0 update')
-    const oldPid = app.process().pid
+    // every process of the installed bundle's main executable before the swap (the 1.x app, and
+    // any 1.x Node daemon running as it): none of these is the relaunched 2.0 app
+    const mainExe = `${installed}/Contents/MacOS/${plist(installed, 'CFBundleExecutable')}`
+    const pidsOf = () => (spawnSync('/usr/bin/pgrep', ['-f', mainExe], { encoding: 'utf8' }).stdout || '').split('\n').map(Number).filter(Boolean)
+    const before = new Set([app.process().pid, ...pidsOf()])
     await page.evaluate(() => { void window.spawnloftDesktop.installUpdate() }).catch(() => {})
     await until(() => {
       try { return plist(installed, 'CFBundleShortVersionString') === version }
@@ -143,12 +148,8 @@ async function main() {
 
     // the relaunch: ShipIt runs <new bundle>/Contents/Frameworks/Squirrel.framework/Resources/ShipIt
     // ___launch___ <bundle>, which opens the 2.0 app; a process of the installed bundle's main
-    // executable other than the 1.x one is it
-    const mainExe = `${installed}/Contents/MacOS/${plist(installed, 'CFBundleExecutable')}`
-    const running = () => {
-      const res = spawnSync('/usr/bin/pgrep', ['-f', mainExe], { encoding: 'utf8' })
-      return (res.stdout || '').split('\n').map(Number).filter(pid => pid && pid !== oldPid)
-    }
+    // executable that was not there before the update is it
+    const running = () => pidsOf().filter(pid => !before.has(pid))
     await until(() => running().length > 0, 'the 2.0 app did not open again after "Restart and update" (Squirrel.Mac could not run the ShipIt stand-in?)', 90000)
     console.log(`relaunch: 2.0 opened again after "Restart and update" (pid ${running().join(', ')})`)
 

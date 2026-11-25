@@ -236,9 +236,11 @@ fn dispatch(
         }
         return Err(e);
     }
-    // design section 8, item 1: the first command after an install or update records the version
-    // and marks the data folder (the panel's `ui` is one, so the window's first start is too)
-    if command != "data" {
+    // design section 8, item 1: record the version and mark the data folder. The window's core
+    // (`ui`) does it in the panel's start-up; `repair` is what the installers and packages run
+    // after an install or update. Not every command: `uninstall` would leave a marker behind in
+    // the data root it is emptying, and tests of other commands would write to the real config.
+    if command == "repair" {
         spawnloft_lib::data_format::mark_version(
             &spawnloft_lib::paths::config_dir(),
             std::path::Path::new(&layout.data_root),
