@@ -1,6 +1,9 @@
 // Writes what one macOS build needs beside the base tauri.conf.json, into <out dir>:
 //   overlay.json   passed to `tauri build --config`
 //   bin/           the `spawnloft` and `mcctl` forwarders at 1.x's path, Contents/Resources/bin/
+//   Squirrel.framework  the ShipIt stand-in (mac-shipit/ShipIt.c) that reopens the app after 1.x's
+//                  Squirrel.Mac swapped in this bundle, at Contents/Frameworks/; signed here with
+//                  $SIGNING_IDENTITY (and $KEYCHAIN) when set, as the core is before `tauri build`
 //
 //   node mac-config.mjs <version> <pubkey file> <out dir> [--feed-http] [--icons=<dir>]
 //
@@ -17,7 +20,8 @@
 // `tauri build`; `tauri build` signs, notarizes and staples the app (design section 6, D8).
 //
 // Paths in `resources` are relative to rust/crates/spawnloft-shell or absolute.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkBuildVersion } from './build-version.mjs'
@@ -54,6 +58,47 @@ exec "$SCRIPT_DIR/../resources/bin/spawnloft-core" "$@"
 `
 for (const name of ['spawnloft', 'mcctl']) writeFileSync(join(out, 'bin', name), forwarder, { mode: 0o755 })
 
+// Squirrel.framework, for the 1.x -> 2.0 relaunch (mac-shipit/ShipIt.c): 1.x's ShipIt runs
+// <app>/Contents/Frameworks/Squirrel.framework/Resources/ShipIt inside the new bundle to open it.
+// A real versioned framework (Versions/A, Current, and the top-level symlinks), because codesign
+// seals anything under Contents/Frameworks as nested code. Tauri copies it (symlinks kept) and
+// signs the framework; ShipIt sits in Resources, which Tauri does not sign, so both binaries are
+// signed here first, with the hardened runtime and a timestamp, as notarization wants.
+const shipitSrc = resolve(dirname(fileURLToPath(import.meta.url)), 'mac-shipit')
+const framework = join(out, 'Squirrel.framework')
+rmSync(framework, { recursive: true, force: true })
+const versionA = join(framework, 'Versions', 'A')
+mkdirSync(join(versionA, 'Resources'), { recursive: true })
+const clang = (...a) => execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-arch', 'arm64', '-mmacosx-version-min=13.0', ...a], { stdio: 'inherit' })
+clang('-o', join(versionA, 'Resources', 'ShipIt'), join(shipitSrc, 'ShipIt.c'))
+clang('-dynamiclib', '-install_name', '@rpath/Squirrel.framework/Versions/A/Squirrel', '-o', join(versionA, 'Squirrel'), join(shipitSrc, 'Squirrel.c'))
+writeFileSync(join(versionA, 'Resources', 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleExecutable</key><string>Squirrel</string>
+  <key>CFBundleIdentifier</key><string>io.github.joogiebear.mcctl.shipit</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>Squirrel</string>
+  <key>CFBundlePackageType</key><string>FMWK</string>
+  <key>CFBundleShortVersionString</key><string>${version.split('-')[0]}</string>
+  <key>CFBundleVersion</key><string>${version}</string>
+</dict>
+</plist>
+`)
+symlinkSync('A', join(framework, 'Versions', 'Current'))
+symlinkSync('Versions/Current/Squirrel', join(framework, 'Squirrel'))
+symlinkSync('Versions/Current/Resources', join(framework, 'Resources'))
+const identity = process.env.SIGNING_IDENTITY
+if (identity) {
+  const keychain = process.env.KEYCHAIN ? ['--keychain', process.env.KEYCHAIN] : []
+  const sign = (target, runtime) => execFileSync('/usr/bin/codesign', ['--force', ...(runtime ? ['--options', 'runtime'] : []), '--timestamp', '--sign', identity, ...keychain, target], { stdio: 'inherit' })
+  sign(join(versionA, 'Resources', 'ShipIt'), true)
+  sign(join(versionA, 'Squirrel'), false)
+  sign(framework, false)
+  execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', framework], { stdio: 'inherit' })
+}
 
 // a macOS .app bundle needs an .icns; the workflow generates one with `tauri icon` and passes its
 // folder, otherwise the base PNG icons are kept (plain `cargo build` does not bundle)
@@ -70,6 +115,7 @@ const overlay = {
       // macOS 13: the panel's container queries and :has() want its WebKit (README: macOS 13+)
       minimumSystemVersion: '13.0',
       hardenedRuntime: true,
+      frameworks: [framework],
     },
     resources: {
       [core]: 'resources/bin/spawnloft-core',

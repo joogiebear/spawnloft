@@ -55,7 +55,7 @@ pub fn panel_log() -> Option<std::fs::File> {
         .ok()
 }
 
-/// macOS and Linux: Electron kept its window files in its own folder (`~/Library/Application
+/// macOS and Linux: Electron kept its window files and the update channel in its own folder (`~/Library/Application
 /// Support/SpawnLoft`, `~/.config/SpawnLoft`); copy them once into `<config>` (installer design
 /// section 7). On Windows the two are one NTFS folder already, so there is nothing to do.
 pub fn carry_over_electron_files() {
@@ -77,7 +77,14 @@ pub fn carry_over_electron_files() {
     if electron == to {
         return;
     }
-    for name in ["window-state.json", "launcher-window-state.json", "ui-zoom.json"] {
+    // update-channel.json too: 1.x kept "Get beta builds" there, and without it a choice made in
+    // 1.x would be lost and the build's default (betas for a beta build) taken instead
+    for name in [
+        "window-state.json",
+        "launcher-window-state.json",
+        "ui-zoom.json",
+        "update-channel.json",
+    ] {
         let (src, dst) = (electron.join(name), to.join(name));
         if src.is_file() && !dst.exists() {
             let _ = std::fs::create_dir_all(&to);

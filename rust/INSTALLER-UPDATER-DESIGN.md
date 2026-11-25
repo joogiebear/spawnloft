@@ -702,6 +702,14 @@ same release, with the `apt`/`dnf` command to install it.
   (**verified**, install on quit). Running 1.x Node daemons keep running from the old bundle's
   deleted files; 1.5.0 and 1.6.0-beta.413 have lazy imports, so such a daemon can fail at a
   later crash diagnosis or restart. Section 8 handles it on first launch.
+- **Reopening after "Restart and update".** On macOS 11 and later, 1.x's ShipIt does not open the
+  app itself after the swap: it runs `Contents/Frameworks/Squirrel.framework/Resources/ShipIt
+  ___launch___ <bundle>` from the **new** bundle and waits for it (its own file left with the old
+  bundle). The 2.0 bundle therefore carries a ShipIt stand-in at that path
+  (`installer/mac-shipit/ShipIt.c`, in a minimal versioned `Squirrel.framework` built and signed
+  by `mac-config.mjs`) that runs `/usr/bin/open <bundle>`, and exits 0 for anything else.
+  **Verified** in CI: the Squirrel.Mac smoke goes through "Restart and update" and waits for the
+  2.0 app to open again (found missing on the mini, 2026-11-25: posix_spawn ENOENT).
 - **2.x updates.** The plugin extracts the tar beside the bundle and replaces it in place, then
   relaunches (**verify** on the mini: the Squirrel path was run, the plugin's was not). Rust
   daemons running from `Contents/Resources/resources/bin/spawnloft-core` keep running from the

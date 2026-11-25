@@ -183,11 +183,18 @@ fn before_listening(layout: &Layout) {
     }
     let file = crate::data_format::data_format_file(&layout.data_root);
     let marker = crate::data_format::read(Path::new(&file));
-    if let Some(newer) = crate::data_format::warning(
+    // the warning above reads the marker as it was; then this version is recorded (design 8.1)
+    let warned = crate::data_format::warning(
         &file,
         marker.as_ref(),
         Some(crate::data_format::release_version()),
-    ) {
+    );
+    crate::data_format::mark_version(
+        &crate::paths::config_dir(),
+        Path::new(&layout.data_root),
+        crate::data_format::release_version(),
+    );
+    if let Some(newer) = warned {
         panel_log(&layout.run_dir, &format!("warning: {newer}"));
     }
 }

@@ -9,6 +9,10 @@
 //                                                    hardened runtime (signed before `tauri build`);
 //                                                    arm64; runs, and `spawnloft help` through the
 //                                                    forwarder with no Node on PATH
+//   ShipIt stand-in (Contents/Frameworks/            Developer ID authority, team, timestamp,
+//     Squirrel.framework/Resources/ShipIt)           hardened runtime; arm64; an install request
+//                                                    exits 0 (1.x's Squirrel.Mac reopens the app
+//                                                    through it after the 1.x -> 2.0 swap)
 //   payload                                          no Node.js binary and no Node core .mjs file
 //                                                    anywhere in the bundle (rust/PLAN-CORE-PORT.md
 //                                                    5.1), so nothing needs the JIT entitlements
@@ -56,6 +60,17 @@ async function main() {
     throw new Error(`the core does not run: --version exited ${ran.status ?? ran.error?.message}${ran.stderr ? ` (${ran.stderr.trim()})` : ''}`)
   }
   console.log(`core: Developer ID, team, timestamp, hardened runtime; arm64, runs as ${printed.name} ${printed.version}`)
+
+  // --- the ShipIt stand-in 1.x's Squirrel.Mac runs to reopen the app (mac-shipit/ShipIt.c) ---
+  const shipit = path.join(app, 'Contents', 'Frameworks', 'Squirrel.framework', 'Resources', 'ShipIt')
+  execFileSync('codesign', ['--verify', '--strict', shipit], { stdio: 'inherit' })
+  verifySignatureDetails(signatureOf(shipit), 'signed', teamId)
+  const shipitArchs = spawnSync('/usr/bin/lipo', ['-archs', shipit], { encoding: 'utf8' })
+  if (shipitArchs.status !== 0 || !/\barm64\b/.test(shipitArchs.stdout)) throw new Error(`ShipIt is not an arm64 binary: ${shipitArchs.stdout || shipitArchs.stderr}`)
+  // only the install-request form: the launch form would open the app
+  const asked = spawnSync(shipit, ['io.github.joogiebear.mcctl.ShipIt', '/nonexistent/ShipItState.plist'], { encoding: 'utf8', timeout: 10000 })
+  if (asked.status !== 0) throw new Error(`ShipIt does not run: exited ${asked.status ?? asked.error?.message} ${asked.stderr || ''}`)
+  console.log('ShipIt stand-in: Developer ID, team, timestamp, hardened runtime; arm64; runs')
 
   // --- no Node in the bundle (rust/PLAN-CORE-PORT.md 5.1) ---
   const { checkNoNode } = await import(path.resolve(__dirname, '../../../../desktop/payload-gate.mjs'))

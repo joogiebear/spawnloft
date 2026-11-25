@@ -236,6 +236,15 @@ fn dispatch(
         }
         return Err(e);
     }
+    // design section 8, item 1: the first command after an install or update records the version
+    // and marks the data folder (the panel's `ui` is one, so the window's first start is too)
+    if command != "data" {
+        spawnloft_lib::data_format::mark_version(
+            &spawnloft_lib::paths::config_dir(),
+            std::path::Path::new(&layout.data_root),
+            spawnloft_lib::data_format::release_version(),
+        );
+    }
     match command {
         "help" => {
             ctx.out.print(HELP);
