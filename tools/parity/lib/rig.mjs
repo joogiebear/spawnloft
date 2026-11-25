@@ -71,6 +71,8 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
     SPAWNLOFT_NODE: process.execPath,
     SPAWNLOFT_CORE_DIR: ctx.repo,
     SPAWNLOFT_HARNESS_INDEX_FETCH: 'off',
+    // declared difference `version-marker`: the frozen Node records never wrote these files
+    SPAWNLOFT_TEST_NO_VERSION_MARK: '1',
     // the daemon every 2.0 package runs (and the only one once the Node core is gone); a
     // scenario about the Node daemon says so in its own env
     SPAWNLOFT_DAEMON: 'rust',

@@ -86,22 +86,36 @@ pub struct Marked {
     pub wrote_format: bool,
 }
 
-/// Design section 8, item 1 (first launch after an install or update): when the installed version
-/// differs from `<config>/installed-version.json`, or the data root has no `data-format.json`,
-/// write `{ "writtenBy": <version>, "format": DATA_FORMAT }` there, record the version, and note
-/// the change in `update.log`. A marker that names a newer major or a newer format is left as
-/// it is, so the "this data folder was last used by" warning keeps being said after a rollback.
-/// Losing any of these writes is fine: the next start tries again.
+/// Design section 8, item 1 (first launch after an install or update, and plain CLI use): when the
+/// installed version differs from `<config>/installed-version.json`, record it, note the change in
+/// `update.log`, and write `{ "writtenBy": <version>, "format": DATA_FORMAT }` into the data root's
+/// `data-format.json`; also write that marker whenever it is missing. A marker that cannot be read,
+/// or that names a newer format, is never overwritten (design 5.6: an older build rewrites it only
+/// when the format is the same). Losing any of these writes is fine: the next start tries again.
+///
+/// The parity rig's test-hooks build skips all of it when `SPAWNLOFT_TEST_NO_VERSION_MARK=1`: the
+/// frozen Node records never had these files (declared difference `version-marker`).
 pub fn mark_version(config_dir: &Path, data_root: &Path, version: &str) -> Marked {
+    if cfg!(feature = "test-hooks")
+        && std::env::var_os("SPAWNLOFT_TEST_NO_VERSION_MARK").is_some_and(|v| v == "1")
+    {
+        return Marked::default();
+    }
     let version_file = installed_version_file(config_dir);
     let previous =
         read(&version_file).and_then(|m| m.get("version").and_then(Value::as_str).map(str::to_string));
     let changed = previous.as_deref() != Some(version);
     let format_file = data_root.join("data-format.json");
+    let exists = format_file.exists();
     let marker = read(&format_file);
+    let newer_format = marker
+        .as_ref()
+        .and_then(|m| m.get("format"))
+        .and_then(Value::as_f64)
+        .is_some_and(|f| f > DATA_FORMAT as f64);
+    let keep = (exists && marker.is_none()) || newer_format;
     let mut out = Marked::default();
-    let newer = warning("", marker.as_ref(), Some(version)).is_some();
-    if (changed || marker.is_none()) && !newer && data_root.is_dir() {
+    if (changed || !exists) && !keep && data_root.is_dir() {
         let value = serde_json::json!({ "writtenBy": version, "format": DATA_FORMAT });
         out.wrote_format = crate::fsx::write_json(&format_file, &value).is_ok();
     }
@@ -226,18 +240,24 @@ mod tests {
         let m = mark_version(&config, &data, "2.1.0");
         assert_eq!(m.changed_from.as_deref(), Some("2.0.0"));
         assert!(m.wrote_format);
-        // back to 2.x from a 3.x that wrote the folder: the marker keeps saying so
-        std::fs::write(
-            data.join("data-format.json"),
-            r#"{"writtenBy":"3.0.0","format":1}"#,
-        )
-        .unwrap();
+        // back to 2.0 from a 2.1 of the same format: rewritten (design 5.6)
         let m = mark_version(&config, &data, "2.0.0");
-        assert!(!m.wrote_format && m.changed_from.is_some());
+        assert!(m.wrote_format && m.changed_from.as_deref() == Some("2.1.0"));
         assert_eq!(
             read(&data.join("data-format.json")).unwrap()["writtenBy"],
-            json!("3.0.0")
+            json!("2.0.0")
         );
+        // a newer format, or a marker that cannot be read: left as it is
+        for kept in [r#"{"writtenBy":"3.0.0","format":2}"#, "{ not json"] {
+            std::fs::write(data.join("data-format.json"), kept).unwrap();
+            let m = mark_version(&config, &data, "2.2.0");
+            assert!(!m.wrote_format && m.changed_from.is_some(), "{kept}");
+            assert_eq!(
+                std::fs::read_to_string(data.join("data-format.json")).unwrap(),
+                kept
+            );
+            std::fs::remove_file(installed_version_file(&config)).unwrap();
+        }
         // no data folder (an unplugged drive): nothing is made there
         let gone = base.join("gone");
         assert!(!mark_version(&config, &gone, "2.2.0").wrote_format);
