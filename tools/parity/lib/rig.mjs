@@ -472,9 +472,21 @@ function renormalized(record, extra) {
 // A side as it is held against a record frozen on another runner: a tar's members come in the
 // order the runner's file system listed the folder, so they are compared as a sorted list. Two
 // cores on one machine are still held to the same order.
+// The runner image's JDKs also move between patch releases (21.0.13 to 21.0.13.1, 8u512 to
+// 8u514) without the cores changing, so a Java version is compared by its major only here,
+// as printed, in JSON and in a URL (the feedback link's prefilled diagnostics).
+export function javaPatchNeutral(text) {
+  return typeof text === 'string' ? text.replace(/(openjdk[ +]version[ +](?:\\?"|%22))(1\.\d+|\d+)[\d._]*(\\?"|%22)/g, '$1$2.<patch>$3') : text
+}
+
 function acrossRunners(side) {
-  const tree = new Map([...side.tree].map(([p, e]) => [p, e && typeof e.tar === 'string' ? { ...e, tar: e.tar.split('\n').sort().join('\n') } : e]))
-  return { ...side, tree }
+  const tree = new Map([...side.tree].map(([p, e]) => {
+    if (e && typeof e.tar === 'string') e = { ...e, tar: e.tar.split('\n').sort().join('\n') }
+    if (e && typeof e.text === 'string') e = { ...e, text: javaPatchNeutral(e.text) }
+    return [p, e]
+  }))
+  const steps = side.steps.map(s => ({ ...s, stdout: javaPatchNeutral(s.stdout), stderr: javaPatchNeutral(s.stderr) }))
+  return { ...side, steps, tree }
 }
 
 // A frozen record read back as a side compareSides takes.

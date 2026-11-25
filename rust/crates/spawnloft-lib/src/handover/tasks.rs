@@ -65,6 +65,18 @@ pub fn parse_states(text: &str) -> Vec<(String, bool)> {
         .collect()
 }
 
+/// Why a task could not be turned off, in words, when the reason is one people hit: a task made
+/// from an administrator terminal belongs to the administrators, so a normal update cannot pause
+/// it. It stays on; anything it starts during the update is stopped with the rest.
+pub fn disable_failure_note(error: &str) -> Option<&'static str> {
+    let e = error.to_ascii_lowercase();
+    (e.contains("access is denied") || e.contains("0x80070005")).then_some(
+        "it belongs to an administrator (made from an administrator terminal, most likely), so this \
+         update cannot pause it; it stays on, \
+         and a server it starts during the update is stopped with the rest",
+    )
+}
+
 impl Tasks for WindowsTasks {
     fn states(&self) -> Result<Vec<(String, bool)>, String> {
         if !cfg!(windows) {
@@ -103,6 +115,13 @@ impl Tasks for WindowsTasks {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn access_denied_is_explained() {
+        assert!(disable_failure_note("schtasks exited exit code: 1: ERROR: Access is denied.").is_some());
+        assert!(disable_failure_note("ERROR: 0x80070005").is_some());
+        assert!(disable_failure_note("ERROR: The system cannot find the file specified.").is_none());
+    }
 
     #[test]
     fn states() {

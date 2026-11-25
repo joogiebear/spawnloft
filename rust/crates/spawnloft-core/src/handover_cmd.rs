@@ -410,7 +410,8 @@ impl Starter for InProcess {
             timeout: 180_000.0,
             ..StartOptions::default()
         };
-        let by = spawnloft_lib::activity::Actor::new("cli", None);
+        // the update did this, not the person: the activity feed says "SpawnLoft update"
+        let by = spawnloft_lib::activity::Actor::new("spawnloft", Some("update"));
         let outcome = match supervisor::start(&self.layout, &by, name, opts) {
             Ok(res) if res.ready => {
                 log.line(&format!(

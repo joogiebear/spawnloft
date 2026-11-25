@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normalizeText, machineNeutral } from '../tools/parity/lib/normalize.mjs'
-import { textDiff, compareSides, runScenario, sideEnv, findCore, awaitedReply } from '../tools/parity/lib/rig.mjs'
+import { textDiff, compareSides, runScenario, sideEnv, findCore, awaitedReply, javaPatchNeutral } from '../tools/parity/lib/rig.mjs'
 import { snapshot, zipListing, tarListing, globToRegExp } from '../tools/parity/lib/tree.mjs'
 import { startHosts } from '../tools/parity/lib/fake-host.mjs'
 import { DECLARED, applyDeclared, declaredTable } from '../tools/parity/declared-differences.mjs'
@@ -41,6 +41,15 @@ test('golden files name this machine\'s paths, with / after them on every platfo
   const run = 'C:\\T\\run'
   assert.equal(machineNeutral('C:\\T\\run\\data\\x.json {"d":"C:\\\\T\\\\run\\\\data"}', { run }), '<run>/data/x.json {"d":"<run>/data"}')
   assert.equal(machineNeutral('/tmp/r/run/data and /repo/src', { run: '/tmp/r/run', repo: '/repo' }), '<run>/data and <repo>/src')
+})
+
+test('a frozen record holds when the runner\'s JDKs move a patch release', () => {
+  const frozen = '"version": "openjdk version \\"21.0.13\\" <date> LTS", 8: openjdk version "1.8.0_512", 11: openjdk version "11.0.33"'
+  const now = '"version": "openjdk version \\"21.0.13.1\\" <date> LTS", 8: openjdk version "1.8.0_514", 11: openjdk version "11.0.33.1"'
+  assert.equal(javaPatchNeutral(frozen), javaPatchNeutral(now))
+  assert.equal(javaPatchNeutral('java%3A+openjdk+version+%2225.0.5.1%22+LTS'), javaPatchNeutral('java%3A+openjdk+version+%2225.0.5%22+LTS'))
+  // a different major is still a difference
+  assert.notEqual(javaPatchNeutral('openjdk version "21.0.13"'), javaPatchNeutral('openjdk version "17.0.13"'))
 })
 
 test('a text diff shows where the sides part', () => {

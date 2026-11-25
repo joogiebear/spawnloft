@@ -57,6 +57,7 @@ function activityActor(by) {
   if (k === 'cli') return { text: 'You, in a terminal', tone: 'you' };
   if (k === 'assistant') return { text: by.name || 'AI assistant', tone: 'ai', title: 'An AI assistant, through SpawnLoft’s MCP tools' };
   if (k === 'schedule') return { text: by.name ? 'Schedule: ' + by.name : 'A schedule', tone: 'sched' };
+  if (by && by.name === 'update') return { text: 'SpawnLoft update', tone: 'sl', title: 'SpawnLoft, starting servers again after it updated itself' };
   return { text: 'SpawnLoft', tone: 'sl', title: 'SpawnLoft itself - crash guard, or something it did on its own' };
 }
 
