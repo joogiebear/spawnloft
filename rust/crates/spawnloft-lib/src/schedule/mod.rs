@@ -289,6 +289,14 @@ impl Sched {
     pub fn load(&self) -> Result<Map<String, Value>, Failure> {
         let file = self.tasks_file();
         let mut data = match std::fs::read(&file) {
+            // a file a power cut or crash zeroed: never read as "no tasks", which the next
+            // change would write back over the person's schedules
+            Ok(b) if crate::control::is_torn_state(&b) => {
+                return Err(Failure::user(format!(
+                    "{} is empty: a power cut or crash cut it off while it was being saved. The scheduled tasks themselves are still registered with the system; restore that file from a copy of the data folder, or delete it and add the schedules again with \"spawnloft task add\"",
+                    file.display()
+                )));
+            }
             Ok(b) => match crate::jsjson::parse(&String::from_utf8_lossy(&b)).map_err(Failure::syntax)? {
                 Value::Object(m) => m,
                 Value::Null => {
