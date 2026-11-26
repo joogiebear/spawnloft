@@ -318,6 +318,14 @@ pub fn run(args: &[String]) -> Outcome {
             code: EXIT_USAGE,
         };
     };
+    // `handover --help`, `daemon -h`...: this binary's help, never the command (`update` has its own)
+    if matches!(
+        command.as_str(),
+        "daemon" | "ui" | "probe-process" | "handover" | "user-path"
+    ) && rest.iter().any(|a| a == "--help" || a == "-h")
+    {
+        return ok(help());
+    }
     match command.as_str() {
         "--version" | "-V" | "version" => version(rest),
         "--core-help" => ok(help()),
@@ -423,6 +431,34 @@ mod tests {
             "{}",
             out.stdout
         );
+    }
+
+    #[test]
+    fn the_library_knows_the_cores_own_commands() {
+        let mut own: Vec<&str> = CORE_OWN.iter().flat_map(|r| r.names.iter().copied()).collect();
+        let mut lib = spawnloft_lib::commands::CORE_COMMANDS.to_vec();
+        own.sort_unstable();
+        lib.sort_unstable();
+        assert_eq!(own, lib, "spawnloft_lib::commands::CORE_COMMANDS is out of date");
+    }
+
+    #[test]
+    fn the_cores_own_commands_answer_help() {
+        for line in [
+            &["daemon", "--help"][..],
+            &["daemon", "survival", "-h"],
+            &["probe-process", "--help"],
+            &["handover", "--help"],
+            &["user-path", "-h"],
+            &["ui", "--exit-with-stdin", "--help"],
+        ] {
+            let out = run(&args(line));
+            assert_eq!(out.code, 0, "{line:?}: {}", out.stderr);
+            assert!(out.stdout.contains("Usage:"), "{line:?}");
+        }
+        let out = run(&args(&["update", "--help"]));
+        assert_eq!(out.code, 0);
+        assert!(out.stdout.contains("update check"));
     }
 
     #[test]

@@ -71,68 +71,8 @@ fn query_alias(command: &str) -> Option<&'static str> {
     })
 }
 
-/// Every name `COMMANDS` in mcctl.mjs answers.
-const COMMANDS: &[&str] = &[
-    "list",
-    "ls",
-    "status",
-    "start",
-    "stop",
-    "restart",
-    "kill",
-    "logs",
-    "log",
-    "cmd",
-    "rcon",
-    "send",
-    "console",
-    "attach",
-    "players",
-    "new",
-    "clone",
-    "adopt",
-    "rm",
-    "remove",
-    "set",
-    "props",
-    "backup",
-    "snapshot",
-    "snapshots",
-    "backups",
-    "restore",
-    "prune",
-    "verify",
-    "templates",
-    "template",
-    "jars",
-    "paper",
-    "config",
-    "data",
-    "rename",
-    "rebuild",
-    "reveal",
-    "open",
-    "plugins",
-    "upgrade",
-    "pack",
-    "worlds",
-    "why",
-    "diagnostics",
-    "diag",
-    "metrics",
-    "launchers",
-    "ui",
-    "panel",
-    "task",
-    "doctor",
-    "repair",
-    "db",
-    "mcp",
-    "bot",
-    "client",
-    "uninstall",
-    "help",
-];
+/// Every name `COMMANDS` in mcctl.mjs answers (in the library: the window forwards them too).
+use spawnloft_lib::commands::CLI_COMMANDS as COMMANDS;
 
 /// The commands whose own handler takes `--json` (mcctl.mjs main).
 const JSON_HANDLERS: &[&str] = &[
@@ -204,6 +144,16 @@ fn dispatch(
         return Err(Failure::usage(format!(
             "Unknown command \"{command}\". Run \"spawnloft help\" for usage."
         )));
+    }
+    // `<command> --help` (or `-h`) answers with that command's help and does nothing else: before
+    // this it ran the command, so `ui --help` started the panel and never returned, and
+    // `doctor --help` ran the checks. Before any folder is made or version marked.
+    if parsed.get("help").is_some_and(Flag::truthy) || parsed.get("h").is_some_and(Flag::truthy) {
+        if json {
+            return Err(Failure::usage("Use help without --json"));
+        }
+        out.print(&command_help(command));
+        return Ok(());
     }
     if parsed.get("csv").is_some() && command != "metrics" {
         return Err(Failure::usage("--csv is supported only for metrics"));
@@ -306,6 +256,52 @@ fn dispatch(
     }
 }
 
+/// The canonical name the help text uses for an alias (`ls` is listed as `list`).
+fn help_name(command: &str) -> &str {
+    match command {
+        "ls" => "list",
+        "log" => "logs",
+        "rcon" => "cmd",
+        "attach" => "console",
+        "remove" => "rm",
+        "snapshot" => "backup",
+        "template" => "templates",
+        "open" => "reveal",
+        "panel" => "ui",
+        other => other,
+    }
+}
+
+/// The lines of [`HELP`] about one command: each `  spawnloft <command> ...` line with the option
+/// lines indented under it, then a pointer to the full help. The full help when the command has
+/// no line of its own.
+pub fn command_help(command: &str) -> String {
+    let name = help_name(command);
+    let head = format!("  spawnloft {name}");
+    let mut picked = Vec::new();
+    let mut taking = false;
+    for line in HELP.lines() {
+        let is_head = line
+            .strip_prefix(&head)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '));
+        if is_head {
+            taking = true;
+        } else if taking && !line.starts_with("      ") {
+            taking = false;
+        }
+        if taking {
+            picked.push(line);
+        }
+    }
+    if picked.is_empty() {
+        return HELP.to_string();
+    }
+    format!(
+        "Usage:\n{}\n\nRun \"spawnloft help\" for every command.\n",
+        picked.join("\n")
+    )
+}
+
 /// `requireName(positional, command)`.
 pub fn require_name<'a>(positional: &'a [String], command: &str) -> Result<&'a str, Failure> {
     match positional.first() {
@@ -405,6 +401,43 @@ mod tests {
         assert!(!root.join("instances").exists());
         assert_eq!(run_in(&root, &["help"]).1, HELP);
         assert!(root.join("instances").is_dir() && root.join("services").is_dir());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn every_command_answers_help_without_running() {
+        let root = scratch("help");
+        for &command in COMMANDS {
+            for flag in ["--help", "-h"] {
+                let (code, out, err) = run_in(&root, &[command, flag]);
+                assert_eq!(code, 0, "{command} {flag}: {err}");
+                assert!(err.is_empty(), "{command} {flag}: {err}");
+                assert!(out.contains("spawnloft "), "{command} {flag}: {out}");
+                // only help: no folders made, no version marked, nothing started
+                assert!(!root.join("instances").exists(), "{command} {flag}");
+            }
+        }
+        // one command's help, not the whole text
+        let (_, out, _) = run_in(&root, &["start", "--help", "survival"]);
+        assert!(
+            out.contains("spawnloft start <name>") && out.contains("--detach"),
+            "{out}"
+        );
+        assert!(!out.contains("spawnloft stop"), "{out}");
+        assert_eq!(run_in(&root, &["ls", "-h"]).1, command_help("list"));
+        assert_eq!(run_in(&root, &["help", "--help"]).1, HELP);
+        assert_eq!(run_in(&root, &["list", "--help", "--json"]).0, 2);
+        assert_eq!(run_in(&root, &["frobnicate", "--help"]).0, 2);
+        // `--no-help` asks for no help: the command's own checks answer it
+        assert_ne!(
+            run_in(&root, &["metrics", "--no-help"]).1,
+            command_help("metrics")
+        );
+        // `--no-help` asks for no help: the command's own checks answer it
+        assert_ne!(
+            run_in(&root, &["metrics", "--no-help"]).1,
+            command_help("metrics")
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 

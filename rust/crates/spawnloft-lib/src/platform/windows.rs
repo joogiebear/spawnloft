@@ -172,6 +172,42 @@ pub fn no_new_window_flag(has_console: bool) -> u32 {
     if has_console { 0 } else { CREATE_NO_WINDOW }
 }
 
+/// The standard handles for a command a GUI-subsystem program (the release `SpawnLoft.exe`)
+/// forwards to the console core: its own where it has them (a pipe, a file), else those of the
+/// console of the terminal it was run from, which it attaches to, so `SpawnLoft.exe update --help`
+/// typed in a terminal prints there. `Stdio::null()` for one it can find neither for, and for
+/// standard input from the console: cmd.exe and PowerShell do not wait for a GUI program, so they
+/// read the same console meanwhile and would split the keystrokes with the core (`console`,
+/// `mcp` and prompts get end of input instead). Call before
+/// [`run_in_kill_job_no_new_window`], which then shares that console with the child.
+pub fn terminal_stdio() -> [Stdio; 3] {
+    use windows_sys::Win32::System::Console::{
+        ATTACH_PARENT_PROCESS, AttachConsole, GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE,
+        STD_OUTPUT_HANDLE,
+    };
+    // SAFETY: no pointers; fails harmlessly when there is no parent console or one is attached.
+    let attached = has_console() || unsafe { AttachConsole(ATTACH_PARENT_PROCESS) } != 0;
+    let pick = |id, device: Option<&str>| -> Stdio {
+        // SAFETY: a standard-handle id; returns a handle, null or INVALID_HANDLE_VALUE.
+        let h = unsafe { GetStdHandle(id) };
+        if !h.is_null() && h != INVALID_HANDLE_VALUE {
+            return Stdio::inherit();
+        }
+        if attached
+            && let Some(device) = device
+            && let Ok(f) = std::fs::OpenOptions::new().read(true).write(true).open(device)
+        {
+            return Stdio::from(f);
+        }
+        Stdio::null()
+    };
+    [
+        pick(STD_INPUT_HANDLE, None),
+        pick(STD_OUTPUT_HANDLE, Some("CONOUT$")),
+        pick(STD_ERROR_HANDLE, Some("CONOUT$")),
+    ]
+}
+
 fn has_console() -> bool {
     // SAFETY: no arguments; returns this process's console window or null.
     !unsafe { windows_sys::Win32::System::Console::GetConsoleWindow() }.is_null()

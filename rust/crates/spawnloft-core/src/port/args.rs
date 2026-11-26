@@ -8,6 +8,9 @@ use spawnloft_lib::jsjson::is_index_key;
 /// `BOOLEAN_FLAGS`: flags that never take the next argument as their value.
 pub const BOOLEAN_FLAGS: &[&str] = &[
     "json",
+    // `<command> --help` never takes the next argument (`start --help survival` names no server)
+    "help",
+    "h",
     "csv",
     "follow",
     "f",

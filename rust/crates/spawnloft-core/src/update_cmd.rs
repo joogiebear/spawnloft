@@ -9,8 +9,7 @@ use spawnloft_lib::update::{Context, Outcome, api, envelope::Channel};
 
 use crate::cli::{EXIT_USAGE, Outcome as Out};
 
-pub const HELP: &str = "\
-  update check [--json] [--channel stable|beta]   look for a newer release and verify its feed
+pub const HELP: &str = "  update check [--json] [--channel stable|beta]   look for a newer release and verify its feed
   update status [--json]                          what the last check found, the channel and the hold
   update apply [--json] [--no-run]                headless: download, verify and (Windows) install the pending update
   update list [--json]                            releases below this one that can be rolled back to
@@ -72,7 +71,19 @@ fn print(value: serde_json::Value, plain: String, json: bool, code: u8) -> Out {
     }
 }
 
+fn is_help(arg: &str) -> bool {
+    arg == "--help" || arg == "-h"
+}
+
 pub fn run(args: &[String]) -> Out {
+    // `update --help`, `update check --help`: the usage, and nothing is checked or fetched
+    if args.iter().any(|a| is_help(a)) || args.first().is_some_and(|a| a == "help") {
+        return Out {
+            stdout: format!("Usage:\n{HELP}\n"),
+            stderr: String::new(),
+            code: 0,
+        };
+    }
     let Some((sub, args)) = args.split_first() else {
         return usage("which update command?");
     };
@@ -312,5 +323,22 @@ mod tests {
         assert_eq!(run(&args(&["hold", "please"])).code, EXIT_USAGE);
         assert_eq!(run(&args(&["channel", "nightly"])).code, EXIT_USAGE);
         assert_eq!(run(&args(&["log", "-n", "x"])).code, EXIT_USAGE);
+    }
+
+    #[test]
+    fn help_prints_the_usage_and_does_nothing_else() {
+        for line in [
+            &["--help"][..],
+            &["-h"],
+            &["help"],
+            &["check", "--help"],
+            &["apply", "--no-run", "-h"],
+            &["rollback", "--help"],
+        ] {
+            let out = run(&args(line));
+            assert_eq!(out.code, 0, "{line:?}: {}", out.stderr);
+            assert!(out.stdout.contains("update check [--json]"), "{line:?}");
+            assert!(out.stderr.is_empty(), "{line:?}");
+        }
     }
 }
