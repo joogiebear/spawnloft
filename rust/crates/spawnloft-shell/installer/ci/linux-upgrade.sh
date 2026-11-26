@@ -154,8 +154,32 @@ if kill -0 "$pid" 2>/dev/null; then fail "the 1.x daemon (pid $pid) is still ali
 # what a 1.x task shim or MCP config runs: the app with the Node core's script path, which no
 # longer exists and is never read (the shell drops it, rust/PLAN-CORE-PORT.md 5.2)
 /opt/SpawnLoft/spawnloft-desktop /opt/SpawnLoft/resources/core/mcctl.mjs list | grep -q pkgtest || fail "the 1.x shim form does not reach the core"
-spawnloft start pkgtest
+
+step "2.0 answers 1.x's relaunch"
+# "Restart and update" in 1.x: electron-updater installs the package, then app.relaunch() starts
+# the file that is now 2.0 as Electron's helper (--type=relauncher), the write end of a pipe as
+# descriptor 3, and blocks reading it until the helper writes one byte. Played here with a FIFO.
+fifo=/tmp/relaunch.fifo
+mkfifo "$fifo"
+( /opt/SpawnLoft/spawnloft-desktop --type=relauncher --- /opt/SpawnLoft/spawnloft-desktop 3>"$fifo" </dev/null >/tmp/relaunch.out 2>&1 &
+  echo $! > /tmp/relaunch.pid )
+got=$(timeout 20 head -c 1 "$fifo" | wc -c) || true
+# it goes on to open the window, which a container has no display for
+kill "$(cat /tmp/relaunch.pid)" 2>/dev/null || true
+test "$got" = 1 || fail "2.0 did not answer 1.x's relaunch helper pipe (1.x's window would stay open, frozen): $(cat /tmp/relaunch.out)"
+echo "2.0 answered the relaunch pipe"
+
+step "nothing a parent leaves open reaches the servers"
+# a descriptor the starting process left open (no close-on-exec), as 1.x's relaunch pipe was:
+# a server holding it kept 1.x waiting for as long as the server ran
+/opt/SpawnLoft/spawnloft-desktop /opt/SpawnLoft/resources/core/mcctl.mjs start pkgtest 7>/tmp/inherited-marker
 spawnloft status pkgtest --json | grep -q '"status": *"running"' || fail "2.0 did not start the server"
+for p in /proc/[0-9]*; do
+  if ls -l "$p/fd" 2>/dev/null | grep -q inherited-marker; then
+    fail "$(cat "$p/comm" 2>/dev/null) (pid ${p#/proc/}) holds a descriptor it was not meant to inherit"
+  fi
+done
+echo "no process holds the inherited descriptor"
 spawnloft stop pkgtest
 
 step "spawnloft-cli is refused beside the desktop package"

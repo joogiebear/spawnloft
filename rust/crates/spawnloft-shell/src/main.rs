@@ -110,6 +110,20 @@ impl Core {
 fn main() -> ExitCode {
     let started = Instant::now();
     let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    #[cfg(unix)]
+    {
+        // After "Restart and update" in 1.x on Linux, 1.x starts the file that is now this app as
+        // Electron's relaunch helper and waits on a pipe until it answers: answer, let 1.x quit,
+        // then carry on as the app it asked to start again (its arguments are the ones 1.x was
+        // started with, which nothing below reads)
+        if spawnloft_lib::platform::is_electron_relauncher(&args) {
+            let answered =
+                spawnloft_lib::platform::answer_electron_relauncher(std::time::Duration::from_secs(30));
+            local::log(&format!("started as 1.x's relaunch helper; answered: {answered}"));
+        }
+        // and nothing a parent left open reaches the core, its daemons or the servers
+        spawnloft_lib::platform::close_inherited_fds();
+    }
     if let Some(code) = argv_compat(&args) {
         return code;
     }
