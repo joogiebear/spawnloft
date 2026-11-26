@@ -91,6 +91,16 @@ fn arm_sign_in(legacy_dir: &Path, log: &Log) {
     }
 }
 
+/// Run-state files a power cut zeroed: 1.x refuses every command while one is there, so they go
+/// before 1.x is asked to list, stop or start anything.
+fn clear_torn(data_root: &Path, log: &Log) {
+    for name in spawnloft_lib::control::clear_torn_states(data_root) {
+        log.line(&format!(
+            "{name}: its run-state file was left empty by a power cut; cleared"
+        ));
+    }
+}
+
 fn disarm_sign_in(log: &Log) {
     if !cfg!(windows) {
         return;
@@ -287,6 +297,8 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         log.line("Windows is shutting down: not updating now; nothing was changed");
         return done(h::EXIT_INTERNAL, json!({ "exit": 2, "sessionEnding": true }));
     }
+    // under the lock: a step that holds it may be writing a fresh state file right now
+    clear_torn(&data_root, &log);
     // The record must be writable before anything is changed: without it a cut-short stop could
     // not be put back.
     if let Err(e) = journal_writable(&files.record()) {
@@ -567,6 +579,7 @@ fn resume_cmd(rest: &[String]) -> Outcome {
         log.line("another handover resume is running; leaving it to that one");
         return done(0, json!({ "exit": 0, "busy": true }));
     };
+    clear_torn(&data_root, &log);
     // read again under the lock: the other resume may have finished meanwhile
     let Some(fresh) = Record::read(&files.record()) else {
         return done(0, json!({ "exit": 0, "record": null }));
@@ -652,6 +665,7 @@ fn restore_cmd(rest: &[String]) -> Outcome {
         }
         return done(0, json!({ "exit": 0, "busy": true }));
     };
+    clear_torn(&data_root, &log);
     let Some(mut record) = Record::read(&files.record()).filter(|r| !r.settled()) else {
         disarm_sign_in(&log);
         return done(0, json!({ "exit": 0, "record": null }));

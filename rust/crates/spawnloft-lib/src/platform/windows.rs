@@ -1293,7 +1293,7 @@ pub fn run_once_set(name: &str, command: &str) -> std::io::Result<()> {
     use windows_sys::Win32::Foundation::ERROR_SUCCESS;
     use windows_sys::Win32::System::Registry::{
         HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
-        RegCreateKeyExW, RegSetValueExW,
+        RegCreateKeyExW, RegFlushKey, RegSetValueExW,
     };
     if command.encode_utf16().count() > RUN_ONCE_MAX {
         return Err(std::io::Error::other("the command is too long for RunOnce"));
@@ -1330,10 +1330,22 @@ pub fn run_once_set(name: &str, command: &str) -> std::io::Result<()> {
             (data.len() * 2) as u32,
         )
     };
+    // Windows writes registry changes to disk lazily, seconds later: without the flush a power
+    // cut soon after loses the command, and the sign-in that should put servers back runs
+    // nothing (seen in the 2026-11-26 power-cut test). The flush makes the value durable now.
+    // SAFETY: the key opened above.
+    let flushed = if r == ERROR_SUCCESS {
+        unsafe { RegFlushKey(key) }
+    } else {
+        r
+    };
     // SAFETY: the key opened above.
     unsafe { RegCloseKey(key) };
     if r != ERROR_SUCCESS {
         return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    if flushed != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(flushed as i32));
     }
     Ok(())
 }
