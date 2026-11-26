@@ -256,7 +256,6 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     if let Some(dir) = status_dir {
         log = log.with_progress(dir.join("handover-progress.txt"));
     }
-    clear_torn(&data_root, &log);
     let legacy = CliLegacy {
         dir: PathBuf::from(dir),
         scratch: std::env::temp_dir(),
@@ -298,6 +297,8 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         log.line("Windows is shutting down: not updating now; nothing was changed");
         return done(h::EXIT_INTERNAL, json!({ "exit": 2, "sessionEnding": true }));
     }
+    // under the lock: a step that holds it may be writing a fresh state file right now
+    clear_torn(&data_root, &log);
     // The record must be writable before anything is changed: without it a cut-short stop could
     // not be put back.
     if let Err(e) = journal_writable(&files.record()) {
@@ -578,6 +579,7 @@ fn resume_cmd(rest: &[String]) -> Outcome {
         log.line("another handover resume is running; leaving it to that one");
         return done(0, json!({ "exit": 0, "busy": true }));
     };
+    clear_torn(&data_root, &log);
     // read again under the lock: the other resume may have finished meanwhile
     let Some(fresh) = Record::read(&files.record()) else {
         return done(0, json!({ "exit": 0, "record": null }));
@@ -638,7 +640,6 @@ fn restore_cmd(rest: &[String]) -> Outcome {
     let files = Files::new(&data_root);
     let log_path = get(&f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
     let log = Log::open(Some(&log_path), !logon);
-    clear_torn(&data_root, &log);
     // the folder as given, or as the stop wrote it down (a sign-in command too long to carry it)
     let dir_of = |r: Option<&Record>| {
         get(&f, "--legacy-dir")
@@ -664,6 +665,7 @@ fn restore_cmd(rest: &[String]) -> Outcome {
         }
         return done(0, json!({ "exit": 0, "busy": true }));
     };
+    clear_torn(&data_root, &log);
     let Some(mut record) = Record::read(&files.record()).filter(|r| !r.settled()) else {
         disarm_sign_in(&log);
         return done(0, json!({ "exit": 0, "record": null }));
