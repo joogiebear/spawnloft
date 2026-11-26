@@ -4,7 +4,7 @@
 // there, with the Azure signing profile 1.x stables already use, rather than through a new Azure
 // federated credential for CI. Nothing is tagged, uploaded or published: the result is a folder.
 //
-//   node rust/crates/spawnloft-shell/installer/release-windows.mjs --version 2.0.0-beta.N
+//   node rust/crates/spawnloft-shell/installer/release-windows.mjs --version 2.0.0-beta.N (or 2.0.0)
 //        [--key <minisign secret key file> [--pubkey <its .pub>]]  (default: a throwaway key;
 //                                                     --pubkey defaults to the shell's release.pub)
 //        [--out <dir>]                                          (default: desktop/dist/v2-signed/<version>)
@@ -12,7 +12,7 @@
 //
 // In order, stopping at the first problem:
 //   1. checks: Windows, a clean checkout at the commit its upstream branch (v2) is at, an
-//      `az login` session, a signing module, a beta version;
+//      `az login` session, a signing module, a 2.x version;
 //   2. builds spawnloft-core.exe at that version and signs it (sign-windows.ps1): the bundler
 //      copies resources as they are, so the core is signed before it is bundled;
 //   3. writes the installer configuration (installer-config.mjs);
@@ -68,9 +68,9 @@ export function parseArgs(argv) {
       default: throw new Error(`unknown argument ${a}`)
     }
   }
-  if (!out.version) throw new Error('--version is required (2.0.0-beta.N)')
-  // a pre-beta build is a beta of 2.x: release-gate's semverKey shape, never a stable version
-  if (!/^2\.\d+\.\d+-beta\.\d+$/.test(out.version)) throw new Error(`${out.version} is not a 2.x beta version (2.0.0-beta.N)`)
+  if (!out.version) throw new Error('--version is required (2.0.0-beta.N or 2.0.0)')
+  // a 2.x beta (pre-beta builds included) or a 2.x stable release: release-gate's semverKey shape
+  if (!/^2\.\d+\.\d+(-beta\.\d+)?$/.test(out.version)) throw new Error(`${out.version} is not a 2.x release version (2.x.y or 2.x.y-beta.N)`)
   if (out.pubkey && !out.key) throw new Error('--pubkey is the public half of --key; pass both')
   return out
 }
