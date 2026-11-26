@@ -148,7 +148,7 @@ fn dispatch(
     // `<command> --help` (or `-h`) answers with that command's help and does nothing else: before
     // this it ran the command, so `ui --help` started the panel and never returned, and
     // `doctor --help` ran the checks. Before any folder is made or version marked.
-    if parsed.get("help").is_some() || parsed.get("h").is_some() {
+    if parsed.get("help").is_some_and(Flag::truthy) || parsed.get("h").is_some_and(Flag::truthy) {
         if json {
             return Err(Failure::usage("Use help without --json"));
         }
@@ -428,6 +428,16 @@ mod tests {
         assert_eq!(run_in(&root, &["help", "--help"]).1, HELP);
         assert_eq!(run_in(&root, &["list", "--help", "--json"]).0, 2);
         assert_eq!(run_in(&root, &["frobnicate", "--help"]).0, 2);
+        // `--no-help` asks for no help: the command's own checks answer it
+        assert_ne!(
+            run_in(&root, &["metrics", "--no-help"]).1,
+            command_help("metrics")
+        );
+        // `--no-help` asks for no help: the command's own checks answer it
+        assert_ne!(
+            run_in(&root, &["metrics", "--no-help"]).1,
+            command_help("metrics")
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
