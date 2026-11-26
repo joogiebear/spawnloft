@@ -236,10 +236,40 @@ pub fn same_image_of(raw: Option<&Value>, expected: Option<&Value>, started_at: 
     }
 }
 
+/// Whether a state file's bytes are what a power cut leaves of a write that never reached the
+/// disk: nothing, or only NUL bytes (NTFS keeps the new length and zeroes the data). Such a file
+/// was being written when the machine went down, so nothing it could name is still running.
+pub fn is_torn_state(bytes: &[u8]) -> bool {
+    bytes.iter().all(|&b| b == 0 || b.is_ascii_whitespace())
+}
+
+/// Removes every `run/<name>/state.json` under `data_root` that [`is_torn_state`]: 1.x's
+/// `readState` stops every command on one ("JSON parse error"), so the handover clears them
+/// before it asks 1.x to list or start anything. Returns the names it cleared.
+pub fn clear_torn_states(data_root: &Path) -> Vec<String> {
+    let mut cleared = Vec::new();
+    let Ok(dirs) = std::fs::read_dir(data_root.join("run")) else {
+        return cleared;
+    };
+    for d in dirs.flatten() {
+        let file = d.path().join("state.json");
+        if let Ok(b) = std::fs::read(&file)
+            && is_torn_state(&b)
+            && std::fs::remove_file(&file).is_ok()
+        {
+            cleared.push(d.file_name().to_string_lossy().into_owned());
+        }
+    }
+    cleared.sort();
+    cleared
+}
+
 /// `readState(name)`: the status and the state file's record. A file that is not JSON fails as
-/// it does in the Node core.
+/// it does in the Node core, except one a power cut left empty or zeroed ([`is_torn_state`]),
+/// which reads as stopped: otherwise one cut while a server stops locks out every command.
 pub fn read_state(state_file: &Path) -> Result<(Status, Option<Map<String, Value>>), Failure> {
     let text = match std::fs::read(state_file) {
+        Ok(b) if is_torn_state(&b) => return Ok((Status::Stopped, None)),
         Ok(b) => String::from_utf8_lossy(&b).into_owned(),
         Err(e) if crate::jspath::is_enoent(&e) => return Ok((Status::Stopped, None)),
         Err(e) => return Err(Failure::read(&e, state_file)),
@@ -419,6 +449,34 @@ pub fn control_request(addr: &str, name: &str, req: &Value, timeout_ms: f64) -> 
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_state_file_a_power_cut_zeroed_reads_as_stopped_and_is_cleared() {
+        let root = std::env::temp_dir().join(format!("sl-ctl-torn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for (name, bytes) in [
+            ("zeroed", vec![0u8; 502]),
+            ("empty", Vec::new()),
+            ("good", br#"{"running":false}"#.to_vec()),
+            ("garbage", b"{not json".to_vec()),
+        ] {
+            std::fs::create_dir_all(root.join("run").join(name)).unwrap();
+            std::fs::write(root.join("run").join(name).join("state.json"), bytes).unwrap();
+        }
+        let state = |n: &str| root.join("run").join(n).join("state.json");
+        assert_eq!(read_state(&state("zeroed")).unwrap(), (Status::Stopped, None));
+        assert_eq!(read_state(&state("empty")).unwrap(), (Status::Stopped, None));
+        assert_eq!(read_state(&state("good")).unwrap().0, Status::Stopped);
+        // anything else that is not JSON still fails as the Node core does
+        assert!(read_state(&state("garbage")).is_err());
+        assert_eq!(
+            clear_torn_states(&root),
+            vec!["empty".to_string(), "zeroed".to_string()]
+        );
+        assert!(!state("zeroed").exists() && !state("empty").exists());
+        assert!(state("good").exists() && state("garbage").exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[cfg(unix)]
     #[test]

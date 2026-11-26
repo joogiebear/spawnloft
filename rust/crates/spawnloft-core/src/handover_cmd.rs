@@ -91,6 +91,16 @@ fn arm_sign_in(legacy_dir: &Path, log: &Log) {
     }
 }
 
+/// Run-state files a power cut zeroed: 1.x refuses every command while one is there, so they go
+/// before 1.x is asked to list, stop or start anything.
+fn clear_torn(data_root: &Path, log: &Log) {
+    for name in spawnloft_lib::control::clear_torn_states(data_root) {
+        log.line(&format!(
+            "{name}: its run-state file was left empty by a power cut; cleared"
+        ));
+    }
+}
+
 fn disarm_sign_in(log: &Log) {
     if !cfg!(windows) {
         return;
@@ -246,6 +256,7 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     if let Some(dir) = status_dir {
         log = log.with_progress(dir.join("handover-progress.txt"));
     }
+    clear_torn(&data_root, &log);
     let legacy = CliLegacy {
         dir: PathBuf::from(dir),
         scratch: std::env::temp_dir(),
@@ -627,6 +638,7 @@ fn restore_cmd(rest: &[String]) -> Outcome {
     let files = Files::new(&data_root);
     let log_path = get(&f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
     let log = Log::open(Some(&log_path), !logon);
+    clear_torn(&data_root, &log);
     // the folder as given, or as the stop wrote it down (a sign-in command too long to carry it)
     let dir_of = |r: Option<&Record>| {
         get(&f, "--legacy-dir")
