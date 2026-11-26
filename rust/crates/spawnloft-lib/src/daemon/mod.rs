@@ -357,6 +357,13 @@ impl Daemon {
                 .ok_or("this database's launch spec was not handed over by the supervisor (--spec -)")?;
             return program::from_spec(spec);
         }
+        if let Some(dir) = inst.dir()
+            && crate::control::clear_torn_paper_remap(Path::new(dir))
+        {
+            self.log.line(
+                "Paper's plugin cache (plugins/.paper-remapped) was left empty by a power cut or crash; removed so Paper rebuilds it",
+            );
+        }
         program::minecraft(inst, self.node.as_deref())
     }
 

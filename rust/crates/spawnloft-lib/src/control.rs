@@ -264,6 +264,30 @@ pub fn clear_torn_states(data_root: &Path) -> Vec<String> {
     cleared
 }
 
+/// Paper's plugin remapping cache (`plugins/.paper-remapped`) when a power cut zeroed one of its
+/// `index.json` files: Paper then refuses to start ("Failed to create PluginRemapper, try deleting
+/// the 'plugins\.paper-remapped' directory"). The folder is a cache Paper rebuilds from the
+/// plugin jars at the next start, so it is removed before a launch. Returns whether it was.
+pub fn clear_torn_paper_remap(server_dir: &Path) -> bool {
+    let cache = server_dir.join("plugins").join(".paper-remapped");
+    let mut torn = false;
+    let mut stack = vec![cache.clone()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in entries.flatten() {
+            let path = e.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if e.file_name() == "index.json" && std::fs::read(&path).is_ok_and(|b| is_torn_state(&b)) {
+                torn = true;
+            }
+        }
+    }
+    torn && std::fs::remove_dir_all(&cache).is_ok()
+}
+
 /// `readState(name)`: the status and the state file's record. A file that is not JSON fails as
 /// it does in the Node core, except one a power cut left empty or zeroed ([`is_torn_state`]),
 /// which reads as stopped: otherwise one cut while a server stops locks out every command.
@@ -449,6 +473,40 @@ pub fn control_request(addr: &str, name: &str, req: &Value, timeout_ms: f64) -> 
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_zeroed_paper_remap_index_removes_the_cache_and_a_good_one_does_not() {
+        let dir = std::env::temp_dir().join(format!("sl-ctl-remap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cache = dir.join("plugins").join(".paper-remapped");
+        std::fs::create_dir_all(cache.join("extra-plugins")).unwrap();
+        std::fs::write(cache.join("index.json"), b"{\"v\":1}").unwrap();
+        std::fs::write(cache.join("extra-plugins").join("index.json"), b"{}").unwrap();
+        assert!(!clear_torn_paper_remap(&dir));
+        assert!(cache.exists());
+        std::fs::write(cache.join("extra-plugins").join("index.json"), vec![0u8; 127]).unwrap();
+        assert!(clear_torn_paper_remap(&dir));
+        assert!(!cache.exists() && dir.join("plugins").exists());
+        // no cache at all: nothing to do
+        assert!(!clear_torn_paper_remap(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_registry_a_power_cut_zeroed_says_so_and_is_not_read_as_empty() {
+        let dir = std::env::temp_dir().join(format!("sl-ctl-reg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let reg = dir.join("instances.json");
+        std::fs::write(&reg, vec![0u8; 300]).unwrap();
+        let err = crate::registry::load(&reg).unwrap_err();
+        assert!(
+            err.message().contains("is empty: a power cut or crash"),
+            "{}",
+            err.message()
+        );
+        assert!(crate::registry::lookup(&reg, "survival").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn a_state_file_a_power_cut_zeroed_reads_as_stopped_and_is_cleared() {

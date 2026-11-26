@@ -189,6 +189,7 @@ pub fn spread(name: &str, cfg: &Value) -> Instance {
 pub fn load(registry_file: &Path) -> Result<Value, crate::failure::Failure> {
     use crate::failure::Failure;
     let text = match std::fs::read(registry_file) {
+        Ok(b) if crate::control::is_torn_state(&b) => return Err(torn(registry_file)),
         Ok(b) => String::from_utf8_lossy(&b).into_owned(),
         Err(e) if crate::jspath::is_enoent(&e) => return Ok(Value::Object(Map::new())),
         Err(e) => return Err(Failure::read(&e, registry_file)),
@@ -277,6 +278,16 @@ pub fn list_services(registry_file: &Path) -> Result<Vec<Instance>, crate::failu
         .collect())
 }
 
+/// A registry a power cut or crash left empty or zeroed (written by a SpawnLoft that did not yet
+/// sync before renaming). Nothing reads it as "no servers" and nothing writes over it: the
+/// person is told what happened and how to get the list back, in place of a JSON parse error.
+fn torn(registry_file: &Path) -> crate::failure::Failure {
+    crate::failure::Failure::user(format!(
+        "{} is empty: a power cut or crash cut it off while it was being saved. Your servers' folders, worlds and backups are untouched. Put the list back by restoring that file from a copy of the data folder, or add each server again with \"spawnloft adopt <name> <folder>\"",
+        registry_file.display()
+    ))
+}
+
 /// `getInstance(name)` for the command line: the name checked, then the record or the
 /// "no instance named" refusal with the names that do exist.
 pub fn lookup(registry_file: &Path, name: &str) -> Result<Instance, crate::failure::Failure> {
@@ -313,6 +324,7 @@ pub fn lock_file(registry_file: &Path) -> std::path::PathBuf {
 fn load_document(registry_file: &Path) -> Result<Value, crate::failure::Failure> {
     use crate::failure::Failure;
     let text = match std::fs::read(registry_file) {
+        Ok(b) if crate::control::is_torn_state(&b) => return Err(torn(registry_file)),
         Ok(b) => String::from_utf8_lossy(&b).into_owned(),
         // readJson's fallback, { version: 1, instances: {} }
         Err(e) if crate::jspath::is_enoent(&e) => {
