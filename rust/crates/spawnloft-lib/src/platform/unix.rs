@@ -895,3 +895,180 @@ fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
 fn free_bytes_c(_c: &std::ffi::CStr) -> Option<u64> {
     None
 }
+
+// ---------------------------------------------------------------------- what a parent left open
+
+const F_GETFD: i32 = 1;
+const F_SETFD: i32 = 2;
+const FD_CLOEXEC: i32 = 1;
+
+unsafe extern "C" {
+    fn fcntl(fd: i32, cmd: i32, ...) -> i32;
+    fn getppid() -> i32;
+}
+
+/// Marks every descriptor above stderr that this process was started with close-on-exec, so
+/// nothing it starts (the core, its daemons, the servers) holds them. A parent's pipe held open
+/// by a server keeps that parent waiting for as long as the server runs: 1.x's window, after
+/// "Restart and update" on Linux, waited on its relaunch pipe beside 2.0 for days. What this
+/// process opens itself is close-on-exec already (std opens everything that way).
+pub fn close_inherited_fds() {
+    let dir = if cfg!(target_os = "linux") {
+        "/proc/self/fd"
+    } else {
+        "/dev/fd"
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    // read first, then change: the listing's own descriptor is in it, and is closed by then
+    let fds: Vec<i32> = entries
+        .filter_map(|e| e.ok()?.file_name().to_str()?.parse().ok())
+        .filter(|&fd| fd > 2)
+        .collect();
+    for fd in fds {
+        set_cloexec(fd);
+    }
+}
+
+fn set_cloexec(fd: i32) {
+    // SAFETY: F_GETFD and F_SETFD only read and set this descriptor's flags; a descriptor that
+    // is not open any more (the listing's own) fails with EBADF and is left alone.
+    unsafe {
+        let flags = fcntl(fd, F_GETFD);
+        if flags >= 0 && flags & FD_CLOEXEC == 0 {
+            fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+        }
+    }
+}
+
+/// Whether a descriptor is close-on-exec (None when it is not open).
+pub fn is_cloexec(fd: i32) -> Option<bool> {
+    // SAFETY: F_GETFD only reads the descriptor's flags.
+    let flags = unsafe { fcntl(fd, F_GETFD) };
+    (flags >= 0).then_some(flags & FD_CLOEXEC != 0)
+}
+
+/// The argument Electron's `app.relaunch()` starts its helper with: the app's own executable,
+/// `--type=relauncher`, the helper's own switches, `---`, and the arguments to start the app again
+/// with (shell/browser/relauncher.cc).
+pub const ELECTRON_RELAUNCHER_ARG: &str = "--type=relauncher";
+
+/// The descriptor the helper answers on (relauncher.h kRelauncherSyncFD, stderr + 1).
+const RELAUNCHER_SYNC_FD: i32 = 3;
+
+/// Whether this process was started as Electron's relaunch helper. After 1.x's "Restart and
+/// update" on Linux, `dpkg -i` or `rpm -U` has put 2.0 where 1.x's executable was, and 1.x
+/// starts that file as its helper.
+pub fn is_electron_relauncher(args: &[std::ffi::OsString]) -> bool {
+    // Electron puts it first and its helper refuses anything else (relauncher.cc RelauncherMain)
+    args.get(1).is_some_and(|a| a == ELECTRON_RELAUNCHER_ARG)
+}
+
+/// Plays Electron's relaunch helper for the 1.x app that started this process: writes the one
+/// byte it blocks on (it reads descriptor 3 until it gets one, its window frozen meanwhile), then
+/// waits up to `wait` for it to quit, so the window that opens next is the only one. Returns
+/// whether the byte was written.
+pub fn answer_electron_relauncher(wait: std::time::Duration) -> bool {
+    // SAFETY: no arguments, no state.
+    let parent = unsafe { getppid() };
+    let answered = answer_on(RELAUNCHER_SYNC_FD);
+    if answered {
+        let until = std::time::Instant::now() + wait;
+        // SAFETY: as above. A parent that quit leaves this process to another (init, a
+        // subreaper), so the parent pid changes.
+        while unsafe { getppid() } == parent && std::time::Instant::now() < until {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
+    answered
+}
+
+/// Writes one byte to `fd` and closes it, when it is a pipe (anything else is not 1.x's).
+fn answer_on(fd: i32) -> bool {
+    use std::io::Write;
+    use std::os::fd::{BorrowedFd, FromRawFd};
+    use std::os::unix::fs::FileTypeExt;
+    if is_cloexec(fd).is_none() {
+        return false;
+    }
+    // SAFETY: the descriptor is open (checked above) and nothing else in this process uses it:
+    // it was inherited, and this runs before anything else starts.
+    let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+    let Ok(owned) = borrowed.try_clone_to_owned() else {
+        return false;
+    };
+    let mut file = std::fs::File::from(owned);
+    if !file.metadata().is_ok_and(|m| m.file_type().is_fifo()) {
+        return false;
+    }
+    let ok = file.write_all(&[0]).is_ok();
+    drop(file);
+    // the original goes too: the parent reads until every write end is closed
+    // SAFETY: fd is the inherited descriptor checked above; nothing holds it.
+    drop(unsafe { std::fs::File::from_raw_fd(fd) });
+    ok
+}
+
+#[cfg(test)]
+mod inherited_tests {
+    use super::*;
+    use std::io::Read;
+    use std::os::fd::{AsRawFd, IntoRawFd};
+
+    #[test]
+    fn an_inherited_descriptor_is_not_passed_on() {
+        let (reader, writer) = std::io::pipe().unwrap();
+        let fd = writer.as_raw_fd();
+        // as a parent leaves it: no close-on-exec
+        // SAFETY: fd is the open pipe end above.
+        unsafe { fcntl(fd, F_SETFD, 0) };
+        assert_eq!(is_cloexec(fd), Some(false));
+        close_inherited_fds();
+        assert_eq!(is_cloexec(fd), Some(true));
+        drop((reader, writer));
+    }
+
+    #[test]
+    fn the_relaunch_helper_answers_and_lets_go_of_the_pipe() {
+        let (mut reader, writer) = std::io::pipe().unwrap();
+        let fd = writer.into_raw_fd();
+        assert!(answer_on(fd));
+        // one byte, then end of file: no write end is left open
+        let mut got = Vec::new();
+        reader.read_to_end(&mut got).unwrap();
+        assert_eq!(got, vec![0]);
+    }
+
+    #[test]
+    fn only_a_pipe_is_answered() {
+        let file = tempfile_like();
+        let fd = file.as_raw_fd();
+        assert!(!answer_on(fd));
+        assert_eq!(
+            is_cloexec(fd),
+            Some(true),
+            "a descriptor that is not 1.x's is left open"
+        );
+        assert!(!answer_on(-1));
+    }
+
+    fn tempfile_like() -> std::fs::File {
+        std::fs::File::open("/dev/null").unwrap()
+    }
+
+    #[test]
+    fn the_helper_argument() {
+        let args = |v: &[&str]| v.iter().map(std::ffi::OsString::from).collect::<Vec<_>>();
+        assert!(is_electron_relauncher(&args(&[
+            "/opt/SpawnLoft/spawnloft-desktop",
+            "--type=relauncher",
+            "---",
+            "/opt/SpawnLoft/spawnloft-desktop"
+        ])));
+        assert!(!is_electron_relauncher(&args(&[
+            "/opt/SpawnLoft/spawnloft-desktop"
+        ])));
+        assert!(!is_electron_relauncher(&args(&["--type=relauncher"])));
+    }
+}
