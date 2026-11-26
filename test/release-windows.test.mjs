@@ -11,9 +11,11 @@ import { parseSigned } from '../desktop/release-gate.mjs'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-test('only a 2.x beta version is built, and a public key comes only with its key', () => {
+test('only a 2.x beta or stable version is built, and a public key comes only with its key', () => {
   assert.equal(parseArgs(['--version', '2.0.0-beta.3']).version, '2.0.0-beta.3')
-  for (const v of ['2.0.0', '1.6.0-beta.9', '2.0.0-internal.4', '2.0.0-beta']) assert.throws(() => parseArgs(['--version', v]), /not a 2\.x beta/)
+  assert.equal(parseArgs(['--version', '2.0.0']).version, '2.0.0')
+  assert.equal(parseArgs(['--version', '2.1.4']).version, '2.1.4')
+  for (const v of ['1.6.0-beta.9', '1.5.0', '2.0.0-internal.4', '2.0.0-beta', '2.0', 'v2.0.0']) assert.throws(() => parseArgs(['--version', v]), /not a 2\.x release version/)
   assert.throws(() => parseArgs([]), /--version is required/)
   assert.equal(parseArgs(['--version', '2.0.0-beta.1', '--key', 'k']).pubkey, undefined)
   assert.throws(() => parseArgs(['--version', '2.0.0-beta.1', '--pubkey', 'p']), /pass both/)
