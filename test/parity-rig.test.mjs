@@ -291,9 +291,9 @@ test('every scenario file loads and keeps to the rules', () => {
 })
 
 test('the --json scenario runs every command name the core answers', () => {
-  // COMMANDS in spawnloft-core's port/mod.rs: every name mcctl.mjs's table answered
-  const src = fs.readFileSync(path.join(repo, 'rust', 'crates', 'spawnloft-core', 'src', 'port', 'mod.rs'), 'utf8')
-  const table = src.slice(src.indexOf('const COMMANDS: &[&str] = &['))
+  // CLI_COMMANDS in spawnloft-lib's commands.rs (the core's port COMMANDS): every name mcctl.mjs's table answered
+  const src = fs.readFileSync(path.join(repo, 'rust', 'crates', 'spawnloft-lib', 'src', 'commands.rs'), 'utf8')
+  const table = src.slice(src.indexOf('pub const CLI_COMMANDS: &[&str] = &['))
   const names = [...table.slice(0, table.indexOf('];')).matchAll(/^\s+"([a-z]+)",/gm)].map(m => m[1])
   assert.ok(names.length >= 59, `found ${names.length} names`)
   const scenario = JSON.parse(fs.readFileSync(path.join(parity, 'scenarios', 'cli-json.json'), 'utf8'))
