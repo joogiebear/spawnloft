@@ -495,6 +495,10 @@ switch ($Name) {
       $r = Run-Captured "$env:WINDIR\System32\cmd.exe" @('/d', '/c', 'spawnloft', '--version') 60 @{ PATH = "$([Environment]::ExpandEnvironmentVariables((Reg 'HKCU:\Environment' 'Path')));$env:WINDIR\System32" }
     } finally { Pop-Location }
     Check '  a new terminal finds spawnloft' ($r.code -eq 0 -and $r.out -match 'spawnloft-core') "$($r.code) $($r.out)$($r.err)"
+    # the window's own name with a command hands it to the core and returns (2.0.0-beta.1 opened
+    # the window instead and held the terminal until it was closed)
+    $r = Run-Captured "$inst\SpawnLoft.exe" @('update', '--help') 60
+    Check '  SpawnLoft.exe update --help prints the usage and returns' ($r.code -eq 0 -and $r.out -match 'update check') "$($r.code) $($r.out)$($r.err)"
     Kill-Everything
     $dataRoot = Use-Layout 'new'
     $spec = @{ servers = @(@{ name = 'keep' }); databases = @(); fixtures = $fixtures } | ConvertTo-Json -Depth 4

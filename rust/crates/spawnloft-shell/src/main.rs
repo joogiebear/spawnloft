@@ -10,7 +10,9 @@
 //! Also here, because they are what the spike has to prove:
 //! - the argv compatibility form (REVIEW-REV3 B1): `SpawnLoft.exe <...>\mcctl.mjs <command...>`,
 //!   which every 1.x task shim, server launcher and MCP config runs, is forwarded to
-//!   `spawnloft-core` so those keep working after the shell replaces Electron;
+//!   `spawnloft-core` so those keep working after the shell replaces Electron, and so is a
+//!   command line that starts with a command (`SpawnLoft.exe update --help`), which would
+//!   otherwise open the window and never return to the terminal;
 //! - start-time numbers, written when `SPAWNLOFT_SPIKE_MEASURE` names a file.
 //!
 //! Updates (2.x to 2.y) are in `updater.rs`: the core verifies the signed feed, the plugin
@@ -444,24 +446,32 @@ fn message_box(title: &str, text: &str) {
 /// `SpawnLoft.exe <path ending in mcctl.mjs or spawnloft.mjs> <command...>`: what 1.x task shims,
 /// server launchers and MCP configs run (with ELECTRON_RUN_AS_NODE, ignored here). Forwarded to
 /// `spawnloft-core <command...>`, the install's one entry point (the `.mjs` argument is dropped,
-/// never run); `None` when the command line is not that form. The first `repair` rewrites those files
-/// to name `spawnloft-core` directly (RUNTIME_FORMAT 2), so this form only carries the time
-/// between the handover and that repair, and MCP configs a user copied from 1.x.
+/// never run). The first `repair` rewrites those files to name `spawnloft-core` directly
+/// (RUNTIME_FORMAT 2), so this form only carries the time between the handover and that repair,
+/// and MCP configs a user copied from 1.x.
+///
+/// `SpawnLoft.exe <command...>` (a CLI command, one of the core's own, `--help`): forwarded the
+/// same way, so someone who types the window's name in a terminal gets the command's answer
+/// rather than a window that holds the terminal until it is closed. Anything else (no
+/// arguments, what an installer passes) is not a command: `None`, and the window opens.
 fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
-    let first = args.get(1)?.to_string_lossy().to_ascii_lowercase();
-    if !(first.ends_with("mcctl.mjs") || first.ends_with("spawnloft.mjs")) {
+    let first = args.get(1)?.to_string_lossy().into_owned();
+    let lower = first.to_ascii_lowercase();
+    let (rest, terminal) = if lower.ends_with("mcctl.mjs") || lower.ends_with("spawnloft.mjs") {
+        (&args[2..], false)
+    } else if spawnloft_lib::commands::is_command(&first) {
+        (&args[1..], true)
+    } else {
         return None;
-    }
+    };
     let Some(core) = core_binary() else {
         local::log("argv compatibility: no core binary path");
         return Some(ExitCode::from(127));
     };
     let mut cmd = Command::new(&core);
-    cmd.args(&args[2..])
-        .env_remove("ELECTRON_RUN_AS_NODE")
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
+    cmd.args(rest).env_remove("ELECTRON_RUN_AS_NODE");
+    let [stdin, stdout, stderr] = forwarder_stdio(terminal);
+    cmd.stdin(stdin).stdout(stdout).stderr(stderr);
     Some(match run_forwarder(cmd) {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(e) => {
@@ -469,6 +479,17 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
             ExitCode::from(1)
         }
     })
+}
+
+/// The forwarded core's standard handles: this process's own, and for a command typed in a
+/// terminal on Windows, that terminal's console when the release window has none of its own.
+fn forwarder_stdio(terminal: bool) -> [Stdio; 3] {
+    #[cfg(windows)]
+    if terminal {
+        return spawnloft_lib::platform::terminal_stdio();
+    }
+    let _ = terminal;
+    [Stdio::inherit(), Stdio::inherit(), Stdio::inherit()]
 }
 
 /// The forwarded core in a kill-on-close job on Windows (a killed `SpawnLoft.exe` takes the core
