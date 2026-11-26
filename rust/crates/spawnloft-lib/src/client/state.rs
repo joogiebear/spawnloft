@@ -67,6 +67,11 @@ pub fn alive(state: &Value) -> bool {
 /// gone is removed, unless another launch rewrote it meanwhile).
 pub fn read(paths: &Paths, name: &str) -> Result<Option<Value>, Failure> {
     let file = paths.state_file(name);
+    // a record a power cut zeroed: the game it named went down with the machine
+    if std::fs::read(&file).is_ok_and(|b| crate::control::is_torn_state(&b)) {
+        let _ = super::rm_force(&file);
+        return Ok(None);
+    }
     let Some(state) = read_json(&file)? else {
         return Ok(None);
     };

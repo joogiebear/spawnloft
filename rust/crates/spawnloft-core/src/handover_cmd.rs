@@ -95,9 +95,7 @@ fn arm_sign_in(legacy_dir: &Path, log: &Log) {
 /// before 1.x is asked to list, stop or start anything.
 fn clear_torn(data_root: &Path, log: &Log) {
     for name in spawnloft_lib::control::clear_torn_states(data_root) {
-        log.line(&format!(
-            "{name}: its run-state file was left empty by a power cut; cleared"
-        ));
+        log.line(&format!("{name} was left empty by a power cut; cleared"));
     }
 }
 

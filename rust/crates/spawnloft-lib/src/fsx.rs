@@ -42,8 +42,18 @@ fn is_busy(e: &std::io::Error) -> bool {
     }
 }
 
+/// Puts a just-written temp file's data on the disk before it is renamed over the real one (the
+/// rename itself stays [`rename_over`]: NTFS journals it, and it replaces a file a reader holds).
+/// Without it a power cut soon after the rename can leave the real name holding only NUL bytes:
+/// the rename is journaled at once, the data later (seen on NTFS in the 2026-11-26 power-cut
+/// test: run-state files and `index.json` caches came back as zeros).
+fn sync_temp(tmp: &Path) -> std::io::Result<()> {
+    std::fs::OpenOptions::new().write(true).open(tmp)?.sync_all()
+}
+
 /// `JSON.stringify(data, null, 2)` plus a newline, written through `<file>.tmp` and a rename so a
-/// reader never sees half a file.
+/// reader never sees half a file, and synced first so a power cut leaves the old file or the new
+/// one, never zeros.
 pub fn write_json(file: &Path, data: &serde_json::Value) -> std::io::Result<()> {
     if let Some(dir) = file.parent() {
         std::fs::create_dir_all(dir)?;
@@ -54,6 +64,7 @@ pub fn write_json(file: &Path, data: &serde_json::Value) -> std::io::Result<()> 
     tmp.push(".tmp");
     let tmp = std::path::PathBuf::from(tmp);
     std::fs::write(&tmp, text)?;
+    sync_temp(&tmp)?;
     rename_over(&tmp, file)
 }
 
@@ -110,6 +121,8 @@ pub fn write_json_node(
             file.display()
         )));
     }
+    // the registry, settings and schedules go through here: synced like [`write_json`]
+    sync_temp(&tmp).map_err(|e| Failure::io(&e, "open", Some(&tmp)))?;
     rename_over(&tmp, file).map_err(|e| rename_failure(&e, &tmp, file))?;
     Ok(protection)
 }

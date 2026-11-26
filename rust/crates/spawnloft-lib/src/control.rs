@@ -245,7 +245,8 @@ pub fn is_torn_state(bytes: &[u8]) -> bool {
 
 /// Removes every `run/<name>/state.json` under `data_root` that [`is_torn_state`]: 1.x's
 /// `readState` stops every command on one ("JSON parse error"), so the handover clears them
-/// before it asks 1.x to list or start anything. Returns the names it cleared.
+/// before it asks 1.x to list or start anything, and Paper caches a cut zeroed
+/// ([`clear_torn_paper_remap`]). Returns what it cleared, one phrase each.
 pub fn clear_torn_states(data_root: &Path) -> Vec<String> {
     let mut cleared = Vec::new();
     let Ok(dirs) = std::fs::read_dir(data_root.join("run")) else {
@@ -257,11 +258,49 @@ pub fn clear_torn_states(data_root: &Path) -> Vec<String> {
             && is_torn_state(&b)
             && std::fs::remove_file(&file).is_ok()
         {
-            cleared.push(d.file_name().to_string_lossy().into_owned());
+            cleared.push(format!("{}'s run-state file", d.file_name().to_string_lossy()));
+        }
+    }
+    // Paper's cache too: the handover's restore starts servers under 1.x, which has no daemon
+    // that clears it, so a cut there would leave Paper refusing to start
+    let registry = std::fs::read(data_root.join("instances.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+    if let Some(Value::Object(instances)) = registry.as_ref().and_then(|r| r.get("instances")) {
+        for (name, inst) in instances {
+            if let Some(dir) = inst.get("dir").and_then(Value::as_str)
+                && clear_torn_paper_remap(Path::new(dir))
+            {
+                cleared.push(format!("{name}'s Paper plugin cache"));
+            }
         }
     }
     cleared.sort();
     cleared
+}
+
+/// Paper's plugin remapping cache (`plugins/.paper-remapped`) when a power cut zeroed one of its
+/// `index.json` files: Paper then refuses to start ("Failed to create PluginRemapper, try deleting
+/// the 'plugins\.paper-remapped' directory"). The folder is a cache Paper rebuilds from the
+/// plugin jars at the next start, so it is removed before a launch. Returns whether it was.
+pub fn clear_torn_paper_remap(server_dir: &Path) -> bool {
+    let cache = server_dir.join("plugins").join(".paper-remapped");
+    let mut torn = false;
+    let mut stack = vec![cache.clone()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in entries.flatten() {
+            let path = e.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if e.file_name() == "index.json" && std::fs::read(&path).is_ok_and(|b| is_torn_state(&b)) {
+                torn = true;
+            }
+        }
+    }
+    torn && std::fs::remove_dir_all(&cache).is_ok()
 }
 
 /// `readState(name)`: the status and the state file's record. A file that is not JSON fails as
@@ -451,6 +490,40 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn a_zeroed_paper_remap_index_removes_the_cache_and_a_good_one_does_not() {
+        let dir = std::env::temp_dir().join(format!("sl-ctl-remap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cache = dir.join("plugins").join(".paper-remapped");
+        std::fs::create_dir_all(cache.join("extra-plugins")).unwrap();
+        std::fs::write(cache.join("index.json"), b"{\"v\":1}").unwrap();
+        std::fs::write(cache.join("extra-plugins").join("index.json"), b"{}").unwrap();
+        assert!(!clear_torn_paper_remap(&dir));
+        assert!(cache.exists());
+        std::fs::write(cache.join("extra-plugins").join("index.json"), vec![0u8; 127]).unwrap();
+        assert!(clear_torn_paper_remap(&dir));
+        assert!(!cache.exists() && dir.join("plugins").exists());
+        // no cache at all: nothing to do
+        assert!(!clear_torn_paper_remap(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_registry_a_power_cut_zeroed_says_so_and_is_not_read_as_empty() {
+        let dir = std::env::temp_dir().join(format!("sl-ctl-reg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let reg = dir.join("instances.json");
+        std::fs::write(&reg, vec![0u8; 300]).unwrap();
+        let err = crate::registry::load(&reg).unwrap_err();
+        assert!(
+            err.message().contains("is empty: a power cut or crash"),
+            "{}",
+            err.message()
+        );
+        assert!(crate::registry::lookup(&reg, "survival").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn a_state_file_a_power_cut_zeroed_reads_as_stopped_and_is_cleared() {
         let root = std::env::temp_dir().join(format!("sl-ctl-torn-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
@@ -469,10 +542,25 @@ mod tests {
         assert_eq!(read_state(&state("good")).unwrap().0, Status::Stopped);
         // anything else that is not JSON still fails as the Node core does
         assert!(read_state(&state("garbage")).is_err());
+        // a server whose Paper cache was zeroed too, named in instances.json
+        let srv = root.join("srv");
+        std::fs::create_dir_all(srv.join("plugins").join(".paper-remapped")).unwrap();
+        std::fs::write(
+            srv.join("plugins").join(".paper-remapped").join("index.json"),
+            vec![0u8; 9],
+        )
+        .unwrap();
+        let reg = json!({ "version": 1, "instances": { "zeroed": { "dir": srv.to_string_lossy() } } });
+        std::fs::write(root.join("instances.json"), reg.to_string()).unwrap();
         assert_eq!(
             clear_torn_states(&root),
-            vec!["empty".to_string(), "zeroed".to_string()]
+            vec![
+                "empty's run-state file".to_string(),
+                "zeroed's Paper plugin cache".to_string(),
+                "zeroed's run-state file".to_string()
+            ]
         );
+        assert!(!srv.join("plugins").join(".paper-remapped").exists());
         assert!(!state("zeroed").exists() && !state("empty").exists());
         assert!(state("good").exists() && state("garbage").exists());
         let _ = std::fs::remove_dir_all(&root);
