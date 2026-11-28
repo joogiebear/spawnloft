@@ -59,11 +59,24 @@ user accounts, a remote web panel - stay off it on purpose.
   owner's own config allows them, and deleting a server is not offered at all. Settings shows the
   exact config for the install. Plugin installs now take a snapshot first, in the panel too.
 
-## Later
+- **Databases** *(2.0)* — managed MySQL and a Redis-compatible service (Garnet) per server, each
+  with its own database and user, listening on localhost only. Connection details are shown, never
+  written into a plugin's configuration. Snapshots include a dump; MySQL has its own backups.
+- **Java that picks itself** *(2.0)* — each server uses the newest installed Java that fits its
+  Minecraft version (17, 21 or 25); a version nothing installed can run is refused before any
+  download, with a link to the Java it needs.
+- **The game launcher** *(2.0)* — a Play button for your own server: a setup with a Minecraft
+  version, an optional mod loader and memory, Microsoft sign-in or offline play on a test server,
+  and a way for an allowed assistant to join as a real player.
+- **SpawnLoft 2.0** *(2.0.0, 2026-11-26)* — the whole core is the `spawnloft-core` binary: CLI,
+  panel, game launcher, daemons, bot harness and MCP server. A Tauri shell on the system web view
+  replaces Electron, so no Node runtime ships in any package (Node is needed only for test players,
+  see BOTS.md). A supervisor keeps servers running while the app updates, updates are verified
+  against SpawnLoft's own signing key, and the panel needs a sign-in.
 
-## After 1.0
+## Next
 
-- **A Share screen** *(tabled 2026-09-01, owner's call — likely post-1.0)*. The honest
+- **A Share screen** *(tabled 2026-09-01, owner's call)*. The honest
   answer to "how do my friends join?", in tiers of increasing exposure: the LAN address
   plainly; "direct" keeping a DNS record on the owner's own domain pointed at the home
   IP with SRV for the port and UPnP as an explicit opt-in; "tunnel" via playit.gg or a
@@ -75,9 +88,8 @@ user accounts, a remote web panel - stay off it on purpose.
 
 - **Distribution.** Screenshots in the README, a winget manifest, a public landing.
   People cannot want a tool they cannot find.
-- **macOS.** Signed Apple Silicon and Intel betas now include native scheduling,
-  automatic backups, performance metrics, managed MySQL, and automatic update feeds.
-  Installed upgrade verification gates subsequent signed betas before 1.0.
+- **macOS.** Signed, notarized builds for Apple Silicon (Intel Macs are not supported) with native
+  scheduling, automatic backups, performance metrics, managed MySQL, and automatic update feeds.
 - **Linux.** Ships as a `.deb` and an `.rpm`, for x64 and arm64, with the same panel and CLI: scheduling and automatic
   backups through systemd user timers, performance metrics from `/proc`, managed MySQL (x64) and
   Redis (x64 and arm64), and automatic updates. Every preview installs the package on Ubuntu 24.04
@@ -86,7 +98,4 @@ user accounts, a remote web panel - stay off it on purpose.
   line alone (the Rust `spawnloft-core`, with no Node; in 1.x it carried its own), as a `.deb` and an `.rpm`, installed and run in clean Ubuntu 22.04, Debian 12,
   Rocky 9 and Fedora containers by every build. Still to come: an AppImage - which needs libfuse2, meets Ubuntu's AppArmor sandbox restriction, and mounts at a new path on
   every launch, so its scheduler shims have to go through `$APPIMAGE` before it can ship.
-- **Rust core, no Node** *(2.0)* — the whole core is the `spawnloft-core` binary: CLI, panel, game
-  launcher, daemons, bot harness and MCP server. No Node runtime and no `.mjs` core ships in any
-  package; Node is needed only for test players (Node.js 22 or later, see BOTS.md).
 - Localization.
